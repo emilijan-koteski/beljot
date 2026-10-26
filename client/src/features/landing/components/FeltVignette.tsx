@@ -101,7 +101,7 @@ export function FeltVignette({
         borderRadius: 20,
         overflow: "hidden",
         background:
-          "radial-gradient(ellipse 70% 60% at 50% 42%, var(--felt-scene-top) 0%, var(--felt-scene-mid) 60%, var(--felt-scene-deep) 100%)",
+          "radial-gradient(ellipse 70% 60% at 50% 42%, var(--felt-scene-top) 0%, var(--surface) 60%, var(--bg) 100%)",
         border: "3px solid var(--wood-rim)",
         boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), 0 30px 70px -30px rgba(0,0,0,0.6)",
         ...style,
@@ -190,7 +190,7 @@ export function FeltVignette({
             alignItems: "center",
             gap: 7,
             background: "rgba(10,24,18,0.7)",
-            border: "1px solid var(--border-2)",
+            border: "1px solid var(--brass)",
             padding: "6px 11px",
             borderRadius: 10,
           }}

@@ -98,8 +98,8 @@ export function DeclarationReveal({
           width: "min(520px, calc(100vw - 2rem))",
           overflowY: "auto",
           background: "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)",
-          border: "1px solid rgba(201,168,118,0.55)",
-          boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 rgba(201,168,118,0.22)`,
+          border: "1px solid var(--brass-55)",
+          boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, inset 0 1px 0 var(--brass-25)`,
           color: "var(--ink-light)",
           fontFamily: "var(--font-body)",
         }}
@@ -177,7 +177,7 @@ export function DeclarationReveal({
                 className="flex items-center gap-4 rounded-lg px-3.5 py-3"
                 style={{
                   background: "rgba(0,0,0,0.22)",
-                  border: "1px solid rgba(201,168,118,0.25)",
+                  border: "1px solid var(--brass-25)",
                 }}
               >
                 <div className="flex shrink-0">
@@ -235,8 +235,8 @@ export function DeclarationReveal({
         <div
           className="rounded-lg px-4 py-3 flex items-center justify-between"
           style={{
-            background: "rgba(201,168,118,0.1)",
-            border: "1px solid rgba(201,168,118,0.3)",
+            background: "var(--brass-10)",
+            border: "1px solid var(--brass-25)",
           }}
           data-testid="declaration-reveal-total"
         >

@@ -356,7 +356,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_rgba(201,168,118,0.20)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[22px] border p-0 ring-0 shadow-[0_30px_80px_-40px_rgba(14,58,36,0.30),0_0_0_1px_var(--brass-soft)] sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
@@ -413,7 +413,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     }}
                     aria-label={t("lobby.createRoomModal.roomNameShuffleAria")}
                     data-testid="room-name-shuffle"
-                    className="text-brass-deep bg-brass-soft border-border-2/60 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-[9px] border"
+                    className="text-brass-deep bg-brass-soft border-brass/55 absolute top-1/2 right-1.5 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-[9px] border"
                   >
                     <span
                       key={nameShuffleSpin}
@@ -761,7 +761,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             className="border-border hidden flex-col gap-4 border-t px-9 py-7 md:flex md:min-h-0 md:overflow-y-auto md:border-t-0 md:border-l"
             style={{
               background:
-                "radial-gradient(ellipse 90% 60% at 50% -10%, rgba(201,168,118,0.18), transparent 70%), var(--surface-3)",
+                "radial-gradient(ellipse 90% 60% at 50% -10%, var(--brass-soft), transparent 70%), var(--surface-3)",
             }}
           >
             <Eyebrow>{t("lobby.createRoomModal.preview.title")}</Eyebrow>
@@ -805,7 +805,7 @@ function AdvancedSettings({
     <section
       className={cn(
         "shrink-0 overflow-hidden rounded-[13px] border transition-[border-color,background-color]",
-        open ? "border-border-2 bg-surface-sunken" : "border-border bg-surface-elevated",
+        open ? "border-brass bg-surface-sunken" : "border-border bg-surface-elevated",
       )}
     >
       <button
@@ -824,7 +824,7 @@ function AdvancedSettings({
         {changedCount > 0 && (
           <span
             data-testid="advanced-settings-badge"
-            className="bg-brass-soft text-brass-deep border-border-2/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
+            className="bg-brass-soft text-brass-deep border-brass/40 rounded-full border px-1.75 py-0.5 font-mono text-[10.5px] font-semibold"
           >
             {t("lobby.createRoomModal.advanced.changedCount", { count: changedCount })}
           </span>

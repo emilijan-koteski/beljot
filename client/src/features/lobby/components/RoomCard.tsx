@@ -75,7 +75,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
       style={{ animationDelay: delay }}
       className={cn(
         "bg-surface text-ink relative flex flex-col overflow-hidden rounded-lg border border-border transition-[transform,border-color,box-shadow]",
-        "animate-[card-in_.35s_ease_both] hover:-translate-y-0.5 hover:border-border-2 hover:shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]",
+        "animate-[card-in_.35s_ease_both] hover:-translate-y-0.5 hover:border-brass hover:shadow-[0_18px_40px_-22px_rgba(14,58,36,0.30)]",
       )}
     >
       <div className="px-5 pt-4.5 pb-3">

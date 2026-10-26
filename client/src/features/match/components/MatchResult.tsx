@@ -34,7 +34,7 @@ interface MatchResultProps {
   soundKey?: string | null;
 }
 
-const COIN_LOSS = "#ff8585";
+const COIN_LOSS = "var(--danger-light)";
 
 /**
  * End-of-match overlay with the winner banner, viewer-first scores, and the return-to-room and lobby actions.
@@ -180,8 +180,10 @@ export function MatchResult({
                 className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
                 style={{
                   color: coinWon ? COIN_GOLD : COIN_LOSS,
-                  border: `1px solid ${coinWon ? "rgba(212,160,23,0.4)" : "rgba(255,133,133,0.4)"}`,
-                  background: coinWon ? "rgba(212,160,23,0.08)" : "rgba(255,133,133,0.08)",
+                  border: `1px solid ${coinWon ? "rgba(212,160,23,0.4)" : "color-mix(in srgb, var(--danger-light) 40%, transparent)"}`,
+                  background: coinWon
+                    ? "rgba(212,160,23,0.08)"
+                    : "color-mix(in srgb, var(--danger-light) 8%, transparent)",
                 }}
                 data-testid="match-result-coins"
                 data-coin-delta={coinDelta}
@@ -205,8 +207,8 @@ export function MatchResult({
                     className="font-display inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
                     style={{
                       color: HONOR_TIER_COLOR[tierAfter],
-                      border: "1px solid rgba(201,168,118,0.35)",
-                      background: "rgba(201,168,118,0.08)",
+                      border: "1px solid var(--brass-40)",
+                      background: "var(--brass-10)",
                     }}
                     data-testid="match-result-honor"
                     data-honor-before={honorSettlement.before}
@@ -240,7 +242,7 @@ export function MatchResult({
                 <button
                   type="button"
                   onClick={() => setStatsOpen((v) => !v)}
-                  className="font-body focus-visible:ring-brass/60 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                  className="font-body focus-visible:ring-brass/55 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                   style={{ color: "var(--ink-light)" }}
                   aria-expanded={statsOpen}
                   aria-controls="match-result-stats-panel"

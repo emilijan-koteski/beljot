@@ -82,7 +82,7 @@ export function Avatar({
   let ringColor: string;
   if (team === "A") ringColor = "var(--team-a)";
   else if (team === "B") ringColor = "var(--team-b)";
-  else ringColor = "var(--border-2)";
+  else ringColor = "var(--brass)";
 
   const isProfile = halo === "profile";
   const border = isProfile ? "none" : `2px solid ${ringColor}`;

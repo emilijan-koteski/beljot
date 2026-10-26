@@ -49,14 +49,14 @@ describe("TrumpIndicator", () => {
     render(<TrumpIndicator trumpSuit="H" />);
     const indicator = screen.getByTestId("trump-indicator");
     expect(indicator.textContent).toContain("\u2665");
-    expect(indicator.querySelector(".text-\\(--suit-red-up\\)")?.textContent).toContain("\u2665");
+    expect(indicator.querySelector(".text-danger")?.textContent).toContain("\u2665");
   });
 
   it("renders diamonds suit symbol in red", () => {
     render(<TrumpIndicator trumpSuit="D" />);
     const indicator = screen.getByTestId("trump-indicator");
     expect(indicator.textContent).toContain("\u2666");
-    expect(indicator.querySelector(".text-\\(--suit-red-up\\)")?.textContent).toContain("\u2666");
+    expect(indicator.querySelector(".text-danger")?.textContent).toContain("\u2666");
   });
 
   it("renders clubs suit symbol in primary text color", () => {

@@ -41,7 +41,7 @@ interface ReconnectOverlayProps {
 
 const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
 const RING_PARCHMENT = "#d4d0c4";
-const RING_DANGER = "#e85a5a";
+const RING_DANGER = "var(--danger-light)";
 const RING_SIZE = 132;
 const RING_STROKE_INSET = 4;
 const RING_RADIUS = (RING_SIZE - RING_STROKE_INSET) / 2;
@@ -387,8 +387,8 @@ function DisconnectedPlayerRow({
       className="flex items-center gap-3 px-3 py-2 rounded-xl"
       style={{
         background: "rgba(0,0,0,0.22)",
-        border: "1px solid rgba(201,168,118,0.32)",
-        boxShadow: "inset 0 1px 0 rgba(201,168,118,0.12)",
+        border: "1px solid var(--brass-40)",
+        boxShadow: "inset 0 1px 0 var(--brass-10)",
       }}
     >
       <div
@@ -402,7 +402,7 @@ function DisconnectedPlayerRow({
             position: "absolute",
             inset: 0,
             background:
-              "conic-gradient(from 0deg, rgba(201,168,118,0.85), rgba(156,125,78,0.85), rgba(201,168,118,0.85))",
+              "conic-gradient(from 0deg, var(--brass-85), rgba(156,125,78,0.85), var(--brass-85))",
             padding: 2,
             boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
           }}
@@ -412,7 +412,7 @@ function DisconnectedPlayerRow({
             style={{
               width: "100%",
               height: "100%",
-              background: "var(--avatar-inner, #1f2e23)",
+              background: "var(--avatar-inner)",
               color: "var(--ink-light)",
               fontSize: AVATAR_DISC * 0.5,
             }}
@@ -428,8 +428,8 @@ function DisconnectedPlayerRow({
             width: 12,
             height: 12,
             background: RING_DANGER,
-            border: "2px solid var(--avatar-inner, #1f2e23)",
-            boxShadow: `0 0 8px ${RING_DANGER}aa`,
+            border: "2px solid var(--avatar-inner)",
+            boxShadow: `0 0 8px color-mix(in srgb, ${RING_DANGER} 67%, transparent)`,
           }}
         />
       </div>

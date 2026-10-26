@@ -155,8 +155,8 @@ export function EmotePickerButton({
         aria-pressed={isOpen}
         className={`inline-flex h-9 cursor-pointer items-center rounded-[10px] transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
         style={{
-          background: "var(--panel-hud, rgba(18,32,22,0.85))",
-          border: "1px solid rgba(201,168,118,0.4)",
+          background: "var(--panel-deeper)",
+          border: "1px solid var(--brass-40)",
           color: "var(--ink-light)",
           backdropFilter: "blur(6px)",
           WebkitBackdropFilter: "blur(6px)",
@@ -175,8 +175,8 @@ export function EmotePickerButton({
           className={`absolute right-0 w-44 rounded-lg p-2 shadow-xl ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
           style={{
             zIndex: Z.UTIL,
-            background: "var(--panel-deeper, rgba(18,32,22,0.94))",
-            border: "1px solid rgba(201,168,118,0.4)",
+            background: "var(--panel-deeper)",
+            border: "1px solid var(--brass-40)",
             backdropFilter: "blur(10px)",
             WebkitBackdropFilter: "blur(10px)",
           }}

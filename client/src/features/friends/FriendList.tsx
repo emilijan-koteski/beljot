@@ -102,7 +102,7 @@ export function FriendList() {
                   onClick={() => openWhisper(friend.username)}
                   aria-label={t("friends.whisperAria", { username: friend.username })}
                   title={t("friends.whisperAria", { username: friend.username })}
-                  className="focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-(--whisper-name) transition-colors hover:text-(--whisper-ink) focus-visible:ring-3 focus-visible:outline-none"
+                  className="focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-(--whisper-ink) transition-colors hover:bg-(--whisper-fill) focus-visible:ring-3 focus-visible:outline-none"
                 >
                   <MessageCircle className="size-4" aria-hidden="true" />
                 </button>

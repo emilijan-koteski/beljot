@@ -326,7 +326,7 @@ const MODE_TOKENS: Record<SeatMode, ModeTokens> = {
   },
   neutral: {
     fill: "var(--surface)",
-    edge: "var(--border-2)",
+    edge: "var(--brass)",
     edgeSoft: "var(--border)",
     text: "var(--brass-deep)",
   },

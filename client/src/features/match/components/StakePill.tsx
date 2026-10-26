@@ -23,7 +23,7 @@ export function StakePill({ amount }: StakePillProps) {
       className="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
       style={{
         background: PANEL_BG,
-        border: "1px solid rgba(201,168,118,0.4)",
+        border: "1px solid var(--brass-40)",
         boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",

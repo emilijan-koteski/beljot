@@ -13,7 +13,10 @@ export function WinLoseBar({ winPct }: WinLoseBarProps) {
       <span className="block h-full" style={{ width: `${win}%`, background: "var(--accent)" }} />
       <span
         className="block h-full"
-        style={{ width: `${100 - win}%`, background: "rgba(139,42,31,0.18)" }}
+        style={{
+          width: `${100 - win}%`,
+          background: "color-mix(in srgb, var(--danger) 18%, transparent)",
+        }}
       />
     </div>
   );

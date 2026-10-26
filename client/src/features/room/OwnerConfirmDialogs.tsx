@@ -121,9 +121,11 @@ function OwnerConfirmDialog({
   const { t } = useTranslation();
   const isDanger = tone === "danger";
   const accentColor = isDanger ? "var(--danger)" : "var(--brass-deep)";
-  const badgeBg = isDanger ? "rgba(139,42,31,0.10)" : "var(--brass-soft)";
+  const badgeBg = isDanger
+    ? "color-mix(in srgb, var(--danger) 10%, transparent)"
+    : "var(--brass-soft)";
   const badgeRing = isDanger
-    ? "rgba(139,42,31,0.28)"
+    ? "color-mix(in srgb, var(--danger) 30%, transparent)"
     : "color-mix(in srgb, var(--brass) 45%, transparent)";
 
   return (
@@ -137,10 +139,10 @@ function OwnerConfirmDialog({
           padding: 0,
           overflow: "hidden",
           background: "var(--surface)",
-          border: "1px solid var(--border-2)",
+          border: "1px solid var(--brass)",
           borderRadius: "var(--radius-lg)",
           color: "var(--ink)",
-          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px rgba(201,168,118,0.18)",
+          boxShadow: "0 40px 90px -30px rgba(14,58,36,0.55), 0 0 0 1px var(--brass-soft)",
         }}
       >
         <div
@@ -187,7 +189,7 @@ function OwnerConfirmDialog({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: isDanger ? "none" : "inset 0 0 0 4px rgba(201,168,118,0.10)",
+              boxShadow: isDanger ? "none" : "inset 0 0 0 4px var(--brass-10)",
             }}
           >
             {icon}

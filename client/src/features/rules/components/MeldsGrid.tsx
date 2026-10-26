@@ -14,7 +14,7 @@ const TIER_STYLES: Record<
   },
   1: {
     eyebrow: "var(--brass-deep)",
-    border: "var(--border-2)",
+    border: "var(--brass)",
     tint: "var(--surface)",
     pts: "var(--ink)",
     text: "var(--ink)",
@@ -29,7 +29,7 @@ const TIER_STYLES: Record<
   3: {
     eyebrow: "var(--danger)",
     border: "var(--danger)",
-    tint: "rgba(139,42,31,0.05)",
+    tint: "color-mix(in srgb, var(--danger) 5%, transparent)",
     pts: "var(--danger)",
     text: "var(--danger)",
   },

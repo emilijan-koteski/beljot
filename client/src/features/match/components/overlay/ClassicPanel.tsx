@@ -28,8 +28,10 @@ export function ClassicPanel({
   children,
 }: ClassicPanelProps) {
   const baseShadow =
-    "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px rgba(201,168,118,0.12), inset 0 1px 0 rgba(201,168,118,0.22)";
-  const glowShadow = glowColor ? `0 0 0 2px ${glowColor}88, 0 0 24px ${glowColor}77, ` : "";
+    "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)";
+  const glowShadow = glowColor
+    ? `0 0 0 2px color-mix(in srgb, ${glowColor} 53%, transparent), 0 0 24px color-mix(in srgb, ${glowColor} 47%, transparent), `
+    : "";
 
   return (
     <div
@@ -40,7 +42,7 @@ export function ClassicPanel({
         maxHeight: "calc(100vh - 2rem)",
         borderRadius: 14,
         background: PANEL_BG,
-        border: "1px solid rgba(201,168,118,0.55)",
+        border: "1px solid var(--brass-55)",
         boxShadow: `${glowShadow}${baseShadow}`,
         color: "var(--ink-light)",
         fontFamily: "var(--font-body)",
@@ -51,7 +53,7 @@ export function ClassicPanel({
         <div
           className="shrink-0 px-4 pt-3.5 pb-2.5 sm:px-6 sm:pt-4.5"
           style={{
-            borderBottom: "1px solid rgba(201,168,118,0.22)",
+            borderBottom: "1px solid var(--brass-25)",
           }}
         >
           <div

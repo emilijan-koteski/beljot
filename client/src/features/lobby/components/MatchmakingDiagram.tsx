@@ -63,7 +63,7 @@ export function MatchmakingDiagram({
       style={{
         background: `
           radial-gradient(ellipse 70% 50% at 50% 35%, rgba(25,101,54,0.07), transparent 70%),
-          radial-gradient(ellipse 60% 40% at 50% 115%, rgba(201,168,118,0.12), transparent 70%)`,
+          radial-gradient(ellipse 60% 40% at 50% 115%, var(--brass-10), transparent 70%)`,
       }}
     >
       <Eyebrow tone="accent" className="gap-2">
@@ -107,7 +107,7 @@ export function MatchmakingDiagram({
         }}
       >
         <div
-          className="border-border-2 absolute rounded-full border-2 border-dashed opacity-70"
+          className="border-brass absolute rounded-full border-2 border-dashed opacity-70"
           style={{ inset: "10.53%" }}
         />
         <div

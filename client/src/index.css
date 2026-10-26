@@ -37,7 +37,6 @@
   --color-surface-elevated: var(--surface-2);
   --color-surface-sunken: var(--surface-3);
   --color-border: var(--border);
-  --color-border-2: var(--border-2);
   --color-ring: var(--accent);
 
   /* Text */
@@ -90,7 +89,6 @@
   --surface-2: #ffffff;
   --surface-3: #ebe6d6;
   --border: #d9d1ba;
-  --border-2: #c9a876;
 
   /* ── Ink (text) ───────────────────────────────────────────────────── */
   --ink: #0e3a24;
@@ -107,47 +105,14 @@
   --accent-glow: rgba(25, 101, 54, 0.7);
 
   --brass-deep: #7c633e;
-}
-
-:root {
-  --ink-light: #f5f2e8;
-
-  /* ── Brass (chrome accent) ────────────────────────────────────────── */
-  --brass: #c9a876;
-  --brass-ink: #2a1a08;
-  --brass-soft: rgba(201, 168, 118, 0.18);
-
-  /* ── Bot (frost-blue) ─────────────────────────────────────────────────
-     The single source of truth for "this is a bot". Shared by every bot
-     marker — the match-history "with bots" chip, the seated-bot badge, and
-     the add-bot spawn icon in the waiting room. Deliberately the same cool
-     frost-blue family as the cold-streak callout's ICE tone
-     (StreakCallout.tsx): an off-palette accent that reads distinct from the
-     warm felt-green / brass UI and never says "player". Fixed across scopes
-     (not re-rooted for felt/dark), mirroring the ICE exception. ── */
-  --bot: #2c82ad;
-  --bot-deep: #1f5e80;
-  --bot-soft: #eaf4fa;
-  --bot-edge: rgba(46, 131, 176, 0.32);
-
-  /* ── Teams — viewer-relative (Us = gold, Them = silver) ───────────── */
-  --team-a: #a07d1a;
-  --team-a-fill: #e8c25a;
-  --team-a-tint: rgba(160, 125, 26, 0.1);
-  --team-a-line: rgba(160, 125, 26, 0.05);
-  --team-a-edge: rgba(160, 125, 26, 0.55);
-  --team-a-edge-soft: rgba(160, 125, 26, 0.32);
-
-  --team-b: #8b919a;
-  --team-b-fill: #d8dde4;
-  --team-b-tint: rgba(139, 145, 154, 0.16);
-  --team-b-line: rgba(139, 145, 154, 0.08);
-  --team-b-edge: rgba(139, 145, 154, 0.6);
-  --team-b-edge-soft: rgba(139, 145, 154, 0.38);
-
-  /* ── Status ───────────────────────────────────────────────────────── */
-  --warning: var(--brass-deep);
   --danger: #8b2a1f;
+
+  /* ── Teams — viewer-relative (Us = gold, Them = silver) ─────────────
+     Dark enough to carry text on parchment (4.6:1); felt restores the
+     lighter pair. These are also the Gold and Silver season tiers
+     (`--rt4`, `--rt3`), so the palette holds one gold and one silver. */
+  --team-a: #8a6800;
+  --team-b: #596f8a;
 
   /* ── Honour tier ramp (h1 = worst … h5 = best) ─────────────────────────
      The five honour tiers, as ONE cool→warm scale: deep teal → felt →
@@ -171,24 +136,15 @@
      No `--color-*` alias in `@theme inline` on purpose — like
      `--surface-3` and the `--team-*-tint` family, these are consumed via
      `style={{}}` / `var()` rather than as generated utilities, because
-     the tier is a runtime value and cannot be a static class name. ── */
+     the tier is a runtime value and cannot be a static class name.
+
+     Every tier carries 4.5:1 on parchment, and Problematic IS the danger
+     red rather than a near-copy of it. ── */
   --h5: #0b5a55; /* exemplary  95-100 · deep teal */
-  --h4: #17703d; /* trusted    85-94  · felt      */
-  --h3: #6f7d1f; /* fair       70-84  · olive     */
+  --h4: #3b723e; /* trusted    85-94  · leaf      */
+  --h3: #667412; /* fair       70-84  · olive     */
   --h2: #9a5713; /* unreliable 50-69  · amber     */
-  --h1: #93291c; /* problematic 0-49  · ember     */
-
-  --h5-soft: rgba(11, 90, 85, 0.12);
-  --h4-soft: rgba(23, 112, 61, 0.11);
-  --h3-soft: rgba(111, 125, 31, 0.12);
-  --h2-soft: rgba(154, 87, 19, 0.13);
-  --h1-soft: rgba(147, 41, 28, 0.11);
-
-  --h5-line: rgba(11, 90, 85, 0.32);
-  --h4-line: rgba(23, 112, 61, 0.3);
-  --h3-line: rgba(111, 125, 31, 0.3);
-  --h2-line: rgba(154, 87, 19, 0.42);
-  --h1-line: rgba(147, 41, 28, 0.28);
+  --h1: var(--danger); /* problematic 0-49 · ember */
 
   /* ── Season rank tier ramp (rt1 = Iron … rt8 = Grandmaster) ────────────────
      The eight seasonal rank tiers (Story 13.1). A SEPARATE ramp from the
@@ -206,13 +162,14 @@
      Grandmaster is the accent plus a glow (UX spec: "Grandmaster = accent +
      glow"), which is why `--rt8` points at `--accent` rather than a
      literal: the top of the ladder is the same colour as the app's
-     primary action, and it re-roots to lime on felt for free. ALL THREE
-     Grandmaster tokens derive from `--accent` for that reason -- the fill via
-     `var()`, the soft via `--accent-soft`, and the hairline via
-     `color-mix` off the same token. Hardcoding the accent's RGB in the
-     `-line` value (which is what shipped first) desynced the Grandmaster
-     border from its own fill the moment the accent was retuned, which is
-     precisely the drift this indirection exists to prevent.
+     primary action, and it re-roots to lime on felt for free. Gold and
+     Silver point at the team colours for the same reason. Bronze sits on
+     a redder, quieter hue than the honour ramp's amber so an Unreliable
+     shield and a Bronze badge never read as the same colour.
+
+     Every `-soft` and `-line` companion is a `color-mix` off its tier (see
+     the block below), so a retuned tier can never desync from its own
+     fill and hairline.
 
      Consumed only through the maps in `shared/lib/seasonTier.ts` — no
      component should name these directly, for the reason honor.ts's
@@ -222,38 +179,62 @@
      No `--color-*` alias in `@theme inline`, same as the honour ramp:
      the tier is a RUNTIME value, so it cannot be a static class name. ── */
   --rt1: #5a6068; /* iron      · graphite   */
-  --rt2: #96581f; /* bronze    · burnt      */
-  --rt3: #5f7590; /* silver    · steel blue */
-  --rt4: #a8801c; /* gold      · deep gold  */
-  --rt5: #2f7f7c; /* platinum  · teal       */
+  --rt2: #844d3a; /* bronze    · copper     */
+  --rt3: var(--team-b); /* silver · steel blue */
+  --rt4: var(--team-a); /* gold   · deep gold  */
+  --rt5: #277876; /* platinum  · teal       */
   --rt6: #2a63ad; /* diamond   · sapphire   */
-  --rt7: #6c3a9c; /* master  · violet     */
+  --rt7: #6c3a9c; /* master    · violet     */
   --rt8: var(--accent); /* grandmaster · accent + glow */
 
-  --rt1-soft: rgba(90, 96, 104, 0.12);
-  --rt2-soft: rgba(150, 88, 31, 0.12);
-  --rt3-soft: rgba(95, 117, 144, 0.13);
-  --rt4-soft: rgba(168, 128, 28, 0.13);
-  --rt5-soft: rgba(47, 127, 124, 0.12);
-  --rt6-soft: rgba(42, 99, 173, 0.12);
-  --rt7-soft: rgba(108, 58, 156, 0.12);
-  --rt8-soft: var(--accent-soft);
+  --tier-soft: 12%;
+  --tier-line: 34%;
+}
 
-  --rt1-line: rgba(90, 96, 104, 0.3);
-  --rt2-line: rgba(150, 88, 31, 0.34);
-  --rt3-line: rgba(95, 117, 144, 0.34);
-  --rt4-line: rgba(168, 128, 28, 0.4);
-  --rt5-line: rgba(47, 127, 124, 0.34);
-  --rt6-line: rgba(42, 99, 173, 0.34);
-  --rt7-line: rgba(108, 58, 156, 0.34);
-  --rt8-line: color-mix(in srgb, var(--accent) 45%, transparent);
+:root {
+  /* Scope-stable felt colours, for overlays that portal out of `.game-table`. */
+  --ink-light: #f5f2e8;
+  --danger-light: #ff8585;
+  --accent-light: #00e5a0;
+
+  /* ── Brass (chrome accent) ────────────────────────────────────────── */
+  --brass: #c9a876;
+  --brass-ink: #2a1a08;
+  /* Brass alpha ladder — the only translucent brasses. In class names use
+     the same steps as `brass/10`, `brass/25`, …; `--brass-soft` is the 18% step. */
+  --brass-10: color-mix(in srgb, var(--brass) 10%, transparent);
+  --brass-soft: color-mix(in srgb, var(--brass) 18%, transparent);
+  --brass-25: color-mix(in srgb, var(--brass) 25%, transparent);
+  --brass-40: color-mix(in srgb, var(--brass) 40%, transparent);
+  --brass-55: color-mix(in srgb, var(--brass) 55%, transparent);
+  --brass-85: color-mix(in srgb, var(--brass) 85%, transparent);
+
+  /* ── Bot (frost-blue) ─────────────────────────────────────────────────
+     The single source of truth for "this is a bot". Shared by every bot
+     marker — the match-history "with bots" chip, the seated-bot badge, and
+     the add-bot spawn icon in the waiting room. Deliberately the same cool
+     frost-blue family as the cold-streak callout's ICE tone
+     (StreakCallout.tsx): an off-palette accent that reads distinct from the
+     warm felt-green / brass UI and never says "player". Fixed across scopes
+     (not re-rooted for felt/dark), mirroring the ICE exception. ── */
+  --bot: #2c82ad;
+  --bot-deep: #1f5e80;
+  --bot-soft: #eaf4fa;
+  --bot-edge: rgba(46, 131, 176, 0.32);
+
+  /* ── Team discs — the light gold and silver behind an initial ─────── */
+  --team-a-fill: #e8c25a;
+  --team-b-fill: #d8dde4;
+
+  /* ── Status ───────────────────────────────────────────────────────── */
+  --warning: var(--brass-deep);
 
   /* ── Playing card — intrinsic colours, scope-stable (a card face is the
        same cream on parchment and on felt, so these are NOT re-rooted by
-       `.felt-surface`/`.game-table`). Used by the marketing card graphics. */
-  --card-face: #fbf8ee;
-  --suit-red: #b3261d;
-  --suit-black: #16241c;
+       `.felt-surface`/`.game-table`). Shared by the table and marketing cards. */
+  --card-face: #fdfaf0;
+  --suit-red: #c62828;
+  --suit-black: #1a1a1a;
 
   /* ── Chat dock shadows — themeable so the felt-scoped dock can swap them
        for a heavier black drop shadow (see `.chat-dock-match`). ─────────── */
@@ -262,6 +243,55 @@
 
   /* ── Radius ───────────────────────────────────────────────────────── */
   --radius: 14px;
+}
+
+/* Team companions — resolved per scope like the tier ones below. */
+:root,
+.parchment-inset,
+.game-table,
+.felt-surface {
+  --team-a-tint: color-mix(in srgb, var(--team-a) 10%, transparent);
+  --team-a-line: color-mix(in srgb, var(--team-a) 5%, transparent);
+  --team-a-edge: color-mix(in srgb, var(--team-a) 55%, transparent);
+  --team-a-edge-soft: color-mix(in srgb, var(--team-a) 32%, transparent);
+  --team-b-tint: color-mix(in srgb, var(--team-b) 10%, transparent);
+  --team-b-line: color-mix(in srgb, var(--team-b) 5%, transparent);
+  --team-b-edge: color-mix(in srgb, var(--team-b) 55%, transparent);
+  --team-b-edge-soft: color-mix(in srgb, var(--team-b) 32%, transparent);
+}
+
+/* Tier companions — resolved per scope, so the felt ramp and its `--tier-*`
+   strengths below produce felt tints without restating thirteen pairs. */
+:root,
+.parchment-inset,
+.game-table {
+  --h5-soft: color-mix(in srgb, var(--h5) var(--tier-soft), transparent);
+  --h4-soft: color-mix(in srgb, var(--h4) var(--tier-soft), transparent);
+  --h3-soft: color-mix(in srgb, var(--h3) var(--tier-soft), transparent);
+  --h2-soft: color-mix(in srgb, var(--h2) var(--tier-soft), transparent);
+  --h1-soft: color-mix(in srgb, var(--h1) var(--tier-soft), transparent);
+  --rt1-soft: color-mix(in srgb, var(--rt1) var(--tier-soft), transparent);
+  --rt2-soft: color-mix(in srgb, var(--rt2) var(--tier-soft), transparent);
+  --rt3-soft: color-mix(in srgb, var(--rt3) var(--tier-soft), transparent);
+  --rt4-soft: color-mix(in srgb, var(--rt4) var(--tier-soft), transparent);
+  --rt5-soft: color-mix(in srgb, var(--rt5) var(--tier-soft), transparent);
+  --rt6-soft: color-mix(in srgb, var(--rt6) var(--tier-soft), transparent);
+  --rt7-soft: color-mix(in srgb, var(--rt7) var(--tier-soft), transparent);
+  --rt8-soft: color-mix(in srgb, var(--rt8) var(--tier-soft), transparent);
+
+  --h5-line: color-mix(in srgb, var(--h5) var(--tier-line), transparent);
+  --h4-line: color-mix(in srgb, var(--h4) var(--tier-line), transparent);
+  --h3-line: color-mix(in srgb, var(--h3) var(--tier-line), transparent);
+  --h2-line: color-mix(in srgb, var(--h2) var(--tier-line), transparent);
+  --h1-line: color-mix(in srgb, var(--h1) var(--tier-line), transparent);
+  --rt1-line: color-mix(in srgb, var(--rt1) var(--tier-line), transparent);
+  --rt2-line: color-mix(in srgb, var(--rt2) var(--tier-line), transparent);
+  --rt3-line: color-mix(in srgb, var(--rt3) var(--tier-line), transparent);
+  --rt4-line: color-mix(in srgb, var(--rt4) var(--tier-line), transparent);
+  --rt5-line: color-mix(in srgb, var(--rt5) var(--tier-line), transparent);
+  --rt6-line: color-mix(in srgb, var(--rt6) var(--tier-line), transparent);
+  --rt7-line: color-mix(in srgb, var(--rt7) var(--tier-line), transparent);
+  --rt8-line: color-mix(in srgb, var(--rt8) var(--tier-line), transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -296,8 +326,7 @@
   body:not(.no-halos):not(.game-table) {
     background:
       radial-gradient(ellipse 90% 50% at 50% -15%, rgba(25, 101, 54, 0.07), transparent 70%),
-      radial-gradient(ellipse 70% 40% at 50% 115%, rgba(201, 168, 118, 0.1), transparent 70%),
-      var(--bg);
+      radial-gradient(ellipse 70% 40% at 50% 115%, var(--brass-10), transparent 70%), var(--bg);
     background-attachment: fixed;
   }
 
@@ -328,7 +357,7 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: var(--border-2);
+    background: var(--brass);
     border-radius: 6px;
     border: 2px solid var(--bg);
   }
@@ -375,15 +404,17 @@
   --ink-mute: rgba(245, 242, 232, 0.65);
   --ink-off: rgba(245, 242, 232, 0.35);
 
-  --accent: #00e5a0;
+  --accent: var(--accent-light);
   --accent-deep: #00b07c;
-  --accent-soft: rgba(0, 229, 160, 0.18);
+  --accent-soft: color-mix(in srgb, var(--accent-light) 18%, transparent);
   --accent-ink: #0a1812;
-  --accent-glow: rgba(0, 229, 160, 0.7);
+  --accent-glow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
-  --border: rgba(201, 168, 118, 0.25);
-  --border-2: #c9a876;
+  --border: var(--brass-25);
   --brass-deep: #9c7d4e;
+  --danger: var(--danger-light);
+  --team-a: #a07d1a;
+  --team-b: #8b919a;
 }
 
 .game-table {
@@ -398,22 +429,12 @@
   --wood-base: #5b3a1e;
   --wood-dark: #4a2d17;
 
-  /* Turn / action signal */
-  --turn-lime: #00e5a0;
-  --turn-urgent: #ef4444;
-
   /* Surface panels */
   --panel-dark: rgba(20, 45, 30, 0.85);
   --panel-deeper: rgba(18, 32, 22, 0.94);
-  --panel-hud: rgba(18, 32, 22, 0.85);
 
   /* Avatar inner disc */
   --avatar-inner: #1f2e23;
-
-  /* Card suits */
-  --suit-red: #c62828;
-  --suit-red-up: #ff8585;
-  --suit-black: #1a1a1a;
 
   /* Honour tier ramp — lifted for felt. Same five hues, same order; the
      parchment ramp is unreadable on a dark surface (the #0b5a55 teal in
@@ -427,19 +448,7 @@
   --h4: #7fd39b;
   --h3: #c6c96e;
   --h2: #e0a05a;
-  --h1: #ff8585;
-
-  --h5-soft: rgba(88, 195, 177, 0.16);
-  --h4-soft: rgba(127, 211, 155, 0.16);
-  --h3-soft: rgba(198, 201, 110, 0.16);
-  --h2-soft: rgba(224, 160, 90, 0.18);
-  --h1-soft: rgba(255, 133, 133, 0.16);
-
-  --h5-line: rgba(88, 195, 177, 0.45);
-  --h4-line: rgba(127, 211, 155, 0.45);
-  --h3-line: rgba(198, 201, 110, 0.4);
-  --h2-line: rgba(224, 160, 90, 0.5);
-  --h1-line: rgba(255, 133, 133, 0.45);
+  --h1: var(--danger);
 
   /* Season rank tier ramp — lifted for felt. Same eight hues in the same
      order; the parchment ramp is unreadable on a dark surface (the #5a6068
@@ -450,32 +459,17 @@
      scope-blind map: a rank surface that ends up inside .game-table (the
      tier-up toast fired while the player is still at the table) themes
      itself with no fork and no per-component branch. */
-  --rt1: #a3adb6;
-  --rt2: #d99a5c;
+  --rt1: #93999e;
+  --rt2: #ca8e79;
   --rt3: #9db4d0;
-  --rt4: #e8c25a;
+  --rt4: var(--team-a-fill);
   --rt5: #5fd4cc;
   --rt6: #6ba8f5;
   --rt7: #b98ce8;
   --rt8: var(--accent);
 
-  --rt1-soft: rgba(163, 173, 182, 0.16);
-  --rt2-soft: rgba(217, 154, 92, 0.18);
-  --rt3-soft: rgba(157, 180, 208, 0.16);
-  --rt4-soft: rgba(232, 194, 90, 0.18);
-  --rt5-soft: rgba(95, 212, 204, 0.16);
-  --rt6-soft: rgba(107, 168, 245, 0.16);
-  --rt7-soft: rgba(185, 140, 232, 0.16);
-  --rt8-soft: var(--accent-soft);
-
-  --rt1-line: rgba(163, 173, 182, 0.45);
-  --rt2-line: rgba(217, 154, 92, 0.5);
-  --rt3-line: rgba(157, 180, 208, 0.45);
-  --rt4-line: rgba(232, 194, 90, 0.5);
-  --rt5-line: rgba(95, 212, 204, 0.45);
-  --rt6-line: rgba(107, 168, 245, 0.45);
-  --rt7-line: rgba(185, 140, 232, 0.45);
-  --rt8-line: color-mix(in srgb, var(--accent) 50%, transparent);
+  --tier-soft: 16%;
+  --tier-line: 45%;
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -489,8 +483,8 @@
    same card the profile and the room lobby render.
 
    Only the tokens the felt scopes actually override are restated — brass,
-   bot, team-*, danger and the card-face colours are scope-stable and inherit
-   from :root unchanged.
+   bot, the team discs and the card-face colours are scope-stable and
+   inherit from :root unchanged.
    ────────────────────────────────────────────────────────────────────── */
 .parchment-inset {
   background: var(--bg);
@@ -506,17 +500,15 @@
      • <Button> default (bg-accent/text-accent-ink) → lime CTA on dark
      • <LanguageSelector> (text-ink-dim, border-border) → light + brass border
    Used by the landing hero, CTA band, footer, dark nav, and the FeltVignette.
-   brass-* and team-* are identical across scopes, so they inherit from :root.
+   brass-* and the team discs are identical across scopes, so they inherit from :root.
 
-   `--felt-scene-*` drive the decorative radial scene gradients below; they
-   live here so the gradient utility classes resolve only inside the scope.
+   `--felt-scene-top` lights the decorative radial scene gradients below,
+   which fade through the scope's own `--surface` into `--bg`.
    ────────────────────────────────────────────────────────────────────── */
 .felt-surface {
   /* Decorative felt scene gradient stops (hero / CTA radials) + wood rim
      for the felt-table vignette. */
   --felt-scene-top: #1a5a3a;
-  --felt-scene-mid: #0d2c1d;
-  --felt-scene-deep: #0a1812;
   --wood-rim: #3a2a16;
 
   background: var(--bg);
@@ -528,8 +520,8 @@
   background: radial-gradient(
     ellipse 80% 70% at 50% 8%,
     var(--felt-scene-top) 0%,
-    var(--felt-scene-mid) 48%,
-    var(--felt-scene-deep) 100%
+    var(--surface) 48%,
+    var(--bg) 100%
   );
 }
 
@@ -538,8 +530,8 @@
   background: radial-gradient(
     ellipse 70% 90% at 50% 100%,
     var(--felt-scene-top) 0%,
-    var(--felt-scene-mid) 55%,
-    var(--felt-scene-deep) 100%
+    var(--surface) 55%,
+    var(--bg) 100%
   );
 }
 
@@ -559,7 +551,6 @@
   --surface: var(--panel-deeper); /* frosted dark panel */
   --surface-2: rgba(255, 255, 255, 0.04); /* bubble / input fill */
   --border: rgba(180, 220, 200, 0.12); /* felt-tinted hairline */
-  --border-2: var(--brass);
   --accent: var(--brass);
   --accent-deep: var(--brass-deep);
   --accent-soft: var(--brass-soft);
@@ -577,38 +568,27 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   Whisper bubbles (Story 11.4) — a pink tint distinct from the accent /
-   team palettes, marking private friend messages in the ChatDock. The
-   default set reads on the parchment lobby/room dock; `.chat-dock-match`
-   re-points to a brighter pink that reads on the dark felt match dock,
-   mirroring how the match skin re-points the accent family above.
+   Whisper bubbles — a pink tint distinct from the accent /
+   team palettes, marking private friend messages in the ChatDock. One ink
+   per scope colours the sender name, the bubble text and the count-badge
+   fill; fill, border and glow are mixed from it. `.chat-dock-match`
+   re-points it to a light pink that reads on the dark felt dock. Badge ink
+   contrast at 9–11px bold: #ffffff on #a83d70 = 5.9:1, #3d0f26 on #f2b8d4
+   = 9.7:1.
    ────────────────────────────────────────────────────────────────────── */
 :root {
-  --whisper-fill: rgba(194, 86, 138, 0.12);
-  --whisper-border: rgba(194, 86, 138, 0.4);
   --whisper-ink: #a83d70;
-  --whisper-name: #c2568a;
-  /* Count-badge trio, shared by the closed FAB's whisper chip and the open
-     dock's per-friend tab badge, so both read as one system. Split from
-     `--whisper-name` because a fill needs its own ink AND its own halo: the
-     felt skin's bright pink below cannot carry white text, and a fixed glow
-     would leave a dark lobby halo around that bright fill. Contrast measured
-     against the 11px/9px bold these carry: #ffffff on #b0416f = 5.48:1, and on
-     felt #3d0f26 on #f2b8d4 = 9.72:1 — both clear of the 4.5:1 WCAG AA floor.
-     Reusing `--whisper-name`'s #c2568a here would have been 4.21:1, and the
-     tab badge's old white-on-#f2b8d4 in-game was 1.67:1. */
-  --whisper-badge: #b0416f;
   --whisper-badge-ink: #ffffff;
-  --whisper-badge-glow: rgba(176, 65, 111, 0.55);
 }
 .chat-dock-match {
-  --whisper-fill: rgba(240, 168, 204, 0.16);
-  --whisper-border: rgba(240, 168, 204, 0.45);
   --whisper-ink: #f2b8d4;
-  --whisper-name: #f2b8d4;
-  --whisper-badge: #f2b8d4;
   --whisper-badge-ink: #3d0f26;
-  --whisper-badge-glow: rgba(242, 184, 212, 0.55);
+}
+:root,
+.chat-dock-match {
+  --whisper-fill: color-mix(in srgb, var(--whisper-ink) 12%, transparent);
+  --whisper-border: color-mix(in srgb, var(--whisper-ink) 42%, transparent);
+  --whisper-glow: color-mix(in srgb, var(--whisper-ink) 55%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────

@@ -75,7 +75,10 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
               style={
                 m.won
                   ? { background: "var(--accent-soft)", color: "var(--accent)" }
-                  : { background: "rgba(139,42,31,0.1)", color: "var(--danger)" }
+                  : {
+                      background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+                      color: "var(--danger)",
+                    }
               }
             >
               {m.won ? labels.won : labels.lost}

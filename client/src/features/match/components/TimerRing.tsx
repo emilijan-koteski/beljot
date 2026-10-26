@@ -17,8 +17,8 @@ const SIZE_CONFIG = {
   button: { px: 36, strokeWidth: 2, labelClass: "text-[10px]" },
 } as const;
 
-const COLOR_LIME = "var(--turn-lime, #00e5a0)";
-const COLOR_URGENT = "var(--turn-urgent, #ef4444)";
+const COLOR_LIME = "var(--accent)";
+const COLOR_URGENT = "var(--danger)";
 
 /**
  * SVG countdown ring around a seat avatar or an action button.

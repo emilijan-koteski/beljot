@@ -12,13 +12,13 @@ type Props = {
 const LIGHT = {
   color: "var(--brass-deep)",
   background: "var(--brass-soft)",
-  border: "1px solid var(--border-2)",
+  border: "1px solid var(--brass)",
 };
 
 const DARK = {
-  color: "#c9a876",
-  background: "rgba(201,168,118,0.14)",
-  border: "1px solid rgba(201,168,118,0.42)",
+  color: "var(--brass)",
+  background: "var(--brass-10)",
+  border: "1px solid var(--brass-40)",
 };
 
 /**

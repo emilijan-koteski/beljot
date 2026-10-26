@@ -35,12 +35,11 @@ const PANEL_ID = "rules-dialog-panel";
 const tabId = (v: Variant) => `rules-dialog-tab-${v}`;
 
 const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
-const BRASS = "#c9a876";
-const INK = "#f5f2e8";
+const BRASS = "var(--brass)";
+const INK = "var(--ink-light)";
 const TEXT = "rgba(245,242,232,0.88)";
 const TEXT_DIM = "rgba(245,242,232,0.66)";
-const TEXT_FAINT = "rgba(245,242,232,0.5)";
-const GREEN = "#00e5a0";
+const GREEN = "var(--accent-light)";
 
 type DarkRulesValue = { content: RulesContent; variant: Variant };
 const DarkRulesCtx = createContext<DarkRulesValue | null>(null);
@@ -118,9 +117,9 @@ export function RulesDialog({
               maxHeight: "88vh",
               borderRadius: 14,
               background: PANEL_BG,
-              border: "1px solid rgba(201,168,118,0.55)",
+              border: "1px solid var(--brass-55)",
               boxShadow:
-                "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px rgba(201,168,118,0.12), inset 0 1px 0 rgba(201,168,118,0.22)",
+                "0 20px 60px rgba(0,0,0,0.7), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
               color: INK,
             }}
           >
@@ -128,7 +127,7 @@ export function RulesDialog({
               className="flex shrink-0 items-center gap-3"
               style={{
                 padding: "16px 20px 14px",
-                borderBottom: "1px solid rgba(201,168,118,0.22)",
+                borderBottom: "1px solid var(--brass-25)",
               }}
             >
               <BookOpen size={18} style={{ color: BRASS }} aria-hidden="true" />
@@ -166,7 +165,7 @@ export function RulesDialog({
                 className="hidden shrink-0 flex-col gap-0.5 md:flex"
                 style={{
                   width: 200,
-                  borderRight: "1px solid rgba(201,168,118,0.22)",
+                  borderRight: "1px solid var(--brass-25)",
                   padding: "14px 10px",
                   background: "rgba(10,22,15,0.30)",
                 }}
@@ -196,16 +195,16 @@ export function RulesDialog({
                       className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-[7px] text-left transition-colors"
                       style={{
                         padding: "8px 10px",
-                        background: on ? "rgba(201,168,118,0.18)" : "transparent",
-                        border: on ? "1px solid rgba(201,168,118,0.4)" : "1px solid transparent",
-                        color: on ? INK : "rgba(245,242,232,0.75)",
+                        background: on ? "var(--brass-soft)" : "transparent",
+                        border: on ? "1px solid var(--brass-40)" : "1px solid transparent",
+                        color: on ? INK : TEXT_DIM,
                       }}
                     >
                       <span
                         style={{
                           fontFamily: "var(--font-body)",
                           fontSize: 10.5,
-                          color: on ? BRASS : TEXT_FAINT,
+                          color: on ? BRASS : TEXT_DIM,
                           letterSpacing: 0.5,
                           fontWeight: 600,
                         }}
@@ -273,10 +272,8 @@ export function RulesDialog({
                           padding: "5px 11px",
                           fontSize: 12.5,
                           fontWeight: on ? 600 : 500,
-                          background: on ? "rgba(201,168,118,0.18)" : "transparent",
-                          border: on
-                            ? "1px solid rgba(201,168,118,0.45)"
-                            : "1px solid rgba(201,168,118,0.20)",
+                          background: on ? "var(--brass-soft)" : "transparent",
+                          border: on ? "1px solid var(--brass-40)" : "1px solid var(--brass-soft)",
                           color: on ? INK : TEXT_DIM,
                         }}
                       >
@@ -321,7 +318,7 @@ export function RulesDialog({
               className="flex shrink-0 items-center justify-end"
               style={{
                 padding: "12px 20px",
-                borderTop: "1px solid rgba(201,168,118,0.22)",
+                borderTop: "1px solid var(--brass-25)",
                 background: "rgba(10,22,15,0.30)",
               }}
             >
@@ -348,8 +345,8 @@ function TableRuleNote({ testId, children }: { testId: string; children: React.R
     <div
       className="mt-3 rounded-lg px-3 py-2.5"
       style={{
-        background: "rgba(201,168,118,0.10)",
-        border: "1px solid rgba(201,168,118,0.32)",
+        background: "var(--brass-10)",
+        border: "1px solid var(--brass-40)",
         fontFamily: "var(--font-body)",
         fontSize: 12.5,
         lineHeight: 1.5,
@@ -380,7 +377,7 @@ function DarkChapter({
         flexDirection: "column",
         gap: 14,
         padding: "22px 0 20px",
-        borderTop: idx === 0 ? "none" : "1px solid rgba(201,168,118,0.16)",
+        borderTop: idx === 0 ? "none" : "1px solid var(--brass-soft)",
       }}
     >
       <header style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -451,7 +448,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
           style={{
             padding: "11px 14px",
             background: "rgba(20,46,28,0.55)",
-            border: "1px solid rgba(201,168,118,0.25)",
+            border: "1px solid var(--brass-25)",
             borderLeft: `3px solid ${GREEN}`,
             borderRadius: 8,
           }}
@@ -477,8 +474,8 @@ function DarkBlock({ block }: { block: RuleBlock }) {
         <div
           style={{
             padding: "10px 12px",
-            background: "rgba(201,168,118,0.10)",
-            border: "1px dashed rgba(201,168,118,0.40)",
+            background: "var(--brass-10)",
+            border: "1px dashed var(--brass-40)",
             borderRadius: 8,
             display: "flex",
             gap: 10,
@@ -532,7 +529,7 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                   gap: 12,
                   padding: "10px 12px",
                   background: "rgba(20,46,28,0.45)",
-                  border: "1px solid rgba(201,168,118,0.18)",
+                  border: "1px solid var(--brass-soft)",
                   borderRadius: 8,
                 }}
               >
@@ -544,8 +541,8 @@ function DarkBlock({ block }: { block: RuleBlock }) {
                     width: 24,
                     height: 24,
                     borderRadius: 6,
-                    background: "rgba(201,168,118,0.18)",
-                    border: "1px solid rgba(201,168,118,0.35)",
+                    background: "var(--brass-soft)",
+                    border: "1px solid var(--brass-40)",
                     fontFamily: "var(--font-body)",
                     fontSize: 11,
                     fontWeight: 700,
@@ -629,14 +626,12 @@ function DarkCardLadder({
     <div
       style={{
         background: "rgba(10,22,15,0.45)",
-        border: "1px solid rgba(201,168,118,0.22)",
+        border: "1px solid var(--brass-25)",
         borderRadius: 10,
         overflow: "hidden",
       }}
     >
-      <header
-        style={{ padding: "10px 12px 8px", borderBottom: "1px solid rgba(201,168,118,0.18)" }}
-      >
+      <header style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--brass-soft)" }}>
         <div
           style={{
             fontFamily: "var(--font-body)",
@@ -672,8 +667,10 @@ function DarkCardLadder({
                 gridTemplateColumns: "34px 1fr 40px",
                 alignItems: "center",
                 padding: "6px 12px",
-                borderTop: i === 0 ? "none" : "1px solid rgba(201,168,118,0.10)",
-                background: top ? "rgba(0,229,160,0.06)" : "transparent",
+                borderTop: i === 0 ? "none" : "1px solid var(--brass-10)",
+                background: top
+                  ? "color-mix(in srgb, var(--accent-light) 6%, transparent)"
+                  : "transparent",
               }}
             >
               <span
@@ -685,8 +682,10 @@ function DarkCardLadder({
                   height: 26,
                   padding: "0 4px",
                   borderRadius: 5,
-                  background: top ? "rgba(0,229,160,0.10)" : "rgba(245,242,232,0.06)",
-                  border: `1px solid ${top ? `${accent}88` : "rgba(245,242,232,0.18)"}`,
+                  background: top
+                    ? "color-mix(in srgb, var(--accent-light) 10%, transparent)"
+                    : "rgba(245,242,232,0.06)",
+                  border: `1px solid ${top ? `color-mix(in srgb, ${accent} 53%, transparent)` : "rgba(245,242,232,0.18)"}`,
                   fontFamily: "var(--font-body)",
                   fontWeight: 700,
                   fontSize: 12,
@@ -699,13 +698,13 @@ function DarkCardLadder({
                 style={{
                   marginLeft: 10,
                   fontSize: 12.5,
-                  color: top ? INK : "rgba(245,242,232,0.78)",
+                  color: top ? INK : TEXT,
                   fontWeight: top ? 600 : 500,
                 }}
               >
                 {r.name}
                 {r.note ? (
-                  <span style={{ color: TEXT_FAINT, fontStyle: "italic" }}> · {r.note}</span>
+                  <span style={{ color: TEXT_DIM, fontStyle: "italic" }}> · {r.note}</span>
                 ) : null}
               </span>
               <span
@@ -716,7 +715,7 @@ function DarkCardLadder({
                   fontFamily: "var(--font-body)",
                   fontSize: 12.5,
                   fontWeight: 600,
-                  color: r.pts > 0 ? INK : "rgba(245,242,232,0.4)",
+                  color: r.pts > 0 ? INK : TEXT_DIM,
                 }}
               >
                 {r.pts}
@@ -756,8 +755,10 @@ function DarkMeldChip({
       data-testid={`rules-meld-${meld.id}`}
       style={{
         padding: "10px 12px",
-        background: jackpot ? "rgba(0,229,160,0.06)" : "rgba(10,22,15,0.45)",
-        border: `1px solid ${jackpot ? "rgba(0,229,160,0.35)" : "rgba(201,168,118,0.22)"}`,
+        background: jackpot
+          ? "color-mix(in srgb, var(--accent-light) 6%, transparent)"
+          : "rgba(10,22,15,0.45)",
+        border: `1px solid ${jackpot ? "color-mix(in srgb, var(--accent-light) 35%, transparent)" : "var(--brass-25)"}`,
         borderRadius: 8,
         display: "flex",
         flexDirection: "column",
@@ -785,7 +786,7 @@ function DarkMeldChip({
           >
             +{meld.pts}
           </span>
-          <span style={{ fontSize: 10, color: TEXT_FAINT }}>{ptsLabel}</span>
+          <span style={{ fontSize: 10, color: TEXT_DIM }}>{ptsLabel}</span>
         </span>
       </div>
       <div
@@ -800,9 +801,7 @@ function DarkMeldChip({
       >
         {kindLabel}
       </div>
-      <div style={{ fontSize: 11.5, lineHeight: 1.45, color: "rgba(245,242,232,0.72)" }}>
-        {meld.summary}
-      </div>
+      <div style={{ fontSize: 11.5, lineHeight: 1.45, color: TEXT_DIM }}>{meld.summary}</div>
     </div>
   );
 }

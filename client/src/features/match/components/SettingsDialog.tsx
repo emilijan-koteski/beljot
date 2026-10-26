@@ -39,7 +39,7 @@ const DECKS = [
   { code: "croatian", labelKey: "cardDeck.croatian" },
 ] as const satisfies ReadonlyArray<{ code: CardDeck; labelKey: string }>;
 
-const BRASS = "#c9a876";
+const BRASS = "var(--brass)";
 
 /**
  * One brass radio row. Shared by the Language and Card Deck sections rather than
@@ -66,14 +66,14 @@ function SettingRow({
       data-testid={testId}
       className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
       style={{
-        border: selected ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.32)",
+        border: selected ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
         background: selected
           ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
           : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
         color: "var(--ink-light)",
         boxShadow: selected
-          ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
-          : "inset 0 1px 0 rgba(201,168,118,0.10)",
+          ? "inset 0 1px 0 var(--brass-25), 0 0 0 1px var(--brass-25)"
+          : "inset 0 1px 0 var(--brass-10)",
       }}
     >
       <span
@@ -90,8 +90,8 @@ function SettingRow({
             width: 7,
             height: 7,
             background: selected ? BRASS : "transparent",
-            border: selected ? "none" : "1px solid rgba(201,168,118,0.45)",
-            boxShadow: selected ? "0 0 6px rgba(201,168,118,0.55)" : "none",
+            border: selected ? "none" : "1px solid var(--brass-40)",
+            boxShadow: selected ? "0 0 6px var(--brass-55)" : "none",
             flexShrink: 0,
           }}
         />
@@ -133,14 +133,14 @@ function SettingSwitchRow({
       data-testid={testId}
       className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
       style={{
-        border: checked ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.32)",
+        border: checked ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
         background: checked
           ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
           : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
         color: "var(--ink-light)",
         boxShadow: checked
-          ? "inset 0 1px 0 rgba(201,168,118,0.22), 0 0 0 1px rgba(201,168,118,0.25)"
-          : "inset 0 1px 0 rgba(201,168,118,0.10)",
+          ? "inset 0 1px 0 var(--brass-25), 0 0 0 1px var(--brass-25)"
+          : "inset 0 1px 0 var(--brass-10)",
       }}
     >
       <span
@@ -158,9 +158,9 @@ function SettingSwitchRow({
         style={{
           width: 34,
           height: 18,
-          background: checked ? "rgba(201,168,118,0.85)" : "rgba(0,0,0,0.3)",
-          border: checked ? `1px solid ${BRASS}` : "1px solid rgba(201,168,118,0.45)",
-          boxShadow: checked ? "0 0 6px rgba(201,168,118,0.45)" : "none",
+          background: checked ? "var(--brass-85)" : "rgba(0,0,0,0.3)",
+          border: checked ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
+          boxShadow: checked ? "0 0 6px var(--brass-40)" : "none",
         }}
       >
         <span
@@ -169,7 +169,7 @@ function SettingSwitchRow({
             left: 2,
             width: 12,
             height: 12,
-            background: checked ? "#1d3a26" : "rgba(201,168,118,0.6)",
+            background: checked ? "#1d3a26" : "var(--brass-55)",
             transform: checked ? "translateX(16px)" : "none",
           }}
         />
@@ -211,9 +211,9 @@ function SettingVolumeRow({
         aria-label={label}
         getAriaValueText={(v) => `${v}%`}
         className="data-disabled:opacity-100"
-        trackClassName="bg-[rgba(0,0,0,0.3)] shadow-[inset_0_0_0_1px_rgba(201,168,118,0.45)]"
-        indicatorClassName="bg-[rgba(201,168,118,0.85)]"
-        thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_rgba(201,168,118,0.45)] has-[:focus-visible]:ring-[rgba(201,168,118,0.5)]"
+        trackClassName="bg-[rgba(0,0,0,0.3)] shadow-[inset_0_0_0_1px_var(--brass-40)]"
+        indicatorClassName="bg-brass/85"
+        thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_var(--brass-40)] has-[:focus-visible]:ring-brass/55"
       />
       <span
         aria-hidden

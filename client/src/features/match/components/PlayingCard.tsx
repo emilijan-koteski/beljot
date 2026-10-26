@@ -49,8 +49,8 @@ function warmDeck(deck: CardDeck): void {
 
 const BACK_RADIUS = 6;
 
-const DEFAULT_GLOW = "var(--turn-lime, #00e5a0)";
-const DEFAULT_GLOW_HALO = "rgba(0, 229, 160, 0.8)";
+const DEFAULT_GLOW = "var(--accent)";
+const DEFAULT_GLOW_HALO = "color-mix(in srgb, var(--accent) 80%, transparent)";
 
 /**
  * Playing card drawn from the player's active deck, in playable, unplayable, or face-down state.
@@ -103,7 +103,7 @@ export function PlayingCard({
   };
 
   const stateClasses = isPlayable
-    ? "motion-safe:translate-y-[-10px] cursor-pointer motion-safe:hover:translate-y-[-14px] focus-visible:ring-2 focus-visible:ring-[color:var(--turn-lime)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--felt-deep)]"
+    ? "motion-safe:translate-y-[-10px] cursor-pointer motion-safe:hover:translate-y-[-14px] focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--felt-deep)]"
     : isUnplayable
       ? "motion-safe:translate-y-[4px] cursor-not-allowed"
       : "";
@@ -139,7 +139,7 @@ export function PlayingCard({
           borderRadius: BACK_RADIUS,
           background: CARD_BACK_BACKGROUND,
           border: "2px solid var(--brass)",
-          boxShadow: `${playableGlow}, inset 0 0 0 1px rgba(201,168,118,0.35)`,
+          boxShadow: `${playableGlow}, inset 0 0 0 1px var(--brass-40)`,
         }}
       >
         <CardBackFace width={dims.width} radius={BACK_RADIUS} />

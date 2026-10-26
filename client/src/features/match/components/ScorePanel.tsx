@@ -24,7 +24,7 @@ interface ScorePanelProps {
 }
 
 const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
-const PANEL_BORDER = "1px solid rgba(201,168,118,0.4)";
+const PANEL_BORDER = "1px solid var(--brass-40)";
 const INK = "var(--ink-light)";
 const BRASS_LABEL = "var(--brass)";
 

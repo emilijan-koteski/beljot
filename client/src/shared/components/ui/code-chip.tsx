@@ -46,7 +46,7 @@ export function CodeChip({
           dense ? "px-2.5 py-1 text-[13px]" : "px-3 py-2 text-[13px]",
           copied
             ? "border-accent bg-accent-soft text-accent-deep"
-            : "border-border-2 bg-surface-elevated text-ink hover:border-accent/50",
+            : "border-brass bg-surface-elevated text-ink hover:border-accent/50",
           interactive && "cursor-pointer",
           className,
         )}
@@ -77,7 +77,7 @@ export function CodeChip({
         "inline-flex items-stretch overflow-hidden rounded-[10px] border transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
         copied
           ? "border-accent bg-accent-soft"
-          : "border-border-2 bg-surface-elevated hover:border-accent/50",
+          : "border-brass bg-surface-elevated hover:border-accent/50",
         interactive && "cursor-pointer",
         className,
       )}

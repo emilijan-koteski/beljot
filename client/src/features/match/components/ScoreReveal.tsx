@@ -277,8 +277,8 @@ export function ScoreReveal({
             <div
               className="rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 mt-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4"
               style={{
-                background: "rgba(201,168,118,0.1)",
-                border: "1px solid rgba(201,168,118,0.3)",
+                background: "var(--brass-10)",
+                border: "1px solid var(--brass-25)",
               }}
               data-testid="row-match-total"
             >

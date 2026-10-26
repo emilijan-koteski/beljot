@@ -22,9 +22,9 @@ export function CardBackFace({ width, radius }: { width: number; radius: number 
         style={{
           inset,
           borderRadius: Math.max(0, radius - inset),
-          border: "1px solid rgba(201,168,118,0.45)",
+          border: "1px solid var(--brass-40)",
           backgroundImage:
-            "repeating-linear-gradient(45deg, transparent 0 6px, rgba(201,168,118,0.1) 6px 7px)",
+            "repeating-linear-gradient(45deg, transparent 0 6px, var(--brass-10) 6px 7px)",
         }}
       />
       <div

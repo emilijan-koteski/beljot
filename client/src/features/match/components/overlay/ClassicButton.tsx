@@ -19,7 +19,7 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
     const isPrimary = variant === "primary";
 
     const baseStyle: React.CSSProperties = {
-      border: isPrimary ? "1px solid rgba(201,168,118,0.85)" : "1px solid rgba(201,168,118,0.4)",
+      border: isPrimary ? "1px solid var(--brass-85)" : "1px solid var(--brass-40)",
       background: isPrimary
         ? "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)"
         : "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
@@ -31,7 +31,7 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.4 : 1,
       boxShadow: isPrimary
-        ? "0 4px 10px rgba(201,168,118,0.4), inset 0 1px 0 rgba(255,255,255,0.3)"
+        ? "0 4px 10px var(--brass-40), inset 0 1px 0 rgba(255,255,255,0.3)"
         : "0 2px 6px rgba(0,0,0,0.3)",
       transition: `transform ${MOTION.BUTTON_HOVER}ms, filter ${MOTION.BUTTON_HOVER}ms`,
       ...style,

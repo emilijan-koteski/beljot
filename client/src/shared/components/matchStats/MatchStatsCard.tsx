@@ -46,15 +46,15 @@ function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
         labelKey: "profile.matchHistory.outcomeWin",
       },
       loss: {
-        bg: "rgba(139,42,31,0.10)",
+        bg: "color-mix(in srgb, var(--danger) 10%, transparent)",
         color: "var(--danger)",
-        border: "rgba(139,42,31,0.30)",
+        border: "color-mix(in srgb, var(--danger) 30%, transparent)",
         labelKey: "profile.matchHistory.outcomeLoss",
       },
       abandoned: {
         bg: "var(--brass-soft)",
         color: "var(--brass-deep)",
-        border: "rgba(201,168,118,0.40)",
+        border: "var(--brass-40)",
         labelKey: "profile.matchHistory.outcomeAbandoned",
       },
     };
@@ -142,9 +142,9 @@ function HandNotes({
         <span
           className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold tracking-[0.5px]"
           style={{
-            background: "rgba(139,42,31,0.10)",
+            background: "color-mix(in srgb, var(--danger) 10%, transparent)",
             color: "var(--danger)",
-            border: "1px solid rgba(139,42,31,0.30)",
+            border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
           }}
           data-testid="match-history-hand-failed"
         >
@@ -489,7 +489,7 @@ export function MatchStatsCard({
 
   return (
     <li
-      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-border-2 hover:shadow-[0_8px_22px_-10px_rgba(14,58,36,0.30)]"
+      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-[0_8px_22px_-10px_rgba(14,58,36,0.30)]"
       data-testid="match-history-row"
       data-match-id={match.id}
     >

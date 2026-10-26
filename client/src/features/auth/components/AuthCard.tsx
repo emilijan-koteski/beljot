@@ -109,7 +109,7 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
               ? "bg-accent border-accent text-accent-ink"
               : invalid
                 ? "bg-surface-elevated border-danger"
-                : "bg-surface-elevated border-border-2",
+                : "bg-surface-elevated border-brass",
           )}
         >
           {checked && <Check className="size-3" strokeWidth={3} />}

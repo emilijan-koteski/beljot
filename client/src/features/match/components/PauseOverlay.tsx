@@ -68,9 +68,9 @@ export function PauseOverlay({
                   key={player.seat}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg"
                   style={{
-                    background: isPaused ? "rgba(201,168,118,0.14)" : "rgba(0,0,0,0.18)",
+                    background: isPaused ? "var(--brass-10)" : "rgba(0,0,0,0.18)",
                     border: isPaused
-                      ? "1px solid rgba(201,168,118,0.45)"
+                      ? "1px solid var(--brass-40)"
                       : "1px solid rgba(255,255,255,0.05)",
                   }}
                   data-testid={isPaused ? `pause-player-${player.seat}` : undefined}
@@ -146,10 +146,11 @@ export function PauseOverlay({
                 data-testid="pause-owner-resume-button"
                 className="w-full"
                 style={{
-                  border: "1px solid rgba(255,133,133,0.45)",
+                  border: "1px solid color-mix(in srgb, var(--danger-light) 45%, transparent)",
                   color: "#ffb1a8",
                   background: "linear-gradient(180deg, rgba(70,32,32,0.55), rgba(40,18,18,0.45))",
-                  boxShadow: "inset 0 1px 0 rgba(255,133,133,0.18)",
+                  boxShadow:
+                    "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 18%, transparent)",
                   padding: "8px 14px",
                   fontSize: 13,
                 }}
