@@ -217,6 +217,8 @@ func TestSearchAppliesGates(t *testing.T) {
 	}{
 		{"trick 3 from trick 3", 3, func(v *bot.View) {}, true},
 		{"trick 2 from trick 3", 3, func(v *bot.View) { v.TrickNumber = 2 }, false},
+		{"trick 2 from trick 1 has no samples", 1, func(v *bot.View) { v.TrickNumber = 2 }, false},
+		{"trick 3 from trick 1", 1, func(v *bot.View) {}, true},
 		{"from trick 0 never searches", 0, func(v *bot.View) {}, false},
 		{"one legal card", 3, func(v *bot.View) { v.LegalCards = v.LegalCards[:1] }, false},
 		{"pending belote", 3, func(v *bot.View) { v.PendingBelot = true }, false},

@@ -25,8 +25,8 @@ type SearchResult struct {
 	SE      float64
 }
 
-// SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on, on the seat's
-// own turn in the playing phase with a real choice, and not when a team could still end the match inside this hand.
+// SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on and only where
+// the schedule has samples, on the seat's own turn with a real choice, and not when a team could end the match.
 func SearchApplies(v View, fromTrick int) bool {
 	if fromTrick <= 0 || v.Phase != game.PhasePlaying || v.TrumpSuit == nil || v.ActivePlayerSeat != v.Seat {
 		return false
@@ -34,7 +34,7 @@ func SearchApplies(v View, fromTrick int) bool {
 	if v.PendingBelot || v.AwaitingDeclaration || v.PartnerProposedSurrender {
 		return false
 	}
-	if len(v.LegalCards) <= 1 || v.TrickNumber < fromTrick {
+	if len(v.LegalCards) <= 1 || v.TrickNumber < fromTrick || search.SamplesForTrick(v.TrickNumber) == 0 {
 		return false
 	}
 	return !withinStopAtTargetReach(v)
