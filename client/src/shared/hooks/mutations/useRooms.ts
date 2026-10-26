@@ -49,7 +49,7 @@ export function useJoinRoomMutation() {
 }
 
 /**
- * Invite a friend into a waiting room and refresh its invitable-friends roster.
+ * Invite a friend or lobby player into a waiting room and refresh both invite lists.
  * Errors are left to the caller, which renders them inline per row.
  */
 export function useInviteToRoomMutation() {
@@ -58,6 +58,7 @@ export function useInviteToRoomMutation() {
     mutationFn: ({ roomId, friendUserId }) => inviteToRoom(roomId, friendUserId),
     onSuccess: (_data, { roomId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.invitableFriends(roomId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.invitablePlayersAll(roomId) });
     },
   });
 }

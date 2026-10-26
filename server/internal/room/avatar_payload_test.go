@@ -218,6 +218,31 @@ func TestListInvitableFriends_CarriesAvatarURL(t *testing.T) {
 	assert.Nil(t, byID[201]["avatarUrl"])
 }
 
+func TestListInvitablePlayers_CarriesAvatarURL(t *testing.T) {
+	h := setupInviteTest(nil)
+	seedInviteRoom(t, h.repo, 100, "", 0, true)
+	h.idleInLobby(200, "pictured")
+	h.idleInLobby(201, "plain")
+	pictured := h.players.players[200]
+	pictured.AvatarURL = strPtr(avatarP2)
+	h.players.players[200] = pictured
+
+	rec := doListInvitablePlayers(h.e, "1", validToken(100), "")
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		Data []map[string]any `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	byID := map[float64]map[string]any{}
+	for _, p := range resp.Data {
+		byID[p["userId"].(float64)] = p
+	}
+	require.Len(t, byID, 2)
+	assert.Equal(t, avatarP2, byID[200]["avatarUrl"])
+	require.Contains(t, byID[201], "avatarUrl")
+	assert.Nil(t, byID[201]["avatarUrl"])
+}
+
 // The JOINs behind every roster read, and the owner hydration, turn the
 // stored users.avatar_key into the public 128 URL (DB-backed).
 func TestGormRepository_RosterReadsCarryAvatarURL(t *testing.T) {

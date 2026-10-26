@@ -125,6 +125,9 @@ func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) 
 			if prefs.MusicVolume != nil {
 				u.MusicVolume = *prefs.MusicVolume
 			}
+			if prefs.AllowNonFriendInvites != nil {
+				u.AllowNonFriendInvites = *prefs.AllowNonFriendInvites
+			}
 			return nil
 		}
 	}
@@ -958,6 +961,34 @@ func TestLogin_EchoesStoredAudioPreferences(t *testing.T) {
 	data, raw := decodeAuthEnvelope(t, rec)
 	assert.JSONEq(t, "false", string(raw["soundEnabled"]))
 	assert.True(t, data.MusicEnabled)
+}
+
+func TestRegister_AcceptsNonFriendInvitesByDefault(t *testing.T) {
+	handler, e := setupHandler()
+	rec := registerUser(e)
+	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
+
+	_, raw := decodeAuthEnvelope(t, rec)
+	assert.JSONEq(t, "true", string(raw["allowNonFriendInvites"]))
+
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	require.Len(t, repo.users, 1)
+	assert.True(t, repo.users[0].AllowNonFriendInvites)
+}
+
+func TestLogin_EchoesStoredInvitePreference(t *testing.T) {
+	handler, e := setupHandler()
+	registerUser(e)
+	repo, ok := handler.userRepo.(*mockUserRepo)
+	require.True(t, ok)
+	repo.users[0].AllowNonFriendInvites = false
+
+	rec := doLogin(e, `{"email":"test@example.com","password":"password123"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	_, raw := decodeAuthEnvelope(t, rec)
+	assert.JSONEq(t, "false", string(raw["allowNonFriendInvites"]))
 }
 
 func TestRefresh_EchoesStoredAudioPreferences(t *testing.T) {

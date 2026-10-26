@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/emilijan/beljot/server/internal/friend"
+	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
@@ -68,4 +69,41 @@ func TestInviteFriendDirectory_ListFriendsCarriesAvatarURL(t *testing.T) {
 	require.NotNil(t, byID[2])
 	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", *byID[2])
 	assert.Nil(t, byID[3])
+}
+
+func TestInviteFriendDirectory_FindPlayersCarriesInvitePreference(t *testing.T) {
+	user.SetPublicAssetsURL("https://assets.test")
+	t.Cleanup(func() { user.SetPublicAssetsURL("") })
+
+	prefix := "avatars/88888888-8888-4888-8888-888888888888"
+	dir := &inviteFriendDirectory{
+		users: &fakeUserRows{users: []user.User{
+			{ID: 2, Username: "open", AvatarKey: &prefix, AllowNonFriendInvites: true},
+			{ID: 3, Username: "private", AllowNonFriendInvites: false},
+		}},
+	}
+
+	got, err := dir.FindPlayers([]uint{2, 3, 4})
+	require.NoError(t, err)
+	require.Len(t, got, 2, "an unknown or deleted user is omitted")
+
+	byID := map[uint]room.PlayerSummary{}
+	for _, p := range got {
+		byID[p.UserID] = p
+	}
+	assert.Equal(t, "open", byID[2].Username)
+	assert.True(t, byID[2].AllowsNonFriendInvites)
+	require.NotNil(t, byID[2].AvatarURL)
+	assert.Equal(t, "https://assets.test/"+prefix+"/128.webp", *byID[2].AvatarURL)
+	assert.False(t, byID[3].AllowsNonFriendInvites)
+	assert.Nil(t, byID[3].AvatarURL)
+}
+
+func TestInviteFriendDirectory_FindPlayersWithNoIDsIsAnEmptySlice(t *testing.T) {
+	dir := &inviteFriendDirectory{users: &fakeUserRows{}}
+
+	got, err := dir.FindPlayers(nil)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+	assert.NotNil(t, got)
 }

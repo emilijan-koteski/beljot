@@ -21,6 +21,7 @@ interface RegisterResponse {
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
+  allowNonFriendInvites: boolean;
   walletBalance: number;
   loginStreakDays: number;
   totalXp: number;

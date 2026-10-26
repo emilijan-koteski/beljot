@@ -5,19 +5,21 @@ import "time"
 // PreferencesUpdate is a partial write to the player's preference columns.
 // A nil pointer leaves that column untouched, so false and 0 can still be written explicitly.
 type PreferencesUpdate struct {
-	LanguagePreference *string
-	CardDeckPreference *string
-	SoundEnabled       *bool
-	MusicEnabled       *bool
-	SoundVolume        *int
-	MusicVolume        *int
+	LanguagePreference    *string
+	CardDeckPreference    *string
+	SoundEnabled          *bool
+	MusicEnabled          *bool
+	SoundVolume           *int
+	MusicVolume           *int
+	AllowNonFriendInvites *bool
 }
 
 // IsEmpty reports whether the update names no column at all.
 func (p PreferencesUpdate) IsEmpty() bool {
 	return p.LanguagePreference == nil && p.CardDeckPreference == nil &&
 		p.SoundEnabled == nil && p.MusicEnabled == nil &&
-		p.SoundVolume == nil && p.MusicVolume == nil
+		p.SoundVolume == nil && p.MusicVolume == nil &&
+		p.AllowNonFriendInvites == nil
 }
 
 // UserRepository persists users and their per-user counters.

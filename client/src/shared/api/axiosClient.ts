@@ -100,6 +100,7 @@ async function doRefresh(): Promise<string> {
         musicEnabled: boolean;
         soundVolume: number;
         musicVolume: number;
+        allowNonFriendInvites: boolean;
         walletBalance: number;
         loginStreakDays: number;
         totalXp: number;
@@ -124,6 +125,7 @@ async function doRefresh(): Promise<string> {
         musicEnabled: r.musicEnabled,
         soundVolume: r.soundVolume,
         musicVolume: r.musicVolume,
+        allowNonFriendInvites: r.allowNonFriendInvites,
         walletBalance: r.walletBalance,
         loginStreakDays: r.loginStreakDays,
         totalXp: r.totalXp,

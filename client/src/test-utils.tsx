@@ -23,6 +23,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     musicEnabled: true,
     soundVolume: 70,
     musicVolume: 70,
+    allowNonFriendInvites: true,
     walletBalance: 5000,
     loginStreakDays: 0,
     totalXp: 0,

@@ -127,7 +127,7 @@ func (r *GormUserRepository) Count() (int64, error) {
 // UpdatePreferences writes every supplied preference column in one UPDATE.
 // It uses a map so false and 0 values are written, since GORM skips zero-value struct fields.
 func (r *GormUserRepository) UpdatePreferences(id uint, prefs PreferencesUpdate) error {
-	columns := make(map[string]interface{}, 6)
+	columns := make(map[string]interface{}, 7)
 	if prefs.LanguagePreference != nil {
 		columns["language_preference"] = *prefs.LanguagePreference
 	}
@@ -145,6 +145,9 @@ func (r *GormUserRepository) UpdatePreferences(id uint, prefs PreferencesUpdate)
 	}
 	if prefs.MusicVolume != nil {
 		columns["music_volume"] = *prefs.MusicVolume
+	}
+	if prefs.AllowNonFriendInvites != nil {
+		columns["allow_non_friend_invites"] = *prefs.AllowNonFriendInvites
 	}
 	if len(columns) == 0 {
 		return apperr.ErrBadRequest

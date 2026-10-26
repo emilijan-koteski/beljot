@@ -14,6 +14,7 @@ export interface ProfileResponse {
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
+  allowNonFriendInvites: boolean;
   createdAt: string;
   totalGamesPlayed: number;
   wins: number;
@@ -69,6 +70,7 @@ interface UpdatePreferencesRequest {
   musicEnabled?: boolean;
   soundVolume?: number;
   musicVolume?: number;
+  allowNonFriendInvites?: boolean;
 }
 
 /** Only the fields the server wrote, so untouched preferences are never clobbered on merge. */
@@ -79,6 +81,7 @@ interface UpdatePreferencesResponse {
   musicEnabled?: boolean;
   soundVolume?: number;
   musicVolume?: number;
+  allowNonFriendInvites?: boolean;
 }
 
 export function getProfile(userId: number): Promise<ProfileResponse> {

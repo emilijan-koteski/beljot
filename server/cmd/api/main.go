@@ -301,15 +301,18 @@ func main() {
 	api.DELETE("/rooms/:id/bots/:seat", roomHandler.RemoveBot)
 	api.GET("/rooms/:id/last-match", userHandler.GetRoomLastMatch)
 
+	inviteDirectory := &inviteFriendDirectory{friends: friendRepo, users: userRepo}
 	inviteHandler := room.NewInviteHandler(
 		roomRepo,
 		inviteRegistry,
-		&inviteFriendDirectory{friends: friendRepo, users: userRepo},
+		inviteDirectory,
+		inviteDirectory,
 		hub,
 		sessionManager,
 		hub,
 	)
 	api.GET("/rooms/:id/invitable-friends", inviteHandler.ListInvitableFriends)
+	api.GET("/rooms/:id/invitable-players", inviteHandler.ListInvitablePlayers)
 	api.POST("/rooms/:id/invite", inviteHandler.InviteToRoom)
 	api.POST("/rooms/:id/invite/decline", inviteHandler.DeclineInvite)
 
@@ -420,7 +423,7 @@ func (p *whisperPresenceLocator) ActiveRoomID(userID uint) (uint, bool, error) {
 }
 
 // inviteFriendDirectory adapts friend.Repository and user.UserRepository to
-// room.FriendDirectory, so the room package never imports friend.
+// room.FriendDirectory and room.PlayerDirectory, so the room package never imports friend.
 type inviteFriendDirectory struct {
 	friends friend.Repository
 	users   user.UserRepository
@@ -465,6 +468,28 @@ func (d *inviteFriendDirectory) ListFriends(userID uint) ([]room.FriendSummary, 
 			continue
 		}
 		out = append(out, room.FriendSummary{UserID: id, Username: u.Username, AvatarURL: user.SmallAvatarURL(u.AvatarKey)})
+	}
+	return out, nil
+}
+
+// FindPlayers resolves user IDs to invite-panel rows with their non-friend invite opt-in,
+// omitting IDs whose user row is missing or soft-deleted.
+func (d *inviteFriendDirectory) FindPlayers(userIDs []uint) ([]room.PlayerSummary, error) {
+	if len(userIDs) == 0 {
+		return []room.PlayerSummary{}, nil
+	}
+	users, err := d.users.FindManyByIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]room.PlayerSummary, 0, len(users))
+	for _, u := range users {
+		out = append(out, room.PlayerSummary{
+			UserID:                 u.ID,
+			Username:               u.Username,
+			AvatarURL:              user.SmallAvatarURL(u.AvatarKey),
+			AllowsNonFriendInvites: u.AllowNonFriendInvites,
+		})
 	}
 	return out, nil
 }

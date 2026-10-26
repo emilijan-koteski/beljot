@@ -1,11 +1,14 @@
 package room
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -30,16 +33,33 @@ type FriendDirectory interface {
 	ListFriends(userID uint) ([]FriendSummary, error)
 }
 
-// ConnectionTracker reports whether a user holds a live WebSocket connection.
+// PlayerSummary is one player resolved for the invite panel's Lobby tab, with
+// their opt-in to invites from players who are not their friends.
+type PlayerSummary struct {
+	UserID                 uint
+	Username               string
+	AvatarURL              *string
+	AllowsNonFriendInvites bool
+}
+
+// PlayerDirectory resolves user IDs to invite-panel rows, omitting unknown or deleted users.
+// It is satisfied by the same main.go adapter as FriendDirectory.
+type PlayerDirectory interface {
+	FindPlayers(userIDs []uint) ([]PlayerSummary, error)
+}
+
+// ConnectionTracker reports which users hold a live WebSocket connection.
 // Implemented by *ws.Hub.
 type ConnectionTracker interface {
 	IsConnected(userID uint) bool
+	ConnectedUserIDs() []uint
 }
 
-// SessionTracker reports whether a user is mapped to an active game session.
+// SessionTracker reports which users are mapped to an active game session.
 // Implemented by *match.Manager.
 type SessionTracker interface {
 	IsUserInMatch(userID uint) bool
+	InMatchUserIDs() []uint
 }
 
 // InviteNotifier is the per-user push the invite handler needs. *ws.Hub
@@ -56,13 +76,16 @@ const (
 	inviteReasonRoomFull    = "room_full"
 )
 
-// InviteHandler serves the friend-invite endpoints, kept apart from RoomHandler to
+const lobbyInviteListLimit = 50
+
+// InviteHandler serves the room-invite endpoints, kept apart from RoomHandler to
 // avoid widening its constructor. It shares the InviteRegistry with RoomHandler:
 // this handler issues grants and JoinRoom consumes them.
 type InviteHandler struct {
 	repo        RoomRepository
 	invites     *InviteRegistry
 	friends     FriendDirectory
+	players     PlayerDirectory
 	connections ConnectionTracker
 	sessions    SessionTracker
 	notifier    InviteNotifier
@@ -74,6 +97,7 @@ func NewInviteHandler(
 	repo RoomRepository,
 	invites *InviteRegistry,
 	friends FriendDirectory,
+	players PlayerDirectory,
 	connections ConnectionTracker,
 	sessions SessionTracker,
 	notifier InviteNotifier,
@@ -85,6 +109,7 @@ func NewInviteHandler(
 		repo:        repo,
 		invites:     invites,
 		friends:     friends,
+		players:     players,
 		connections: connections,
 		sessions:    sessions,
 		notifier:    notifier,
@@ -97,8 +122,8 @@ type InviteToRoomRequest struct {
 	FriendUserID uint `json:"friendUserId"`
 }
 
-// InvitableFriendDTO is one row of GET /rooms/:id/invitable-friends. Available
-// is computed server-side from the presence trio; Reason is empty when Available.
+// InvitableFriendDTO is one row of GET /rooms/:id/invitable-friends or /invitable-players.
+// Available is computed server-side from the presence trio; Reason is empty when Available.
 type InvitableFriendDTO struct {
 	UserID    uint    `json:"userId"`
 	Username  string  `json:"username"`
@@ -136,25 +161,68 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 		})
 	}
 
-	full, err := h.roomIsFull(roomID)
-	if err != nil {
+	if err := h.markUnavailableWhenFull(roomID, items); err != nil {
 		return err
-	}
-	if full {
-		for i := range items {
-			items[i].Available = false
-			if items[i].Reason == "" {
-				items[i].Reason = inviteReasonRoomFull
-			}
-		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
 
-// InviteToRoom handles POST /rooms/:id/invite, issuing a one-time grant and pushing
-// the popup. Only one invite per room and friend may be live, and only the owner's
-// invite carries a password bypass.
+// ListInvitablePlayers handles GET /rooms/:id/invitable-players?search=, returning idle
+// lobby players who are not the caller's friends and accept non-friend invites. Opted-out
+// players are simply absent; the result is sorted by username and capped.
+func (h *InviteHandler) ListInvitablePlayers(c echo.Context) error {
+	callerID, roomID, _, err := h.requireRoomMember(c)
+	if err != nil {
+		return err
+	}
+
+	candidates, err := h.idleNonFriendIDs(callerID)
+	if err != nil {
+		return err
+	}
+
+	players, err := h.players.FindPlayers(candidates)
+	if err != nil {
+		return fmt.Errorf("resolving lobby players for invite panel: %w", err)
+	}
+
+	search := strings.ToLower(strings.TrimSpace(c.QueryParam("search")))
+	items := make([]InvitableFriendDTO, 0, len(players))
+	for _, p := range players {
+		if !p.AllowsNonFriendInvites {
+			continue
+		}
+		if search != "" && !strings.Contains(strings.ToLower(p.Username), search) {
+			continue
+		}
+		items = append(items, InvitableFriendDTO{
+			UserID:    p.UserID,
+			Username:  p.Username,
+			AvatarURL: p.AvatarURL,
+			Available: true,
+		})
+	}
+
+	slices.SortFunc(items, func(a, b InvitableFriendDTO) int {
+		if byName := strings.Compare(strings.ToLower(a.Username), strings.ToLower(b.Username)); byName != 0 {
+			return byName
+		}
+		return cmp.Compare(a.UserID, b.UserID)
+	})
+	if len(items) > lobbyInviteListLimit {
+		items = items[:lobbyInviteListLimit]
+	}
+
+	if err := h.markUnavailableWhenFull(roomID, items); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
+}
+
+// InviteToRoom handles POST /rooms/:id/invite, issuing a one-time grant and pushing the popup.
+// A non-friend is invitable only while they accept non-friend invites; one invite per room and player may be live.
 func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 	callerID, roomID, room, err := h.requireRoomMember(c)
 	if err != nil {
@@ -169,11 +237,11 @@ func (h *InviteHandler) InviteToRoom(c echo.Context) error {
 		return apperr.ErrBadRequest
 	}
 
-	areFriends, err := h.friends.AreFriends(callerID, req.FriendUserID)
+	invitable, err := h.acceptsInviteFrom(callerID, req.FriendUserID)
 	if err != nil {
-		return fmt.Errorf("checking friendship for invite: %w", err)
+		return err
 	}
-	if !areFriends {
+	if !invitable {
 		return apperr.ErrNotFriends
 	}
 
@@ -304,6 +372,81 @@ func (h *InviteHandler) availabilityReason(friendID, roomID uint) (string, error
 		return inviteReasonInRoom, nil
 	}
 	return "", nil
+}
+
+// acceptsInviteFrom reports whether inviteeID takes invites from inviterID: always for
+// a friend, and for anyone else only while the invitee's opt-in is on.
+func (h *InviteHandler) acceptsInviteFrom(inviterID, inviteeID uint) (bool, error) {
+	areFriends, err := h.friends.AreFriends(inviterID, inviteeID)
+	if err != nil {
+		return false, fmt.Errorf("checking friendship for invite: %w", err)
+	}
+	if areFriends {
+		return true, nil
+	}
+	found, err := h.players.FindPlayers([]uint{inviteeID})
+	if err != nil {
+		return false, fmt.Errorf("reading invitee invite preference: %w", err)
+	}
+	return len(found) == 1 && found[0].AllowsNonFriendInvites, nil
+}
+
+// idleNonFriendIDs returns the connected users who are in neither a match nor a waiting or playing room,
+// excluding callerID and callerID's friends. Without a connection tracker nobody is known to be online.
+func (h *InviteHandler) idleNonFriendIDs(callerID uint) ([]uint, error) {
+	if h.connections == nil {
+		return []uint{}, nil
+	}
+	excluded := map[uint]struct{}{callerID: {}}
+	if h.sessions != nil {
+		for _, uid := range h.sessions.InMatchUserIDs() {
+			excluded[uid] = struct{}{}
+		}
+	}
+	for _, status := range []string{"waiting", "playing"} {
+		ids, err := h.repo.FindUserIDsByRoomStatus(status)
+		if err != nil {
+			return nil, fmt.Errorf("listing %s-room players for invite panel: %w", status, err)
+		}
+		for _, uid := range ids {
+			excluded[uid] = struct{}{}
+		}
+	}
+	friends, err := h.friends.ListFriends(callerID)
+	if err != nil {
+		return nil, fmt.Errorf("listing friends for invite panel: %w", err)
+	}
+	for _, f := range friends {
+		excluded[f.UserID] = struct{}{}
+	}
+
+	idle := make([]uint, 0)
+	for _, uid := range h.connections.ConnectedUserIDs() {
+		if _, skip := excluded[uid]; skip || uid == 0 {
+			continue
+		}
+		idle = append(idle, uid)
+	}
+	return idle, nil
+}
+
+// markUnavailableWhenFull disables every row with reason room_full once the room
+// cannot seat another human, keeping any more specific reason a row already has.
+func (h *InviteHandler) markUnavailableWhenFull(roomID uint, items []InvitableFriendDTO) error {
+	full, err := h.roomIsFull(roomID)
+	if err != nil {
+		return err
+	}
+	if !full {
+		return nil
+	}
+	for i := range items {
+		items[i].Available = false
+		if items[i].Reason == "" {
+			items[i].Reason = inviteReasonRoomFull
+		}
+	}
+	return nil
 }
 
 // roomIsFull reports whether the room can still seat another human. Bot-covered

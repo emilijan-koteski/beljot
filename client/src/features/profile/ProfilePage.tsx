@@ -11,6 +11,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import { AudioPanel } from "./components/AudioPanel";
 import { CardDeckPanel } from "./components/CardDeckPanel";
 import { IdentityHero } from "./components/IdentityHero";
+import { InvitePrivacyPanel } from "./components/InvitePrivacyPanel";
 import { LinkedAccounts } from "./components/LinkedAccounts";
 import { Milestones } from "./components/Milestones";
 import { PartnerSpotlight } from "./components/PartnerSpotlight";
@@ -155,6 +156,8 @@ export function ProfilePage() {
           <CardDeckPanel />
 
           <AudioPanel />
+
+          <InvitePrivacyPanel />
 
           {career.isError ? (
             <p className="text-ink-mute text-sm" data-testid="profile-career-error">
