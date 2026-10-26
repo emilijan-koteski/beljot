@@ -80,7 +80,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
           <Link
             to={`/players/${featured.userId}`}
             aria-label={t("friends.viewProfileAria", { username: featured.username })}
-            className="group focus-visible:ring-ring/50 flex items-center gap-3.5 rounded-md focus-visible:ring-3 focus-visible:outline-none"
+            className="group focus-visible:ring-ring/70 flex items-center gap-3.5 rounded-md focus-visible:ring-3 focus-visible:outline-none"
           >
             <FeaturedPartner featured={featured} />
           </Link>
@@ -104,7 +104,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
                   <Link
                     to={`/players/${p.userId}`}
                     aria-label={t("friends.viewProfileAria", { username: p.username })}
-                    className="focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+                    className="focus-visible:ring-ring/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                   >
                     <Avatar name={p.username} avatarUrl={p.avatarUrl} team="A" size={24} />
                     <span className="text-ink truncate text-[13px] font-medium">{p.username}</span>

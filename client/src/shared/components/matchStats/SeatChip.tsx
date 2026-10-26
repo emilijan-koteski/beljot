@@ -58,7 +58,7 @@ export function SeatChip({
         to={`/players/${userId}`}
         onClick={(e) => e.stopPropagation()}
         aria-label={t("friends.viewProfileAria", { username: name })}
-        className="text-ink focus-visible:ring-ring/50 inline-flex h-7 items-center gap-1.5 rounded-lg pr-2 pl-1 text-xs font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+        className="text-ink focus-visible:ring-ring/70 inline-flex h-7 items-center gap-1.5 rounded-lg pr-2 pl-1 text-xs font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
         style={tint}
         data-testid="match-seat-chip"
       >

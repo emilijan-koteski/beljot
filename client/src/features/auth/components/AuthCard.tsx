@@ -104,7 +104,7 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-[5px] border transition-[background-color,border-color,box-shadow] peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50",
+            "pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-[5px] border transition-[background-color,border-color,box-shadow] peer-focus-visible:ring-3 peer-focus-visible:ring-ring/70",
             checked
               ? "bg-accent border-accent text-accent-ink"
               : invalid

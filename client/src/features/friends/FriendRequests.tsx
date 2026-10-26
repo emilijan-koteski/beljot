@@ -51,7 +51,7 @@ export function FriendRequests() {
               onClick={() => navigate(`/players/${request.fromUserId}`)}
               aria-label={t("friends.viewProfileAria", { username: request.fromUsername })}
               data-testid="friend-request-profile"
-              className="hover:bg-surface-sunken focus-visible:ring-ring/50 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
+              className="hover:bg-surface-sunken focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
             >
               <Avatar
                 name={request.fromUsername}
@@ -70,7 +70,7 @@ export function FriendRequests() {
               }
               aria-label={t("friends.accept")}
               title={t("friends.accept")}
-              className="text-accent hover:text-accent-deep focus-visible:ring-ring/50 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
+              className="text-accent hover:text-accent-deep focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
             >
               <Check className="size-4" aria-hidden="true" />
             </button>
@@ -83,7 +83,7 @@ export function FriendRequests() {
               }
               aria-label={t("friends.decline")}
               title={t("friends.decline")}
-              className="text-ink-mute hover:text-danger focus-visible:ring-ring/50 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
+              className="text-ink-mute hover:text-danger focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
             >
               <X className="size-4" aria-hidden="true" />
             </button>

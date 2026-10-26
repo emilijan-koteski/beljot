@@ -49,7 +49,7 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
                     <Link
                       to={`/players/${r.userId}`}
                       aria-label={t("friends.viewProfileAria", { username: r.username })}
-                      className="focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+                      className="focus-visible:ring-ring/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
                     >
                       <Avatar name={r.username} avatarUrl={r.avatarUrl} team="B" size={24} />
                       <span className="text-ink truncate text-[13px] font-medium">

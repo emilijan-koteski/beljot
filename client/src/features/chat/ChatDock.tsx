@@ -442,7 +442,7 @@ export function ChatDock(props: ChatDockProps) {
           maxLength={MAX_MESSAGE_LENGTH}
           title={t("whisper.hint")}
           data-testid={`${testIdRoot}-input`}
-          className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-off focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-off focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <button
           onClick={send}

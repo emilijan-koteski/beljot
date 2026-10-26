@@ -60,7 +60,7 @@ export function Segmented<T extends string>({
                 : o.disabled
                   ? "text-ink-off cursor-not-allowed opacity-55"
                   : "text-ink-dim hover:text-ink cursor-pointer",
-              "focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1",
+              "focus-visible:ring-3 focus-visible:ring-ring/70",
             )}
           >
             {o.icon}

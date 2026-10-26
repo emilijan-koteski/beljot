@@ -56,7 +56,7 @@ function Slider({
             }
             className={cn(
               "border-accent bg-surface size-4 rounded-full border-2 shadow-sm outline-none select-none",
-              "has-[:focus-visible]:ring-ring/50 has-[:focus-visible]:ring-[3px]",
+              "has-[:focus-visible]:ring-ring/70 has-[:focus-visible]:ring-[3px]",
               thumbClassName,
             )}
           />

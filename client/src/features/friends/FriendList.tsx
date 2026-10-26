@@ -34,7 +34,7 @@ export function FriendList() {
           aria-label={searchOpen ? t("lobby.playerSearch.close") : t("lobby.playerSearch.label")}
           title={searchOpen ? t("lobby.playerSearch.close") : t("lobby.playerSearch.label")}
           data-testid="player-search-toggle"
-          className="text-ink-mute hover:text-ink hover:bg-surface-sunken focus-visible:ring-ring/50 ml-auto flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
+          className="text-ink-mute hover:text-ink hover:bg-surface-sunken focus-visible:ring-ring/70 ml-auto flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
         >
           {searchOpen ? (
             <X className="size-3.5" aria-hidden="true" />
@@ -67,7 +67,7 @@ export function FriendList() {
                 type="button"
                 onClick={() => navigate(`/players/${friend.id}`)}
                 aria-label={t("friends.viewProfileAria", { username: friend.username })}
-                className="hover:bg-surface-sunken focus-visible:ring-ring/50 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
+                className="hover:bg-surface-sunken focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
               >
                 <Avatar
                   name={friend.username}
@@ -102,7 +102,7 @@ export function FriendList() {
                   onClick={() => openWhisper(friend.username)}
                   aria-label={t("friends.whisperAria", { username: friend.username })}
                   title={t("friends.whisperAria", { username: friend.username })}
-                  className="focus-visible:ring-ring/50 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-(--whisper-name) transition-colors hover:text-(--whisper-ink) focus-visible:ring-3 focus-visible:outline-none"
+                  className="focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-(--whisper-name) transition-colors hover:text-(--whisper-ink) focus-visible:ring-3 focus-visible:outline-none"
                 >
                   <MessageCircle className="size-4" aria-hidden="true" />
                 </button>
