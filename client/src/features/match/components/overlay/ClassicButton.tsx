@@ -2,6 +2,8 @@ import { type ButtonHTMLAttributes, type CSSProperties, forwardRef } from "react
 
 import { MOTION } from "@/shared/lib/motion";
 
+import { BUTTON_RADIUS_PX, DISABLED_OPACITY } from "../../lib/buttonShape";
+
 type ClassicButtonVariant = "primary" | "ghost" | "danger";
 
 interface ClassicButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -43,9 +45,9 @@ export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
     const baseStyle: CSSProperties = {
       ...VARIANT_STYLE[variant],
       fontWeight: 600,
-      borderRadius: 8,
+      borderRadius: BUTTON_RADIUS_PX,
       cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.4 : 1,
+      opacity: disabled ? DISABLED_OPACITY : 1,
       transition: `transform ${MOTION.BUTTON_HOVER}ms, filter ${MOTION.BUTTON_HOVER}ms`,
       ...style,
     };

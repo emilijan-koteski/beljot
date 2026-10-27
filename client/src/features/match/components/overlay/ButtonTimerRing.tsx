@@ -4,6 +4,7 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { remainingMsUntil } from "@/shared/lib/clockSync";
 import { MOTION } from "@/shared/lib/motion";
 
+import { BUTTON_RADIUS_PX } from "../../lib/buttonShape";
 import {
   ringDrainStyle,
   TIMER_RING_INK,
@@ -33,7 +34,7 @@ export function ButtonTimerRing({
   totalDuration,
   clientCountdown = false,
   onExpire,
-  radius = 8,
+  radius = BUTTON_RADIUS_PX,
   hideRing = false,
   children,
 }: ButtonTimerRingProps) {

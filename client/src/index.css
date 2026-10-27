@@ -259,6 +259,11 @@
   --brass-55: color-mix(in srgb, var(--brass) 55%, transparent);
   --brass-85: color-mix(in srgb, var(--brass) 85%, transparent);
 
+  /* ── Felt dialog ground — the two stops of ClassicPanel's vertical
+     gradient. Scope-stable: in-match dialogs portal out of `.game-table`. */
+  --dialog-felt-top: rgba(30, 60, 40, 0.98);
+  --dialog-felt-bottom: rgba(14, 40, 24, 0.98);
+
   /* ── Bot (frost-blue) ─────────────────────────────────────────────────
      The single source of truth for "this is a bot". Shared by every bot
      marker — the match-history "with bots" chip, the seated-bot badge, and

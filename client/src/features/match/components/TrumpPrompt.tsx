@@ -5,6 +5,7 @@ import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
+import { BUTTON_RADIUS_PX, DISABLED_OPACITY } from "../lib/buttonShape";
 import type { CardDeck } from "../lib/cardFace";
 import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER, resolveCardDeck } from "../lib/cardFace";
 import { floatingPanelStyle } from "../lib/floatingPanel";
@@ -59,7 +60,7 @@ function SuitPickerGrid({
             onClick={() => onPick(suit)}
             aria-label={t(suitNameKey(suit, deck))}
             data-testid={`trump-prompt-suit-${suit}`}
-            className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
+            className="flex items-center justify-center rounded-lg transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
             style={{
               height: 52,
               background: CARD_FACE_BACKGROUND,
@@ -69,7 +70,7 @@ function SuitPickerGrid({
               fontFamily: "var(--font-suit)",
               fontSize: 28,
               lineHeight: 1,
-              opacity: isLocked ? 0.4 : 1,
+              opacity: isLocked ? DISABLED_OPACITY : 1,
               filter: isLocked ? "grayscale(0.85)" : undefined,
             }}
           >
@@ -95,7 +96,7 @@ function MustPickNote() {
       className="inline-flex items-center px-3.5 py-2 text-sm sm:px-4.5 sm:py-2.5 sm:text-sm"
       style={{
         border: "1px dashed var(--brass-40)",
-        borderRadius: 8,
+        borderRadius: BUTTON_RADIUS_PX,
         background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
         color: "var(--ink-light)",
         fontWeight: 600,
@@ -143,7 +144,7 @@ export function TrumpPrompt({
             </div>
           )}
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm leading-snug" style={{ color: "rgba(245,242,232,0.85)" }}>
+            <p className="text-sm leading-snug" style={{ color: "var(--ink-light)" }}>
               <Trans
                 i18nKey={
                   !canPass

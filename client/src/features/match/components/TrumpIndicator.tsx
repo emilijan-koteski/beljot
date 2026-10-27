@@ -88,7 +88,7 @@ export function TrumpIndicator({
 
   return (
     <div
-      className={`flex min-w-0 items-center gap-3 rounded-xl px-3 py-2 ${containerBorderClass}`}
+      className={`flex min-w-0 items-center gap-3 rounded-lg px-3 py-2 ${containerBorderClass}`}
       style={legacyTeamClass ? undefined : floatingPanelStyle()}
       aria-live="polite"
       aria-label={ariaLabel}

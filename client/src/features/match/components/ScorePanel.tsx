@@ -248,7 +248,7 @@ export function ScorePanel({
       </div>
 
       <div
-        className="fixed top-4 left-4 hidden overflow-hidden rounded-xl md:block"
+        className="fixed top-4 left-4 hidden overflow-hidden rounded-lg md:block"
         style={{
           zIndex: Z.HUD,
           ...floatingPanelStyle(),

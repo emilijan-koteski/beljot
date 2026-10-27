@@ -956,7 +956,7 @@
       "message": "Reshuffling deck…"
     },
     "declaration": {
-      "title": "You have declarations!",
+      "title": "You have declarations",
       "declare": "Declare",
       "skip": "Skip",
       "noneTitle": "No declarations",

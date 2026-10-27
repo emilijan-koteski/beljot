@@ -23,7 +23,8 @@ interface ClassicPanelProps {
   children: ReactNode;
 }
 
-const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
+const PANEL_BG =
+  "linear-gradient(180deg, var(--dialog-felt-top) 0%, var(--dialog-felt-bottom) 100%)";
 
 /**
  * Felt-gradient shell for every in-match dialog and reveal, with an optional team-tinted `glowColor` ring.

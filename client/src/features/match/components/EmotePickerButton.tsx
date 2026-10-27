@@ -155,7 +155,7 @@ export function EmotePickerButton({
         disabled={disabled}
         aria-label={t("match.emote.button")}
         aria-pressed={isOpen}
-        className={`inline-flex h-9 cursor-pointer items-center rounded-md transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
+        className={`inline-flex h-9 cursor-pointer items-center rounded-lg transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-50 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
         style={{ ...floatingPanelStyle(), color: "var(--ink-light)" }}
         data-testid="emote-toggle"
       >
@@ -168,7 +168,7 @@ export function EmotePickerButton({
           ref={popoverRef}
           role="group"
           aria-label={t("match.emote.picker.title")}
-          className={`absolute right-0 w-44 rounded-lg p-2 ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
+          className={`absolute right-0 w-44 rounded-md p-2 ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
           style={{ zIndex: Z.UTIL, ...floatingPanelStyle({ menu: true }) }}
           data-testid="emote-picker"
         >
@@ -187,7 +187,7 @@ export function EmotePickerButton({
                   aria-disabled={tileDisabled}
                   aria-label={t(`match.emote.names.${EMOTE_I18N_KEYS[id]}`)}
                   data-testid={`emote-tile-${id}`}
-                  className="aspect-square cursor-pointer rounded-md text-2xl leading-none transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  className="aspect-square cursor-pointer rounded-md text-2xl leading-none transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span aria-hidden="true">{EMOTE_GLYPHS[id]}</span>
                 </button>

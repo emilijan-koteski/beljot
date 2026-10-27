@@ -1456,7 +1456,7 @@ export function MatchPage() {
             aria-label={t("nav.menu")}
             aria-expanded={hudMenuOpen}
             data-testid="hud-menu-button"
-            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-md"
+            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-lg"
             style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle(), color: "var(--ink-light)" }}
           >
             {hudMenuOpen ? (
@@ -1477,7 +1477,7 @@ export function MatchPage() {
                 style={{ zIndex: Z.CHROME_TOP }}
               />
               <div
-                className="absolute top-14 right-3 flex w-44 flex-col gap-1.5 rounded-xl p-2"
+                className="absolute top-14 right-3 flex w-44 flex-col gap-1.5 rounded-md p-2"
                 style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle({ menu: true }) }}
                 data-testid="hud-menu"
               >

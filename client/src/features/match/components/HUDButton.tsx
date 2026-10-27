@@ -1,5 +1,6 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 
+import { BUTTON_RADIUS_PX } from "../lib/buttonShape";
 import { floatingPanelStyle } from "../lib/floatingPanel";
 
 type HUDButtonVariant = "default" | "danger";
@@ -21,7 +22,7 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
     color: variant === "danger" ? "var(--danger-light)" : "var(--ink-light)",
     minWidth: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: BUTTON_RADIUS_PX,
     padding: isLabeled ? "0 14px" : 0,
     gap: 8,
     fontSize: 12,
@@ -33,7 +34,7 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
     <button
       ref={ref}
       type={type}
-      className={`inline-flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:brightness-110 ${className}`}
+      className={`inline-flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:brightness-110 ${className}`}
       style={baseStyle}
       {...rest}
     >
