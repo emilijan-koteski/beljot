@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Badge } from "@/shared/components/ui/badge";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
 import { isCardId } from "@/shared/lib/cardId";
@@ -229,21 +230,14 @@ export function TrumpReveal({
 
         {team && teamLabel && (
           <div className="mt-3.5 flex justify-center">
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wider"
-              style={{
-                background: `${glowColor}22`,
-                border: `1px solid ${glowColor}88`,
-                color: glowColor,
-              }}
-            >
+            <Badge size="sm" style={{ background: `${glowColor}22`, color: glowColor }}>
               <span
                 aria-hidden
                 className="rounded-full"
                 style={{ width: 5, height: 5, background: glowColor }}
               />
               {teamLabel}
-            </span>
+            </Badge>
           </div>
         )}
       </div>

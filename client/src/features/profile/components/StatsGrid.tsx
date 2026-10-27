@@ -60,7 +60,7 @@ function OutcomeSplitBar({ wins, losses, abandoned }: Omit<StatsGridProps, "game
         </span>
         <LegendDot color="var(--accent)" label={t("profile.stats.legendWins", { count: wins })} />
         <LegendDot
-          color="var(--ink-off)"
+          color="var(--faint)"
           label={t("profile.stats.legendLosses", { count: losses })}
         />
         <LegendDot
@@ -73,7 +73,7 @@ function OutcomeSplitBar({ wins, losses, abandoned }: Omit<StatsGridProps, "game
         style={{ background: "var(--surface-3)" }}
       >
         <span style={{ width: pct(wins), background: "var(--accent)" }} />
-        <span style={{ width: pct(losses), background: "var(--ink-off)" }} />
+        <span style={{ width: pct(losses), background: "var(--faint)" }} />
         <span style={{ width: pct(abandoned), background: "var(--brass-deep)" }} />
       </div>
     </div>

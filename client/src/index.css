@@ -94,13 +94,13 @@
   --color-surface-elevated: var(--surface-2);
   --color-surface-sunken: var(--surface-3);
   --color-border: var(--border);
+  --color-faint: var(--faint);
   --color-ring: var(--accent);
 
   /* Text */
   --color-ink: var(--ink);
   --color-ink-dim: var(--ink-dim);
   --color-ink-mute: var(--ink-mute);
-  --color-ink-off: var(--ink-off);
 
   /* Accent (felt-green action) */
   --color-accent: var(--accent);
@@ -137,12 +137,12 @@
   --surface-2: #ffffff;
   --surface-3: #ebe6d6;
   --border: #d9d1ba;
+  --faint: #b1b8b3;
 
   /* ── Ink (text) ───────────────────────────────────────────────────── */
   --ink: #0e3a24;
   --ink-dim: #466354;
   --ink-mute: #64726b;
-  --ink-off: #b1b8b3;
 
   /* ── Accent (felt-green action) ───────────────────────────────────── */
   --accent: #196536;
@@ -154,6 +154,8 @@
 
   --brass-deep: #7c633e;
   --danger: #8b2a1f;
+  --bot-deep: #1f5e80;
+  --bot-soft: #eaf4fa;
 
   /* ── Teams — viewer-relative (Us = gold, Them = silver) ─────────────
      Dark enough to carry text on parchment (4.6:1); felt restores the
@@ -168,7 +170,7 @@
      `shared/lib/honor.ts` — no component should name these directly.
 
      Why a dedicated ramp rather than reusing the palette: the shipped
-     version borrowed `--ink-off` for "Fair" and a second grey for
+     version borrowed `--faint` for "Fair" and a second grey for
      "Unreliable", so a declining score read as "greyed out / not loaded"
      instead of as a warning. A single ramp makes decline legible.
 
@@ -263,11 +265,10 @@
      the add-bot spawn icon in the waiting room. Deliberately the same cool
      frost-blue family as the cold-streak callout's ICE tone
      (StreakCallout.tsx): an off-palette accent that reads distinct from the
-     warm felt-green / brass UI and never says "player". Fixed across scopes
-     (not re-rooted for felt/dark), mirroring the ICE exception. ── */
+     warm felt-green / brass UI and never says "player". The hue is fixed
+     across scopes; the tag fill and its text (`--bot-soft`, `--bot-deep`)
+     lift on felt so a bot tag never glares as a white box there. ── */
   --bot: #2c82ad;
-  --bot-deep: #1f5e80;
-  --bot-soft: #eaf4fa;
   --bot-edge: rgba(46, 131, 176, 0.32);
 
   /* ── Team discs — the light gold and silver behind an initial ─────── */
@@ -385,7 +386,7 @@
   }
 
   input::placeholder {
-    color: var(--ink-off);
+    color: var(--ink-mute);
   }
 
   ::selection {
@@ -443,7 +444,6 @@
   --ink: #f5f2e8;
   --ink-dim: #c8d5cd;
   --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
 
   --accent: var(--accent-light);
   --accent-deep: #00b07c;
@@ -452,10 +452,13 @@
   --accent-glow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
   --border: var(--brass-25);
+  --faint: rgba(245, 242, 232, 0.35);
   --brass-deep: #9c7d4e;
   --danger: var(--danger-light);
   --team-a: #a07d1a;
   --team-b: #8b919a;
+  --bot-deep: #8ecbee;
+  --bot-soft: color-mix(in srgb, var(--bot) 22%, transparent);
 }
 
 .game-table {

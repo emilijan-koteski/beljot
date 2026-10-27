@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { FetchError } from "@/shared/api/axiosClient";
 import { playAlertSfx } from "@/shared/audio/audioEngine";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -183,24 +184,19 @@ export function RoomInviteModal() {
 
           <div className="flex flex-wrap items-center gap-2">
             {invite.coinBuyIn > 0 && (
-              <span
-                className="border-border bg-surface-sunken text-ink-dim inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+              <Badge
+                icon={<Coins style={{ color: COIN_GOLD }} aria-hidden="true" />}
                 data-testid="room-invite-buyin"
               >
-                <Coins className="size-3" style={{ color: COIN_GOLD }} aria-hidden="true" />
                 {t("roomInvite.popup.buyIn", { buyIn: formatCoins(invite.coinBuyIn) })}
-              </span>
+              </Badge>
             )}
             {invite.isPrivate === true && (
-              <span
-                className="border-border bg-surface-sunken text-ink-dim inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
-                data-testid="room-invite-private"
-              >
-                <Lock className="size-3" />
+              <Badge icon={<Lock />} data-testid="room-invite-private">
                 {invite.isHostInvite === true
                   ? t("roomInvite.popup.privateHostInvite")
                   : t("roomInvite.popup.privatePasswordNeeded")}
-              </span>
+              </Badge>
             )}
           </div>
 

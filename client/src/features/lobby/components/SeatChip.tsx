@@ -42,7 +42,7 @@ export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Pro
       <span
         data-testid={testId}
         className={cn(
-          "text-ink-off inline-flex h-7 items-center justify-center rounded-lg border border-dashed px-2 text-xs tracking-wider",
+          "text-ink-mute inline-flex h-7 items-center justify-center rounded-lg border border-dashed px-2 text-xs tracking-wider",
           tone.edgeSoft,
           tone.line,
         )}

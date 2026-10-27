@@ -62,7 +62,7 @@ export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
                   )}
                   <span className="text-ink-dim text-xs tabular-nums">
                     {total}
-                    <span className="text-ink-off"> · </span>
+                    <span className="text-faint"> · </span>
                     <span className="text-ink font-semibold">{winPct}%</span>
                   </span>
                 </div>

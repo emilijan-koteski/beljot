@@ -696,7 +696,7 @@ export function RoomPage() {
   const otherPair = yourPair[0] === 0 ? [1, 3] : [0, 2];
   const renderSlots = (pair: number[]) => (
     <span className="text-ink-mute inline-flex flex-wrap items-center">
-      <span className="text-ink-off" aria-hidden>
+      <span className="text-faint" aria-hidden>
         (
       </span>
       <span className="inline-flex flex-wrap items-center gap-1">
@@ -705,7 +705,7 @@ export function RoomPage() {
           const isYouSlot = p !== undefined && p.isBot !== true && p.userId === currentUser?.id;
           return (
             <span key={seatIndex} className="inline-flex items-center gap-1">
-              {i > 0 && <span className="text-ink-off">+</span>}
+              {i > 0 && <span className="text-faint">+</span>}
               {p ? (
                 <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
                   {isYouSlot
@@ -721,7 +721,7 @@ export function RoomPage() {
           );
         })}
       </span>
-      <span className="text-ink-off" aria-hidden>
+      <span className="text-faint" aria-hidden>
         )
       </span>
     </span>
@@ -829,7 +829,7 @@ export function RoomPage() {
                   components={{ name: <span className="text-ink font-semibold" /> }}
                 />
               </span>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 ·
               </span>
               <DropdownMenu>
@@ -900,16 +900,9 @@ export function RoomPage() {
                                 </span>
                               )}
                             </span>
-                            <span
-                              className={cn(
-                                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-2xs font-semibold tracking-wider uppercase",
-                                seated
-                                  ? "border-accent bg-accent-soft text-accent-deep"
-                                  : "border-border bg-surface-sunken text-ink-mute",
-                              )}
-                            >
+                            <Badge tone={seated ? "accent" : "neutral"} size="sm">
                               {seatLabel}
-                            </span>
+                            </Badge>
                             {ownerCanPromoteRow && (
                               <button
                                 type="button"
@@ -965,7 +958,7 @@ export function RoomPage() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 ·
               </span>
               <span
@@ -1029,7 +1022,10 @@ export function RoomPage() {
                   </span>
                 </Badge>
               )}
-              <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
+              <Badge
+                tone={isRelaxed ? "accent" : "neutral"}
+                icon={isRelaxed ? undefined : <Clock />}
+              >
                 <span data-testid="badge-timer">{timerLabel}</span>
               </Badge>
               <Badge tone="brass" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
@@ -1068,7 +1064,7 @@ export function RoomPage() {
               )}
               {players.some((p) => p.isBot === true) && (
                 <Badge tone="bot" icon={<Bot className="size-3" />}>
-                  <span data-testid="badge-bots">{t("bots.withBots")}</span>
+                  <span data-testid="badge-bots">{t("bots.tag")}</span>
                 </Badge>
               )}
             </div>
@@ -1115,13 +1111,9 @@ export function RoomPage() {
               </Button>
             )}
             {inSwapMode && (
-              <span
-                className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-                data-testid="swap-mode-banner"
-              >
-                <Shuffle className="size-3" />
+              <Badge tone="accent" icon={<Shuffle />} data-testid="swap-mode-banner">
                 {t("room.actionBarSwap")}
-              </span>
+              </Badge>
             )}
           </div>
           <Button
@@ -1158,7 +1150,7 @@ export function RoomPage() {
                 <span className="text-team-a font-semibold">{t("room.legendUs")}</span>
                 {renderSlots(yourPair)}
               </span>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 {t("room.legendVs")}
               </span>
               <span className="inline-flex items-center gap-2" data-team="teamB">

@@ -132,7 +132,7 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
                   ? "1px solid #9c7d4e"
                   : "1px dashed var(--brass)",
               boxShadow: today ? "0 0 0 3px rgba(232,194,90,0.28), var(--shadow-sm)" : "none",
-              color: today ? "#6e520f" : done ? "#5a4322" : "var(--ink-off)",
+              color: today ? "#6e520f" : done ? "#5a4322" : "var(--faint)",
             }}
           >
             {milestone ? (

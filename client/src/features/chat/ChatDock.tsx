@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { Chip } from "@/shared/components/ui/chips";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useVisualViewport } from "@/shared/hooks/useVisualViewport";
 import { cn } from "@/shared/lib/utils";
@@ -442,7 +443,7 @@ export function ChatDock(props: ChatDockProps) {
           maxLength={MAX_MESSAGE_LENGTH}
           title={t("whisper.hint")}
           data-testid={`${testIdRoot}-input`}
-          className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-off focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-mute focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <button
           onClick={send}
@@ -562,21 +563,16 @@ function ChannelTab({
   unread?: number;
 }) {
   return (
-    <button
-      type="button"
+    <Chip
+      size="sm"
       role="tab"
       aria-selected={active}
+      active={active}
+      tone={whisper ? "var(--whisper-ink)" : undefined}
       data-active={active}
       data-testid={testId}
       onClick={onClick}
-      className={cn(
-        "inline-flex max-w-32 items-center gap-1 truncate rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-        active
-          ? whisper
-            ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
-            : "bg-accent-soft border-accent/40 text-accent"
-          : "border-border text-ink-mute hover:text-ink",
-      )}
+      className="max-w-32"
     >
       <span className="truncate">{label}</span>
       {unread > 0 && !active && (
@@ -587,6 +583,6 @@ function ChannelTab({
           {unread > 9 ? "9+" : unread}
         </span>
       )}
-    </button>
+    </Chip>
   );
 }

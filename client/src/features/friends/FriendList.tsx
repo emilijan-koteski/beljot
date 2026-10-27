@@ -86,7 +86,7 @@ export function FriendList() {
                   className={
                     friend.online === true
                       ? "bg-accent size-2 rounded-full"
-                      : "bg-ink-off size-2 rounded-full"
+                      : "bg-faint size-2 rounded-full"
                   }
                   aria-hidden="true"
                 />

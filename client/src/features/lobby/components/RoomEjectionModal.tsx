@@ -214,7 +214,7 @@ export function RoomEjectionModal() {
             <ComparisonRow
               label={t("lobby.roomEjection.tableLabel")}
               value={ejection.minHonor}
-              color="var(--ink-off)"
+              color="var(--faint)"
               testId="room-ejection-table"
             />
           </div>

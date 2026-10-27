@@ -85,7 +85,7 @@ export function JoinByCodeTile() {
         placeholder={t("lobby.actions.joinByCode.placeholder")}
         maxLength={CODE_LENGTH}
         data-testid="join-by-code-input"
-        className="text-ink min-w-0 flex-1 bg-transparent py-2.5 text-base font-semibold tracking-widest tabular-nums outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-off"
+        className="text-ink min-w-0 flex-1 bg-transparent py-2.5 text-base font-semibold tracking-widest tabular-nums outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-mute"
       />
       <Button
         size="sm"

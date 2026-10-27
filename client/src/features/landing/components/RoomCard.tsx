@@ -34,7 +34,7 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
   if (!ini) {
     return (
       <span
-        className="text-ink-off flex h-7 items-center justify-center rounded-lg border border-dashed px-2.5 text-xs"
+        className="text-ink-mute flex h-7 items-center justify-center rounded-lg border border-dashed px-2.5 text-xs"
         style={{
           borderColor: isA ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",
           background: isA ? "var(--team-a-line)" : "var(--team-b-line)",
@@ -103,7 +103,7 @@ export function RoomCard({
         </div>
         <div className="text-ink-dim mt-1.5 flex items-center gap-1.5 text-xs">
           <span>{meta}</span>
-          <span className="text-ink-off">·</span>
+          <span className="text-faint">·</span>
           <span>{ago}</span>
         </div>
       </div>

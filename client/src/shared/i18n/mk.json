@@ -243,8 +243,7 @@
           "failedThem": "паднаа · тие"
         },
         "unfinished": "Недовршена рака: целта е достигната"
-      },
-      "withBots": "Со ботови"
+      }
     },
     "partners": {
       "eyebrow": "Во фокус",
@@ -1416,7 +1415,7 @@
   "bots": {
     "seatName": "Бот {{n}}",
     "badge": "Бот",
-    "withBots": "Со ботови"
+    "tag": "Ботови"
   },
   "rewards": {
     "dailyReward": {

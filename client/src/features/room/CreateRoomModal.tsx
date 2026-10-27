@@ -26,6 +26,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
@@ -822,12 +823,9 @@ function AdvancedSettings({
           {t("lobby.createRoomModal.advanced.title")}
         </span>
         {changedCount > 0 && (
-          <span
-            data-testid="advanced-settings-badge"
-            className="bg-brass-soft text-brass-deep border-brass/40 rounded-full border px-1.75 py-0.5 font-mono text-2xs font-semibold"
-          >
+          <Badge tone="brass" size="sm" data-testid="advanced-settings-badge">
             {t("lobby.createRoomModal.advanced.changedCount", { count: changedCount })}
-          </span>
+          </Badge>
         )}
         <span
           className={cn("text-ink-mute ml-auto flex transition-transform", open && "rotate-180")}
@@ -1078,5 +1076,5 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
 }
 
 function Dot() {
-  return <span className="text-ink-off text-2xs">·</span>;
+  return <span className="text-faint text-2xs">·</span>;
 }

@@ -210,7 +210,7 @@ export function CardLadder({ title, accent, rows, suit, testId }: Props) {
                 style={{
                   textAlign: "right",
                   fontSize: 14,
-                  color: r.pts > 0 ? "var(--ink)" : "var(--ink-off)",
+                  color: r.pts > 0 ? "var(--ink)" : "var(--ink-mute)",
                   fontWeight: r.pts > 0 ? 600 : 500,
                 }}
               >

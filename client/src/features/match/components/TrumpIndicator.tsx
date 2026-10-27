@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 
+import { Badge } from "@/shared/components/ui/badge";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Suit, TeamString } from "@/shared/types/matchTypes";
 
@@ -145,17 +146,18 @@ export function TrumpIndicator({
                 {callerName}
               </span>
             )}
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-px text-2xs font-bold uppercase tracking-wider ${
-                legacyTeamClass !== null ? `text-${legacyTeamClass} bg-${legacyTeamClass}/10` : ""
-              }`}
+            <Badge
+              size="sm"
+              tone={
+                legacyTeamClass === "team-a"
+                  ? "teamA"
+                  : legacyTeamClass === "team-b"
+                    ? "teamB"
+                    : "neutral"
+              }
               style={
                 teamGradient
-                  ? {
-                      color: teamGradient[0],
-                      background: `${teamGradient[0]}22`,
-                      border: `1px solid ${teamGradient[0]}88`,
-                    }
+                  ? { color: teamGradient[0], background: `${teamGradient[0]}22` }
                   : undefined
               }
               data-testid="trump-caller-team"
@@ -172,7 +174,7 @@ export function TrumpIndicator({
                 }}
               />
               {teamName}
-            </span>
+            </Badge>
           </div>
         )}
       </div>

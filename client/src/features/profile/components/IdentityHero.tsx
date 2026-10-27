@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Badge } from "@/shared/components/ui/badge";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { XpBar } from "@/shared/components/XpBar";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
@@ -53,39 +54,16 @@ function HeroPill({
   titleText?: string;
   tone: PillTone;
 }) {
-  const bg =
-    tone === "accent"
-      ? "var(--accent-soft)"
-      : tone === "brass"
-        ? "var(--brass-soft)"
-        : "var(--surface-2)";
-  const border =
-    tone === "accent"
-      ? "rgba(25,101,54,0.33)"
-      : tone === "brass"
-        ? "var(--brass-40)"
-        : "var(--border)";
-  const valueColor =
-    tone === "accent" ? "var(--accent)" : tone === "brass" ? "var(--brass-deep)" : "var(--ink)";
-  const labelColor =
-    tone === "accent" ? "var(--accent)" : tone === "brass" ? "var(--brass-deep)" : "var(--ink-dim)";
   return (
-    <span
-      className="inline-flex items-baseline gap-1.5 rounded-full px-2.5 py-1 text-xs"
-      style={{ background: bg, border: `1px solid ${border}` }}
+    <Badge
+      tone={tone}
+      icon={icon && <span aria-hidden="true">{icon}</span>}
       title={titleText ?? (icon ? label : undefined)}
       aria-label={icon ? `${label} ${value}` : undefined}
     >
-      {icon && (
-        <span className="inline-flex self-center" style={{ color: valueColor }} aria-hidden="true">
-          {icon}
-        </span>
-      )}
-      <span className="text-sm font-bold tabular-nums" style={{ color: valueColor }}>
-        {value}
-      </span>
-      {!icon && <span style={{ color: labelColor }}>{label}</span>}
-    </span>
+      <span className="tabular-nums font-bold">{value}</span>
+      {!icon && <span className="font-medium">{label}</span>}
+    </Badge>
   );
 }
 
@@ -175,7 +153,7 @@ export function IdentityHero({
           />
           <div className="text-ink-dim flex flex-col gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
-            {memberSince && lastPlayed && <span className="text-ink-off hidden sm:inline">·</span>}
+            {memberSince && lastPlayed && <span className="text-faint hidden sm:inline">·</span>}
             {lastPlayed && <span>{lastPlayed}</span>}
           </div>
         </div>
