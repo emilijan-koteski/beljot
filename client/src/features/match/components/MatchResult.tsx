@@ -6,6 +6,7 @@ import { useSfxOnce } from "@/shared/audio/useSfxOnce";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
+import { Badge } from "@/shared/components/ui/badge";
 import { useRoomLastMatchQuery } from "@/shared/hooks/queries/useMatches";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
@@ -18,7 +19,9 @@ import type { MatchEndPayload } from "@/shared/types/wsEvents";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { FinalScore } from "./overlay/FinalScore";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { ResultHeading } from "./overlay/ResultHeading";
 import { SeasonSpLine } from "./SeasonSpLine";
 
 interface MatchResultProps {
@@ -78,6 +81,23 @@ export function MatchResult({
   const teamAGradient: TeamGradient = viewerTeam === "teamA" ? TEAM_GOLD : TEAM_SILVER;
   const teamBGradient: TeamGradient = viewerTeam === "teamB" ? TEAM_GOLD : TEAM_SILVER;
 
+  const teamASide = {
+    label: teamAColumnLabel,
+    score: data.teamAFinalScore,
+    color: teamAGradient[0],
+    team: "teamA",
+    testId: "match-result-team-a-column",
+    scoreTestId: "match-result-team-a-score",
+  } as const;
+  const teamBSide = {
+    label: teamBColumnLabel,
+    score: data.teamBFinalScore,
+    color: teamBGradient[0],
+    team: "teamB",
+    testId: "match-result-team-b-column",
+    scoreTestId: "match-result-team-b-score",
+  } as const;
+
   const formattedDuration = useMemo(() => {
     const totalSec = data.matchDurationSec;
     const minutes = Math.floor(totalSec / 60);
@@ -90,22 +110,15 @@ export function MatchResult({
       <OverlayBackdrop dim="blocker">
         <ClassicPanel size="wide" glowColor={glowColor}>
           <div className="flex flex-col items-center text-center gap-3">
-            <span
-              className="text-2xs uppercase tracking-caps"
-              style={{ color: "var(--ink-light)", opacity: 0.55 }}
-              data-testid="match-result-title"
-            >
-              {t("match.matchResult.title")}
-            </span>
-
-            <h2
-              className="text-3xl font-semibold tracking-tight"
-              style={{ color: glowColor }}
+            <ResultHeading
+              eyebrow={t("match.matchResult.title")}
+              eyebrowTestId="match-result-title"
+              color={glowColor}
               data-testid="match-result-winner"
               data-team={winnerTeamString}
             >
               {isUs ? t("match.matchResult.winnerUs") : t("match.matchResult.winnerThem")}
-            </h2>
+            </ResultHeading>
 
             {data.outcomeReason === "surrender" && (
               <p
@@ -129,72 +142,24 @@ export function MatchResult({
               </p>
             )}
 
-            <div className="flex items-center justify-center gap-6 mt-2 mb-2">
-              {viewerTeam === "teamA" ? (
-                <>
-                  <ScoreColumn
-                    team="teamA"
-                    label={teamAColumnLabel}
-                    score={data.teamAFinalScore}
-                    gradient={teamAGradient}
-                  />
-                  <span
-                    className="text-3xl tracking-tight"
-                    style={{ color: "var(--ink-light)", opacity: 0.4 }}
-                  >
-                    ·
-                  </span>
-                  <ScoreColumn
-                    team="teamB"
-                    label={teamBColumnLabel}
-                    score={data.teamBFinalScore}
-                    gradient={teamBGradient}
-                  />
-                </>
-              ) : (
-                <>
-                  <ScoreColumn
-                    team="teamB"
-                    label={teamBColumnLabel}
-                    score={data.teamBFinalScore}
-                    gradient={teamBGradient}
-                  />
-                  <span
-                    className="text-3xl tracking-tight"
-                    style={{ color: "var(--ink-light)", opacity: 0.4 }}
-                  >
-                    ·
-                  </span>
-                  <ScoreColumn
-                    team="teamA"
-                    label={teamAColumnLabel}
-                    score={data.teamAFinalScore}
-                    gradient={teamAGradient}
-                  />
-                </>
-              )}
-            </div>
+            <FinalScore
+              sides={viewerTeam === "teamA" ? [teamASide, teamBSide] : [teamBSide, teamASide]}
+            />
 
             {showCoins && (
-              <div
-                className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
-                style={{
-                  color: coinWon ? COIN_GOLD : COIN_LOSS,
-                  border: `1px solid ${coinWon ? "rgba(212,160,23,0.4)" : "color-mix(in srgb, var(--danger-light) 40%, transparent)"}`,
-                  background: coinWon
-                    ? "rgba(212,160,23,0.08)"
-                    : "color-mix(in srgb, var(--danger-light) 8%, transparent)",
-                }}
+              <Badge
+                size="lg"
+                tint={coinWon ? COIN_GOLD : COIN_LOSS}
+                icon={<Coins aria-hidden="true" />}
                 data-testid="match-result-coins"
                 data-coin-delta={coinDelta}
               >
-                <Coins className="h-4 w-4" aria-hidden="true" />
-                <span className="text-base font-semibold tabular-nums">
+                <span className="tabular-nums">
                   {coinWon
                     ? t("match.settlement.won", { amount: formatCoins(coinDelta ?? 0) })
                     : t("match.settlement.lost", { amount: formatCoins(-(coinDelta ?? 0)) })}
                 </span>
-              </div>
+              </Badge>
             )}
 
             {honorSettlement &&
@@ -203,27 +168,21 @@ export function MatchResult({
                 const tierAfter = normalizeHonorTier(honorSettlement.tier, honorSettlement.after);
                 if (tierBefore === tierAfter) return null;
                 return (
-                  <div
-                    className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
-                    style={{
-                      color: HONOR_TIER_COLOR[tierAfter],
-                      border: "1px solid var(--brass-40)",
-                      background: "var(--brass-10)",
-                    }}
+                  <Badge
+                    size="lg"
+                    tint={HONOR_TIER_COLOR[tierAfter]}
+                    icon={<HonorShield tier={tierAfter} size={16} />}
                     data-testid="match-result-honor"
                     data-honor-before={honorSettlement.before}
                     data-honor-after={honorSettlement.after}
                     data-tier-before={tierBefore}
                     data-tier-after={tierAfter}
                   >
-                    <HonorShield tier={tierAfter} size={16} />
-                    <span className="text-base font-semibold">
-                      {t("match.settlement.honorTierChanged", {
-                        before: t(`profile.honor.tier.${tierBefore}`),
-                        after: t(`profile.honor.tier.${tierAfter}`),
-                      })}
-                    </span>
-                  </div>
+                    {t("match.settlement.honorTierChanged", {
+                      before: t(`profile.honor.tier.${tierBefore}`),
+                      after: t(`profile.honor.tier.${tierAfter}`),
+                    })}
+                  </Badge>
                 );
               })()}
 
@@ -296,32 +255,6 @@ export function MatchResult({
           </div>
         </ClassicPanel>
       </OverlayBackdrop>
-    </div>
-  );
-}
-
-interface ScoreColumnProps {
-  team: TeamString;
-  label: string;
-  score: number;
-  gradient: TeamGradient;
-}
-
-function ScoreColumn({ team, label, score, gradient }: ScoreColumnProps) {
-  const testId = team === "teamA" ? "match-result-team-a-column" : "match-result-team-b-column";
-  const scoreTestId = team === "teamA" ? "match-result-team-a-score" : "match-result-team-b-score";
-  return (
-    <div className="text-center" data-testid={testId} data-team={team}>
-      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: gradient[0] }}>
-        {label}
-      </p>
-      <p
-        className="text-5xl font-bold tabular-nums tracking-tight"
-        style={{ color: gradient[0] }}
-        data-testid={scoreTestId}
-      >
-        {score}
-      </p>
     </div>
   );
 }

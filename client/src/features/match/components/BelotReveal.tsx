@@ -132,12 +132,11 @@ export function BelotReveal({
           </div>
 
           <div className="mt-3 flex justify-center">
-            <Badge size="sm" style={{ background: `${glowColor}22`, color: glowColor }}>
-              <span
-                aria-hidden
-                className="rounded-full"
-                style={{ width: 5, height: 5, background: glowColor }}
-              />
+            <Badge
+              size="sm"
+              tint={glowColor}
+              icon={<span aria-hidden className="size-1.25 rounded-full bg-current" />}
+            >
               {teamLabel}
             </Badge>
           </div>

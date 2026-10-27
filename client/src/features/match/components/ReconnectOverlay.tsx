@@ -10,7 +10,7 @@ import type { SeasonSettlement } from "@/shared/stores/matchStore";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
-import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
+import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import {
   isCountdownUrgent,
   TIMER_RING_INK,
@@ -19,7 +19,9 @@ import {
   useTurnCountdown,
 } from "../lib/turnCountdown";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { FinalScore } from "./overlay/FinalScore";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { ResultHeading } from "./overlay/ResultHeading";
 import { SeasonSpLine } from "./SeasonSpLine";
 
 interface DisconnectedPlayerInfo {
@@ -143,44 +145,31 @@ export function ReconnectOverlay({
         <OverlayBackdrop dim="blocker">
           <ClassicPanel size="wide" glowColor={resultColor}>
             <div className="flex flex-col items-center text-center gap-3">
-              <span
-                className="text-2xs uppercase tracking-caps"
-                style={{ color: "var(--ink-light)", opacity: 0.55 }}
-              >
-                {t("match.matchResult.title")}
-              </span>
-
-              <h2
-                className="text-2xl font-semibold tracking-tight"
-                style={{ color: resultColor }}
+              <ResultHeading
+                eyebrow={t("match.matchResult.title")}
+                color={resultColor}
                 data-testid="abandon-title"
                 data-result={result ?? undefined}
               >
                 {t("match.disconnect.matchAbandoned", {
                   player: disconnectedPlayerName,
                 })}
-              </h2>
+              </ResultHeading>
 
-              <div
-                className="flex items-center justify-center gap-6 mt-1 mb-1"
-                data-testid="abandon-scores"
+              <FinalScore
+                sides={[
+                  { label: t("team.us"), score: usValue, color: TEAM_GOLD[0] },
+                  { label: t("team.them"), score: themValue, color: TEAM_SILVER[0] },
+                ]}
+                testId="abandon-scores"
               >
-                <ScoreColumn label={t("team.us")} value={usValue} gradient={TEAM_GOLD} />
-                <span
-                  className="text-3xl tracking-tight"
-                  style={{ color: "var(--ink-light)", opacity: 0.4 }}
-                  aria-hidden
-                >
-                  ·
-                </span>
-                <ScoreColumn label={t("team.them")} value={themValue} gradient={TEAM_SILVER} />
                 <span className="sr-only">
                   {t("match.disconnect.matchAbandonedScores", {
                     us: usValue,
                     them: themValue,
                   })}
                 </span>
-              </div>
+              </FinalScore>
 
               {showResultLine && (
                 <p
@@ -457,25 +446,6 @@ function DisconnectedPlayerRow({
       >
         {formatCountdown(remainingSeconds)}
       </span>
-    </div>
-  );
-}
-
-interface ScoreColumnProps {
-  label: string;
-  value: number;
-  gradient: TeamGradient;
-}
-
-function ScoreColumn({ label, value, gradient }: ScoreColumnProps) {
-  return (
-    <div className="text-center">
-      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: gradient[0] }}>
-        {label}
-      </p>
-      <p className="text-4xl font-bold tabular-nums tracking-tight" style={{ color: gradient[0] }}>
-        {value}
-      </p>
     </div>
   );
 }

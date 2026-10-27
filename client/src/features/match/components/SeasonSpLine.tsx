@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
+import { Badge } from "@/shared/components/ui/badge";
 import {
   formatSpChange,
   normalizeSeasonDivision,
@@ -40,21 +41,19 @@ export function SeasonSpLine({ settlement }: Props) {
   const trend = gained ? "gain" : settlement.spChange < 0 ? "loss" : "none";
 
   return (
-    <div
-      className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
-      style={{
-        color,
-        border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
-        background: `color-mix(in srgb, ${color} 8%, transparent)`,
-      }}
+    <Badge
+      size="lg"
+      tint={color}
+      icon={
+        namesRank ? <TierBadge tier={tier} size="sm" data-testid="season-sp-line-badge" /> : null
+      }
       role="status"
       data-testid="season-sp-line"
       data-sp-change={settlement.spChange}
       data-reason={settlement.reason}
       data-trend={trend}
     >
-      {namesRank && <TierBadge tier={tier} size="sm" data-testid="season-sp-line-badge" />}
-      <span className="text-base font-semibold tabular-nums">{text}</span>
-    </div>
+      <span className="tabular-nums">{text}</span>
+    </Badge>
   );
 }
