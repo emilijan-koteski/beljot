@@ -243,8 +243,7 @@
           "failedThem": "failed · them"
         },
         "unfinished": "Unfinished hand — target reached"
-      },
-      "withBots": "With bots"
+      }
     },
     "partners": {
       "eyebrow": "Spotlight",
@@ -1416,7 +1415,7 @@
   "bots": {
     "seatName": "Bot {{n}}",
     "badge": "Bot",
-    "withBots": "With bots"
+    "tag": "Bots"
   },
   "rewards": {
     "dailyReward": {

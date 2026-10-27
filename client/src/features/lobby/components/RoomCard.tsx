@@ -109,7 +109,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
               icon={<Bot strokeWidth={2.4} />}
               data-testid="room-card-bots"
             >
-              {t("bots.withBots")}
+              {t("bots.tag")}
             </Badge>
           )}
           <CodeChip code={room.code} />

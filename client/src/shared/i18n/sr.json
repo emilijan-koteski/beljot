@@ -243,8 +243,7 @@
           "failedThem": "pali · oni"
         },
         "unfinished": "Nedovršena ruka: cilj je dostignut"
-      },
-      "withBots": "Sa botovima"
+      }
     },
     "partners": {
       "eyebrow": "U fokusu",
@@ -1416,7 +1415,7 @@
   "bots": {
     "seatName": "Bot {{n}}",
     "badge": "Bot",
-    "withBots": "Sa botovima"
+    "tag": "Botovi"
   },
   "rewards": {
     "dailyReward": {

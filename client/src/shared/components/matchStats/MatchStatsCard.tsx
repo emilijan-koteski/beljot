@@ -612,7 +612,7 @@ export function MatchStatsCard({
               icon={<Bot aria-hidden="true" />}
               data-testid="match-history-bots-marker"
             >
-              {t("profile.matchHistory.withBots")}
+              {t("bots.tag")}
             </Badge>
           )}
           <OutcomeChip outcome={match.outcome} />

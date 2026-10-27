@@ -1022,7 +1022,10 @@ export function RoomPage() {
                   </span>
                 </Badge>
               )}
-              <Badge tone={isRelaxed ? "accent" : "neutral"} icon={<Clock className="size-3" />}>
+              <Badge
+                tone={isRelaxed ? "accent" : "neutral"}
+                icon={isRelaxed ? undefined : <Clock />}
+              >
                 <span data-testid="badge-timer">{timerLabel}</span>
               </Badge>
               <Badge tone="brass" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
@@ -1061,7 +1064,7 @@ export function RoomPage() {
               )}
               {players.some((p) => p.isBot === true) && (
                 <Badge tone="bot" icon={<Bot className="size-3" />}>
-                  <span data-testid="badge-bots">{t("bots.withBots")}</span>
+                  <span data-testid="badge-bots">{t("bots.tag")}</span>
                 </Badge>
               )}
             </div>
