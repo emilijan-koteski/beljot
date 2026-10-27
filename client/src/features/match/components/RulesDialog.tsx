@@ -20,6 +20,7 @@ import { Z } from "@/shared/lib/zLayers";
 import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
 import { ClassicButton } from "./overlay/ClassicButton";
+import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
 interface RulesDialogProps {
@@ -34,7 +35,7 @@ interface RulesDialogProps {
 const PANEL_ID = "rules-dialog-panel";
 const tabId = (v: Variant) => `rules-dialog-tab-${v}`;
 
-const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
+const RULES_PANEL_HEIGHT = 620;
 const BRASS = "var(--brass)";
 const INK = "var(--ink-light)";
 const TEXT = "rgba(245,242,232,0.88)";
@@ -103,227 +104,223 @@ export function RulesDialog({
   const dialog = (
     <TooltipProvider delay={0}>
       <div className="fixed inset-0" style={{ zIndex: Z.UTIL }} data-testid="rules-dialog">
-        <OverlayBackdrop dim={0.55}>
+        <OverlayBackdrop dim="prompt">
           <div
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="rules-dialog-title"
-            className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150 flex flex-col overflow-hidden"
-            style={{
-              width: 860,
-              maxWidth: "92vw",
-              height: 620,
-              maxHeight: "88vh",
-              borderRadius: 14,
-              background: PANEL_BG,
-              border: "1px solid var(--brass-55)",
-              boxShadow:
-                "var(--shadow-felt-xl), 0 0 0 4px var(--brass-10), inset 0 1px 0 var(--brass-25)",
-              color: INK,
-            }}
+            className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
           >
-            <div
-              className="flex shrink-0 items-center gap-3"
-              style={{
-                padding: "16px 20px 14px",
-                borderBottom: "1px solid var(--brass-25)",
-              }}
-            >
-              <BookOpen size={20} style={{ color: BRASS }} aria-hidden="true" />
-              <div className="flex flex-col">
-                <span
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.18em",
-                    textTransform: "uppercase",
-                    color: BRASS,
-                    opacity: 0.85,
-                  }}
-                >
-                  {ui.ovReference}
-                </span>
-                <span
-                  id="rules-dialog-title"
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: INK,
-                    marginTop: 1,
-                  }}
-                >
-                  {ui.ovTitle}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-1">
-              <nav
-                className="hidden shrink-0 flex-col gap-0.5 md:flex"
-                style={{
-                  width: 200,
-                  borderRight: "1px solid var(--brass-25)",
-                  padding: "14px 10px",
-                  background: "rgba(10,22,15,0.30)",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "0 10px 10px",
-                    fontSize: 10,
-                    letterSpacing: "0.18em",
-                    textTransform: "uppercase",
-                    color: BRASS,
-                    opacity: 0.7,
-                    fontWeight: 600,
-                  }}
-                >
-                  {ui.ovChapters}
-                </div>
-                {sections.map((s, i) => {
-                  const on = s.id === activeId;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => jump(s.id)}
-                      data-testid={`rules-toc-${s.id}`}
-                      className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-sm text-left transition-colors"
+            <ClassicPanel
+              size="reference"
+              bodyPadding={0}
+              style={{ height: RULES_PANEL_HEIGHT }}
+              title={
+                <span className="flex items-center gap-3">
+                  <BookOpen size={20} style={{ color: BRASS }} aria-hidden="true" />
+                  <span className="flex flex-col">
+                    <span
                       style={{
-                        padding: "8px 10px",
-                        background: on ? "var(--brass-soft)" : "transparent",
-                        border: on ? "1px solid var(--brass-40)" : "1px solid transparent",
-                        color: on ? INK : TEXT_DIM,
+                        fontSize: 10,
+                        letterSpacing: "0.18em",
+                        textTransform: "uppercase",
+                        color: BRASS,
+                        opacity: 0.85,
                       }}
+                    >
+                      {ui.ovReference}
+                    </span>
+                    <span
+                      id="rules-dialog-title"
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 600,
+                        color: INK,
+                        marginTop: 1,
+                      }}
+                    >
+                      {ui.ovTitle}
+                    </span>
+                  </span>
+                </span>
+              }
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="flex min-h-0 flex-1">
+                  <nav
+                    className="hidden shrink-0 flex-col gap-0.5 md:flex"
+                    style={{
+                      width: 200,
+                      borderRight: "1px solid var(--brass-25)",
+                      padding: "14px 10px",
+                      background: "rgba(10,22,15,0.30)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "0 10px 10px",
+                        fontSize: 10,
+                        letterSpacing: "0.18em",
+                        textTransform: "uppercase",
+                        color: BRASS,
+                        opacity: 0.7,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {ui.ovChapters}
+                    </div>
+                    {sections.map((s, i) => {
+                      const on = s.id === activeId;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => jump(s.id)}
+                          data-testid={`rules-toc-${s.id}`}
+                          className="grid cursor-pointer grid-cols-[26px_1fr] items-center rounded-sm text-left transition-colors"
+                          style={{
+                            padding: "8px 10px",
+                            background: on ? "var(--brass-soft)" : "transparent",
+                            border: on ? "1px solid var(--brass-40)" : "1px solid transparent",
+                            color: on ? INK : TEXT_DIM,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: on ? BRASS : TEXT_DIM,
+                              letterSpacing: "0.05em",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <span style={{ fontSize: 14, fontWeight: on ? 600 : 500 }}>
+                            {s.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+
+                  <div
+                    ref={scrollRef}
+                    className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
+                  >
+                    <div
+                      className="flex items-center gap-2 pt-3"
+                      data-testid="rules-dialog-variant-tabs"
+                      role="tablist"
+                      aria-label={ui.variantLabel}
                     >
                       <span
                         style={{
                           fontSize: 10,
-                          color: on ? BRASS : TEXT_DIM,
-                          letterSpacing: "0.05em",
+                          letterSpacing: "0.18em",
+                          textTransform: "uppercase",
+                          color: BRASS,
+                          opacity: 0.7,
                           fontWeight: 600,
                         }}
                       >
-                        {String(i + 1).padStart(2, "0")}
+                        {ui.variantLabel}
                       </span>
-                      <span style={{ fontSize: 14, fontWeight: on ? 600 : 500 }}>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-
-              <div
-                ref={scrollRef}
-                className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
-              >
-                <div
-                  className="flex items-center gap-2 pt-3"
-                  data-testid="rules-dialog-variant-tabs"
-                  role="tablist"
-                  aria-label={ui.variantLabel}
-                >
-                  <span
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: "0.18em",
-                      textTransform: "uppercase",
-                      color: BRASS,
-                      opacity: 0.7,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {ui.variantLabel}
-                  </span>
-                  {VARIANTS.map((v, i) => {
-                    const on = v === activeVariant;
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        role="tab"
-                        id={tabId(v)}
-                        aria-selected={on}
-                        aria-controls={PANEL_ID}
-                        tabIndex={on ? 0 : -1}
-                        onKeyDown={(e) => {
-                          const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-                          if (step === 0) return;
-                          e.preventDefault();
-                          const next = normalizeVariant(
-                            VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length],
-                          );
-                          setActiveVariant(next);
-                          e.currentTarget.parentElement
-                            ?.querySelector<HTMLButtonElement>(
-                              `[data-testid="rules-dialog-variant-${next}"]`,
-                            )
-                            ?.focus();
-                        }}
-                        onClick={() => setActiveVariant(v)}
-                        data-testid={`rules-dialog-variant-${v}`}
-                        className="cursor-pointer rounded-sm transition-colors"
-                        style={{
-                          padding: "5px 11px",
-                          fontSize: 12,
-                          fontWeight: on ? 600 : 500,
-                          background: on ? "var(--brass-soft)" : "transparent",
-                          border: on ? "1px solid var(--brass-40)" : "1px solid var(--brass-soft)",
-                          color: on ? INK : TEXT_DIM,
-                        }}
-                      >
-                        {variantLabel(t, v)}
-                      </button>
-                    );
-                  })}
-                </div>
-                {stopAtTarget === true && (
-                  <TableRuleNote testId="rules-dialog-stop-at-target-note">
-                    {t("match.rules.stopAtTargetNote")}
-                  </TableRuleNote>
-                )}
-                {declarationsTransfer === false && (
-                  <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
-                    {t("match.rules.noDeclarationsTransferNote")}
-                  </TableRuleNote>
-                )}
-                {clockwise === true && (
-                  <TableRuleNote testId="rules-dialog-clockwise-note">
-                    {t("match.rules.clockwiseNote")}
-                  </TableRuleNote>
-                )}
-                <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
-                  <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
-                    {sections.map((s, i) => (
-                      <DarkChapter
-                        key={s.id}
-                        idx={i}
-                        section={s}
-                        registerRef={(el) => {
-                          chapterRefs.current[s.id] = el;
-                        }}
-                      />
-                    ))}
+                      {VARIANTS.map((v, i) => {
+                        const on = v === activeVariant;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="tab"
+                            id={tabId(v)}
+                            aria-selected={on}
+                            aria-controls={PANEL_ID}
+                            tabIndex={on ? 0 : -1}
+                            onKeyDown={(e) => {
+                              const step =
+                                e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+                              if (step === 0) return;
+                              e.preventDefault();
+                              const next = normalizeVariant(
+                                VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length],
+                              );
+                              setActiveVariant(next);
+                              e.currentTarget.parentElement
+                                ?.querySelector<HTMLButtonElement>(
+                                  `[data-testid="rules-dialog-variant-${next}"]`,
+                                )
+                                ?.focus();
+                            }}
+                            onClick={() => setActiveVariant(v)}
+                            data-testid={`rules-dialog-variant-${v}`}
+                            className="cursor-pointer rounded-sm transition-colors"
+                            style={{
+                              padding: "5px 11px",
+                              fontSize: 12,
+                              fontWeight: on ? 600 : 500,
+                              background: on ? "var(--brass-soft)" : "transparent",
+                              border: on
+                                ? "1px solid var(--brass-40)"
+                                : "1px solid var(--brass-soft)",
+                              color: on ? INK : TEXT_DIM,
+                            }}
+                          >
+                            {variantLabel(t, v)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {stopAtTarget === true && (
+                      <TableRuleNote testId="rules-dialog-stop-at-target-note">
+                        {t("match.rules.stopAtTargetNote")}
+                      </TableRuleNote>
+                    )}
+                    {declarationsTransfer === false && (
+                      <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
+                        {t("match.rules.noDeclarationsTransferNote")}
+                      </TableRuleNote>
+                    )}
+                    {clockwise === true && (
+                      <TableRuleNote testId="rules-dialog-clockwise-note">
+                        {t("match.rules.clockwiseNote")}
+                      </TableRuleNote>
+                    )}
+                    <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
+                      <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
+                        {sections.map((s, i) => (
+                          <DarkChapter
+                            key={s.id}
+                            idx={i}
+                            section={s}
+                            registerRef={(el) => {
+                              chapterRefs.current[s.id] = el;
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </DarkRulesCtx.Provider>
                   </div>
-                </DarkRulesCtx.Provider>
-              </div>
-            </div>
+                </div>
 
-            <div
-              className="flex shrink-0 items-center justify-end"
-              style={{
-                padding: "12px 20px",
-                borderTop: "1px solid var(--brass-25)",
-                background: "rgba(10,22,15,0.30)",
-              }}
-            >
-              <ClassicButton
-                variant="primary"
-                onClick={() => onOpenChange(false)}
-                data-testid="rules-dialog-close"
-              >
-                {ui.ovClose}
-              </ClassicButton>
-            </div>
+                <div
+                  className="flex shrink-0 items-center justify-end"
+                  style={{
+                    padding: "12px 20px",
+                    borderTop: "1px solid var(--brass-25)",
+                    background: "rgba(10,22,15,0.30)",
+                  }}
+                >
+                  <ClassicButton
+                    variant="primary"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="rules-dialog-close"
+                  >
+                    {ui.ovClose}
+                  </ClassicButton>
+                </div>
+              </div>
+            </ClassicPanel>
           </div>
         </OverlayBackdrop>
       </div>

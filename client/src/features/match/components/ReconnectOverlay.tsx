@@ -139,8 +139,8 @@ export function ReconnectOverlay({
         data-testid="reconnect-overlay"
         aria-live="assertive"
       >
-        <OverlayBackdrop dim={0.7}>
-          <ClassicPanel width={520} glowColor={RING_DANGER}>
+        <OverlayBackdrop dim="blocker">
+          <ClassicPanel size="wide" glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="text-2xs uppercase tracking-caps"
@@ -216,8 +216,8 @@ export function ReconnectOverlay({
         data-testid="reconnect-overlay"
         aria-live="assertive"
       >
-        <OverlayBackdrop dim={0.7}>
-          <ClassicPanel width={480} glowColor={RING_DANGER}>
+        <OverlayBackdrop dim="blocker">
+          <ClassicPanel size="dialog" glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="text-2xs uppercase tracking-caps"
@@ -265,9 +265,9 @@ export function ReconnectOverlay({
       data-testid="reconnect-overlay"
       aria-live="assertive"
     >
-      <OverlayBackdrop dim={0.65}>
+      <OverlayBackdrop dim="blocker">
         <ClassicPanel
-          width={480}
+          size="dialog"
           title={t("match.disconnect.reconnecting")}
           subtitle={
             chipPlayers.length > 1

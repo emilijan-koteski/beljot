@@ -48,9 +48,9 @@ export function PauseOverlay({
       data-testid="pause-overlay"
       aria-live="polite"
     >
-      <OverlayBackdrop dim={0.65}>
+      <OverlayBackdrop dim="blocker">
         <ClassicPanel
-          width={480}
+          size="dialog"
           title={t("match.pause.title")}
           subtitle={t(
             pausedNames.length > 1 ? "match.pause.pausedByMany" : "match.pause.pausedBy",

@@ -22,7 +22,7 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.SURRENDER }} data-testid="surrender-prompt">
-      <OverlayBackdrop dim={0.5}>
+      <OverlayBackdrop dim="prompt">
         <div
           ref={promptRef}
           role="dialog"
@@ -31,7 +31,7 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={480}
+            size="dialog"
             glowColor={DANGER}
             title={
               <span id="surrender-prompt-title" className="inline-flex items-center gap-2.5">

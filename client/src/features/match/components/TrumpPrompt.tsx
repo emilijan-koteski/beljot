@@ -213,7 +213,7 @@ export function TrumpPrompt({
       : t("match.trumpPrompt.subtitleRound2");
 
   return (
-    <OverlayBackdrop dim={0.5}>
+    <OverlayBackdrop dim="prompt">
       <div
         ref={promptRef}
         role="dialog"
@@ -223,7 +223,7 @@ export function TrumpPrompt({
         className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
       >
         <ClassicPanel
-          width={560}
+          size="wide"
           title={<span id="trump-prompt-title">{title}</span>}
           subtitle={subtitle}
           style={{ maxHeight: "90vh", overflowY: "auto" }}

@@ -83,7 +83,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
       style={{ zIndex: Z.SURRENDER }}
       data-testid="surrender-confirm-overlay"
     >
-      <OverlayBackdrop dim={0.5}>
+      <OverlayBackdrop dim="prompt">
         <div
           ref={dialogRef}
           role="dialog"
@@ -92,7 +92,7 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={480}
+            size="dialog"
             glowColor={DANGER}
             title={
               <span id="surrender-confirm-title" className="inline-flex items-center gap-2.5">

@@ -15,6 +15,7 @@ import { resolveCardDeck } from "../lib/cardFace";
 import { rankNameKey, suitAccent, suitInkOnFelt, suitNameKey } from "../lib/suitArt";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
+import { ClassicPanel } from "./overlay/ClassicPanel";
 import { PlayingCard } from "./PlayingCard";
 import { SuitMark } from "./SuitMark";
 
@@ -99,147 +100,141 @@ export function TrumpReveal({
       data-testid="trump-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center"
-        style={{
-          width: 264,
-          padding: "20px 24px 22px",
-          background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
-          border: "1px solid var(--brass-55)",
-          boxShadow: `var(--shadow-felt-xl), 0 0 0 2px ${glowColor}66, 0 0 32px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
-          color: "var(--ink-light)",
-        }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
         data-team={team ?? undefined}
       >
-        <div className="absolute top-3 right-3 z-3">
-          <AutoCloseRing
-            duration={prefersReducedMotion ? 1.5 : 8}
-            onClose={handleClose}
-            ariaLabel={t("match.trumpReveal.dismiss", { defaultValue: "Dismiss" })}
-            testId="trump-reveal-close"
-          />
-        </div>
-
-        <div
-          className="text-2xs uppercase tracking-caps"
-          style={{
-            color: "var(--brass)",
-            padding: "0 18px",
-            marginBottom: 16,
-          }}
-          data-testid="trump-reveal-eyebrow"
-        >
-          {eyebrow}
-        </div>
-
-        <div className="relative mb-4.5 inline-block">
-          {card && (
-            <>
-              <div
-                aria-hidden
-                className="absolute rounded-lg"
-                style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
-              />
-              <div className="relative z-1">
-                <PlayingCard card={card} state="default" size="lg" withTransition={false} />
-              </div>
-            </>
-          )}
-          <div
-            className={
-              card
-                ? "absolute z-2 flex items-center justify-center"
-                : "flex items-center justify-center"
-            }
-            style={{
-              ...(card ? { right: -16, bottom: -14 } : {}),
-              width: 60,
-              height: 60,
-              borderRadius: "50%",
-              background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
-              border: `3px solid ${sealRing}`,
-              boxShadow: card
-                ? "var(--shadow-felt-md), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
-                : `var(--shadow-felt-md), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,
-            }}
-            data-testid="trump-reveal-seal"
-            data-suit={trumpSuit}
-            aria-label={suitName}
-          >
-            <SuitMark
-              suit={trumpSuit}
-              deck={deck}
-              size={30}
-              shadow="0 1px 1px rgba(0,0,0,0.25)"
-              style={{ fontFamily: "var(--font-suit)" }}
+        <ClassicPanel size="notice" glowColor={glowColor} className="relative text-center">
+          <div className="absolute top-3 right-3 z-3">
+            <AutoCloseRing
+              duration={prefersReducedMotion ? 1.5 : 8}
+              onClose={handleClose}
+              ariaLabel={t("match.trumpReveal.dismiss", { defaultValue: "Dismiss" })}
+              testId="trump-reveal-close"
             />
           </div>
-        </div>
 
-        <div
-          className="flex items-center justify-center gap-2"
-          style={{ fontSize: 20, fontWeight: 600 }}
-          data-testid="trump-reveal-taker"
-          data-seat={playerSeat}
-        >
-          {pickerName !== null && picker ? (
-            <>
-              <Avatar
-                name={pickerName}
-                avatarUrl={picker.isBot === true ? null : picker.avatarUrl}
-                team={avatarTeam}
-                size={24}
-                icon={picker.isBot === true ? <Bot aria-hidden="true" /> : undefined}
-              />
-              <span>{pickerName}</span>
-            </>
-          ) : (
-            <span>{t("match.trumpReveal.unknownPlayer", { defaultValue: "Trump taken" })}</span>
-          )}
-        </div>
-
-        <div
-          className="mt-1 leading-snug"
-          style={{ fontSize: 14, color: "#e8dfc8" }}
-          data-testid="trump-reveal-copy"
-        >
-          <Trans
-            i18nKey={
-              card === null
-                ? "match.trumpReveal.namedTrump"
-                : isFreePick
-                  ? "match.trumpReveal.chose"
-                  : "match.trumpReveal.isTrump"
-            }
-            values={{ suit: suitName }}
-            components={{ suit: <b style={{ color: chosenColor }} /> }}
-          />
-        </div>
-
-        {isFreePick && (
           <div
-            className="mt-1"
-            style={{ fontSize: 12, opacity: 0.6 }}
-            data-testid="trump-reveal-candidate"
+            className="text-2xs uppercase tracking-caps"
+            style={{
+              color: "var(--brass)",
+              padding: "0 18px",
+              marginBottom: 16,
+            }}
+            data-testid="trump-reveal-eyebrow"
           >
-            {t("match.trumpReveal.candidateOnTable", {
-              rank: candidateRankName,
-              suit: candidateSuitName,
-            })}
+            {eyebrow}
           </div>
-        )}
 
-        {team && teamLabel && (
-          <div className="mt-3.5 flex justify-center">
-            <Badge size="sm" style={{ background: `${glowColor}22`, color: glowColor }}>
-              <span
-                aria-hidden
-                className="rounded-full"
-                style={{ width: 5, height: 5, background: glowColor }}
+          <div className="relative mb-4.5 inline-block">
+            {card && (
+              <>
+                <div
+                  aria-hidden
+                  className="absolute rounded-lg"
+                  style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
+                />
+                <div className="relative z-1">
+                  <PlayingCard card={card} state="default" size="lg" withTransition={false} />
+                </div>
+              </>
+            )}
+            <div
+              className={
+                card
+                  ? "absolute z-2 flex items-center justify-center"
+                  : "flex items-center justify-center"
+              }
+              style={{
+                ...(card ? { right: -16, bottom: -14 } : {}),
+                width: 60,
+                height: 60,
+                borderRadius: "50%",
+                background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
+                border: `3px solid ${sealRing}`,
+                boxShadow: card
+                  ? "var(--shadow-felt-md), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
+                  : `var(--shadow-felt-md), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,
+              }}
+              data-testid="trump-reveal-seal"
+              data-suit={trumpSuit}
+              aria-label={suitName}
+            >
+              <SuitMark
+                suit={trumpSuit}
+                deck={deck}
+                size={30}
+                shadow="0 1px 1px rgba(0,0,0,0.25)"
+                style={{ fontFamily: "var(--font-suit)" }}
               />
-              {teamLabel}
-            </Badge>
+            </div>
           </div>
-        )}
+
+          <div
+            className="flex items-center justify-center gap-2"
+            style={{ fontSize: 20, fontWeight: 600 }}
+            data-testid="trump-reveal-taker"
+            data-seat={playerSeat}
+          >
+            {pickerName !== null && picker ? (
+              <>
+                <Avatar
+                  name={pickerName}
+                  avatarUrl={picker.isBot === true ? null : picker.avatarUrl}
+                  team={avatarTeam}
+                  size={24}
+                  icon={picker.isBot === true ? <Bot aria-hidden="true" /> : undefined}
+                />
+                <span>{pickerName}</span>
+              </>
+            ) : (
+              <span>{t("match.trumpReveal.unknownPlayer", { defaultValue: "Trump taken" })}</span>
+            )}
+          </div>
+
+          <div
+            className="mt-1 leading-snug"
+            style={{ fontSize: 14, color: "#e8dfc8" }}
+            data-testid="trump-reveal-copy"
+          >
+            <Trans
+              i18nKey={
+                card === null
+                  ? "match.trumpReveal.namedTrump"
+                  : isFreePick
+                    ? "match.trumpReveal.chose"
+                    : "match.trumpReveal.isTrump"
+              }
+              values={{ suit: suitName }}
+              components={{ suit: <b style={{ color: chosenColor }} /> }}
+            />
+          </div>
+
+          {isFreePick && (
+            <div
+              className="mt-1"
+              style={{ fontSize: 12, opacity: 0.6 }}
+              data-testid="trump-reveal-candidate"
+            >
+              {t("match.trumpReveal.candidateOnTable", {
+                rank: candidateRankName,
+                suit: candidateSuitName,
+              })}
+            </div>
+          )}
+
+          {team && teamLabel && (
+            <div className="mt-3.5 flex justify-center">
+              <Badge size="sm" style={{ background: `${glowColor}22`, color: glowColor }}>
+                <span
+                  aria-hidden
+                  className="rounded-full"
+                  style={{ width: 5, height: 5, background: glowColor }}
+                />
+                {teamLabel}
+              </Badge>
+            </div>
+          )}
+        </ClassicPanel>
       </div>
     </div>
   );

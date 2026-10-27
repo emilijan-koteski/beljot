@@ -87,8 +87,8 @@ export function MatchResult({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="match-result">
-      <OverlayBackdrop dim={0.7}>
-        <ClassicPanel width={520} glowColor={glowColor}>
+      <OverlayBackdrop dim="blocker">
+        <ClassicPanel size="wide" glowColor={glowColor}>
           <div className="flex flex-col items-center text-center gap-3">
             <span
               className="text-2xs uppercase tracking-caps"

@@ -199,7 +199,7 @@ export function ScoreReveal({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="score-reveal">
-      <OverlayBackdrop dim={0.6}>
+      <OverlayBackdrop dim="blocker">
         <div
           className={
             prefersReducedMotion
@@ -208,7 +208,7 @@ export function ScoreReveal({
           }
         >
           <ClassicPanel
-            width={560}
+            size="wide"
             title={<span data-testid="score-reveal-title">{title}</span>}
             subtitle={subtitle ?? undefined}
           >

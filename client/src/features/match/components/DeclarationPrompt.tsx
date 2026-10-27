@@ -92,7 +92,7 @@ export function DeclarationPrompt({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="declaration-prompt">
-      <OverlayBackdrop dim={0.5}>
+      <OverlayBackdrop dim="prompt">
         <div
           ref={promptRef}
           role="dialog"
@@ -102,7 +102,7 @@ export function DeclarationPrompt({
           className="outline-none motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={500}
+            size="dialog"
             title={
               <span id="declaration-prompt-title">
                 {hasDeclarations ? t("match.declaration.title") : t("match.declaration.noneTitle")}

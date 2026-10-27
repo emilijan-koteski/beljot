@@ -6,6 +6,7 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 
+import { overlayDimBackground } from "../lib/overlayDim";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 
 interface CapotAnimationProps {
@@ -54,8 +55,7 @@ export function CapotAnimation({
       className="fixed inset-0 flex cursor-pointer items-center justify-center"
       style={{
         zIndex: Z.CAPOT,
-        background:
-          "radial-gradient(ellipse at center, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.82) 100%)",
+        background: overlayDimBackground("spotlight"),
         backdropFilter: "blur(3px)",
       }}
       data-testid="capot-animation"

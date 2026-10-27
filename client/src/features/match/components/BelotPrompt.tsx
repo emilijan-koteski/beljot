@@ -40,7 +40,7 @@ export function BelotPrompt({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="belot-prompt">
-      <OverlayBackdrop dim={0.5}>
+      <OverlayBackdrop dim="prompt">
         <div
           ref={promptRef}
           role="dialog"
@@ -49,7 +49,7 @@ export function BelotPrompt({
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={480}
+            size="dialog"
             title={<span id="belot-prompt-title">{t(titleKey)}</span>}
             subtitle={t(subtitleKey)}
           >
