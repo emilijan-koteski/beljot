@@ -22,7 +22,7 @@ interface PauseOverlayProps {
 }
 
 /**
- * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume All controls.
+ * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume all controls.
  */
 export function PauseOverlay({
   pausedPlayers,
@@ -133,18 +133,10 @@ export function PauseOverlay({
 
             {isRoomOwner && (
               <ClassicButton
+                variant={hasActivePause ? "ghost" : "primary"}
                 onClick={onOwnerResume}
                 data-testid="pause-owner-resume-button"
                 className="w-full"
-                style={{
-                  border: "1px solid color-mix(in srgb, var(--danger-light) 45%, transparent)",
-                  color: "#ffb1a8",
-                  background: "linear-gradient(180deg, rgba(70,32,32,0.55), rgba(40,18,18,0.45))",
-                  boxShadow:
-                    "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 18%, transparent)",
-                  padding: "8px 14px",
-                  fontSize: 14,
-                }}
               >
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <Crown size={14} aria-hidden="true" />

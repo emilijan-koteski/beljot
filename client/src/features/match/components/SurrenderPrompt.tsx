@@ -73,16 +73,9 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
 
             <div className="flex justify-end items-center gap-3.5">
               <ClassicButton
-                variant="primary"
+                variant="danger"
                 onClick={onAccept}
                 data-testid="surrender-prompt-accept"
-                style={{
-                  background: "linear-gradient(180deg, #d96a5a 0%, #8a3024 100%)",
-                  borderColor: "color-mix(in srgb, var(--danger-light) 70%, transparent)",
-                  color: "#fff8f3",
-                  boxShadow:
-                    "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
-                }}
               >
                 {t("match.surrender.prompt.accept")}
               </ClassicButton>

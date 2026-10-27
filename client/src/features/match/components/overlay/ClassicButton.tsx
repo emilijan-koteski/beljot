@@ -1,36 +1,51 @@
-import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { type ButtonHTMLAttributes, type CSSProperties, forwardRef } from "react";
 
 import { MOTION } from "@/shared/lib/motion";
 
-type ClassicButtonVariant = "primary" | "ghost";
+type ClassicButtonVariant = "primary" | "ghost" | "danger";
 
 interface ClassicButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ClassicButtonVariant;
 }
 
+const VARIANT_STYLE: Record<ClassicButtonVariant, CSSProperties> = {
+  primary: {
+    border: "1px solid var(--brass-85)",
+    background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",
+    color: "var(--brass-ink)",
+    boxShadow:
+      "0 8px 24px -12px color-mix(in srgb, var(--brass) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
+  },
+  ghost: {
+    border: "1px solid var(--brass-40)",
+    background: "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
+    color: "var(--ink-light)",
+    boxShadow: "var(--shadow-felt-sm)",
+  },
+  danger: {
+    border: "1px solid color-mix(in srgb, var(--danger-light) 70%, transparent)",
+    background: "linear-gradient(180deg, #d96a5a 0%, #8a3024 100%)",
+    color: "#fff8f3",
+    boxShadow:
+      "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
+  },
+};
+
 /**
- * Action button used inside ClassicPanel overlays, as a brass `primary` or a translucent felt `ghost`.
+ * Action button used inside ClassicPanel overlays: a brass `primary`, a translucent felt `ghost`,
+ * or a red `danger` for the one action that cannot be taken back.
  */
 export const ClassicButton = forwardRef<HTMLButtonElement, ClassicButtonProps>(
   function ClassicButton(
     { variant = "ghost", type = "button", style, className = "", children, disabled, ...rest },
     ref,
   ) {
-    const isPrimary = variant === "primary";
-
-    const baseStyle: React.CSSProperties = {
-      border: isPrimary ? "1px solid var(--brass-85)" : "1px solid var(--brass-40)",
-      background: isPrimary
-        ? "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)"
-        : "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
-      color: isPrimary ? "var(--brass-ink)" : "var(--ink-light)",
+    const baseStyle: CSSProperties = {
+      ...VARIANT_STYLE[variant],
       fontWeight: 600,
       borderRadius: 8,
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.4 : 1,
-      boxShadow: isPrimary
-        ? "0 8px 24px -12px color-mix(in srgb, var(--brass) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)"
-        : "var(--shadow-felt-sm)",
       transition: `transform ${MOTION.BUTTON_HOVER}ms, filter ${MOTION.BUTTON_HOVER}ms`,
       ...style,
     };
