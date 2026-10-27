@@ -5,6 +5,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import type { Suit, TeamString } from "@/shared/types/matchTypes";
 
 import { resolveCardDeck } from "../lib/cardFace";
+import { floatingPanelStyle } from "../lib/floatingPanel";
 import { suitAccent, suitGlowAlpha, suitNameKey } from "../lib/suitArt";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 import { SuitMark } from "./SuitMark";
@@ -32,7 +33,6 @@ const LEGACY_INK_CLASS: Record<Suit, string> = {
   C: "text-ink",
 };
 
-const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
 const INK = "var(--ink-light)";
 const BRASS = "var(--brass)";
 
@@ -89,17 +89,7 @@ export function TrumpIndicator({
   return (
     <div
       className={`flex min-w-0 items-center gap-3 rounded-xl px-3 py-2 ${containerBorderClass}`}
-      style={
-        legacyTeamClass
-          ? undefined
-          : {
-              background: PANEL_BG,
-              border: "1px solid var(--brass-40)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              boxShadow: "var(--shadow-felt-md)",
-            }
-      }
+      style={legacyTeamClass ? undefined : floatingPanelStyle()}
       aria-live="polite"
       aria-label={ariaLabel}
       data-testid="trump-indicator"

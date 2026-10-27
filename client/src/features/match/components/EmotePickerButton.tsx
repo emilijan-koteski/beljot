@@ -14,6 +14,8 @@ import { Z } from "@/shared/lib/zLayers";
 import { useMatchStore } from "@/shared/stores/matchStore";
 import { EMOTE_IDS, type EmoteID } from "@/shared/types/wsEvents";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
+
 const EMOTE_GLYPHS: Record<EmoteID, string> = {
   thumbs_up: "👍",
   clap: "👏",
@@ -154,13 +156,7 @@ export function EmotePickerButton({
         aria-label={t("match.emote.button")}
         aria-pressed={isOpen}
         className={`inline-flex h-9 cursor-pointer items-center rounded-md transition-colors hover:not-disabled:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:cursor-not-allowed disabled:opacity-40 ${label ? "w-full justify-start gap-2 px-3.5" : "w-9 justify-center"} ${className}`}
-        style={{
-          background: "var(--panel-deeper)",
-          border: "1px solid var(--brass-40)",
-          color: "var(--ink-light)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-        }}
+        style={{ ...floatingPanelStyle(), color: "var(--ink-light)" }}
         data-testid="emote-toggle"
       >
         <Smile className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -172,14 +168,8 @@ export function EmotePickerButton({
           ref={popoverRef}
           role="group"
           aria-label={t("match.emote.picker.title")}
-          className={`absolute right-0 w-44 rounded-lg p-2 shadow-felt-lg ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
-          style={{
-            zIndex: Z.UTIL,
-            background: "var(--panel-deeper)",
-            border: "1px solid var(--brass-40)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-          }}
+          className={`absolute right-0 w-44 rounded-lg p-2 ${openDirection === "down" ? "top-full mt-1" : "bottom-12"}`}
+          style={{ zIndex: Z.UTIL, ...floatingPanelStyle({ menu: true }) }}
           data-testid="emote-picker"
         >
           <div className="grid grid-cols-3 gap-1" onKeyDown={handleGridKeyDown}>

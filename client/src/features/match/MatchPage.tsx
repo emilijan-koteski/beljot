@@ -93,6 +93,7 @@ import { TrumpReveal } from "./components/TrumpReveal";
 import { UrgentTick } from "./components/UrgentTick";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
+import { floatingPanelStyle } from "./lib/floatingPanel";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
@@ -1456,14 +1457,7 @@ export function MatchPage() {
             aria-expanded={hudMenuOpen}
             data-testid="hud-menu-button"
             className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-md"
-            style={{
-              zIndex: Z.CHROME_TOP,
-              background: "var(--panel-deeper)",
-              border: "1px solid var(--brass-40)",
-              color: "var(--ink-light)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-            }}
+            style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle(), color: "var(--ink-light)" }}
           >
             {hudMenuOpen ? (
               <X className="h-5 w-5" aria-hidden="true" />
@@ -1484,14 +1478,7 @@ export function MatchPage() {
               />
               <div
                 className="absolute top-14 right-3 flex w-44 flex-col gap-1.5 rounded-xl p-2"
-                style={{
-                  zIndex: Z.CHROME_TOP,
-                  background: "var(--panel-deeper)",
-                  border: "1px solid var(--brass-40)",
-                  boxShadow: "var(--shadow-felt-lg)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                }}
+                style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle({ menu: true }) }}
                 data-testid="hud-menu"
               >
                 {isTurnPhase && (
@@ -1852,8 +1839,8 @@ export function MatchPage() {
 
       {errorToast && (
         <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 border border-danger/45 bg-(--panel-deeper) text-danger text-sm px-4 py-2 rounded-lg flex items-center gap-3"
-          style={{ zIndex: Z.TOAST }}
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 text-danger text-sm px-4 py-2 rounded-lg flex items-center gap-3"
+          style={{ zIndex: Z.TOAST, ...floatingPanelStyle({ edge: "danger" }) }}
           role="alert"
           data-testid="error-toast"
         >

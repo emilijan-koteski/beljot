@@ -7,6 +7,7 @@ import type { Card, Suit } from "@/shared/types/matchTypes";
 
 import type { CardDeck } from "../lib/cardFace";
 import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER, resolveCardDeck } from "../lib/cardFace";
+import { floatingPanelStyle } from "../lib/floatingPanel";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors } from "../lib/tableTheme";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
@@ -134,12 +135,7 @@ export function TrumpPrompt({
       >
         <div
           className="mx-4 flex max-w-[24rem] items-center gap-3 rounded-lg px-4 py-3"
-          style={{
-            background: "var(--panel-dark, rgba(20,45,30,0.85))",
-            border: "1px solid var(--brass-40)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-          }}
+          style={floatingPanelStyle()}
         >
           {trumpCandidate && (
             <div className="shrink-0">

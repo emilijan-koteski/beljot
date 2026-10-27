@@ -4,11 +4,12 @@ import { useTranslation } from "react-i18next";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
+
 interface StakePillProps {
   amount: number;
 }
 
-const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
 const INK = "var(--ink-light)";
 
 /**
@@ -22,11 +23,7 @@ export function StakePill({ amount }: StakePillProps) {
     <div
       className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
       style={{
-        background: PANEL_BG,
-        border: "1px solid var(--brass-40)",
-        boxShadow: "var(--shadow-felt-md)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        ...floatingPanelStyle(),
         color: INK,
       }}
       aria-live="polite"

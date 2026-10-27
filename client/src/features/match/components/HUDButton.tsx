@@ -1,5 +1,7 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
+
 type HUDButtonVariant = "default" | "danger";
 
 interface HUDButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,14 +17,8 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
   const isLabeled = label !== undefined && label !== null;
 
   const baseStyle: React.CSSProperties = {
-    background: "var(--panel-deeper)",
-    border:
-      variant === "danger"
-        ? "1px solid color-mix(in srgb, var(--danger-light) 30%, transparent)"
-        : "1px solid var(--brass-40)",
+    ...floatingPanelStyle({ edge: variant === "danger" ? "danger" : "hairline" }),
     color: variant === "danger" ? "var(--danger-light)" : "var(--ink-light)",
-    backdropFilter: "blur(6px)",
-    WebkitBackdropFilter: "blur(6px)",
     minWidth: 36,
     height: 36,
     borderRadius: 10,
