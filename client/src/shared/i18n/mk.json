@@ -925,7 +925,7 @@
       "eyebrowFreeChoice": "Адутот е земен · слободен избор",
       "isTrump": "<suit>{{suit}}</suit> е адут во оваа рака",
       "chose": "избра <suit>{{suit}}</suit>",
-      "namedTrump": "го зеде <suit>{{suit}}</suit> за адут",
+      "namedTrump": "зеде <suit>{{suit}}</suit> за адут",
       "candidateOnTable": "{{rank}} {{suit}} беше на масата",
       "dismiss": "Затвори"
     },
