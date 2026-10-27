@@ -32,7 +32,7 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("lobby.search.placeholder")}
           data-testid="room-list-search"
-          className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-off"
+          className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-mute"
         />
         {search && (
           <button

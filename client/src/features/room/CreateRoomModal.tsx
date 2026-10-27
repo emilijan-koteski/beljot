@@ -1076,5 +1076,5 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
 }
 
 function Dot() {
-  return <span className="text-ink-off text-2xs">·</span>;
+  return <span className="text-faint text-2xs">·</span>;
 }

@@ -105,7 +105,7 @@ export function DurationSlider({
                   <span
                     className={cn(
                       "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xs",
-                      tk.emphasis ? "bg-brass-deep opacity-70" : "bg-ink-off opacity-45",
+                      tk.emphasis ? "bg-brass-deep opacity-70" : "bg-faint opacity-45",
                     )}
                     style={{
                       left: `${tickPct}%`,

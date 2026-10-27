@@ -159,7 +159,7 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
                 placeholder={t("roomInvite.panel.searchPlaceholder")}
                 aria-label={t("roomInvite.panel.searchLabel")}
                 data-testid="invite-lobby-search"
-                className="text-ink placeholder:text-ink-off min-w-0 flex-1 truncate bg-transparent text-sm outline-none"
+                className="text-ink placeholder:text-ink-mute min-w-0 flex-1 truncate bg-transparent text-sm outline-none"
               />
             </div>
             <InviteList

@@ -153,7 +153,7 @@ export function IdentityHero({
           />
           <div className="text-ink-dim flex flex-col gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             {memberSince && <span data-testid="profile-member-since">{memberSince}</span>}
-            {memberSince && lastPlayed && <span className="text-ink-off hidden sm:inline">·</span>}
+            {memberSince && lastPlayed && <span className="text-faint hidden sm:inline">·</span>}
             {lastPlayed && <span>{lastPlayed}</span>}
           </div>
         </div>

@@ -40,7 +40,7 @@ export function Chip({
         SIZE_CLASS[size],
         active
           ? "font-semibold"
-          : "border-border bg-surface-elevated text-ink-dim hover:border-ink-off hover:text-ink font-medium",
+          : "border-border bg-surface-elevated text-ink-dim hover:border-faint hover:text-ink font-medium",
         className,
       )}
       style={
@@ -61,7 +61,7 @@ export function Chip({
         <span
           className={cn(
             "inline-flex h-4 min-w-4 items-center justify-center rounded px-1 text-2xs leading-none font-semibold",
-            active ? "bg-current/15" : "bg-surface-sunken text-ink-mute",
+            active ? "bg-current/15" : "bg-surface-sunken text-ink-dim",
           )}
         >
           {count}

@@ -696,7 +696,7 @@ export function RoomPage() {
   const otherPair = yourPair[0] === 0 ? [1, 3] : [0, 2];
   const renderSlots = (pair: number[]) => (
     <span className="text-ink-mute inline-flex flex-wrap items-center">
-      <span className="text-ink-off" aria-hidden>
+      <span className="text-faint" aria-hidden>
         (
       </span>
       <span className="inline-flex flex-wrap items-center gap-1">
@@ -705,7 +705,7 @@ export function RoomPage() {
           const isYouSlot = p !== undefined && p.isBot !== true && p.userId === currentUser?.id;
           return (
             <span key={seatIndex} className="inline-flex items-center gap-1">
-              {i > 0 && <span className="text-ink-off">+</span>}
+              {i > 0 && <span className="text-faint">+</span>}
               {p ? (
                 <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
                   {isYouSlot
@@ -721,7 +721,7 @@ export function RoomPage() {
           );
         })}
       </span>
-      <span className="text-ink-off" aria-hidden>
+      <span className="text-faint" aria-hidden>
         )
       </span>
     </span>
@@ -829,7 +829,7 @@ export function RoomPage() {
                   components={{ name: <span className="text-ink font-semibold" /> }}
                 />
               </span>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 ·
               </span>
               <DropdownMenu>
@@ -958,7 +958,7 @@ export function RoomPage() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 ·
               </span>
               <span
@@ -1150,7 +1150,7 @@ export function RoomPage() {
                 <span className="text-team-a font-semibold">{t("room.legendUs")}</span>
                 {renderSlots(yourPair)}
               </span>
-              <span className="text-ink-off" aria-hidden>
+              <span className="text-faint" aria-hidden>
                 {t("room.legendVs")}
               </span>
               <span className="inline-flex items-center gap-2" data-team="teamB">

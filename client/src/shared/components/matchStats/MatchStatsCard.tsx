@@ -245,16 +245,16 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
 
               <div className="text-ink-mute mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums">
                 <span>
-                  <span className="text-ink-off tracking-wider uppercase">
+                  <span className="tracking-wider uppercase">
                     {t("profile.matchHistory.hand.col.cards")}
                   </span>{" "}
-                  {d.us.card} <span className="text-ink-off">/</span> {d.them.card}
+                  {d.us.card} <span className="text-faint">/</span> {d.them.card}
                 </span>
                 <span>
-                  <span className="text-ink-off tracking-wider uppercase">
+                  <span className="tracking-wider uppercase">
                     {t("profile.matchHistory.hand.col.declarations")}
                   </span>{" "}
-                  {d.us.decl} <span className="text-ink-off">/</span> {d.them.decl}
+                  {d.us.decl} <span className="text-faint">/</span> {d.them.decl}
                 </span>
               </div>
 
@@ -364,10 +364,10 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
                 {d.them.total}
               </span>
               <span className="text-ink-dim text-xs tabular-nums">
-                {d.us.card} <span className="text-ink-off">/</span> {d.them.card}
+                {d.us.card} <span className="text-faint">/</span> {d.them.card}
               </span>
               <span className="text-ink-dim text-xs tabular-nums">
-                {d.us.decl} <span className="text-ink-off">/</span> {d.them.decl}
+                {d.us.decl} <span className="text-faint">/</span> {d.them.decl}
               </span>
               <span className="flex flex-wrap gap-1.5">
                 <HandNotes
@@ -582,7 +582,7 @@ export function MatchStatsCard({
           >
             {usScore}
           </span>
-          <span className="text-ink-off font-medium">–</span>
+          <span className="text-faint font-medium">–</span>
           <span
             className="text-2xl leading-none font-bold tracking-tight tabular-nums"
             style={{ color: themColor }}

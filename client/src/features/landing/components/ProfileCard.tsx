@@ -82,7 +82,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
               {m.won ? labels.won : labels.lost}
             </span>
             <span className="font-mono text-ink tabular-nums text-sm font-semibold">
-              {m.a} <span className="text-ink-off">–</span> {m.b}
+              {m.a} <span className="text-faint">–</span> {m.b}
               <span className="font-sans text-ink-mute ml-2 text-xs font-normal">
                 {labels.with} {m.withWho}
               </span>

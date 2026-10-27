@@ -286,7 +286,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
           className={cn(
             "ml-auto inline-flex items-center gap-1.5 rounded-md border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
             full || locked
-              ? "bg-surface-sunken text-ink-mute cursor-default"
+              ? "bg-surface-sunken text-ink-dim cursor-default"
               : "bg-accent text-accent-ink cursor-pointer",
           )}
         >
@@ -333,5 +333,5 @@ function CodeChip({ code }: { code: string }) {
 }
 
 function Dot() {
-  return <span className="text-ink-off text-2xs">·</span>;
+  return <span className="text-faint text-2xs">·</span>;
 }

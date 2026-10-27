@@ -58,7 +58,7 @@ export function Segmented<T extends string>({
               active
                 ? "bg-surface-elevated text-ink shadow-xs ring-1 ring-border"
                 : o.disabled
-                  ? "text-ink-off cursor-not-allowed opacity-55"
+                  ? "text-ink-dim cursor-not-allowed opacity-50"
                   : "text-ink-dim hover:text-ink cursor-pointer",
               "focus-visible:ring-3 focus-visible:ring-ring/70",
             )}

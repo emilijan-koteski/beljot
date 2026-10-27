@@ -34,7 +34,7 @@ function FeaturedPartner({ featured }: { featured: PartnerStat }) {
         </div>
         <div className="text-ink-dim text-xs">
           {t("profile.partners.matchesTogether", { count: featured.played })}
-          <span className="text-ink-off"> · </span>
+          <span className="text-faint"> · </span>
           <span className="text-ink font-semibold tabular-nums">
             {winRate(featured.wins, featured.played)}%
           </span>
@@ -117,7 +117,7 @@ export function PartnerSpotlight({ partners, subjectIsSelf = true }: PartnerSpot
                 )}
                 <span className="text-ink-dim text-xs tabular-nums">
                   {p.played}
-                  <span className="text-ink-off"> · </span>
+                  <span className="text-faint"> · </span>
                   <span className="text-ink font-semibold">{winRate(p.wins, p.played)}%</span>
                 </span>
               </div>

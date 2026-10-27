@@ -94,13 +94,13 @@
   --color-surface-elevated: var(--surface-2);
   --color-surface-sunken: var(--surface-3);
   --color-border: var(--border);
+  --color-faint: var(--faint);
   --color-ring: var(--accent);
 
   /* Text */
   --color-ink: var(--ink);
   --color-ink-dim: var(--ink-dim);
   --color-ink-mute: var(--ink-mute);
-  --color-ink-off: var(--ink-off);
 
   /* Accent (felt-green action) */
   --color-accent: var(--accent);
@@ -137,12 +137,12 @@
   --surface-2: #ffffff;
   --surface-3: #ebe6d6;
   --border: #d9d1ba;
+  --faint: #b1b8b3;
 
   /* ── Ink (text) ───────────────────────────────────────────────────── */
   --ink: #0e3a24;
   --ink-dim: #466354;
   --ink-mute: #64726b;
-  --ink-off: #b1b8b3;
 
   /* ── Accent (felt-green action) ───────────────────────────────────── */
   --accent: #196536;
@@ -170,7 +170,7 @@
      `shared/lib/honor.ts` — no component should name these directly.
 
      Why a dedicated ramp rather than reusing the palette: the shipped
-     version borrowed `--ink-off` for "Fair" and a second grey for
+     version borrowed `--faint` for "Fair" and a second grey for
      "Unreliable", so a declining score read as "greyed out / not loaded"
      instead of as a warning. A single ramp makes decline legible.
 
@@ -386,7 +386,7 @@
   }
 
   input::placeholder {
-    color: var(--ink-off);
+    color: var(--ink-mute);
   }
 
   ::selection {
@@ -444,7 +444,6 @@
   --ink: #f5f2e8;
   --ink-dim: #c8d5cd;
   --ink-mute: rgba(245, 242, 232, 0.65);
-  --ink-off: rgba(245, 242, 232, 0.35);
 
   --accent: var(--accent-light);
   --accent-deep: #00b07c;
@@ -453,6 +452,7 @@
   --accent-glow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
   --border: var(--brass-25);
+  --faint: rgba(245, 242, 232, 0.35);
   --brass-deep: #9c7d4e;
   --danger: var(--danger-light);
   --team-a: #a07d1a;

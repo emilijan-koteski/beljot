@@ -37,7 +37,7 @@ export function LandingFooter() {
             {t("support.label")}
           </button>
         </nav>
-        <span className="text-ink-off font-mono text-2xs">{t("landing.foot.copyright")}</span>
+        <span className="text-ink-mute font-mono text-2xs">{t("landing.foot.copyright")}</span>
       </div>
 
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
