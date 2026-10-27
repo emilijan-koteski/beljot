@@ -13,6 +13,7 @@ import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 import {
   isCountdownUrgent,
+  TIMER_RING_INK,
   URGENT_FRACTION,
   useRingDrain,
   useTurnCountdown,
@@ -40,7 +41,6 @@ interface ReconnectOverlayProps {
 }
 
 const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
-const RING_PARCHMENT = "#d4d0c4";
 const RING_DANGER = "var(--danger-light)";
 const RING_SIZE = 132;
 const RING_STROKE_INSET = 4;
@@ -255,7 +255,7 @@ export function ReconnectOverlay({
 
   const pct = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
   const isUrgent = pct <= URGENT_FRACTION;
-  const ringColor = isUrgent ? RING_DANGER : RING_PARCHMENT;
+  const ringColor = isUrgent ? RING_DANGER : TIMER_RING_INK;
   const ringSize = RING_SIZE;
   const ringRadius = RING_RADIUS;
   const ringCirc = RING_CIRC;

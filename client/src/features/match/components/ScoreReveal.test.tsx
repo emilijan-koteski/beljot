@@ -92,6 +92,14 @@ describe("ScoreReveal", () => {
     expect(screen.getByTestId("row-match-total")).toBeInTheDocument();
   });
 
+  it("wraps Continue in the shared turn-timer ring", () => {
+    render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
+
+    const ring = screen.getByTestId("button-timer-ring");
+    expect(ring).toContainElement(screen.getByTestId("score-reveal-continue"));
+    expect(ring).toHaveAttribute("data-urgent", "false");
+  });
+
   it("keeps the 1001 target in the match-score strip by default", () => {
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
 
