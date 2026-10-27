@@ -105,25 +105,20 @@ export function PauseOverlay({
           </div>
 
           <div
-            className="mt-2 flex w-full flex-col items-stretch gap-2 text-center"
+            className="mt-4 flex flex-wrap items-center justify-end gap-3.5"
             data-testid="pause-actions"
           >
             {hasActivePause ? (
-              <ClassicButton
-                variant="primary"
-                onClick={onResume}
-                data-testid="pause-resume-button"
-                className="w-full"
-              >
+              <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
                 {t("match.pause.resume")}
               </ClassicButton>
             ) : canStackPause ? (
-              <ClassicButton onClick={onPause} data-testid="pause-stack-button" className="w-full">
+              <ClassicButton onClick={onPause} data-testid="pause-stack-button">
                 {t("match.pause.pauseButton")}
               </ClassicButton>
             ) : (
               <p
-                className="text-sm italic"
+                className="mr-auto text-sm italic"
                 style={{ color: "var(--ink-light)", opacity: 0.65 }}
                 data-testid="pause-waiting"
               >
@@ -136,7 +131,6 @@ export function PauseOverlay({
                 variant={hasActivePause ? "ghost" : "primary"}
                 onClick={onOwnerResume}
                 data-testid="pause-owner-resume-button"
-                className="w-full"
               >
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <Crown size={14} aria-hidden="true" />

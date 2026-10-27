@@ -278,7 +278,7 @@ describe("PauseOverlay", () => {
 });
 
 describe("PauseOverlay action row", () => {
-  it("stacks the player control above the owner override", () => {
+  it("puts the player control before the owner override in one footer row", () => {
     render(
       <PauseOverlay
         pausedPlayers={[true, false, false, false]}
@@ -296,9 +296,7 @@ describe("PauseOverlay action row", () => {
     const ownerResume = screen.getByTestId("pause-owner-resume-button");
     expect(resume.compareDocumentPosition(ownerResume)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
-    const row = screen.getByTestId("pause-actions");
-    expect(row).toBe(resume.parentElement);
-    expect(row.className).toContain("flex-col");
-    expect(row.className).not.toContain("justify-between");
+    expect(screen.getByTestId("pause-actions")).toBe(resume.parentElement);
+    expect(screen.getByTestId("pause-actions")).toBe(ownerResume.parentElement);
   });
 });

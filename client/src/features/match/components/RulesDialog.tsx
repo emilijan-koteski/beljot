@@ -117,32 +117,9 @@ export function RulesDialog({
               bodyPadding={0}
               style={{ height: RULES_PANEL_HEIGHT }}
               title={
-                <span className="flex items-center gap-3">
+                <span id="rules-dialog-title" className="inline-flex items-center gap-2.5">
                   <BookOpen size={20} style={{ color: BRASS }} aria-hidden="true" />
-                  <span className="flex flex-col">
-                    <span
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.18em",
-                        textTransform: "uppercase",
-                        color: BRASS,
-                        opacity: 0.85,
-                      }}
-                    >
-                      {ui.ovReference}
-                    </span>
-                    <span
-                      id="rules-dialog-title"
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 600,
-                        color: INK,
-                        marginTop: 1,
-                      }}
-                    >
-                      {ui.ovTitle}
-                    </span>
-                  </span>
+                  {ui.ovTitle}
                 </span>
               }
             >
