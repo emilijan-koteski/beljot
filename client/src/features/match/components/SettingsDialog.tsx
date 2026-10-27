@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 
 import { updatePreferences } from "@/shared/api/profile";
 import { useAudioVolume } from "@/shared/audio/useAudioVolume";
+import { Segmented } from "@/shared/components/ui/segmented";
 import { Slider } from "@/shared/components/ui/slider";
+import { Switch } from "@/shared/components/ui/switch";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import {
   type AudioVolumeField,
@@ -42,210 +44,83 @@ const DECKS = [
 const BRASS = "var(--brass)";
 
 /**
- * One brass radio row. Shared by the Language and Card Deck sections rather than
- * copied into each, so the two pickers cannot drift apart visually and the next
- * section added below inherits the same row for free.
+ * One audio channel: its switch, named by the label it sits in, over its volume slider.
+ * The slider stays outside the label so pressing the track never toggles the switch.
  */
-function SettingRow({
-  selected,
-  onSelect,
-  testId,
-  children,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  testId: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      data-testid={testId}
-      className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
-      style={{
-        border: selected ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
-        background: selected
-          ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
-          : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-        color: "var(--ink-light)",
-        boxShadow: selected
-          ? "inset 0 1px 0 var(--brass-25), 0 0 0 1px var(--brass-25)"
-          : "inset 0 1px 0 var(--brass-10)",
-      }}
-    >
-      <span className="text-sm font-medium inline-flex items-center gap-2" style={{}}>
-        <span
-          aria-hidden
-          className="rounded-full"
-          style={{
-            width: 7,
-            height: 7,
-            background: selected ? BRASS : "transparent",
-            border: selected ? "none" : "1px solid var(--brass-40)",
-            boxShadow: selected ? "0 0 6px var(--brass-55)" : "none",
-            flexShrink: 0,
-          }}
-        />
-        {children}
-      </span>
-      {selected && (
-        <span className="text-xs uppercase tracking-wider" style={{ color: BRASS }} aria-hidden>
-          ✓
-        </span>
-      )}
-    </button>
-  );
-}
-
-/**
- * Brass on/off switch row, the switch counterpart of `SettingRow`.
- */
-function SettingSwitchRow({
+function AudioChannel({
   checked,
-  onToggle,
-  testId,
-  children,
+  onCheckedChange,
+  label,
+  switchTestId,
+  volumeField,
+  volumeLabel,
+  volumeTestId,
 }: {
   checked: boolean;
-  onToggle: () => void;
-  testId: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onToggle}
-      data-testid={testId}
-      className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-[background,border-color,box-shadow] cursor-pointer"
-      style={{
-        border: checked ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
-        background: checked
-          ? "linear-gradient(90deg, rgba(80,60,30,0.55), rgba(50,38,20,0.35))"
-          : "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-        color: "var(--ink-light)",
-        boxShadow: checked
-          ? "inset 0 1px 0 var(--brass-25), 0 0 0 1px var(--brass-25)"
-          : "inset 0 1px 0 var(--brass-10)",
-      }}
-    >
-      <span className="text-sm font-medium" style={{}}>
-        {children}
-      </span>
-      <span
-        aria-hidden
-        className="relative inline-flex shrink-0 items-center rounded-full"
-        style={{
-          width: 34,
-          height: 18,
-          background: checked ? "var(--brass-85)" : "rgba(0,0,0,0.3)",
-          border: checked ? `1px solid ${BRASS}` : "1px solid var(--brass-40)",
-          boxShadow: checked ? "0 0 6px var(--brass-40)" : "none",
-        }}
-      >
-        <span
-          className="absolute rounded-full motion-safe:transition-transform"
-          style={{
-            left: 2,
-            width: 12,
-            height: 12,
-            background: checked ? "#1d3a26" : "var(--brass-55)",
-            transform: checked ? "translateX(16px)" : "none",
-          }}
-        />
-      </span>
-    </button>
-  );
-}
-
-/**
- * Brass volume slider row under its channel switch, disabled while that switch is off.
- */
-function SettingVolumeRow({
-  field,
-  label,
-  disabled,
-  testId,
-}: {
-  field: AudioVolumeField;
+  onCheckedChange: (checked: boolean) => void;
   label: string;
-  disabled: boolean;
-  testId: string;
+  switchTestId: string;
+  volumeField: AudioVolumeField;
+  volumeLabel: string;
+  volumeTestId: string;
 }) {
-  const { value, onValueChange, onValueCommitted } = useAudioVolume(field);
+  const { value, onValueChange, onValueCommitted } = useAudioVolume(volumeField);
   return (
-    <div
-      data-testid={testId}
-      data-disabled={disabled ? "" : undefined}
-      className="flex items-center gap-3 px-3 py-1 transition-opacity data-disabled:opacity-45"
-    >
-      <Volume1 size={14} aria-hidden="true" style={{ color: BRASS, flexShrink: 0 }} />
-      <Slider
-        min={0}
-        max={100}
-        step={1}
-        value={value}
-        onValueChange={onValueChange}
-        onValueCommitted={onValueCommitted}
-        disabled={disabled}
-        aria-label={label}
-        getAriaValueText={(v) => `${v}%`}
-        className="data-disabled:opacity-100"
-        trackClassName="bg-[rgba(0,0,0,0.3)] inset-ring inset-ring-brass/40"
-        indicatorClassName="bg-brass/85"
-        thumbClassName="border-[#c9a876] bg-[#1d3a26] shadow-[0_0_6px_var(--brass-40)] has-[:focus-visible]:ring-brass/55"
-      />
-      <span
-        aria-hidden
-        className="text-xs tabular-nums"
-        style={{
-          color: BRASS,
-          minWidth: "4ch",
-          textAlign: "right",
-        }}
+    <div className="flex flex-col gap-2">
+      <label className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="text-ink text-sm font-medium">{label}</span>
+        <Switch checked={checked} onCheckedChange={onCheckedChange} data-testid={switchTestId} />
+      </label>
+      <div
+        data-testid={volumeTestId}
+        data-disabled={checked ? undefined : ""}
+        className="flex items-center gap-3 transition-opacity data-disabled:opacity-50"
       >
-        {value}%
-      </span>
+        <Volume1 size={14} aria-hidden="true" className="text-brass shrink-0" />
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          onValueChange={onValueChange}
+          onValueCommitted={onValueCommitted}
+          disabled={!checked}
+          aria-label={volumeLabel}
+          getAriaValueText={(v) => `${v}%`}
+          className="data-disabled:opacity-100"
+        />
+        <span aria-hidden className="text-brass min-w-[4ch] text-right text-xs tabular-nums">
+          {value}%
+        </span>
+      </div>
     </div>
   );
 }
 
 /**
- * Brass eyebrow heading over a group of setting rows, a radiogroup by default.
- * Sections of independent switches pass `role="group"`.
+ * Brass small-caps heading with an icon over one group of settings.
  */
 function SettingSection({
   icon,
   heading,
-  role = "radiogroup",
+  headingId,
   children,
 }: {
   icon: ReactNode;
   heading: string;
-  role?: "radiogroup" | "group";
+  headingId?: string;
   children: ReactNode;
 }) {
-  const headingId = useId();
   return (
     <section className="flex flex-col gap-3">
       <div
         className="flex items-center gap-2 text-xs uppercase"
-        style={{
-          color: BRASS,
-          letterSpacing: "0.18em",
-        }}
+        style={{ color: BRASS, letterSpacing: "0.18em" }}
       >
         {icon}
         <span id={headingId}>{heading}</span>
       </div>
-
-      <div className="flex flex-col gap-2" role={role} aria-labelledby={headingId}>
-        {children}
-      </div>
+      {children}
     </section>
   );
 }
@@ -260,6 +135,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
   const soundEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.soundEnabled));
   const musicEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.musicEnabled));
+  const soundHeadingId = useId();
 
   async function handleLanguageChange(lang: string) {
     if (lang === i18n.language) return;
@@ -307,70 +183,62 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </span>
             }
           >
-            <div className="flex flex-col gap-5">
+            <div className="felt-controls flex flex-col gap-5">
               <SettingSection
                 icon={<Globe size={14} aria-hidden="true" />}
                 heading={t("match.settings.languageHeading")}
               >
-                {LANGUAGES.map((lang) => (
-                  <SettingRow
-                    key={lang.code}
-                    selected={i18n.language === lang.code}
-                    onSelect={() => handleLanguageChange(lang.code)}
-                    testId={`settings-language-option-${lang.code}`}
-                  >
-                    {t(lang.labelKey)}
-                  </SettingRow>
-                ))}
+                <Segmented
+                  value={i18n.language}
+                  onValueChange={(lang) => void handleLanguageChange(lang)}
+                  options={LANGUAGES.map((lang) => ({ value: lang.code, label: t(lang.labelKey) }))}
+                  ariaLabel={t("match.settings.languageHeading")}
+                  testId="settings-language-option"
+                />
               </SettingSection>
 
               <SettingSection
                 icon={<Spade size={14} aria-hidden="true" />}
                 heading={t("match.settings.deckHeading")}
               >
-                {DECKS.map((d) => (
-                  <SettingRow
-                    key={d.code}
-                    selected={deck === d.code}
-                    onSelect={() => handleDeckChange(d.code)}
-                    testId={`settings-deck-option-${d.code}`}
-                  >
-                    {t(d.labelKey)}
-                  </SettingRow>
-                ))}
+                <Segmented
+                  value={deck}
+                  onValueChange={(next) => void handleDeckChange(next)}
+                  options={DECKS.map((d) => ({ value: d.code, label: t(d.labelKey) }))}
+                  ariaLabel={t("match.settings.deckHeading")}
+                  testId="settings-deck-option"
+                />
               </SettingSection>
 
               <SettingSection
                 icon={<Volume2 size={14} aria-hidden="true" />}
                 heading={t("match.settings.soundHeading")}
-                role="group"
+                headingId={soundHeadingId}
               >
-                <SettingSwitchRow
-                  checked={soundEnabled}
-                  onToggle={() => void persistAudioPreferences({ soundEnabled: !soundEnabled })}
-                  testId="settings-sound-toggle"
-                >
-                  {t("match.settings.soundEffects")}
-                </SettingSwitchRow>
-                <SettingVolumeRow
-                  field="soundVolume"
-                  label={t("match.settings.soundVolume")}
-                  disabled={!soundEnabled}
-                  testId="settings-sound-volume"
-                />
-                <SettingSwitchRow
-                  checked={musicEnabled}
-                  onToggle={() => void persistAudioPreferences({ musicEnabled: !musicEnabled })}
-                  testId="settings-music-toggle"
-                >
-                  {t("match.settings.music")}
-                </SettingSwitchRow>
-                <SettingVolumeRow
-                  field="musicVolume"
-                  label={t("match.settings.musicVolume")}
-                  disabled={!musicEnabled}
-                  testId="settings-music-volume"
-                />
+                <div role="group" aria-labelledby={soundHeadingId} className="flex flex-col gap-4">
+                  <AudioChannel
+                    checked={soundEnabled}
+                    onCheckedChange={(checked) =>
+                      void persistAudioPreferences({ soundEnabled: checked })
+                    }
+                    label={t("match.settings.soundEffects")}
+                    switchTestId="settings-sound-toggle"
+                    volumeField="soundVolume"
+                    volumeLabel={t("match.settings.soundVolume")}
+                    volumeTestId="settings-sound-volume"
+                  />
+                  <AudioChannel
+                    checked={musicEnabled}
+                    onCheckedChange={(checked) =>
+                      void persistAudioPreferences({ musicEnabled: checked })
+                    }
+                    label={t("match.settings.music")}
+                    switchTestId="settings-music-toggle"
+                    volumeField="musicVolume"
+                    volumeLabel={t("match.settings.musicVolume")}
+                    volumeTestId="settings-music-volume"
+                  />
+                </div>
               </SettingSection>
             </div>
 

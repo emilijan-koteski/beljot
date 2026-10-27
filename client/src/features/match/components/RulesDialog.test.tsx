@@ -155,15 +155,19 @@ describe("RulesDialog (in-game)", () => {
     expect(bitola).toHaveFocus();
   });
 
-  it("points both variant tabs at the panel they control", () => {
+  it("points the selected variant tab at the panel it controls", async () => {
+    const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
-    const panelId = screen.getByTestId("rules-dialog-variant-bitola").getAttribute("aria-controls");
-    expect(panelId).toBeTruthy();
-    expect(screen.getByTestId("rules-dialog-variant-croatia")).toHaveAttribute(
-      "aria-controls",
-      panelId,
-    );
-    expect(document.getElementById(panelId!)).toHaveAttribute("role", "tabpanel");
+    const panelOf = (testId: string) =>
+      document.getElementById(screen.getByTestId(testId).getAttribute("aria-controls")!);
+
+    expect(panelOf("rules-dialog-variant-bitola")).toHaveAttribute("role", "tabpanel");
+    expect(panelOf("rules-dialog-variant-bitola")).toHaveTextContent(BITOLA_STEP);
+
+    await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
+
+    expect(panelOf("rules-dialog-variant-croatia")).toHaveAttribute("role", "tabpanel");
+    expect(panelOf("rules-dialog-variant-croatia")).toHaveTextContent(CROATIA_STEP);
   });
 
   it("numbers the visible steps gaplessly in the overlay, on both tabs", async () => {

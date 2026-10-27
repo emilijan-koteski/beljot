@@ -210,20 +210,13 @@ export function ReconnectOverlay({
         <OverlayBackdrop dim="blocker">
           <ClassicPanel size="dialog" glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
-              <span
-                className="text-2xs uppercase tracking-caps"
-                style={{ color: "var(--ink-light)", opacity: 0.55 }}
-              >
-                {t("match.matchResult.title")}
-              </span>
-
-              <h2
-                className="text-2xl font-semibold tracking-tight"
-                style={{ color: RING_DANGER }}
+              <ResultHeading
+                eyebrow={t("match.matchResult.title")}
+                color={RING_DANGER}
                 data-testid="match-ended-title"
               >
                 {t("match.disconnect.matchEnded", { defaultValue: "Match has ended" })}
-              </h2>
+              </ResultHeading>
 
               <p className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                 {t("match.disconnect.reconnectFailed")}

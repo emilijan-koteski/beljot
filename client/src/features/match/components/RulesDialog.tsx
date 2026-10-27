@@ -13,6 +13,7 @@ import type {
   RuleSection,
 } from "@/features/rules/content/types";
 import { isVisibleFor, visibleFor } from "@/features/rules/content/visibility";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { variantLabel } from "@/shared/lib/roomLabels";
@@ -31,9 +32,6 @@ interface RulesDialogProps {
   declarationsTransfer?: boolean;
   clockwise?: boolean;
 }
-
-const PANEL_ID = "rules-dialog-panel";
-const tabId = (v: Variant) => `rules-dialog-tab-${v}`;
 
 const RULES_PANEL_HEIGHT = 620;
 const BRASS = "var(--brass)";
@@ -185,98 +183,74 @@ export function RulesDialog({
                     ref={scrollRef}
                     className="min-w-0 flex-1 overflow-y-auto px-4 pt-1 pb-5 md:px-6.5 md:pb-5.5"
                   >
-                    <div
-                      className="flex items-center gap-2 pt-3"
-                      data-testid="rules-dialog-variant-tabs"
-                      role="tablist"
-                      aria-label={ui.variantLabel}
+                    <Tabs
+                      value={activeVariant}
+                      onValueChange={(value) => setActiveVariant(normalizeVariant(value))}
+                      className="gap-0"
                     >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          letterSpacing: "0.18em",
-                          textTransform: "uppercase",
-                          color: BRASS,
-                          opacity: 0.7,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {ui.variantLabel}
-                      </span>
-                      {VARIANTS.map((v, i) => {
-                        const on = v === activeVariant;
-                        return (
-                          <button
-                            key={v}
-                            type="button"
-                            role="tab"
-                            id={tabId(v)}
-                            aria-selected={on}
-                            aria-controls={PANEL_ID}
-                            tabIndex={on ? 0 : -1}
-                            onKeyDown={(e) => {
-                              const step =
-                                e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-                              if (step === 0) return;
-                              e.preventDefault();
-                              const next = normalizeVariant(
-                                VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length],
-                              );
-                              setActiveVariant(next);
-                              e.currentTarget.parentElement
-                                ?.querySelector<HTMLButtonElement>(
-                                  `[data-testid="rules-dialog-variant-${next}"]`,
-                                )
-                                ?.focus();
-                            }}
-                            onClick={() => setActiveVariant(v)}
-                            data-testid={`rules-dialog-variant-${v}`}
-                            className="cursor-pointer rounded-sm transition-colors"
-                            style={{
-                              padding: "5px 11px",
-                              fontSize: 12,
-                              fontWeight: on ? 600 : 500,
-                              background: on ? "var(--brass-soft)" : "transparent",
-                              border: on
-                                ? "1px solid var(--brass-40)"
-                                : "1px solid var(--brass-soft)",
-                              color: on ? INK : TEXT_DIM,
-                            }}
-                          >
-                            {variantLabel(t, v)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {stopAtTarget === true && (
-                      <TableRuleNote testId="rules-dialog-stop-at-target-note">
-                        {t("match.rules.stopAtTargetNote")}
-                      </TableRuleNote>
-                    )}
-                    {declarationsTransfer === false && (
-                      <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
-                        {t("match.rules.noDeclarationsTransferNote")}
-                      </TableRuleNote>
-                    )}
-                    {clockwise === true && (
-                      <TableRuleNote testId="rules-dialog-clockwise-note">
-                        {t("match.rules.clockwiseNote")}
-                      </TableRuleNote>
-                    )}
-                    <DarkRulesCtx.Provider value={{ content, variant: activeVariant }}>
-                      <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(activeVariant)}>
-                        {sections.map((s, i) => (
-                          <DarkChapter
-                            key={s.id}
-                            idx={i}
-                            section={s}
-                            registerRef={(el) => {
-                              chapterRefs.current[s.id] = el;
-                            }}
-                          />
-                        ))}
+                      <div className="flex items-center gap-2 pt-3">
+                        <span
+                          style={{
+                            fontSize: 10,
+                            letterSpacing: "0.18em",
+                            textTransform: "uppercase",
+                            color: BRASS,
+                            opacity: 0.7,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {ui.variantLabel}
+                        </span>
+                        <TabsList
+                          activateOnFocus
+                          aria-label={ui.variantLabel}
+                          className="felt-controls"
+                          data-testid="rules-dialog-variant-tabs"
+                        >
+                          {VARIANTS.map((v) => (
+                            <TabsTrigger
+                              key={v}
+                              value={v}
+                              className="px-3"
+                              data-testid={`rules-dialog-variant-${v}`}
+                            >
+                              {variantLabel(t, v)}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
                       </div>
-                    </DarkRulesCtx.Provider>
+                      {stopAtTarget === true && (
+                        <TableRuleNote testId="rules-dialog-stop-at-target-note">
+                          {t("match.rules.stopAtTargetNote")}
+                        </TableRuleNote>
+                      )}
+                      {declarationsTransfer === false && (
+                        <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
+                          {t("match.rules.noDeclarationsTransferNote")}
+                        </TableRuleNote>
+                      )}
+                      {clockwise === true && (
+                        <TableRuleNote testId="rules-dialog-clockwise-note">
+                          {t("match.rules.clockwiseNote")}
+                        </TableRuleNote>
+                      )}
+                      {VARIANTS.map((v) => (
+                        <TabsContent key={v} value={v}>
+                          <DarkRulesCtx.Provider value={{ content, variant: v }}>
+                            {sections.map((s, i) => (
+                              <DarkChapter
+                                key={s.id}
+                                idx={i}
+                                section={s}
+                                registerRef={(el) => {
+                                  chapterRefs.current[s.id] = el;
+                                }}
+                              />
+                            ))}
+                          </DarkRulesCtx.Provider>
+                        </TabsContent>
+                      ))}
+                    </Tabs>
                   </div>
                 </div>
 

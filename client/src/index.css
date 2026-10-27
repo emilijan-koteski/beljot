@@ -608,6 +608,28 @@
   --chat-shadow-fab: var(--shadow-felt-md);
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Felt controls — lets the shared Switch, Slider, Segmented and Tabs sit
+   in a felt dialog. In-match dialogs portal to <body>, outside
+   `.game-table`, so every token those controls read is re-pointed here:
+   a dark sunken well, cream inks, and brass for the "on" state, because
+   the table's lime accent is the turn signal and stays off these controls.
+   ────────────────────────────────────────────────────────────────────── */
+.felt-controls {
+  --bg: var(--brass-soft);
+  --surface: #1d3a26;
+  --surface-2: var(--brass-soft);
+  --surface-3: rgba(0, 0, 0, 0.28);
+  --border: var(--brass-40);
+  --ink: var(--ink-light);
+  --ink-dim: #c8d5cd;
+  --ink-mute: rgba(245, 242, 232, 0.65);
+  --accent: var(--brass);
+  --accent-deep: var(--brass);
+  --accent-soft: var(--brass-soft);
+  --accent-ink: var(--brass-ink);
+}
+
 /* The floating message peek sits over the felt + cards (not inside the dark
    panel), so it needs an OPAQUE felt-green fill — the in-panel `--surface-2`
    bubble tint is near-transparent and would let the white cards bleed through
