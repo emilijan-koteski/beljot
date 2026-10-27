@@ -252,7 +252,7 @@ function InviteList({
             data-user-id={row.userId}
             data-available={row.available === true ? "true" : "false"}
           >
-            <Avatar name={row.username} avatarUrl={row.avatarUrl} size={28} className="shrink-0" />
+            <Avatar name={row.username} avatarUrl={row.avatarUrl} size={24} className="shrink-0" />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="text-ink truncate font-medium">{row.username}</span>
               {(rowError !== undefined || row.available !== true) && (

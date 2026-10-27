@@ -1046,7 +1046,7 @@ function PreviewCard({
 
       <div className="border-border bg-[rgba(14,58,36,0.03)] flex items-center gap-2.5 border-t px-4.5 py-3">
         <span className="text-ink-dim inline-flex items-center gap-1.5 text-xs">
-          <Avatar name={hostUsername} size={18} />
+          <Avatar name={hostUsername} size={20} />
           {hostUsername}
         </span>
         <span className="text-ink-mute inline-flex items-center gap-1 text-xs">

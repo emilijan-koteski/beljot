@@ -50,7 +50,7 @@ export function PauseOverlay({
     >
       <OverlayBackdrop dim={0.65}>
         <ClassicPanel
-          width={440}
+          width={480}
           title={t("match.pause.title")}
           subtitle={t(
             pausedNames.length > 1 ? "match.pause.pausedByMany" : "match.pause.pausedBy",
@@ -147,7 +147,7 @@ export function PauseOverlay({
                 }}
               >
                 <span className="inline-flex items-center justify-center gap-1.5">
-                  <Crown size={13} aria-hidden="true" />
+                  <Crown size={14} aria-hidden="true" />
                   {t("match.pause.resumeAll")}
                 </span>
               </ClassicButton>

@@ -21,15 +21,15 @@ export function cardBox(width: number): CardDimensions {
   return { width, height: width * ART_ASPECT, radius: width * ART_RADIUS_RATIO };
 }
 
-const MIN_RANK_INDEX_READABLE_WIDTH = 56;
+const MIN_RANK_INDEX_READABLE_WIDTH = 60;
 
 export const CARD_SIZES: Record<CardSize, CardDimensions> = {
   sm: cardBox(MIN_RANK_INDEX_READABLE_WIDTH),
-  md: cardBox(75),
+  md: cardBox(80),
   lg: cardBox(90),
 };
 
-export const SEAT_STACK_CARD_WIDTH = { desktop: 26, compact: 15 } as const;
+export const SEAT_STACK_CARD_WIDTH = { desktop: 30, compact: 20 } as const;
 
 export const CARD_FACE_BACKGROUND = "linear-gradient(180deg, var(--card-face) 0%, #f4ecd8 100%)";
 

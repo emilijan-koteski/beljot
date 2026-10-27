@@ -7,7 +7,12 @@ import { MOTION } from "@/shared/lib/motion";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Suit } from "@/shared/types/matchTypes";
 
-import { CARD_BACK_BACKGROUND, resolveCardDeck, SEAT_STACK_CARD_WIDTH } from "../lib/cardFace";
+import {
+  CARD_BACK_BACKGROUND,
+  cardBox,
+  resolveCardDeck,
+  SEAT_STACK_CARD_WIDTH,
+} from "../lib/cardFace";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
@@ -100,17 +105,17 @@ function CardBackStack({
 }) {
   const visible = Math.min(count, 5);
   const cw = compact ? SEAT_STACK_CARD_WIDTH.compact : SEAT_STACK_CARD_WIDTH.desktop;
-  const ch = compact ? 22 : 38;
-  const overlap = compact ? 12 : 22;
-  const radius = compact ? 3 : 4;
+  const ch = cardBox(cw).height;
+  const overlap = compact ? 16 : 26;
+  const radius = compact ? 2 : 4;
   return (
     <div
       className="flex items-center"
       style={{
         marginLeft: isHorizontal ? 8 : 0,
         marginTop: isHorizontal ? 0 : compact ? 2 : 4,
-        minWidth: compact ? 34 : 56,
-        minHeight: compact ? 22 : 38,
+        minWidth: compact ? 36 : 56,
+        minHeight: ch,
         visibility: visible > 0 ? "visible" : "hidden",
       }}
       data-testid="player-seat-card-stack"
@@ -129,7 +134,7 @@ function CardBackStack({
             marginLeft: i === 0 ? 0 : -overlap,
             transform: `rotate(${(i - 2) * 1.5}deg)`,
             background: CARD_BACK_BACKGROUND,
-            border: `${compact ? 1 : 1.5}px solid var(--brass)`,
+            border: "1px solid var(--brass)",
             borderRadius: radius,
             boxShadow: "var(--shadow-felt-sm)",
           }}
@@ -238,7 +243,7 @@ export function PlayerSeat({
       title={t("match.seat.calledSuit", { suit: t(suitNameKey(trumpCallerSuit, deck)) })}
       testId="player-seat-caller-chip"
     >
-      <SuitMark suit={trumpCallerSuit} deck={deck} size={18} />
+      <SuitMark suit={trumpCallerSuit} deck={deck} size={20} />
     </StatusChip>
   ) : null;
 

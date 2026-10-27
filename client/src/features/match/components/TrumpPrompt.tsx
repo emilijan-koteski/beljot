@@ -186,7 +186,7 @@ export function TrumpPrompt({
                         filter: isLocked ? "grayscale(0.85)" : undefined,
                       }}
                     >
-                      <SuitMark suit={suit} deck={deck} size={15} />
+                      <SuitMark suit={suit} deck={deck} size={16} />
                     </span>
                   );
                 })}

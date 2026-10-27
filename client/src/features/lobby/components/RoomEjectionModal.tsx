@@ -102,7 +102,7 @@ export function RoomEjectionModal() {
         data-testid="room-ejection-modal"
         style={{
           display: "block",
-          width: 460,
+          width: 480,
           maxWidth: "calc(100% - 48px)",
           padding: 0,
           overflow: "hidden",

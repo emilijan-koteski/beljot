@@ -10,7 +10,7 @@ import { LanguageSelector } from "@/shared/components/LanguageSelector";
 export function LandingNav() {
   const { t } = useTranslation();
   return (
-    <header className="border-brass-soft absolute inset-x-0 top-0 z-10 h-18.5 border-b">
+    <header className="border-brass-soft absolute inset-x-0 top-0 z-10 h-18 border-b">
       <div className="mx-auto flex h-full max-w-7xl items-center px-[clamp(28px,5vw,72px)]">
         <BrandLockup showSuffix />
         <nav className="ml-auto flex items-center gap-3 sm:gap-4">

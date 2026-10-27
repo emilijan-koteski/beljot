@@ -69,7 +69,7 @@ export function ProfileCard({ labels }: { labels: ProfileLabels }) {
             style={i < MATCHES.length - 1 ? { borderBottom: "1px solid var(--border)" } : undefined}
           >
             <span
-              className="min-w-13 rounded-md px-2 py-1 text-center text-xs font-bold"
+              className="min-w-14 rounded-md px-2 py-1 text-center text-xs font-bold"
               style={
                 m.won
                   ? { background: "var(--accent-soft)", color: "var(--accent)" }

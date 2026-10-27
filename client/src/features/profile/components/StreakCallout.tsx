@@ -47,7 +47,7 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
           color: isWin ? "var(--accent-ink)" : COLD_STREAK_ICE.icon,
         }}
       >
-        {isWin ? <Sparkles className="size-4.5" /> : <Snowflake className="size-4.5" />}
+        {isWin ? <Sparkles className="size-5" /> : <Snowflake className="size-5" />}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span

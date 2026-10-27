@@ -54,7 +54,7 @@ export function Chapter({ idx, section, registerRef }: Props) {
             fontSize: 16,
             lineHeight: 1.6,
             color: "var(--ink-dim)",
-            maxWidth: 620,
+            maxWidth: 640,
           }}
         >
           {section.lede}

@@ -35,7 +35,7 @@ export function SurrenderPrompt({ proposerUsername, onAccept, onDecline }: Surre
             glowColor={DANGER}
             title={
               <span id="surrender-prompt-title" className="inline-flex items-center gap-2.5">
-                <Flag size={18} style={{ color: DANGER }} aria-hidden="true" />
+                <Flag size={20} style={{ color: DANGER }} aria-hidden="true" />
                 {t("match.surrender.prompt.title")}
               </span>
             }

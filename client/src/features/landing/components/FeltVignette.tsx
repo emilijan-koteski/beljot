@@ -201,7 +201,7 @@ export function FeltVignette({
           >
             {labels.trump}
           </span>
-          <Suit name="hearts" size={15} />
+          <Suit name="hearts" size={16} />
         </div>
       </div>
     </div>

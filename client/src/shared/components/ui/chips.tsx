@@ -53,7 +53,7 @@ export function Chips<T extends string | number>({
             data-state={active ? "on" : "off"}
             data-testid={`${testId ?? "chips"}-${o.value}`}
             className={cn(
-              "inline-flex h-8.5 items-center gap-1.5 rounded-full border px-3.5 text-sm tabular-nums transition-[background-color,border-color,color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
+              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3.5 text-sm tabular-nums transition-[background-color,border-color,color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70",
               active
                 ? "font-bold"
                 : "border-border bg-surface-elevated text-ink-dim hover:text-ink font-medium",

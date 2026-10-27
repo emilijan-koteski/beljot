@@ -49,7 +49,7 @@ export function BelotPrompt({
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={460}
+            width={480}
             title={<span id="belot-prompt-title">{t(titleKey)}</span>}
             subtitle={t(subtitleKey)}
           >

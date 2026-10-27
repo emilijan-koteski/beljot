@@ -300,7 +300,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={460}
+            width={480}
             title={
               <span id="settings-dialog-title" className="inline-flex items-center gap-2.5">
                 {t("match.settings.title")}

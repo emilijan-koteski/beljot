@@ -86,7 +86,7 @@ export function ForgotPasswordPage() {
           <Input
             id="email"
             type="email"
-            className="h-10.5"
+            className="h-11"
             placeholder={t("auth.forgotPassword.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}

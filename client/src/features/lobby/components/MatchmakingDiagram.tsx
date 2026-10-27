@@ -49,7 +49,7 @@ export function MatchmakingDiagram({
   const { t } = useTranslation();
 
   const isCompact = useMediaQuery("(max-width: 767px)");
-  const youSize = isCompact ? 48 : 64;
+  const youSize = isCompact ? 44 : 56;
   const orbitSize = isCompact ? 40 : 52;
   const orbitBox = isCompact ? "min(240px, calc(100vw - 72px))" : "min(380px, calc(100vw - 72px))";
 
@@ -177,7 +177,7 @@ export function MatchmakingDiagram({
               ) : (
                 <div
                   className={`bg-surface-elevated flex items-center justify-center rounded-full border-2 border-dashed ${
-                    isCompact ? "size-10" : "size-13"
+                    isCompact ? "size-11" : "size-14"
                   }`}
                   style={{
                     borderColor: isUs ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",

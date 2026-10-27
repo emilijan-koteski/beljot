@@ -154,7 +154,7 @@ export function RegisterPage() {
           <Input
             id="email"
             type="email"
-            className="h-10.5"
+            className="h-11"
             placeholder={t("auth.register.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -178,7 +178,7 @@ export function RegisterPage() {
           <Input
             id="username"
             type="text"
-            className="h-10.5"
+            className="h-11"
             maxLength={USERNAME_MAX_LENGTH}
             placeholder={t("auth.register.usernamePlaceholder")}
             value={username}
@@ -200,7 +200,7 @@ export function RegisterPage() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              className="h-10.5 pr-10"
+              className="h-11 pr-10"
               placeholder={t("auth.register.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}

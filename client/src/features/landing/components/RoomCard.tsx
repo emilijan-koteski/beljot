@@ -34,7 +34,7 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
   if (!ini) {
     return (
       <span
-        className="text-ink-off flex h-7.5 items-center justify-center rounded-lg border border-dashed px-2.5 text-xs"
+        className="text-ink-off flex h-7 items-center justify-center rounded-lg border border-dashed px-2.5 text-xs"
         style={{
           borderColor: isA ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",
           background: isA ? "var(--team-a-line)" : "var(--team-b-line)",
@@ -47,14 +47,14 @@ function SeatChip({ seat, emptyLabel }: { seat?: Seat; emptyLabel: string }) {
 
   return (
     <span
-      className="text-ink flex h-7.5 items-center gap-1.5 rounded-lg border py-0 pr-2.5 pl-1 text-xs"
+      className="text-ink flex h-7 items-center gap-1.5 rounded-lg border py-0 pr-2.5 pl-1 text-xs"
       style={{
         borderColor: isA ? "var(--team-a-edge)" : "var(--team-b-edge)",
         background: isA ? "var(--team-a-tint)" : "var(--team-b-tint)",
       }}
     >
       <span
-        className="inline-flex size-4.5 items-center justify-center rounded-full text-2xs font-bold"
+        className="inline-flex size-5 items-center justify-center rounded-full text-2xs font-bold"
         style={{
           color: "var(--brass-ink)",
           background: isA ? "var(--team-a-fill)" : "var(--team-b-fill)",
@@ -97,7 +97,7 @@ export function RoomCard({
           />
           <span className="truncate">{title}</span>
           <span className="bg-surface-sunken border-border text-ink-dim font-mono ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-2xs font-semibold tracking-widest">
-            <Lock className="size-2.75" />
+            <Lock className="size-3" />
             {code}
           </span>
         </div>
@@ -125,7 +125,7 @@ export function RoomCard({
         className="border-border text-ink-dim flex items-center gap-2.5 border-t px-4 py-2.5 text-xs"
         style={{ background: "rgba(14,58,36,0.03)" }}
       >
-        <Avatar name={host} size={18} />
+        <Avatar name={host} size={20} />
         <span>{host}</span>
         <span className="text-ink-mute">3/4</span>
         <button

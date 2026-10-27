@@ -127,7 +127,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
                   </Button>
                   {!canUnlink && (
                     <span
-                      className="text-ink-mute max-w-37.5 text-right text-2xs leading-tight"
+                      className="text-ink-mute max-w-40 text-right text-2xs leading-tight"
                       data-testid="unlink-google-hint"
                     >
                       {t("profile.linkedAccounts.passwordlessHint")}

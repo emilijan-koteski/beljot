@@ -100,7 +100,7 @@ export function TrumpReveal({
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center"
         style={{
-          width: 262,
+          width: 264,
           padding: "20px 24px 22px",
           background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
           border: "1px solid var(--brass-55)",
@@ -155,7 +155,7 @@ export function TrumpReveal({
               height: 60,
               borderRadius: "50%",
               background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
-              border: `2.5px solid ${sealRing}`,
+              border: `3px solid ${sealRing}`,
               boxShadow: card
                 ? "var(--shadow-felt-md), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
                 : `var(--shadow-felt-md), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,

@@ -134,7 +134,7 @@ function OwnerConfirmDialog({
         showCloseButton={false}
         style={{
           display: "block",
-          width: 484,
+          width: 480,
           maxWidth: "calc(100% - 48px)",
           padding: 0,
           overflow: "hidden",
@@ -351,7 +351,7 @@ export function KickPlayerDialog({
         />
       }
       confirmLabel={t("room.kickConfirm.confirm")}
-      confirmIcon={<UserX size={15} color="#fbeae6" />}
+      confirmIcon={<UserX size={16} color="#fbeae6" />}
       onConfirm={onConfirm}
       confirmPending={pending}
       confirmTestId="kick-confirm"
@@ -399,7 +399,7 @@ export function RemoveBotDialog({
         />
       }
       confirmLabel={t("room.removeBotConfirm.confirm")}
-      confirmIcon={<UserX size={15} color="#fbeae6" />}
+      confirmIcon={<UserX size={16} color="#fbeae6" />}
       onConfirm={onConfirm}
       confirmPending={pending}
       confirmTestId="remove-bot-confirm"
@@ -473,7 +473,7 @@ export function TransferOwnershipDialog({
         />
       }
       confirmLabel={t("room.transferConfirm.confirm")}
-      confirmIcon={<Crown size={15} color="var(--brass-ink)" />}
+      confirmIcon={<Crown size={16} color="var(--brass-ink)" />}
       onConfirm={onConfirm}
       confirmPending={pending}
       confirmTestId="transfer-confirm"

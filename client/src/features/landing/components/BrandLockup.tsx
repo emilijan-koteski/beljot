@@ -12,7 +12,7 @@ type BrandLockupProps = {
 
 // Logo tile and "Beljot" wordmark linking home: /lobby when signed in, / otherwise.
 export function BrandLockup({
-  size = 34,
+  size = 32,
   wordmarkSize = 24,
   className,
   showSuffix = false,
