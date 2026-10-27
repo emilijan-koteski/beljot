@@ -2,6 +2,8 @@ import { ArrowDownWideNarrow, ArrowUpNarrowWide } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { MatchFilter, MatchSort } from "@/shared/api/matches";
+import { Button } from "@/shared/components/ui/button";
+import { Chip } from "@/shared/components/ui/chips";
 
 type HistoryFiltersProps = {
   filter: MatchFilter;
@@ -41,60 +43,34 @@ export function HistoryFilters({
         {FILTERS.map((f) => {
           const active = filter === f.id;
           return (
-            <button
+            <Chip
               key={f.id}
-              type="button"
+              active={active}
+              count={counts[f.id]}
               onClick={() => onFilterChange(f.id)}
               aria-pressed={active}
               data-testid={`match-history-filter-${f.id}`}
               data-active={active}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
-              style={
-                active
-                  ? {
-                      background: "var(--accent-soft)",
-                      borderColor: "rgba(25,101,54,0.33)",
-                      color: "var(--accent)",
-                    }
-                  : {
-                      background: "transparent",
-                      borderColor: "var(--border)",
-                      color: "var(--ink-dim)",
-                    }
-              }
             >
               {t(f.labelKey)}
-              <span
-                className="rounded-md px-1.5 text-xs tabular-nums"
-                style={{
-                  background: active ? "rgba(25,101,54,0.14)" : "var(--surface-2)",
-                }}
-              >
-                {counts[f.id]}
-              </span>
-            </button>
+            </Chip>
           );
         })}
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
         <span className="text-ink-mute text-xs">{t("profile.matchHistory.sort.label")}</span>
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={() => onSortChange(sort === "new" ? "old" : "new")}
           data-testid="match-history-sort"
           data-sort={sort}
-          className="bg-surface-elevated border-border text-ink inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
         >
           {sort === "new"
             ? t("profile.matchHistory.sort.newest")
             : t("profile.matchHistory.sort.oldest")}
-          {sort === "new" ? (
-            <ArrowDownWideNarrow className="size-3.5" />
-          ) : (
-            <ArrowUpNarrowWide className="size-3.5" />
-          )}
-        </button>
+          {sort === "new" ? <ArrowDownWideNarrow /> : <ArrowUpNarrowWide />}
+        </Button>
       </div>
     </div>
   );

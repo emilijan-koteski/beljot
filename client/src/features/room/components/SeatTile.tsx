@@ -299,10 +299,9 @@ export function SeatTile({
 
       {showSwapHint && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <span className="border-accent bg-surface text-accent-deep inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm">
-            <Shuffle className="size-2.5" style={{ color: "var(--accent-deep)" }} />
+          <Badge tone="accent" icon={<Shuffle />} className="bg-surface shadow-sm">
             {t("room.seatTile.swapHere")}
-          </span>
+          </Badge>
         </div>
       )}
     </div>

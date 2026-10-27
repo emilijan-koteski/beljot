@@ -1,7 +1,8 @@
 import { ArrowDownWideNarrow, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/shared/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { Chip } from "@/shared/components/ui/chips";
 
 export type LobbyFilter = "all" | "qualify" | "open" | "relaxed" | "timed";
 export type LobbySort = "newest" | "filling";
@@ -49,42 +50,30 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
         {FILTERS.map((f) => {
           const active = filter === f;
           return (
-            <button
+            <Chip
               key={f}
+              active={active}
+              count={counts[f]}
               onClick={() => setFilter(f)}
               data-testid={`filter-chip-${f}`}
               aria-pressed={active}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-accent/50 bg-accent-soft text-accent"
-                  : "border-border bg-transparent text-ink-dim hover:bg-surface-sunken",
-              )}
             >
               {t(`lobby.filters.${f}`)}
-              <span
-                className={cn(
-                  "tabular-nums rounded-md px-1.5 py-px text-2xs font-semibold",
-                  active ? "bg-accent/15 text-accent" : "bg-surface-elevated text-ink-mute",
-                )}
-              >
-                {counts[f]}
-              </span>
-            </button>
+            </Chip>
           );
         })}
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
         <span className="text-ink-mute text-xs">{t("lobby.sort.label")}</span>
-        <button
+        <Button
+          variant="outline"
           onClick={() => setSort(sort === "newest" ? "filling" : "newest")}
           data-testid="sort-toggle"
-          className="bg-surface-elevated text-ink inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium"
         >
           {sort === "newest" ? t("lobby.sort.newest") : t("lobby.sort.filling")}
-          <ArrowDownWideNarrow className="size-3.5" />
-        </button>
+          <ArrowDownWideNarrow />
+        </Button>
       </div>
     </div>
   );

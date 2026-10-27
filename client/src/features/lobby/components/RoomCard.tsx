@@ -21,6 +21,7 @@ import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { RelativeTime } from "@/shared/components/RelativeTime";
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Badge } from "@/shared/components/ui/badge";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
@@ -92,22 +93,24 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
             {room.name}
           </h3>
           {room.isQuickPlay && (
-            <span
+            <Badge
+              tone="accent"
+              size="sm"
+              icon={<Zap strokeWidth={2.4} />}
               data-testid="quick-play-badge"
-              className="border-accent/30 bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-bold tracking-wider uppercase"
             >
-              <Zap className="size-2.5" strokeWidth={2.4} />
               {t("lobby.card.quickPlay")}
-            </span>
+            </Badge>
           )}
           {hasBots && (
-            <span
+            <Badge
+              tone="bot"
+              size="sm"
+              icon={<Bot strokeWidth={2.4} />}
               data-testid="room-card-bots"
-              className="border-bot-edge bg-bot-soft text-bot-deep inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-bold tracking-wider uppercase"
             >
-              <Bot className="size-2.5" strokeWidth={2.4} />
               {t("bots.withBots")}
-            </span>
+            </Badge>
           )}
           <CodeChip code={room.code} />
         </div>
@@ -323,10 +326,9 @@ function TeamLabel({ team }: { team: "A" | "B" }) {
 
 function CodeChip({ code }: { code: string }) {
   return (
-    <span className="bg-surface-sunken text-ink-dim inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs font-semibold tabular-nums tracking-caps">
-      <KeyRound className="size-2.5" />
+    <Badge icon={<KeyRound />} className="font-mono tracking-caps">
       {code}
-    </span>
+    </Badge>
   );
 }
 

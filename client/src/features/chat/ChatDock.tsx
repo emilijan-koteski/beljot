@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { Chip } from "@/shared/components/ui/chips";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useVisualViewport } from "@/shared/hooks/useVisualViewport";
 import { cn } from "@/shared/lib/utils";
@@ -562,21 +563,16 @@ function ChannelTab({
   unread?: number;
 }) {
   return (
-    <button
-      type="button"
+    <Chip
+      size="sm"
       role="tab"
       aria-selected={active}
+      active={active}
+      tone={whisper ? "var(--whisper-ink)" : undefined}
       data-active={active}
       data-testid={testId}
       onClick={onClick}
-      className={cn(
-        "inline-flex max-w-32 items-center gap-1 truncate rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-        active
-          ? whisper
-            ? "border-(--whisper-border) bg-(--whisper-fill) text-(--whisper-ink)"
-            : "bg-accent-soft border-accent/40 text-accent"
-          : "border-border text-ink-mute hover:text-ink",
-      )}
+      className="max-w-32"
     >
       <span className="truncate">{label}</span>
       {unread > 0 && !active && (
@@ -587,6 +583,6 @@ function ChannelTab({
           {unread > 9 ? "9+" : unread}
         </span>
       )}
-    </button>
+    </Chip>
   );
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MatchHandView, MatchListItem, MatchOutcome } from "@/shared/api/matches";
+import { Badge } from "@/shared/components/ui/badge";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
 import { formatClockTime, formatLocalizedDate } from "@/shared/lib/formatDate";
@@ -37,37 +38,16 @@ function formatDuration(
 
 function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
   const { t } = useTranslation();
-  const cfg: Record<MatchOutcome, { bg: string; color: string; border: string; labelKey: string }> =
-    {
-      win: {
-        bg: "var(--accent-soft)",
-        color: "var(--accent)",
-        border: "rgba(25,101,54,0.33)",
-        labelKey: "profile.matchHistory.outcomeWin",
-      },
-      loss: {
-        bg: "color-mix(in srgb, var(--danger) 10%, transparent)",
-        color: "var(--danger)",
-        border: "color-mix(in srgb, var(--danger) 30%, transparent)",
-        labelKey: "profile.matchHistory.outcomeLoss",
-      },
-      abandoned: {
-        bg: "var(--brass-soft)",
-        color: "var(--brass-deep)",
-        border: "var(--brass-40)",
-        labelKey: "profile.matchHistory.outcomeAbandoned",
-      },
-    };
+  const cfg: Record<MatchOutcome, { tone: "accent" | "danger" | "brass"; labelKey: string }> = {
+    win: { tone: "accent", labelKey: "profile.matchHistory.outcomeWin" },
+    loss: { tone: "danger", labelKey: "profile.matchHistory.outcomeLoss" },
+    abandoned: { tone: "brass", labelKey: "profile.matchHistory.outcomeAbandoned" },
+  };
   const c = cfg[outcome];
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-      style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}
-      data-testid="match-history-outcome"
-      data-outcome={outcome}
-    >
+    <Badge tone={c.tone} data-testid="match-history-outcome" data-outcome={outcome}>
       {t(c.labelKey)}
-    </span>
+    </Badge>
   );
 }
 
@@ -626,18 +606,14 @@ export function MatchStatsCard({
               </span>
             )}
           {match.hasBots === true && (
-            <span
-              className="inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs font-semibold tracking-wider uppercase"
-              style={{
-                color: "var(--bot-deep)",
-                borderColor: "var(--bot-edge)",
-                background: "var(--bot-soft)",
-              }}
+            <Badge
+              tone="bot"
+              size="sm"
+              icon={<Bot aria-hidden="true" />}
               data-testid="match-history-bots-marker"
             >
-              <Bot className="size-3" aria-hidden="true" />
               {t("profile.matchHistory.withBots")}
-            </span>
+            </Badge>
           )}
           <OutcomeChip outcome={match.outcome} />
           <button

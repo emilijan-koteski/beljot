@@ -900,16 +900,9 @@ export function RoomPage() {
                                 </span>
                               )}
                             </span>
-                            <span
-                              className={cn(
-                                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-2xs font-semibold tracking-wider uppercase",
-                                seated
-                                  ? "border-accent bg-accent-soft text-accent-deep"
-                                  : "border-border bg-surface-sunken text-ink-mute",
-                              )}
-                            >
+                            <Badge tone={seated ? "accent" : "neutral"} size="sm">
                               {seatLabel}
-                            </span>
+                            </Badge>
                             {ownerCanPromoteRow && (
                               <button
                                 type="button"
@@ -1115,13 +1108,9 @@ export function RoomPage() {
               </Button>
             )}
             {inSwapMode && (
-              <span
-                className="border-accent bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-                data-testid="swap-mode-banner"
-              >
-                <Shuffle className="size-3" />
+              <Badge tone="accent" icon={<Shuffle />} data-testid="swap-mode-banner">
                 {t("room.actionBarSwap")}
-              </span>
+              </Badge>
             )}
           </div>
           <Button

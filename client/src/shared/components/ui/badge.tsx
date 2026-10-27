@@ -4,68 +4,51 @@ import { cn } from "@/shared/lib/utils";
 
 type BadgeTone = "neutral" | "accent" | "brass" | "bot" | "teamA" | "teamB" | "danger";
 
-type BadgeProps = {
+type BadgeSize = "sm" | "md";
+
+type BadgeProps = Omit<React.ComponentProps<"span">, "children"> & {
   tone?: BadgeTone;
+  size?: BadgeSize;
   icon?: React.ReactNode;
-  className?: string;
   children: React.ReactNode;
 };
 
-const toneStyles: Record<BadgeTone, { bg: string; color: string; border: string }> = {
-  neutral: {
-    bg: "var(--surface-3)",
-    color: "var(--ink-dim)",
-    border: "var(--border)",
-  },
-  accent: {
-    bg: "var(--accent-soft)",
-    color: "var(--accent-deep)",
-    border: "transparent",
-  },
-  brass: {
-    bg: "var(--brass-soft)",
-    color: "var(--brass-deep)",
-    border: "color-mix(in srgb, var(--brass) 40%, transparent)",
-  },
-  bot: {
-    bg: "var(--bot-soft)",
-    color: "var(--bot-deep)",
-    border: "var(--bot-edge)",
-  },
-  teamA: {
-    bg: "var(--team-a-tint)",
-    color: "var(--team-a)",
-    border: "var(--team-a-edge-soft)",
-  },
-  teamB: {
-    bg: "var(--team-b-tint)",
-    color: "var(--team-b)",
-    border: "var(--team-b-edge-soft)",
-  },
-  danger: {
-    bg: "color-mix(in srgb, var(--danger) 10%, transparent)",
-    color: "var(--danger)",
-    border: "color-mix(in srgb, var(--danger) 30%, transparent)",
-  },
+const TONE_CLASS: Record<BadgeTone, string> = {
+  neutral: "bg-surface-sunken text-ink-dim",
+  accent: "bg-accent-soft text-accent-deep",
+  brass: "bg-brass-soft text-brass-deep",
+  bot: "bg-bot-soft text-bot-deep",
+  teamA: "bg-(--team-a-tint) text-team-a",
+  teamB: "bg-(--team-b-tint) text-team-b",
+  danger: "bg-danger/10 text-danger",
+};
+
+const SIZE_CLASS: Record<BadgeSize, string> = {
+  sm: "h-5 gap-1 px-1.5 text-2xs font-bold tracking-wider uppercase",
+  md: "h-6 gap-1.5 px-2 text-xs font-semibold",
 };
 
 /**
- * Pill badge used for room-info chips, team labels, and matchmaking meta
- * rows. Tones map 1:1 to the design's badge styles in room-flow-parts.jsx.
+ * Informative tag: a flat tinted label that is never clickable. Its square corners and missing
+ * border set it apart from the bordered pill of an interactive {@link Chip}.
  */
-export function Badge({ tone = "neutral", icon, className, children }: BadgeProps) {
-  const s = toneStyles[tone];
+export function Badge({
+  tone = "neutral",
+  size = "md",
+  icon,
+  className,
+  children,
+  ...rest
+}: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-none",
+        "inline-flex shrink-0 items-center rounded leading-none whitespace-nowrap [&_svg]:size-3 [&_svg]:shrink-0",
+        TONE_CLASS[tone],
+        SIZE_CLASS[size],
         className,
       )}
-      style={{
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-      }}
+      {...rest}
     >
       {icon}
       {children}

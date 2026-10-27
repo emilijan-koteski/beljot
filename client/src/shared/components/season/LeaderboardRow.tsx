@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Badge } from "@/shared/components/ui/badge";
 import {
   normalizeSeasonDivision,
   normalizeSeasonTier,
@@ -101,13 +102,9 @@ export function LeaderboardRow({
       </Link>
 
       {isSelf && (
-        <span
-          data-testid="leaderboard-you"
-          aria-hidden="true"
-          className="bg-accent/15 text-accent shrink-0 rounded-full px-1.5 py-0.5 text-2xs font-semibold tracking-wider uppercase"
-        >
+        <Badge tone="accent" size="sm" data-testid="leaderboard-you" aria-hidden="true">
           {t("season.leaderboard.you")}
-        </span>
+        </Badge>
       )}
 
       <span
