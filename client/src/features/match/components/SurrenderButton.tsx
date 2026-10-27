@@ -92,11 +92,11 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
           className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={460}
+            width={480}
             glowColor={DANGER}
             title={
               <span id="surrender-confirm-title" className="inline-flex items-center gap-2.5">
-                <Flag size={18} style={{ color: DANGER }} aria-hidden="true" />
+                <Flag size={20} style={{ color: DANGER }} aria-hidden="true" />
                 {t("match.surrender.confirm.title")}
               </span>
             }

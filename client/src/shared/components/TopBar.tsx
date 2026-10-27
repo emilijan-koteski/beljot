@@ -230,7 +230,7 @@ export function TopBar({
               data-testid="nav-menu"
               className="text-ink-dim hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-transparent transition-colors md:hidden"
             >
-              <Menu className="size-4.5" />
+              <Menu className="size-5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"

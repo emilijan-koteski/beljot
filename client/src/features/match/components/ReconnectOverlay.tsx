@@ -217,7 +217,7 @@ export function ReconnectOverlay({
         aria-live="assertive"
       >
         <OverlayBackdrop dim={0.7}>
-          <ClassicPanel width={440} glowColor={RING_DANGER}>
+          <ClassicPanel width={480} glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="text-2xs uppercase tracking-caps"
@@ -267,7 +267,7 @@ export function ReconnectOverlay({
     >
       <OverlayBackdrop dim={0.65}>
         <ClassicPanel
-          width={440}
+          width={480}
           title={t("match.disconnect.reconnecting")}
           subtitle={
             chipPlayers.length > 1

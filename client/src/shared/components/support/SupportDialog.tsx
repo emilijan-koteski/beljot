@@ -60,7 +60,7 @@ export function SupportDialog({ open, onOpenChange }: SupportDialogProps) {
           className={cn(buttonVariants({ size: "cta" }), "w-full")}
           data-testid="support-cta"
         >
-          <Coffee className="size-4.5" />
+          <Coffee className="size-5" />
           {t("support.dialog.cta")}
         </a>
 

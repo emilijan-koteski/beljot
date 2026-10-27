@@ -124,7 +124,7 @@ export function ResetPasswordPage() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              className="h-10.5 pr-10"
+              className="h-11 pr-10"
               placeholder={t("auth.resetPassword.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -152,7 +152,7 @@ export function ResetPasswordPage() {
           <Input
             id="confirm"
             type={showPassword ? "text" : "password"}
-            className="h-10.5"
+            className="h-11"
             placeholder={t("auth.resetPassword.confirmPlaceholder")}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}

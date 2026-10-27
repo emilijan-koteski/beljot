@@ -23,7 +23,7 @@ type AuthCardProps = {
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
   return (
     <div
-      className="bg-surface relative w-full max-w-125 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-lg inset-shadow-bevel"
+      className="bg-surface relative w-full max-w-120 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-lg inset-shadow-bevel"
       data-testid="auth-card"
     >
       <div
@@ -88,7 +88,7 @@ export function Checkbox({ checked, onChange, invalid, testId, children }: Check
     <label
       className={cn("text-ink-dim flex cursor-pointer items-start gap-2.5 text-sm leading-normal")}
     >
-      <span className="relative mt-px inline-block size-4.5 shrink-0">
+      <span className="relative mt-px inline-block size-5 shrink-0">
         <input
           type="checkbox"
           checked={checked}

@@ -9,7 +9,7 @@ interface LevelRingProps {
 }
 
 /** Compact lifetime-level ring for the top nav on small screens: an XP-progress arc with the level centered. */
-export function LevelRing({ level, fraction, label, size = 30, testId }: LevelRingProps) {
+export function LevelRing({ level, fraction, label, size = 32, testId }: LevelRingProps) {
   const reducedMotion = useReducedMotion();
 
   const stroke = 3;

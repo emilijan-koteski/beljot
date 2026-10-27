@@ -65,7 +65,7 @@ export function SeatTile({
 }: SeatTileProps) {
   const { t } = useTranslation();
   const isCompact = useMediaQuery("(max-width: 639px)");
-  const avatarSize = isCompact ? 36 : 40;
+  const avatarSize = isCompact ? 36 : 44;
   const filled = Boolean(player);
   const isBot = player?.isBot === true;
   const displayName = isBot ? botDisplayName(t, seatIndex) : (player?.username ?? "");
@@ -126,7 +126,7 @@ export function SeatTile({
                 className="text-ink inline-flex items-center gap-1 text-sm font-semibold tracking-tight sm:text-sm"
                 data-testid={isBot ? `bot-name-${seatIndex}` : undefined}
               >
-                {isHost && <Crown className="text-brass-deep size-3.25" aria-hidden="true" />}
+                {isHost && <Crown className="text-brass-deep size-3.5" aria-hidden="true" />}
                 {displayName}
               </span>
 
@@ -203,8 +203,8 @@ export function SeatTile({
         ) : (
           <>
             <div
-              className="bg-surface-elevated mt-1 flex size-9 items-center justify-center rounded-full sm:mt-1.5 sm:size-10"
-              style={{ border: `1.5px dashed ${tokens.edgeSoft}` }}
+              className="bg-surface-elevated mt-1 flex size-9 items-center justify-center rounded-full sm:mt-1.5 sm:size-11"
+              style={{ border: `2px dashed ${tokens.edgeSoft}` }}
             >
               <span
                 className="size-2.5 rounded-full opacity-45 animate-[pulse-dot_1.6s_ease-in-out_infinite]"
@@ -238,9 +238,9 @@ export function SeatTile({
           aria-label={t("room.addBot")}
           title={t("room.addBot")}
           data-testid={`add-bot-seat-${seatIndex}`}
-          className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:text-bot-deep absolute top-2 right-2 z-10 inline-flex size-9 items-center justify-center rounded-md border disabled:opacity-40 md:size-6.5"
+          className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:text-bot-deep absolute top-2 right-2 z-10 inline-flex size-8 items-center justify-center rounded-md border disabled:opacity-40 md:size-7"
         >
-          <Bot className="size-4.5 -translate-y-[5%] md:size-3.5" />
+          <Bot className="size-5 -translate-y-[5%] md:size-3.5" />
         </button>
       )}
 
@@ -255,9 +255,9 @@ export function SeatTile({
             aria-label={t("room.removeBotIconLabel", { name: displayName })}
             title={t("room.removeBotIconLabel", { name: displayName })}
             data-testid={`remove-bot-${seatIndex}`}
-            className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+            className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-7 items-center justify-center rounded-md border disabled:opacity-40"
           >
-            <UserX className="size-3.25" />
+            <UserX className="size-3.5" />
           </button>
         </div>
       )}
@@ -274,9 +274,9 @@ export function SeatTile({
               aria-label={t("room.promoteIconLabel", { username: player.username })}
               title={t("room.promoteIconLabel", { username: player.username })}
               data-testid={`promote-seat-${seatIndex}`}
-              className="bg-surface-elevated border-border text-brass-deep inline-flex size-6.5 items-center justify-center rounded-md border hover:border-brass disabled:opacity-40"
+              className="bg-surface-elevated border-border text-brass-deep inline-flex size-7 items-center justify-center rounded-md border hover:border-brass disabled:opacity-40"
             >
-              <Crown className="size-3.25" />
+              <Crown className="size-3.5" />
             </button>
           )}
           {onKick && (
@@ -289,9 +289,9 @@ export function SeatTile({
               aria-label={t("room.kickIconLabel", { username: player.username })}
               title={t("room.kickIconLabel", { username: player.username })}
               data-testid={`kick-player-${seatIndex}`}
-              className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-6.5 items-center justify-center rounded-md border disabled:opacity-40"
+              className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-7 items-center justify-center rounded-md border disabled:opacity-40"
             >
-              <UserX className="size-3.25" />
+              <UserX className="size-3.5" />
             </button>
           )}
         </div>

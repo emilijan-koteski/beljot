@@ -127,7 +127,7 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
                   ? "radial-gradient(circle at 38% 30%, #ead9b0, #c9a876 60%, #9c7d4e)"
                   : "var(--surface-3)",
               border: today
-                ? "1.5px solid #a07d1a"
+                ? "2px solid #a07d1a"
                 : done
                   ? "1px solid #9c7d4e"
                   : "1px dashed var(--brass)",
@@ -191,7 +191,7 @@ export function DailyRewardDialog({
             {t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
           </DialogTitle>
 
-          <CoinMedallion size={92} tone={tone} />
+          <CoinMedallion size={96} tone={tone} />
 
           <div>
             <div
@@ -220,7 +220,7 @@ export function DailyRewardDialog({
 
           <div className="flex w-full items-center justify-between">
             <span className="text-ink-mute inline-flex items-center gap-2 text-sm">
-              <CoinMedallion size={22} tone={tone} />
+              <CoinMedallion size={24} tone={tone} />
               {t("rewards.dailyReward.newBalance")}
             </span>
             <span className="tabular-nums text-ink text-lg font-bold">

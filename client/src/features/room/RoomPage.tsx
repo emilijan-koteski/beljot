@@ -108,8 +108,8 @@ function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
   return (
     <span
       aria-hidden
-      className="inline-flex h-4.5 w-7 items-center justify-center rounded"
-      style={{ border: `1.5px ${tokens.dashed ? "dashed" : "solid"} ${tokens.border}` }}
+      className="inline-flex h-5 w-7 items-center justify-center rounded"
+      style={{ border: `2px ${tokens.dashed ? "dashed" : "solid"} ${tokens.border}` }}
     >
       <span
         className={cn(
@@ -1085,7 +1085,7 @@ export function RoomPage() {
               onClick={handleLeaveRoom}
               data-testid="leave-room"
               aria-label={t("room.leaveRoom")}
-              className="text-danger hover:text-danger size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              className="text-danger hover:text-danger size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
             >
               <DoorOpen className="size-5 sm:size-4" />
               <span className="hidden sm:inline">{t("room.leaveRoom")}</span>
@@ -1096,7 +1096,7 @@ export function RoomPage() {
                 onClick={() => setShowInviteFriends(true)}
                 data-testid="open-invite-friends"
                 aria-label={t("roomInvite.panel.openButton")}
-                className="size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+                className="size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
               >
                 <Send className="size-5 sm:size-4" />
                 <span className="hidden sm:inline">{t("roomInvite.panel.openButton")}</span>
@@ -1108,7 +1108,7 @@ export function RoomPage() {
                 onClick={() => setShowLastMatch(true)}
                 data-testid="open-last-match"
                 aria-label={t("room.lastMatch.openButton")}
-                className="size-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+                className="size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
               >
                 <History className="size-5 sm:size-4" />
                 <span className="hidden sm:inline">{t("room.lastMatch.openButton")}</span>
@@ -1136,7 +1136,7 @@ export function RoomPage() {
                   : undefined
             }
             data-testid={ctaTestId}
-            className="h-9 min-w-0 shrink px-3.5 text-sm sm:h-11.5 sm:px-5.5 sm:text-sm"
+            className="h-11 min-w-0 shrink px-3.5 text-sm sm:px-5.5"
           >
             <span className="min-w-0 truncate">{ctaLabel}</span>
           </Button>
@@ -1340,7 +1340,7 @@ export function RoomPage() {
               data-testid="table-center"
             >
               <div
-                className="flex size-18 items-center justify-center rounded-lg border-[1.5px]"
+                className="flex size-18 items-center justify-center rounded-lg border-2"
                 style={{
                   transform: "rotate(45deg)",
                   background:

@@ -42,7 +42,7 @@ export function InfoPopover({ text, ariaLabel, testId, className }: InfoPopoverP
         >
           <PopoverPrimitive.Popup
             data-testid={testId ? `${testId}-content` : undefined}
-            className="border-brass bg-surface-elevated text-ink-dim w-67 max-w-[calc(100vw-32px)] rounded-md border p-2.5 text-xs leading-normal font-normal normal-case shadow-lg"
+            className="border-brass bg-surface-elevated text-ink-dim w-66 max-w-[calc(100vw-32px)] rounded-md border p-2.5 text-xs leading-normal font-normal normal-case shadow-lg"
           >
             {text}
           </PopoverPrimitive.Popup>

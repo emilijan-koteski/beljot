@@ -115,7 +115,7 @@ export function LoginPage() {
           <Input
             id="email"
             type="email"
-            className="h-10.5"
+            className="h-11"
             placeholder={t("auth.login.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -146,7 +146,7 @@ export function LoginPage() {
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              className="h-10.5 pr-10"
+              className="h-11 pr-10"
               placeholder={t("auth.login.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}

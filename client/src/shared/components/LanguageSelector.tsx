@@ -62,7 +62,7 @@ export function LanguageSelector({
         aria-label={t("auth.languageSelector.label")}
         data-testid={triggerTestId}
       >
-        <Globe className="size-4.5 md:size-3.5" />
+        <Globe className="size-5 md:size-3.5" />
         <span className="text-ink hidden tracking-wider md:inline">{currentLang}</span>
         <ChevronDown className="hidden size-3 opacity-70 md:block" />
       </DropdownMenuTrigger>

@@ -17,7 +17,7 @@ export function CreateRoomTile({ onClick }: Props) {
       className="bg-surface text-ink hover:bg-surface-sunken hover:border-brass flex items-center gap-3 rounded-lg border border-border px-4.5 py-4.5 text-left transition-colors"
     >
       <span className="bg-surface-sunken text-ink inline-flex size-9 items-center justify-center rounded-md border border-brass">
-        <Plus className="size-4.5" strokeWidth={2} />
+        <Plus className="size-5" strokeWidth={2} />
       </span>
       <span className="flex flex-col gap-0.5">
         <span className="text-sm font-semibold">{t("lobby.actions.createRoom.title")}</span>

@@ -42,7 +42,7 @@ export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Pro
       <span
         data-testid={testId}
         className={cn(
-          "text-ink-off inline-flex h-7.5 items-center justify-center rounded-lg border border-dashed px-2 text-xs tracking-wider",
+          "text-ink-off inline-flex h-7 items-center justify-center rounded-lg border border-dashed px-2 text-xs tracking-wider",
           tone.edgeSoft,
           tone.line,
         )}
@@ -55,7 +55,7 @@ export function SeatChip({ username, team, bot = false, avatarUrl, testId }: Pro
     <span
       data-testid={testId}
       className={cn(
-        "text-ink inline-flex h-7.5 items-center gap-1.5 overflow-hidden rounded-lg border pr-2 pl-1 text-xs",
+        "text-ink inline-flex h-7 items-center gap-1.5 overflow-hidden rounded-lg border pr-2 pl-1 text-xs",
         tone.edge,
         tone.tint,
       )}

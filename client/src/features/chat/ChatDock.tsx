@@ -311,7 +311,7 @@ export function ChatDock(props: ChatDockProps) {
               : "border-brass border shadow-(--chat-shadow-fab)",
           )}
         >
-          <MessageSquare className="size-5.5" strokeWidth={1.8} />
+          <MessageSquare className="size-6" strokeWidth={1.8} />
           {(hasPublicUnread || hasWhisperUnread) && (
             <span className="absolute -top-0.5 -right-0.5 flex items-center">
               {hasPublicUnread && (
@@ -449,7 +449,7 @@ export function ChatDock(props: ChatDockProps) {
           disabled={!draft.trim() || !isConnected}
           aria-label={t(keys.sendLabel)}
           data-testid={`${testIdRoot}-send`}
-          className="bg-accent text-accent-ink inline-flex size-8.5 items-center justify-center rounded-lg disabled:opacity-50"
+          className="bg-accent text-accent-ink inline-flex size-8 items-center justify-center rounded-lg disabled:opacity-50"
         >
           <Send className="size-3.5" strokeWidth={2} />
         </button>

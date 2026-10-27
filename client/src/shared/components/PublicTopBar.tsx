@@ -31,11 +31,7 @@ export function PublicTopBar() {
           {t("landing.nav.login")}
         </Link>
         <span className="hidden sm:inline-flex">
-          <Link
-            to="/register"
-            data-testid="public-signup"
-            className={cn(buttonVariants(), "h-9 px-4")}
-          >
+          <Link to="/register" data-testid="public-signup" className={cn(buttonVariants(), "px-4")}>
             {t("landing.nav.signup")}
           </Link>
         </span>

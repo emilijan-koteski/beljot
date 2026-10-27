@@ -130,7 +130,7 @@ export function RulesDialog({
                 borderBottom: "1px solid var(--brass-25)",
               }}
             >
-              <BookOpen size={18} style={{ color: BRASS }} aria-hidden="true" />
+              <BookOpen size={20} style={{ color: BRASS }} aria-hidden="true" />
               <div className="flex flex-col">
                 <span
                   style={{
