@@ -1024,7 +1024,7 @@
       "handVariant": "Hand {{hand}} · {{variant}}"
     },
     "scoreReveal": {
-      "title": "Hand Score",
+      "title": "Hand score",
       "titleWithHand": "Hand {{hand}} — results",
       "subtitleHeldYour": "Pulled it off · you took trump on {{suit}}",
       "subtitleHeldTheir": "Pulled it off · they took trump on {{suit}}",
@@ -1032,13 +1032,13 @@
       "subtitleFailedThem": "Went down · all points to them",
       "subtitleFailedCardsUs": "Went down · card points to us",
       "subtitleFailedCardsThem": "Went down · card points to them",
-      "cardPoints": "Card Points",
+      "cardPoints": "Card points",
       "declarationPoints": "Declarations",
-      "lastTrickBonus": "Last Trick Bonus",
-      "capotBonus": "Capot Bonus",
-      "failedContract": "Failed Hand",
-      "handTotal": "Hand Total",
-      "matchTotal": "Match Score",
+      "lastTrickBonus": "Last trick bonus",
+      "capotBonus": "Capot bonus",
+      "failedContract": "Failed hand",
+      "handTotal": "Hand total",
+      "matchTotal": "Match score",
       "continue": "Continue",
       "waiting": "Waiting for others…"
     },
@@ -1078,12 +1078,12 @@
       }
     },
     "matchResult": {
-      "title": "Match Complete",
-      "winnerUs": "We Won!",
-      "winnerThem": "They Won!",
-      "duration": "Match Duration",
-      "returnToLobby": "Return to Lobby",
-      "returnToRoom": "Return to Room",
+      "title": "Match complete",
+      "winnerUs": "We won!",
+      "winnerThem": "They won!",
+      "duration": "Match duration",
+      "returnToLobby": "Return to lobby",
+      "returnToRoom": "Return to room",
       "returnToRoomError": "Couldn't return to the room — it may no longer be available.",
       "returnToRoomAlreadyStarted": "The next match already started without you.",
       "returnToRoomNotInRoom": "You're no longer in this room.",
@@ -1134,17 +1134,17 @@
       "unknownProposer": "your opponent"
     },
     "pause": {
-      "title": "Match Paused",
+      "title": "Match paused",
       "pausedBy": "{{player}} paused the game",
       "pausedByMany": "{{player}} paused the game",
       "waitingToResume": "Waiting for players to resume…",
       "resume": "Resume",
       "pauseButton": "Pause",
-      "pauseUsed": "Pause Used",
+      "pauseUsed": "Pause used",
       "pausedNow": "paused now",
       "pauseAvailable": "pause available",
       "pauseUsedRow": "pause used",
-      "resumeAll": "Resume All",
+      "resumeAll": "Resume all",
       "ownerResumedToast": "Room owner resumed the game"
     },
     "disconnect": {

@@ -11,7 +11,7 @@ vi.mock("react-i18next", () => ({
         "match.pause.resume": "Resume",
         "match.pause.pauseButton": "Pause",
         "match.pause.waitingToResume": "Waiting for players to resume...",
-        "match.pause.resumeAll": "Resume All",
+        "match.pause.resumeAll": "Resume all",
       };
       if ((key === "match.pause.pausedBy" || key === "match.pause.pausedByMany") && opts?.player) {
         return `${opts.player} paused the game`;
@@ -208,7 +208,7 @@ describe("PauseOverlay", () => {
     expect(screen.getByTestId("pause-player-2")).toBeInTheDocument();
   });
 
-  it("shows Resume All button for room owner", () => {
+  it("shows Resume all button for room owner", () => {
     render(
       <PauseOverlay
         pausedPlayers={[true, false, false, false]}
@@ -222,10 +222,10 @@ describe("PauseOverlay", () => {
       />,
     );
     expect(screen.getByTestId("pause-owner-resume-button")).toBeInTheDocument();
-    expect(screen.getByText("Resume All")).toBeInTheDocument();
+    expect(screen.getByText("Resume all")).toBeInTheDocument();
   });
 
-  it("does not show Resume All button for non-owner", () => {
+  it("does not show Resume all button for non-owner", () => {
     render(
       <PauseOverlay
         pausedPlayers={[true, false, false, false]}
@@ -241,7 +241,7 @@ describe("PauseOverlay", () => {
     expect(screen.queryByTestId("pause-owner-resume-button")).not.toBeInTheDocument();
   });
 
-  it("fires onOwnerResume on Resume All button click", () => {
+  it("fires onOwnerResume on Resume all button click", () => {
     const onOwnerResume = vi.fn();
     render(
       <PauseOverlay
@@ -259,7 +259,7 @@ describe("PauseOverlay", () => {
     expect(onOwnerResume).toHaveBeenCalledOnce();
   });
 
-  it("owner with active pause sees both Resume and Resume All buttons", () => {
+  it("owner with active pause sees both Resume and Resume all buttons", () => {
     render(
       <PauseOverlay
         pausedPlayers={[true, false, false, false]}

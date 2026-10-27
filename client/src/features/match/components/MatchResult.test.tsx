@@ -9,16 +9,16 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, string>) => {
       const translations: Record<string, string> = {
-        "match.matchResult.title": "Match Complete",
-        "match.matchResult.duration": "Match Duration",
-        "match.matchResult.returnToLobby": "Return to Lobby",
-        "match.matchResult.returnToRoom": "Return to Room",
+        "match.matchResult.title": "Match complete",
+        "match.matchResult.duration": "Match duration",
+        "match.matchResult.returnToLobby": "Return to lobby",
+        "match.matchResult.returnToRoom": "Return to room",
         "team.us": "Us",
         "team.them": "Them",
         "match.surrender.unknownProposer": "your opponent",
       };
-      if (key === "match.matchResult.winnerUs") return "We Won!";
-      if (key === "match.matchResult.winnerThem") return "They Won!";
+      if (key === "match.matchResult.winnerUs") return "We won!";
+      if (key === "match.matchResult.winnerThem") return "They won!";
       if (key === "match.matchResult.surrenderNote" && opts) {
         return `${opts.username} surrendered the match`;
       }
@@ -223,21 +223,21 @@ describe("MatchResult", () => {
     mockGetFriendshipStatus.mockResolvedValue({ status: "none", requestId: null });
   });
 
-  it("renders winner banner with 'We Won!' when viewer is on the winning team", () => {
+  it("renders winner banner with 'We won!' when viewer is on the winning team", () => {
     renderResult({ viewerTeam: "teamA" });
 
     expect(screen.getByTestId("match-result")).toBeInTheDocument();
-    expect(screen.getByTestId("match-result-title")).toHaveTextContent("Match Complete");
+    expect(screen.getByTestId("match-result-title")).toHaveTextContent("Match complete");
     const winner = screen.getByTestId("match-result-winner");
-    expect(winner).toHaveTextContent("We Won!");
+    expect(winner).toHaveTextContent("We won!");
     expect(winner).toHaveAttribute("data-team", "teamA");
   });
 
-  it("renders winner banner with 'They Won!' when viewer is NOT on the winning team", () => {
+  it("renders winner banner with 'They won!' when viewer is NOT on the winning team", () => {
     renderResult({ viewerTeam: "teamB" });
 
     const winner = screen.getByTestId("match-result-winner");
-    expect(winner).toHaveTextContent("They Won!");
+    expect(winner).toHaveTextContent("They won!");
     expect(winner).toHaveAttribute("data-team", "teamA");
   });
 
@@ -290,15 +290,15 @@ describe("MatchResult", () => {
     renderResult({ data: { ...matchData, winnerTeam: 1 }, viewerTeam: "teamB" });
 
     const winner = screen.getByTestId("match-result-winner");
-    expect(winner).toHaveTextContent("We Won!");
+    expect(winner).toHaveTextContent("We won!");
     expect(winner).toHaveAttribute("data-team", "teamB");
   });
 
   it("renders both the Return-to-room and Return-to-lobby actions", () => {
     renderResult();
 
-    expect(screen.getByTestId("match-result-room-btn")).toHaveTextContent("Return to Room");
-    expect(screen.getByTestId("match-result-lobby-btn")).toHaveTextContent("Return to Lobby");
+    expect(screen.getByTestId("match-result-room-btn")).toHaveTextContent("Return to room");
+    expect(screen.getByTestId("match-result-lobby-btn")).toHaveTextContent("Return to lobby");
   });
 
   it("calls onReturnToLobby when the lobby button is clicked", async () => {

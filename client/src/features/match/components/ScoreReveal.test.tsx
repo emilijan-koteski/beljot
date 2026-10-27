@@ -6,14 +6,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, string>) => {
       const translations: Record<string, string> = {
-        "match.scoreReveal.title": "Hand Score",
-        "match.scoreReveal.cardPoints": "Card Points",
+        "match.scoreReveal.title": "Hand score",
+        "match.scoreReveal.cardPoints": "Card points",
         "match.scoreReveal.declarationPoints": "Declarations",
-        "match.scoreReveal.lastTrickBonus": "Last Trick Bonus",
-        "match.scoreReveal.capotBonus": "Capot Bonus",
+        "match.scoreReveal.lastTrickBonus": "Last trick bonus",
+        "match.scoreReveal.capotBonus": "Capot bonus",
         "match.scoreReveal.failedContract": "Failed Contract",
-        "match.scoreReveal.handTotal": "Hand Total",
-        "match.scoreReveal.matchTotal": "Match Score",
+        "match.scoreReveal.handTotal": "Hand total",
+        "match.scoreReveal.matchTotal": "Match score",
         "match.scoreReveal.continue": "Continue",
         "match.scoreReveal.waiting": "Waiting for others…",
         "team.us": "Us",
@@ -86,7 +86,7 @@ describe("ScoreReveal", () => {
     render(<ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />);
 
     expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
-    expect(screen.getByTestId("score-reveal-title")).toHaveTextContent("Hand Score");
+    expect(screen.getByTestId("score-reveal-title")).toHaveTextContent("Hand score");
     expect(screen.getByTestId("row-card-points")).toBeInTheDocument();
     expect(screen.getByTestId("row-hand-total")).toBeInTheDocument();
     expect(screen.getByTestId("row-match-total")).toBeInTheDocument();

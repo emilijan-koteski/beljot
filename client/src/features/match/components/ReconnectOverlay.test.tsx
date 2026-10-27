@@ -15,7 +15,7 @@ vi.mock("react-i18next", () => ({
         "match.disconnect.reconnectFailed": "Reconnection failed — the match may have ended",
         "match.disconnect.abandonCountsWin": "Counts as a win for your team",
         "match.disconnect.abandonCountsLoss": "Counts as a loss for your team",
-        "match.matchResult.title": "Match Complete",
+        "match.matchResult.title": "Match complete",
         "team.us": "Us",
         "team.them": "Them",
       };
