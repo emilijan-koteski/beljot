@@ -15,6 +15,7 @@ import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { SummaryStrip } from "./overlay/SummaryStrip";
 
 interface ScoreRevealProps {
   data: HandScoredPayload;
@@ -185,22 +186,10 @@ export function ScoreReveal({
               />
             </div>
 
-            <div
-              className="rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 mt-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4"
-              style={{
-                background: "var(--brass-10)",
-                border: "1px solid var(--brass-25)",
-              }}
-              data-testid="row-match-total"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span
-                  className="text-2xs uppercase tracking-widest"
-                  style={{ color: "var(--brass)" }}
-                >
-                  {t("match.scoreReveal.matchTotal")}
-                </span>
-                <div className="flex items-baseline gap-1.5 sm:gap-2 text-base sm:text-lg font-bold tabular-nums whitespace-nowrap">
+            <SummaryStrip
+              label={t("match.scoreReveal.matchTotal")}
+              value={
+                <>
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
                   </span>
@@ -208,32 +197,30 @@ export function ScoreReveal({
                   <span style={{ color: teamBGradient[0] }} data-team="teamB">
                     {data.teamBMatchScore}
                   </span>
-                  <span
-                    className="text-xs sm:text-xs font-normal"
-                    style={{ color: "var(--ink-light)", opacity: 0.5 }}
-                  >
+                  <span className="text-xs font-normal" style={{ opacity: 0.5 }}>
                     / {matchTarget}
                   </span>
-                </div>
-              </div>
-              <span className="ml-auto inline-flex">
-                <ButtonTimerRing
-                  totalDuration={AUTO_CONTINUE_MS / 1000}
-                  clientCountdown={!acknowledged}
-                  hideRing={acknowledged}
+                </>
+              }
+              testId="row-match-total"
+              className="mt-4"
+            />
+
+            <div className="mt-4 flex justify-end">
+              <ButtonTimerRing
+                totalDuration={AUTO_CONTINUE_MS / 1000}
+                clientCountdown={!acknowledged}
+                hideRing={acknowledged}
+              >
+                <ClassicButton
+                  variant="ghost"
+                  onClick={onContinue}
+                  disabled={acknowledged}
+                  data-testid="score-reveal-continue"
                 >
-                  <ClassicButton
-                    variant="ghost"
-                    onClick={onContinue}
-                    disabled={acknowledged}
-                    data-testid="score-reveal-continue"
-                  >
-                    {acknowledged
-                      ? t("match.scoreReveal.waiting")
-                      : t("match.scoreReveal.continue")}
-                  </ClassicButton>
-                </ButtonTimerRing>
-              </span>
+                  {acknowledged ? t("match.scoreReveal.waiting") : t("match.scoreReveal.continue")}
+                </ClassicButton>
+              </ButtonTimerRing>
             </div>
           </ClassicPanel>
         </div>

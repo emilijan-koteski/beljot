@@ -7,6 +7,7 @@ import type { Suit } from "@/shared/types/matchTypes";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 import { PlayingCard } from "./PlayingCard";
 
@@ -68,28 +69,7 @@ export function BelotPrompt({
               />
             </div>
 
-            <div
-              className="mb-3.5 px-3 py-2 rounded-lg flex items-center gap-2"
-              style={{
-                border: "1px solid var(--brass-40)",
-                background: "linear-gradient(90deg, rgba(20,46,28,0.55), rgba(14,40,24,0.35))",
-                color: "#e8dfc8",
-                fontSize: 12,
-                boxShadow: "inset 0 1px 0 var(--brass-10)",
-              }}
-            >
-              <span
-                aria-hidden
-                className="rounded-full"
-                style={{
-                  width: 7,
-                  height: 7,
-                  background: "var(--brass)",
-                  boxShadow: "0 0 6px var(--brass-55)",
-                }}
-              />
-              {t(accentStripKey)}
-            </div>
+            <ExplainerStrip className="mb-4">{t(accentStripKey)}</ExplainerStrip>
 
             <div className="flex justify-end items-center gap-3.5">
               <ClassicButton

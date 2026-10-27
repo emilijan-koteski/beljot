@@ -9,6 +9,7 @@ import { Z } from "@/shared/lib/zLayers";
 import { HUDButton } from "./HUDButton";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
 interface SurrenderButtonProps {
@@ -108,29 +109,9 @@ export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirm
               {t("match.surrender.confirm.body")}
             </p>
 
-            <div
-              className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2"
-              style={{
-                border: "1px solid color-mix(in srgb, var(--danger-light) 35%, transparent)",
-                background: "linear-gradient(90deg, rgba(80,28,28,0.55), rgba(50,18,18,0.35))",
-                color: "#ffe1d6",
-                fontSize: 12,
-                boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 14%, transparent)",
-              }}
-            >
-              <span
-                aria-hidden
-                className="rounded-full"
-                style={{
-                  width: 7,
-                  height: 7,
-                  background: DANGER,
-                  boxShadow: "0 0 6px color-mix(in srgb, var(--danger-light) 60%, transparent)",
-                  flexShrink: 0,
-                }}
-              />
+            <ExplainerStrip tone="danger" className="mb-4">
               {t("match.surrender.confirm.consumeWarning")}
-            </div>
+            </ExplainerStrip>
 
             <div className="flex justify-end items-center gap-3.5">
               <ClassicButton variant="danger" onClick={onConfirm} data-testid="surrender-confirm">
