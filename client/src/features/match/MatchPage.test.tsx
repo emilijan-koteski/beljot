@@ -62,6 +62,14 @@ vi.mock("@/shared/api/rooms", () => ({
   returnToRoom: vi.fn(),
 }));
 
+const toastMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  dismiss: vi.fn(),
+}));
+vi.mock("sonner", () => ({ toast: toastMock }));
+
 import { getRoom, returnToRoom } from "@/shared/api/rooms";
 import { makeRoom, makeRoomDetail, makeUser } from "@/test-utils";
 
@@ -217,6 +225,7 @@ describe("MatchPage", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockSendMessage.mockClear();
+    Object.values(toastMock).forEach((fn) => fn.mockClear());
     mockGetRoomLastMatch.mockReset();
     mockGetRoomLastMatch.mockReturnValue(new Promise(() => {}));
     useMatchStore.getState().reset();
@@ -742,7 +751,10 @@ describe("MatchPage", () => {
       fireEvent.click(screen.getByTestId("match-result-room-btn"));
     });
 
-    expect(screen.getByTestId("error-toast")).toHaveTextContent(message);
+    expect(toastMock.error).toHaveBeenCalledWith(
+      message,
+      expect.objectContaining({ id: "match-error" }),
+    );
   });
 
   it("routes to the lobby (no overlay toast) when return-to-room is rejected for insolvency", async () => {
@@ -812,11 +824,11 @@ describe("MatchPage", () => {
     });
 
     expect(screen.getByTestId("lobby-marker")).toBeInTheDocument();
-    expect(screen.queryByTestId("error-toast")).not.toBeInTheDocument();
+    expect(toastMock.error).not.toHaveBeenCalled();
     expect(useMatchStore.getState().matchEndData).toBeNull();
   });
 
-  it("shows error toast when lastError is set and dismisses it on close button click", () => {
+  it("raises a closable error toast for the error's duration when lastError is set", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
@@ -826,15 +838,14 @@ describe("MatchPage", () => {
       useMatchStore.getState().setLastError("error:illegal_play");
     });
 
-    const toast = screen.getByTestId("error-toast");
-    expect(toast).toHaveTextContent("That card cannot be played");
-
-    fireEvent.click(screen.getByTestId("error-toast-close"));
-
-    expect(screen.queryByTestId("error-toast")).not.toBeInTheDocument();
+    expect(toastMock.error).toHaveBeenCalledWith("That card cannot be played", {
+      id: "match-error",
+      duration: MOTION.TOAST_ERROR,
+      closeButton: true,
+    });
   });
 
-  it("auto-dismisses the error toast after 3 seconds", () => {
+  it("replaces the showing error with a newer one under the same toast id", () => {
     useMatchStore.getState().setMatchState(mockMatchState);
     useMatchStore.getState().setMyPlayerSeat(0);
 
@@ -843,33 +854,28 @@ describe("MatchPage", () => {
     act(() => {
       useMatchStore.getState().setLastError("error:illegal_play");
     });
-
-    expect(screen.getByTestId("error-toast")).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(3000);
-    });
-
-    expect(screen.queryByTestId("error-toast")).not.toBeInTheDocument();
-  });
-
-  it("re-shows the error toast on a new error after manual dismiss", () => {
-    useMatchStore.getState().setMatchState(mockMatchState);
-    useMatchStore.getState().setMyPlayerSeat(0);
-
-    renderMatchPage();
-
-    act(() => {
-      useMatchStore.getState().setLastError("error:illegal_play");
-    });
-    fireEvent.click(screen.getByTestId("error-toast-close"));
-    expect(screen.queryByTestId("error-toast")).not.toBeInTheDocument();
-
     act(() => {
       useMatchStore.getState().setLastError("error:not_your_turn");
     });
 
-    expect(screen.getByTestId("error-toast")).toHaveTextContent("It's not your turn");
+    expect(toastMock.error).toHaveBeenCalledTimes(2);
+    expect(toastMock.error).toHaveBeenLastCalledWith(
+      "It's not your turn",
+      expect.objectContaining({ id: "match-error" }),
+    );
+  });
+
+  it("gives toasts the felt skin while mounted and clears the match error on leaving", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    const { unmount } = renderMatchPage();
+    expect(document.body).toHaveClass("felt-toasts");
+
+    unmount();
+
+    expect(document.body).not.toHaveClass("felt-toasts");
+    expect(toastMock.dismiss).toHaveBeenCalledWith("match-error");
   });
 
   it("shows SurrenderButton in playing phase, hides in match_end", () => {

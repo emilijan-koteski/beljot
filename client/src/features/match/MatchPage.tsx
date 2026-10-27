@@ -1,13 +1,4 @@
-import {
-  Flag,
-  HelpCircle,
-  Menu as MenuIcon,
-  Pause,
-  Settings as SettingsIcon,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+import { HelpCircle, Pause, Settings as SettingsIcon, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -72,7 +63,9 @@ import { EmotePickerButton } from "./components/EmotePickerButton";
 import { HandCards } from "./components/HandCards";
 import { HUDButton } from "./components/HUDButton";
 import { MatchChatDock } from "./components/MatchChatDock";
+import { MatchHudMenu } from "./components/MatchHudMenu";
 import { MatchResult } from "./components/MatchResult";
+import { MatchStartSplash } from "./components/MatchStartSplash";
 import { PauseOverlay } from "./components/PauseOverlay";
 import { PlayerSeat, type SeatOrientation } from "./components/PlayerSeat";
 import { ReconnectOverlay } from "./components/ReconnectOverlay";
@@ -93,8 +86,8 @@ import { TrumpReveal } from "./components/TrumpReveal";
 import { UrgentTick } from "./components/UrgentTick";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
-import { floatingPanelStyle } from "./lib/floatingPanel";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
+import { showMatchError, useFeltToasts } from "./lib/matchToast";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
 import { useDealController } from "./lib/useDealController";
@@ -250,6 +243,7 @@ export function MatchPage() {
   const clearPendingResolvedTrick = useMatchStore((s) => s.clearPendingResolvedTrick);
 
   useMatchAudio();
+  useFeltToasts();
   const audioOn =
     resolveAudioEnabled(user?.soundEnabled) || resolveAudioEnabled(user?.musicEnabled);
   const handleToggleMute = useCallback(() => {
@@ -284,14 +278,11 @@ export function MatchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- duration is locked at mount; a motion-preference flip must not restart it
   }, [cameFromRoom]);
 
-  const [errorToast, setErrorToast] = useState<string | null>(null);
-  const errorToastTimerRef = useRef<number | null>(null);
   const roomBuyInRef = useRef<number | null>(null);
   const roomMinHonorRef = useRef<number | null>(null);
   const [roomBuyIn, setRoomBuyIn] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [hudMenuOpen, setHudMenuOpen] = useState(false);
   const [surrenderConfirmOpen, setSurrenderConfirmOpen] = useState(false);
   const [flyingCardId, setFlyingCardId] = useState<string | null>(null);
   const flyingClearTimerRef = useRef<number | null>(null);
@@ -546,14 +537,6 @@ export function MatchPage() {
     };
   }
 
-  const dismissErrorToast = useCallback(() => {
-    if (errorToastTimerRef.current !== null) {
-      clearTimeout(errorToastTimerRef.current);
-      errorToastTimerRef.current = null;
-    }
-    setErrorToast(null);
-  }, []);
-
   type OverlayPhase = "normal" | "capot_animation" | "score_reveal" | "match_result";
   const [overlayPhase, setOverlayPhase] = useState<OverlayPhase>("normal");
 
@@ -757,21 +740,11 @@ export function MatchPage() {
     const i18nKey = surrenderKey ?? ERROR_I18N[lastError];
     setLastError(null);
     if (!i18nKey) return;
-    if (errorToastTimerRef.current !== null) {
-      clearTimeout(errorToastTimerRef.current);
-    }
-    setErrorToast(t(i18nKey));
-    errorToastTimerRef.current = window.setTimeout(() => {
-      setErrorToast(null);
-      errorToastTimerRef.current = null;
-    }, MOTION.TOAST_ERROR);
+    showMatchError(t(i18nKey));
   }, [lastError, setLastError, t]);
 
   useEffect(() => {
     return () => {
-      if (errorToastTimerRef.current !== null) {
-        clearTimeout(errorToastTimerRef.current);
-      }
       if (flyingClearTimerRef.current !== null) {
         clearTimeout(flyingClearTimerRef.current);
       }
@@ -1000,9 +973,6 @@ export function MatchPage() {
       clearGame();
       navigate(`/rooms/${roomIdNum}`, { replace: true });
     } catch (err) {
-      if (errorToastTimerRef.current !== null) {
-        clearTimeout(errorToastTimerRef.current);
-      }
       const code = err instanceof FetchError ? err.code : null;
       if (code === "INSUFFICIENT_COINS") {
         if (
@@ -1048,11 +1018,7 @@ export function MatchPage() {
           : code === "NOT_IN_ROOM"
             ? "match.matchResult.returnToRoomNotInRoom"
             : "match.matchResult.returnToRoomError";
-      setErrorToast(t(messageKey));
-      errorToastTimerRef.current = window.setTimeout(() => {
-        setErrorToast(null);
-        errorToastTimerRef.current = null;
-      }, MOTION.TOAST_ERROR);
+      showMatchError(t(messageKey));
     }
   }, [roomIdNum, clearGame, navigate, returnToLobby, setMatchEndData, setRoomEjection, user, t]);
 
@@ -1085,27 +1051,9 @@ export function MatchPage() {
             "radial-gradient(ellipse at 50% 50%, var(--felt-dark) 0%, var(--felt-deep) 60%, var(--felt-bg) 100%)",
         }}
       >
-        <div className="flex flex-col items-center gap-4" data-testid="match-starting-splash">
-          <span
-            aria-hidden
-            className="inline-block rounded-full motion-safe:animate-spin"
-            style={{
-              width: 36,
-              height: 36,
-              border: "2px solid var(--brass-soft)",
-              borderTopColor: "var(--brass)",
-              animationDuration: "0.9s",
-            }}
-          />
-          <span
-            className="text-base"
-            style={{
-              color: "var(--ink-light)",
-              opacity: 0.85,
-            }}
-            data-testid="splash-text"
-          >
-            {splashIssue === "invalid"
+        <MatchStartSplash
+          message={
+            splashIssue === "invalid"
               ? t("match.roomNotFound")
               : splashIssue === "notMember"
                 ? t("match.notMember")
@@ -1113,9 +1061,9 @@ export function MatchPage() {
                   ? t("match.noActiveMatch")
                   : cameFromRoom
                     ? t("match.starting")
-                    : t("match.reconnecting")}
-          </span>
-        </div>
+                    : t("match.reconnecting")
+          }
+        />
       </div>
     );
   }
@@ -1449,115 +1397,25 @@ export function MatchPage() {
       )}
 
       {overlayPhase === "normal" && (
-        <div className="md:hidden">
-          <button
-            type="button"
-            onClick={() => setHudMenuOpen((v) => !v)}
-            aria-label={t("nav.menu")}
-            aria-expanded={hudMenuOpen}
-            data-testid="hud-menu-button"
-            className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-lg"
-            style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle(), color: "var(--ink-light)" }}
-          >
-            {hudMenuOpen ? (
-              <X className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <MenuIcon className="h-5 w-5" aria-hidden="true" />
-            )}
-          </button>
-
-          {hudMenuOpen && (
-            <>
-              <button
-                type="button"
-                aria-hidden="true"
-                tabIndex={-1}
-                onClick={() => setHudMenuOpen(false)}
-                className="fixed inset-0 cursor-default"
-                style={{ zIndex: Z.CHROME_TOP }}
-              />
-              <div
-                className="absolute top-14 right-3 flex w-44 flex-col gap-1.5 rounded-md p-2"
-                style={{ zIndex: Z.CHROME_TOP, ...floatingPanelStyle({ menu: true }) }}
-                data-testid="hud-menu"
-              >
-                {isTurnPhase && (
-                  <>
-                    {isPausablePhase && (
-                      <HUDButton
-                        icon={<Pause className="h-4 w-4" aria-hidden="true" />}
-                        label={
-                          matchState.pauseUsed?.[myPlayerSeat]
-                            ? t("match.pause.pauseUsed")
-                            : t("match.hud.pause")
-                        }
-                        onClick={() => {
-                          handlePause();
-                          setHudMenuOpen(false);
-                        }}
-                        disabled={!canPause}
-                        style={{ width: "100%", justifyContent: "flex-start" }}
-                        data-testid="hud-menu-pause"
-                      />
-                    )}
-                    <HUDButton
-                      variant="danger"
-                      icon={<Flag className="h-4 w-4" aria-hidden="true" />}
-                      label={t("match.surrender.requestButton")}
-                      onClick={() => {
-                        setSurrenderConfirmOpen(true);
-                        setHudMenuOpen(false);
-                      }}
-                      disabled={!canSurrenderRequest}
-                      style={{ width: "100%", justifyContent: "flex-start" }}
-                      data-testid="hud-menu-surrender"
-                    />
-                  </>
-                )}
-                <HUDButton
-                  icon={<HelpCircle className="h-4 w-4" aria-hidden="true" />}
-                  label={t("match.hud.rules")}
-                  onClick={() => {
-                    setRulesOpen(true);
-                    setHudMenuOpen(false);
-                  }}
-                  style={{ width: "100%", justifyContent: "flex-start" }}
-                  data-testid="hud-menu-rules"
-                />
-                <HUDButton
-                  icon={<SettingsIcon className="h-4 w-4" aria-hidden="true" />}
-                  label={t("match.hud.settings")}
-                  onClick={() => {
-                    setSettingsOpen(true);
-                    setHudMenuOpen(false);
-                  }}
-                  style={{ width: "100%", justifyContent: "flex-start" }}
-                  data-testid="hud-menu-settings"
-                />
-                <HUDButton
-                  icon={<MuteIcon className="h-4 w-4" aria-hidden="true" />}
-                  label={muteLabel}
-                  onClick={() => {
-                    handleToggleMute();
-                    setHudMenuOpen(false);
-                  }}
-                  style={{ width: "100%", justifyContent: "flex-start" }}
-                  data-testid="hud-menu-mute"
-                />
-                {(matchState.phase === "dealing" || isTurnPhase) &&
-                  matchEndData === null &&
-                  matchAbandonedData === null && (
-                    <EmotePickerButton
-                      onSend={handleSendEmote}
-                      onSent={() => setHudMenuOpen(false)}
-                      label={t("match.emote.button")}
-                      openDirection="down"
-                    />
-                  )}
-              </div>
-            </>
-          )}
-        </div>
+        <MatchHudMenu
+          showTurnActions={isTurnPhase}
+          showPause={isPausablePhase}
+          pauseUsed={matchState.pauseUsed?.[myPlayerSeat] === true}
+          canPause={canPause}
+          canSurrender={canSurrenderRequest}
+          audioOn={audioOn}
+          showEmotes={
+            (matchState.phase === "dealing" || isTurnPhase) &&
+            matchEndData === null &&
+            matchAbandonedData === null
+          }
+          onPause={handlePause}
+          onSurrender={() => setSurrenderConfirmOpen(true)}
+          onRules={() => setRulesOpen(true)}
+          onSettings={() => setSettingsOpen(true)}
+          onToggleMute={handleToggleMute}
+          onSendEmote={handleSendEmote}
+        />
       )}
 
       {surrenderConfirmOpen && canSurrenderRequest && (
@@ -1836,26 +1694,6 @@ export function MatchPage() {
         declarationsTransfer={matchState.declarationsTransfer}
         clockwise={matchState.clockwise}
       />
-
-      {errorToast && (
-        <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 text-danger text-sm px-4 py-2 rounded-lg flex items-center gap-3"
-          style={{ zIndex: Z.TOAST, ...floatingPanelStyle({ edge: "danger" }) }}
-          role="alert"
-          data-testid="error-toast"
-        >
-          <span>{errorToast}</span>
-          <button
-            type="button"
-            onClick={dismissErrorToast}
-            aria-label={t("common.close")}
-            data-testid="error-toast-close"
-            className="text-danger/80 hover:text-danger text-lg leading-none px-1 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded"
-          >
-            ×
-          </button>
-        </div>
-      )}
     </div>
   );
 }
