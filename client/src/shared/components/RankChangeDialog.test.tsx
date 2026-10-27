@@ -46,7 +46,7 @@ describe("RankChangeDialog", () => {
 
     const dialog = screen.getByTestId("rank-change-dialog");
     expect(dialog).toHaveAttribute("data-direction", "promoted");
-    expect(dialog).toHaveTextContent("Rank Up!");
+    expect(dialog).toHaveTextContent("Rank up!");
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
     expect(screen.getByTestId("rank-change-sp")).toHaveTextContent("+40 SP this match");
     expect(screen.getByTestId("rank-change-progress")).toHaveAttribute("aria-valuenow", "34");
@@ -59,8 +59,8 @@ describe("RankChangeDialog", () => {
 
     const dialog = screen.getByTestId("rank-change-dialog");
     expect(dialog).toHaveAttribute("data-direction", "demoted");
-    expect(dialog).toHaveTextContent("Rank Down");
-    expect(dialog).not.toHaveTextContent("Rank Up!");
+    expect(dialog).toHaveTextContent("Rank down");
+    expect(dialog).not.toHaveTextContent("Rank up!");
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Silver 3");
     expect(screen.getByTestId("rank-change-sp")).toHaveTextContent("−20 SP this match");
     expect(screen.queryByTestId("rank-change-halo")).not.toBeInTheDocument();
@@ -113,7 +113,7 @@ describe("RankChangeDialog", () => {
   it("names the new rank in the dialog's accessible title", () => {
     render(<Harness {...demotion} />);
 
-    expect(screen.getByRole("dialog", { name: "Rank Down Silver 3" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Rank down Silver 3" })).toBeInTheDocument();
   });
 
   it("closes when the player clicks Continue", async () => {

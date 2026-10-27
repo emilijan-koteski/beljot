@@ -131,7 +131,7 @@
       "lastWindow": "Last {{window}}",
       "trendTooltip": "Your last {{window}} matches compared with the {{window}} before them.",
       "trendTooltipPublic": "Their last {{window}} matches compared with the {{window}} before them.",
-      "newPlayerChip": "New Player",
+      "newPlayerChip": "New player",
       "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Play 5 matches to get an honor score.",
       "newPlayerHintPublic": "Gets an honor score after 5 matches.",
@@ -215,12 +215,12 @@
       },
       "hand": {
         "number": "Hand {{number}}",
-        "cardPoints": "Card Points",
+        "cardPoints": "Card points",
         "declarationPoints": "Declarations",
         "lastTrickBonus": "Last trick",
         "capot": "Capot",
         "failedContract": "Failed hand",
-        "handTotal": "Hand Total",
+        "handTotal": "Hand total",
         "col": {
           "number": "#",
           "hand": "Hand",
@@ -483,7 +483,7 @@
     "copyLinkAriaLabel": "Copy room code {{code}}",
     "copyLinkSuccess": "Room code copied!",
     "copyLinkFailed": "Failed to copy — code: {{code}}",
-    "leaveRoom": "Leave Room",
+    "leaveRoom": "Leave room",
     "seatYou": "You",
     "seatYouInline": "you",
     "seatOwner": "Host",
@@ -498,7 +498,7 @@
       "notSeated": "Standing"
     },
     "notFound": "Room not found",
-    "notFoundAction": "Back to Lobby",
+    "notFoundAction": "Back to lobby",
     "roomClosed": "This room is closed.",
     "returningToLobby": "Returning to lobby…",
     "startMatch": "Start match",
@@ -1439,7 +1439,7 @@
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Level {{level}}, {{current}} / {{next}} XP",
     "levelUpDialog": {
-      "title": "Level Up!",
+      "title": "Level up!",
       "earned": "+{{amount}} XP",
       "continue": "Continue"
     }
@@ -1480,10 +1480,10 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Rank Up!"
+      "title": "Rank up!"
     },
     "rankDownDialog": {
-      "title": "Rank Down"
+      "title": "Rank down"
     },
     "rankDialog": {
       "sp": "{{change}} SP this match",
