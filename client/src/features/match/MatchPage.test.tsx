@@ -1090,6 +1090,21 @@ describe("MatchPage", () => {
     }
   });
 
+  it.each([
+    ["settings-button", "settings-dialog"],
+    ["rules-button", "rules-dialog"],
+  ])("opens %s's dialog above the pause overlay while paused", (button, dialog) => {
+    useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "paused" });
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+    fireEvent.click(screen.getByTestId(button));
+
+    const dialogZ = Number(screen.getByTestId(dialog).style.zIndex);
+    const pauseZ = Number(screen.getByTestId("pause-overlay").style.zIndex);
+    expect(dialogZ).toBeGreaterThan(pauseZ);
+  });
+
   it("hides declarationReveal while the table is paused (AC3)", () => {
     useMatchStore.getState().setMatchState({ ...mockMatchState, phase: "paused" });
     useMatchStore.getState().setMyPlayerSeat(0);
