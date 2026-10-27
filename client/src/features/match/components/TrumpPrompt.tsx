@@ -225,34 +225,22 @@ export function TrumpPrompt({
           subtitle={subtitle}
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
-          {biddingRound === 1 && trumpCandidate ? (
+          {trumpCandidate && (
             <div className="flex items-center gap-5 mb-5">
               <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
               <p
                 className="text-sm leading-relaxed flex-1"
                 style={{ color: "var(--ink-light)", opacity: 0.8 }}
+                data-testid="trump-prompt-candidate-note"
               >
-                {t("match.trumpPrompt.bodyRound1")}
+                {biddingRound === 1
+                  ? t("match.trumpPrompt.bodyRound1")
+                  : t("match.trumpPrompt.bodyRound2")}
               </p>
             </div>
-          ) : (
-            <>
-              {trumpCandidate && (
-                <div className="flex justify-center mb-4">
-                  <PlayingCard
-                    card={trumpCandidate}
-                    state="default"
-                    size="lg"
-                    withTransition={false}
-                  />
-                </div>
-              )}
-              <SuitPickerGrid
-                lockedSuit={trumpCandidate?.suit ?? null}
-                onPick={onPick}
-                deck={deck}
-              />
-            </>
+          )}
+          {(biddingRound !== 1 || !trumpCandidate) && (
+            <SuitPickerGrid lockedSuit={trumpCandidate?.suit ?? null} onPick={onPick} deck={deck} />
           )}
 
           <div className="flex items-center justify-between gap-3">

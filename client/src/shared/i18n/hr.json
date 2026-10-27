@@ -941,6 +941,7 @@
       "titleFreePick": "Zovi aduta u bilo kojoj boji",
       "subtitleFreePick": "Sve četiri boje su ti na raspolaganju.",
       "bodyRound1": "Karta kandidat je okrenuta. Prihvati je kao aduta za svoj tim, ili prepusti sljedećem igraču.",
+      "bodyRound2": "Čak i ako za aduta odabereš drugu boju, ovu kartu i dalje dobivaš iz špila.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
       "pass": "Dalje",
