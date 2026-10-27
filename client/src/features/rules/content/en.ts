@@ -377,7 +377,6 @@ export const en: RulesLangData = {
     colPoints: "Points",
     colPower: "Power",
     meldKinds: { belot: "Trump pair", set: "Carré", run: "Run" },
-    ovReference: "Reference",
     ovTitle: "Belote rules",
     ovChapters: "Chapters",
     ovFullRef: "Full reference:",

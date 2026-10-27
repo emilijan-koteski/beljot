@@ -4,6 +4,7 @@ import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import type { Card } from "@/shared/types/matchTypes";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
 import { PlayingCard } from "./PlayingCard";
 
 interface DealAnimationProps {
@@ -45,11 +46,10 @@ export function DealAnimation({
       {isReshuffle && (
         <p
           aria-hidden="true"
-          className="text-sm rounded-md px-3 py-1.5"
+          className="text-sm rounded-lg px-3 py-1.5"
           style={{
             color: "var(--ink-light)",
-            background: "var(--panel-dark, rgba(20,45,30,0.85))",
-            border: "1px solid var(--brass-40)",
+            ...floatingPanelStyle(),
           }}
           data-testid="deal-reshuffle-caption"
         >

@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import { ReconnectOverlay } from "./ReconnectOverlay";
 
 vi.mock("react-i18next", () => ({
@@ -14,7 +15,7 @@ vi.mock("react-i18next", () => ({
         "match.disconnect.reconnectFailed": "Reconnection failed — the match may have ended",
         "match.disconnect.abandonCountsWin": "Counts as a win for your team",
         "match.disconnect.abandonCountsLoss": "Counts as a loss for your team",
-        "match.matchResult.title": "Match Complete",
+        "match.matchResult.title": "Match complete",
         "team.us": "Us",
         "team.them": "Them",
       };
@@ -135,6 +136,50 @@ describe("ReconnectOverlay", () => {
     expect(screen.getByTestId("abandon-scores")).toHaveTextContent("Final: Us 450 : Them 380");
     expect(screen.getByText("Returning to lobby...")).toBeInTheDocument();
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
+  });
+
+  it("colours the abandonment headline gold when it counts as the viewer's win", () => {
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
+        abandonedData={{
+          abandonedByPlayer: 1,
+          teamAFinalScore: 450,
+          teamBFinalScore: 380,
+          matchDurationSec: 600,
+        }}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByTestId("abandon-title");
+    expect(title).toHaveAttribute("data-result", "win");
+    expect(title).toHaveStyle({ color: TEAM_GOLD[0] });
+  });
+
+  it("colours the abandonment headline silver when the viewer's partner abandoned", () => {
+    render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Dragan"
+        reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
+        abandonedData={{
+          abandonedByPlayer: 2,
+          teamAFinalScore: 450,
+          teamBFinalScore: 380,
+          matchDurationSec: 600,
+        }}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByTestId("abandon-title");
+    expect(title).toHaveAttribute("data-result", "loss");
+    expect(title).toHaveStyle({ color: TEAM_SILVER[0] });
   });
 
   it("flips abandonment scores when viewer is on teamB", () => {

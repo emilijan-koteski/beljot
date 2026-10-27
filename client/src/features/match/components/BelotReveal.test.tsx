@@ -47,6 +47,25 @@ describe("BelotReveal", () => {
     expect(screen.getByTestId("playing-card-KC")).toBeInTheDocument();
   });
 
+  it("credits the viewer's team when a partner announces", () => {
+    render(
+      <BelotReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId="QH"
+        isKing={false}
+        onComplete={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20 to your team's score");
+  });
+
+  it("credits the other team when an opponent announces", () => {
+    render(<BelotReveal playerSeat={1} myPlayerSeat={0} cardId="KH" isKing onComplete={vi.fn()} />);
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20 to their team's score");
+    expect(screen.getByTestId("belot-reveal")).not.toHaveTextContent("your team");
+  });
+
   it("renders the announcer's name in the title when players is provided", () => {
     render(
       <BelotReveal

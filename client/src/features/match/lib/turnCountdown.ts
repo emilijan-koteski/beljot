@@ -37,6 +37,10 @@ export function useTurnCountdown(turnExpiresAt: string | null): number {
 
 export const URGENT_FRACTION = 0.125;
 
+export const TIMER_RING_INK = "#d4d0c4";
+export const TIMER_RING_TRACK = "rgba(255,255,255,0.12)";
+export const TIMER_RING_STROKE = 2;
+
 /**
  * Whether the countdown should read as urgent (≤1/8 of the total duration
  * remains, including 0). Shared so [PlayerSeat] colors the external label

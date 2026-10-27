@@ -22,7 +22,7 @@ interface PauseOverlayProps {
 }
 
 /**
- * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume All controls.
+ * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume all controls.
  */
 export function PauseOverlay({
   pausedPlayers,
@@ -48,9 +48,9 @@ export function PauseOverlay({
       data-testid="pause-overlay"
       aria-live="polite"
     >
-      <OverlayBackdrop dim={0.65}>
+      <OverlayBackdrop dim="blocker">
         <ClassicPanel
-          width={480}
+          size="dialog"
           title={t("match.pause.title")}
           subtitle={t(
             pausedNames.length > 1 ? "match.pause.pausedByMany" : "match.pause.pausedBy",
@@ -105,25 +105,20 @@ export function PauseOverlay({
           </div>
 
           <div
-            className="mt-2 flex w-full flex-col items-stretch gap-2 text-center"
+            className="mt-4 flex flex-wrap items-center justify-end gap-3.5"
             data-testid="pause-actions"
           >
             {hasActivePause ? (
-              <ClassicButton
-                variant="primary"
-                onClick={onResume}
-                data-testid="pause-resume-button"
-                className="w-full"
-              >
+              <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
                 {t("match.pause.resume")}
               </ClassicButton>
             ) : canStackPause ? (
-              <ClassicButton onClick={onPause} data-testid="pause-stack-button" className="w-full">
+              <ClassicButton onClick={onPause} data-testid="pause-stack-button">
                 {t("match.pause.pauseButton")}
               </ClassicButton>
             ) : (
               <p
-                className="text-sm italic"
+                className="mr-auto text-sm italic"
                 style={{ color: "var(--ink-light)", opacity: 0.65 }}
                 data-testid="pause-waiting"
               >
@@ -133,18 +128,9 @@ export function PauseOverlay({
 
             {isRoomOwner && (
               <ClassicButton
+                variant={hasActivePause ? "ghost" : "primary"}
                 onClick={onOwnerResume}
                 data-testid="pause-owner-resume-button"
-                className="w-full"
-                style={{
-                  border: "1px solid color-mix(in srgb, var(--danger-light) 45%, transparent)",
-                  color: "#ffb1a8",
-                  background: "linear-gradient(180deg, rgba(70,32,32,0.55), rgba(40,18,18,0.45))",
-                  boxShadow:
-                    "inset 0 1px 0 color-mix(in srgb, var(--danger-light) 18%, transparent)",
-                  padding: "8px 14px",
-                  fontSize: 14,
-                }}
               >
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <Crown size={14} aria-hidden="true" />

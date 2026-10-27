@@ -88,6 +88,26 @@ describe("SurrenderButton", () => {
     await user.click(screen.getByTestId("surrender-cancel"));
     expect(onConfirm).not.toHaveBeenCalled();
   });
+
+  it("closes the confirm dialog on Escape without proposing", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    render(
+      <SurrenderButton
+        canRequest={true}
+        isExhausted={false}
+        isPending={false}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    await user.click(screen.getByTestId("surrender-button"));
+    expect(screen.getByRole("note")).toHaveTextContent("one surrender per match");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByTestId("surrender-confirm-overlay")).not.toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });
 
 describe("SurrenderConfirmDialog footer order", () => {

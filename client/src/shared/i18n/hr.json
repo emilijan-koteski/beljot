@@ -941,6 +941,7 @@
       "titleFreePick": "Zovi aduta u bilo kojoj boji",
       "subtitleFreePick": "Sve četiri boje su ti na raspolaganju.",
       "bodyRound1": "Karta kandidat je okrenuta. Prihvati je kao aduta za svoj tim, ili prepusti sljedećem igraču.",
+      "bodyRound2": "Čak i ako za aduta odabereš drugu boju, ovu kartu i dalje dobivaš iz špila.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
       "pass": "Dalje",
@@ -956,13 +957,12 @@
       "message": "Ponovno miješanje špila…"
     },
     "declaration": {
-      "title": "Imaš zvanja!",
+      "title": "Imaš zvanja",
       "declare": "Zovi",
       "skip": "Preskoči",
       "noneTitle": "Nemaš zvanja",
       "noneBody": "U ovoj ruci nemaš što zvati.",
       "waitingOthers": "Čekaju se ostali… {{answered}}/4",
-      "pts": "bodova",
       "total": "Ukupno",
       "tierce": "Terca",
       "quarte": "Kvarta",
@@ -993,7 +993,8 @@
         "rebelot": "Rebela",
         "titleBelot": "{{name}} je zvao Belu.",
         "titleRebelot": "{{name}} je zvao Rebelu.",
-        "bonus": "+20 bodova za tim",
+        "bonusUs": "+20 bodova za tvoj tim",
+        "bonusThem": "+20 bodova za njihov tim",
         "dismiss": "Zatvori"
       }
     },
@@ -1111,15 +1112,15 @@
       "pending": "Predaja na čekanju…",
       "confirm": {
         "title": "Predati meč?",
-        "body": "Tvoj suigrač mora prihvatiti. Ako odbije, tvoj jedini pokušaj predaje je iskorišten.",
-        "consumeWarning": "Jednokratna radnja, odbijeni prijedlozi troše tvoj jedini pokušaj.",
+        "body": "Tvoj suigrač mora prihvatiti. Ako prihvati, meč završava kao pobjeda za protivnike.",
+        "consumeWarning": "Imaš jednu predaju po meču. Ako suigrač odbije, iskorištena je.",
         "confirm": "Predloži predaju",
         "cancel": "Odustani"
       },
       "prompt": {
         "title": "Tvoj suigrač želi predati",
-        "body": "{{username}} predlaže da predate meč. Ako prihvatiš, meč završava kao pobjeda za protivnike.",
-        "consequence": "Prihvaćanjem meč završava u korist protivnika.",
+        "body": "{{username}} predlaže da predate meč. Ako odbiješ, igra se nastavlja.",
+        "consequence": "Ako prihvatiš, meč završava kao pobjeda za protivnike.",
         "accept": "Prihvati predaju",
         "decline": "Odbij"
       },

@@ -259,6 +259,11 @@
   --brass-55: color-mix(in srgb, var(--brass) 55%, transparent);
   --brass-85: color-mix(in srgb, var(--brass) 85%, transparent);
 
+  /* ── Felt dialog ground — the two stops of ClassicPanel's vertical
+     gradient. Scope-stable: in-match dialogs portal out of `.game-table`. */
+  --dialog-felt-top: rgba(30, 60, 40, 0.98);
+  --dialog-felt-bottom: rgba(14, 40, 24, 0.98);
+
   /* ── Bot (frost-blue) ─────────────────────────────────────────────────
      The single source of truth for "this is a bot". Shared by every bot
      marker — the match-history "with bots" chip, the seated-bot badge, and
@@ -601,6 +606,55 @@
   --accent-ink: var(--brass-ink);
   --chat-shadow-panel: var(--shadow-felt-xl), inset 0 0 0 1px var(--brass-10);
   --chat-shadow-fab: var(--shadow-felt-md);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Felt controls — lets the shared Switch, Slider, Segmented and Tabs sit
+   in a felt dialog. In-match dialogs portal to <body>, outside
+   `.game-table`, so every token those controls read is re-pointed here:
+   a dark sunken well, cream inks, and brass for the "on" state, because
+   the table's lime accent is the turn signal and stays off these controls.
+   ────────────────────────────────────────────────────────────────────── */
+.felt-controls {
+  --bg: var(--brass-soft);
+  --surface: #1d3a26;
+  --surface-2: var(--brass-soft);
+  --surface-3: rgba(0, 0, 0, 0.28);
+  --border: var(--brass-40);
+  --ink: var(--ink-light);
+  --ink-dim: #c8d5cd;
+  --ink-mute: rgba(245, 242, 232, 0.65);
+  --accent: var(--brass);
+  --accent-deep: var(--brass);
+  --accent-soft: var(--brass-soft);
+  --accent-ink: var(--brass-ink);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Felt toasts — while the match page is mounted it marks <body> with
+   `.felt-toasts` (useFeltToasts), and every sonner toast swaps the
+   parchment card for the floating-panel recipe the table HUD uses:
+   panel-dark, an 8px blur, a brass hairline and cream ink. Errors take
+   the danger edge and ink. The Toaster sits outside `.game-table`, so
+   panel-dark falls back to its literal value here.
+   ────────────────────────────────────────────────────────────────────── */
+body.felt-toasts [data-sonner-toast] {
+  --surface-2: var(--panel-dark, rgba(20, 45, 30, 0.85));
+  --ink: var(--ink-light);
+  --border: var(--brass-40);
+  --normal-bg: var(--panel-dark, rgba(20, 45, 30, 0.85));
+  --normal-bg-hover: rgba(30, 60, 40, 0.92);
+  --normal-text: var(--ink-light);
+  --normal-border: var(--brass-40);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-felt-md);
+}
+
+body.felt-toasts [data-sonner-toast][data-type="error"] {
+  --ink: var(--danger-light);
+  --border: color-mix(in srgb, var(--danger-light) 40%, transparent);
+  --normal-text: var(--danger-light);
+  --normal-border: color-mix(in srgb, var(--danger-light) 40%, transparent);
 }
 
 /* The floating message peek sits over the felt + cards (not inside the dark

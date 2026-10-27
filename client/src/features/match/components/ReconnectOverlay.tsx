@@ -10,15 +10,18 @@ import type { SeasonSettlement } from "@/shared/stores/matchStore";
 import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
-import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
+import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import {
   isCountdownUrgent,
+  TIMER_RING_INK,
   URGENT_FRACTION,
   useRingDrain,
   useTurnCountdown,
 } from "../lib/turnCountdown";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { FinalScore } from "./overlay/FinalScore";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { ResultHeading } from "./overlay/ResultHeading";
 import { SeasonSpLine } from "./SeasonSpLine";
 
 interface DisconnectedPlayerInfo {
@@ -40,7 +43,6 @@ interface ReconnectOverlayProps {
 }
 
 const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
-const RING_PARCHMENT = "#d4d0c4";
 const RING_DANGER = "var(--danger-light)";
 const RING_SIZE = 132;
 const RING_STROKE_INSET = 4;
@@ -131,6 +133,7 @@ export function ReconnectOverlay({
     const themValue = viewerTeam === "teamA" ? teamBValue : teamAValue;
     const showResultLine = result !== null;
     const viewerLost = result === "loss";
+    const resultColor = result === null ? RING_DANGER : viewerLost ? TEAM_SILVER[0] : TEAM_GOLD[0];
 
     return (
       <div
@@ -139,46 +142,34 @@ export function ReconnectOverlay({
         data-testid="reconnect-overlay"
         aria-live="assertive"
       >
-        <OverlayBackdrop dim={0.7}>
-          <ClassicPanel width={520} glowColor={RING_DANGER}>
+        <OverlayBackdrop dim="blocker">
+          <ClassicPanel size="wide" glowColor={resultColor}>
             <div className="flex flex-col items-center text-center gap-3">
-              <span
-                className="text-2xs uppercase tracking-caps"
-                style={{ color: "var(--ink-light)", opacity: 0.55 }}
-              >
-                {t("match.matchResult.title")}
-              </span>
-
-              <h2
-                className="text-2xl font-semibold tracking-tight"
-                style={{ color: RING_DANGER }}
+              <ResultHeading
+                eyebrow={t("match.matchResult.title")}
+                color={resultColor}
                 data-testid="abandon-title"
+                data-result={result ?? undefined}
               >
                 {t("match.disconnect.matchAbandoned", {
                   player: disconnectedPlayerName,
                 })}
-              </h2>
+              </ResultHeading>
 
-              <div
-                className="flex items-center justify-center gap-6 mt-1 mb-1"
-                data-testid="abandon-scores"
+              <FinalScore
+                sides={[
+                  { label: t("team.us"), score: usValue, color: TEAM_GOLD[0] },
+                  { label: t("team.them"), score: themValue, color: TEAM_SILVER[0] },
+                ]}
+                testId="abandon-scores"
               >
-                <ScoreColumn label={t("team.us")} value={usValue} gradient={TEAM_GOLD} />
-                <span
-                  className="text-3xl tracking-tight"
-                  style={{ color: "var(--ink-light)", opacity: 0.4 }}
-                  aria-hidden
-                >
-                  ·
-                </span>
-                <ScoreColumn label={t("team.them")} value={themValue} gradient={TEAM_SILVER} />
                 <span className="sr-only">
                   {t("match.disconnect.matchAbandonedScores", {
                     us: usValue,
                     them: themValue,
                   })}
                 </span>
-              </div>
+              </FinalScore>
 
               {showResultLine && (
                 <p
@@ -216,23 +207,16 @@ export function ReconnectOverlay({
         data-testid="reconnect-overlay"
         aria-live="assertive"
       >
-        <OverlayBackdrop dim={0.7}>
-          <ClassicPanel width={480} glowColor={RING_DANGER}>
+        <OverlayBackdrop dim="blocker">
+          <ClassicPanel size="dialog" glowColor={RING_DANGER}>
             <div className="flex flex-col items-center text-center gap-3">
-              <span
-                className="text-2xs uppercase tracking-caps"
-                style={{ color: "var(--ink-light)", opacity: 0.55 }}
-              >
-                {t("match.matchResult.title")}
-              </span>
-
-              <h2
-                className="text-2xl font-semibold tracking-tight"
-                style={{ color: RING_DANGER }}
+              <ResultHeading
+                eyebrow={t("match.matchResult.title")}
+                color={RING_DANGER}
                 data-testid="match-ended-title"
               >
                 {t("match.disconnect.matchEnded", { defaultValue: "Match has ended" })}
-              </h2>
+              </ResultHeading>
 
               <p className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
                 {t("match.disconnect.reconnectFailed")}
@@ -253,7 +237,7 @@ export function ReconnectOverlay({
 
   const pct = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
   const isUrgent = pct <= URGENT_FRACTION;
-  const ringColor = isUrgent ? RING_DANGER : RING_PARCHMENT;
+  const ringColor = isUrgent ? RING_DANGER : TIMER_RING_INK;
   const ringSize = RING_SIZE;
   const ringRadius = RING_RADIUS;
   const ringCirc = RING_CIRC;
@@ -265,9 +249,9 @@ export function ReconnectOverlay({
       data-testid="reconnect-overlay"
       aria-live="assertive"
     >
-      <OverlayBackdrop dim={0.65}>
+      <OverlayBackdrop dim="blocker">
         <ClassicPanel
-          width={480}
+          size="dialog"
           title={t("match.disconnect.reconnecting")}
           subtitle={
             chipPlayers.length > 1
@@ -455,25 +439,6 @@ function DisconnectedPlayerRow({
       >
         {formatCountdown(remainingSeconds)}
       </span>
-    </div>
-  );
-}
-
-interface ScoreColumnProps {
-  label: string;
-  value: number;
-  gradient: TeamGradient;
-}
-
-function ScoreColumn({ label, value, gradient }: ScoreColumnProps) {
-  return (
-    <div className="text-center">
-      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: gradient[0] }}>
-        {label}
-      </p>
-      <p className="text-4xl font-bold tabular-nums tracking-tight" style={{ color: gradient[0] }}>
-        {value}
-      </p>
     </div>
   );
 }

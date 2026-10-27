@@ -83,7 +83,6 @@ export type RulesUi = {
   colPoints: string;
   colPower: string;
   meldKinds: Record<DeclarationKind, string>;
-  ovReference: string;
   ovTitle: string;
   ovChapters: string;
   ovFullRef: string;

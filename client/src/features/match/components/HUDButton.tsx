@@ -1,5 +1,8 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 
+import { BUTTON_RADIUS_PX } from "../lib/buttonShape";
+import { floatingPanelStyle } from "../lib/floatingPanel";
+
 type HUDButtonVariant = "default" | "danger";
 
 interface HUDButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,17 +18,11 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
   const isLabeled = label !== undefined && label !== null;
 
   const baseStyle: React.CSSProperties = {
-    background: "var(--panel-deeper)",
-    border:
-      variant === "danger"
-        ? "1px solid color-mix(in srgb, var(--danger-light) 30%, transparent)"
-        : "1px solid var(--brass-40)",
+    ...floatingPanelStyle({ edge: variant === "danger" ? "danger" : "hairline" }),
     color: variant === "danger" ? "var(--danger-light)" : "var(--ink-light)",
-    backdropFilter: "blur(6px)",
-    WebkitBackdropFilter: "blur(6px)",
     minWidth: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: BUTTON_RADIUS_PX,
     padding: isLabeled ? "0 14px" : 0,
     gap: 8,
     fontSize: 12,
@@ -37,7 +34,7 @@ export const HUDButton = forwardRef<HTMLButtonElement, HUDButtonProps>(function 
     <button
       ref={ref}
       type={type}
-      className={`inline-flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:brightness-110 ${className}`}
+      className={`inline-flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:not-disabled:brightness-110 ${className}`}
       style={baseStyle}
       {...rest}
     >

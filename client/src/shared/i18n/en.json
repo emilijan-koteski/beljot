@@ -131,7 +131,7 @@
       "lastWindow": "Last {{window}}",
       "trendTooltip": "Your last {{window}} matches compared with the {{window}} before them.",
       "trendTooltipPublic": "Their last {{window}} matches compared with the {{window}} before them.",
-      "newPlayerChip": "New Player",
+      "newPlayerChip": "New player",
       "newPlayerProgress": "{{played}} / {{total}}",
       "newPlayerHint": "Play 5 matches to get an honor score.",
       "newPlayerHintPublic": "Gets an honor score after 5 matches.",
@@ -215,12 +215,12 @@
       },
       "hand": {
         "number": "Hand {{number}}",
-        "cardPoints": "Card Points",
+        "cardPoints": "Card points",
         "declarationPoints": "Declarations",
         "lastTrickBonus": "Last trick",
         "capot": "Capot",
         "failedContract": "Failed hand",
-        "handTotal": "Hand Total",
+        "handTotal": "Hand total",
         "col": {
           "number": "#",
           "hand": "Hand",
@@ -483,7 +483,7 @@
     "copyLinkAriaLabel": "Copy room code {{code}}",
     "copyLinkSuccess": "Room code copied!",
     "copyLinkFailed": "Failed to copy — code: {{code}}",
-    "leaveRoom": "Leave Room",
+    "leaveRoom": "Leave room",
     "seatYou": "You",
     "seatYouInline": "you",
     "seatOwner": "Host",
@@ -498,7 +498,7 @@
       "notSeated": "Standing"
     },
     "notFound": "Room not found",
-    "notFoundAction": "Back to Lobby",
+    "notFoundAction": "Back to lobby",
     "roomClosed": "This room is closed.",
     "returningToLobby": "Returning to lobby…",
     "startMatch": "Start match",
@@ -941,6 +941,7 @@
       "titleFreePick": "Take trump — any suit",
       "subtitleFreePick": "All four suits are yours to take.",
       "bodyRound1": "The candidate card was turned face-up. Take it as trump for your team, or pass to the next player.",
+      "bodyRound2": "Even if you name a different suit as trump, you still get this card from the deck.",
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
       "pass": "Pass",
@@ -956,13 +957,12 @@
       "message": "Reshuffling deck…"
     },
     "declaration": {
-      "title": "You have declarations!",
+      "title": "You have declarations",
       "declare": "Declare",
       "skip": "Skip",
       "noneTitle": "No declarations",
       "noneBody": "Nothing to declare this hand.",
       "waitingOthers": "Waiting for the others… {{answered}}/4",
-      "pts": "pts",
       "total": "Total",
       "tierce": "Tierce",
       "quarte": "Quarte",
@@ -993,7 +993,8 @@
         "rebelot": "Rebelote",
         "titleBelot": "{{name}} declared Belote.",
         "titleRebelot": "{{name}} declared Rebelote.",
-        "bonus": "+20 to your team's score",
+        "bonusUs": "+20 to your team's score",
+        "bonusThem": "+20 to their team's score",
         "dismiss": "Dismiss"
       }
     },
@@ -1023,7 +1024,7 @@
       "handVariant": "Hand {{hand}} · {{variant}}"
     },
     "scoreReveal": {
-      "title": "Hand Score",
+      "title": "Hand score",
       "titleWithHand": "Hand {{hand}} — results",
       "subtitleHeldYour": "Pulled it off · you took trump on {{suit}}",
       "subtitleHeldTheir": "Pulled it off · they took trump on {{suit}}",
@@ -1031,13 +1032,13 @@
       "subtitleFailedThem": "Went down · all points to them",
       "subtitleFailedCardsUs": "Went down · card points to us",
       "subtitleFailedCardsThem": "Went down · card points to them",
-      "cardPoints": "Card Points",
+      "cardPoints": "Card points",
       "declarationPoints": "Declarations",
-      "lastTrickBonus": "Last Trick Bonus",
-      "capotBonus": "Capot Bonus",
-      "failedContract": "Failed Hand",
-      "handTotal": "Hand Total",
-      "matchTotal": "Match Score",
+      "lastTrickBonus": "Last trick bonus",
+      "capotBonus": "Capot bonus",
+      "failedContract": "Failed hand",
+      "handTotal": "Hand total",
+      "matchTotal": "Match score",
       "continue": "Continue",
       "waiting": "Waiting for others…"
     },
@@ -1077,12 +1078,12 @@
       }
     },
     "matchResult": {
-      "title": "Match Complete",
-      "winnerUs": "We Won!",
-      "winnerThem": "They Won!",
-      "duration": "Match Duration",
-      "returnToLobby": "Return to Lobby",
-      "returnToRoom": "Return to Room",
+      "title": "Match complete",
+      "winnerUs": "We won!",
+      "winnerThem": "They won!",
+      "duration": "Match duration",
+      "returnToLobby": "Return to lobby",
+      "returnToRoom": "Return to room",
       "returnToRoomError": "Couldn't return to the room — it may no longer be available.",
       "returnToRoomAlreadyStarted": "The next match already started without you.",
       "returnToRoomNotInRoom": "You're no longer in this room.",
@@ -1111,15 +1112,15 @@
       "pending": "Surrender pending…",
       "confirm": {
         "title": "Surrender the match?",
-        "body": "Your teammate must accept. If they decline, your one surrender attempt is consumed.",
-        "consumeWarning": "One-shot action — declined proposals burn your only attempt.",
+        "body": "Your teammate has to accept. If they do, the match ends as a win for the opponents.",
+        "consumeWarning": "You get one surrender per match. If your teammate declines, it's used up.",
         "confirm": "Propose surrender",
         "cancel": "Cancel"
       },
       "prompt": {
         "title": "Your teammate wants to surrender",
-        "body": "{{username}} is proposing to forfeit the match. Accepting ends the match as a win for the opponents.",
-        "consequence": "Accepting ends the match in the opponents' favour.",
+        "body": "{{username}} is proposing to forfeit the match. If you decline, play continues.",
+        "consequence": "Accepting ends the match as a win for the opponents.",
         "accept": "Accept surrender",
         "decline": "Decline"
       },
@@ -1133,17 +1134,17 @@
       "unknownProposer": "your opponent"
     },
     "pause": {
-      "title": "Match Paused",
+      "title": "Match paused",
       "pausedBy": "{{player}} paused the game",
       "pausedByMany": "{{player}} paused the game",
       "waitingToResume": "Waiting for players to resume…",
       "resume": "Resume",
       "pauseButton": "Pause",
-      "pauseUsed": "Pause Used",
+      "pauseUsed": "Pause used",
       "pausedNow": "paused now",
       "pauseAvailable": "pause available",
       "pauseUsedRow": "pause used",
-      "resumeAll": "Resume All",
+      "resumeAll": "Resume all",
       "ownerResumedToast": "Room owner resumed the game"
     },
     "disconnect": {
@@ -1438,7 +1439,7 @@
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Level {{level}}, {{current}} / {{next}} XP",
     "levelUpDialog": {
-      "title": "Level Up!",
+      "title": "Level up!",
       "earned": "+{{amount}} XP",
       "continue": "Continue"
     }
@@ -1479,10 +1480,10 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Rank Up!"
+      "title": "Rank up!"
     },
     "rankDownDialog": {
-      "title": "Rank Down"
+      "title": "Rank down"
     },
     "rankDialog": {
       "sp": "{{change}} SP this match",

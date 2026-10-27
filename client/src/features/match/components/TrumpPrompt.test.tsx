@@ -808,3 +808,54 @@ describe("TrumpPrompt footer order", () => {
     expectActionBeforeStatusQuo("trump-prompt-pick", "trump-prompt-pass");
   });
 });
+
+describe("TrumpPrompt candidate note", () => {
+  it("tells a round 2 bidder the revealed card still comes to them", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={{ rank: "J", suit: "H" }}
+        biddingRound={2}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("trump-prompt-candidate-note")).toHaveTextContent(
+      "Even if you name a different suit as trump, you still get this card from the deck.",
+    );
+    expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
+  });
+
+  it("keeps the take-or-pass note in round 1", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={{ rank: "J", suit: "H" }}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("trump-prompt-candidate-note")).toHaveTextContent(
+      "The candidate card was turned face-up.",
+    );
+    expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
+  });
+
+  it("shows no candidate note on a Croatian free pick", () => {
+    render(
+      <TrumpPrompt
+        trumpCandidate={null}
+        biddingRound={1}
+        isActiveBidder={true}
+        onPick={vi.fn()}
+        onPass={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("trump-prompt-candidate-note")).not.toBeInTheDocument();
+    expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
+  });
+});

@@ -10,8 +10,9 @@ import { declarationLabelKey } from "../lib/declarations";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { MeldRow } from "./overlay/MeldRow";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
-import { PlayingCard } from "./PlayingCard";
+import { SummaryStrip } from "./overlay/SummaryStrip";
 
 const AUTO_SKIP_SEC = MOTION.DECLARATION_PHASE_AUTO_SKIP / 1000;
 
@@ -92,7 +93,7 @@ export function DeclarationPrompt({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="declaration-prompt">
-      <OverlayBackdrop dim={0.5}>
+      <OverlayBackdrop dim="prompt">
         <div
           ref={promptRef}
           role="dialog"
@@ -102,7 +103,7 @@ export function DeclarationPrompt({
           className="outline-none motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
         >
           <ClassicPanel
-            width={500}
+            size="dialog"
             title={
               <span id="declaration-prompt-title">
                 {hasDeclarations ? t("match.declaration.title") : t("match.declaration.noneTitle")}
@@ -111,57 +112,23 @@ export function DeclarationPrompt({
           >
             {hasDeclarations ? (
               <>
-                <div className="flex flex-col gap-2 mb-4">
+                <div className="flex flex-col gap-2 mb-3">
                   {declarations.map((decl, i) => (
-                    <div
+                    <MeldRow
                       key={i}
-                      className="flex flex-col gap-2 rounded-md px-3 py-2"
-                      style={{
-                        background: "rgba(0,0,0,0.22)",
-                        border: "1px solid var(--brass-25)",
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm" style={{ color: "var(--ink-light)" }}>
-                          {declarationLabel(decl, t)}
-                        </span>
-                        <span
-                          className="text-base font-semibold tabular-nums"
-                          style={{ color: "var(--brass)" }}
-                        >
-                          {decl.value} {t("match.declaration.pts")}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {decl.cards.map((card) => (
-                          <PlayingCard
-                            key={`${card.rank}${card.suit}`}
-                            card={card}
-                            state="default"
-                            size="sm"
-                            withTransition={false}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                      label={declarationLabel(decl, t)}
+                      cards={decl.cards}
+                      value={decl.value}
+                      testId="declaration-prompt-meld"
+                    />
                   ))}
                 </div>
-
-                <div
-                  className="flex items-center justify-between pt-3 mb-4"
-                  style={{ borderTop: "1px solid var(--brass-25)" }}
-                  data-testid="declaration-prompt-total"
-                >
-                  <span className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
-                    {t("match.declaration.total")}
-                  </span>
-                  <span
-                    className="text-lg font-bold tabular-nums"
-                    style={{ color: "var(--brass)" }}
-                  >
-                    {total} {t("match.declaration.pts")}
-                  </span>
-                </div>
+                <SummaryStrip
+                  label={t("match.declaration.total")}
+                  value={`+${total}`}
+                  testId="declaration-prompt-total"
+                  className="mb-4"
+                />
               </>
             ) : (
               <p
@@ -173,7 +140,7 @@ export function DeclarationPrompt({
               </p>
             )}
 
-            <div className="flex justify-end items-center gap-3">
+            <div className="flex justify-end items-center gap-3.5">
               <ClassicButton
                 variant="primary"
                 onClick={handleDeclare}

@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 
 import { Z } from "@/shared/lib/zLayers";
 
+import { type OverlayDim, overlayDimBackground } from "../../lib/overlayDim";
+
 interface OverlayBackdropProps {
-  dim?: number;
+  dim?: OverlayDim;
   dimZ?: number;
   panelZ?: number;
   children: ReactNode;
@@ -14,12 +16,11 @@ interface OverlayBackdropProps {
  * The dim ignores pointer events and never dismisses the overlay.
  */
 export function OverlayBackdrop({
-  dim = 0.55,
+  dim = "prompt",
   dimZ = Z.PROMPT_DIM,
   panelZ = Z.PROMPT,
   children,
 }: OverlayBackdropProps) {
-  const center = dim * 0.8;
   return (
     <>
       <div
@@ -27,7 +28,7 @@ export function OverlayBackdrop({
         className="absolute inset-0 pointer-events-none"
         style={{
           zIndex: dimZ,
-          background: `radial-gradient(ellipse at center, rgba(0,0,0,${center}) 0%, rgba(0,0,0,${dim}) 100%)`,
+          background: overlayDimBackground(dim),
           backdropFilter: "blur(2px)",
           WebkitBackdropFilter: "blur(2px)",
         }}

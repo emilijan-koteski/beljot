@@ -2,10 +2,12 @@ import { type CSSProperties, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSfxOnce } from "@/shared/audio/useSfxOnce";
+import { Badge } from "@/shared/components/ui/badge";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 
+import { overlayDimBackground } from "../lib/overlayDim";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 
 interface CapotAnimationProps {
@@ -54,8 +56,7 @@ export function CapotAnimation({
       className="fixed inset-0 flex cursor-pointer items-center justify-center"
       style={{
         zIndex: Z.CAPOT,
-        background:
-          "radial-gradient(ellipse at center, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.82) 100%)",
+        background: overlayDimBackground("spotlight"),
         backdropFilter: "blur(3px)",
       }}
       data-testid="capot-animation"
@@ -100,38 +101,23 @@ export function CapotAnimation({
           {t("match.capot.title")}
         </h1>
 
-        <div
+        <Badge
+          size="lg"
+          tint={bright}
+          className="mt-5.5"
+          icon={
+            <span
+              aria-hidden
+              className="size-1.75 rounded-full bg-current"
+              style={{ boxShadow: "0 0 6px currentColor" }}
+            />
+          }
           data-testid="capot-bonus"
-          className=""
-          style={{
-            marginTop: 22,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "8px 16px",
-            borderRadius: 999,
-            background: `${bright}1f`,
-            border: `1px solid ${bright}88`,
-            fontSize: 14,
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: bright,
-            fontWeight: 700,
-          }}
         >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: bright,
-              boxShadow: `0 0 6px ${bright}`,
-            }}
-          />
           {isUs
             ? t("match.capot.bonusUs", { points: capotBonus })
             : t("match.capot.bonusThem", { points: capotBonus })}
-        </div>
+        </Badge>
       </div>
     </div>
   );

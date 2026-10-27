@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
-import { ringDrainStyle } from "../../lib/turnCountdown";
+import {
+  ringDrainStyle,
+  TIMER_RING_INK,
+  TIMER_RING_STROKE,
+  TIMER_RING_TRACK,
+} from "../../lib/turnCountdown";
 import { IconX } from "./icons";
 
 interface AutoCloseRingProps {
@@ -15,6 +20,9 @@ interface AutoCloseRingProps {
 
 const RING_RADIUS = 9;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
+const RING_VIEWBOX = 24;
+const RING_BOX_PX = 36;
+const RING_STROKE_IN_VIEWBOX = (TIMER_RING_STROKE * RING_VIEWBOX) / RING_BOX_PX;
 
 /**
  * Circular X button whose progress ring drains over `duration` seconds, in step with the close timer.
@@ -106,8 +114,8 @@ export function AutoCloseRing({
           cy="12"
           r={RING_RADIUS}
           fill="none"
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth="1.5"
+          stroke={TIMER_RING_TRACK}
+          strokeWidth={RING_STROKE_IN_VIEWBOX}
         />
         <circle
           data-testid={`${testId}-arc`}
@@ -115,8 +123,8 @@ export function AutoCloseRing({
           cy="12"
           r={RING_RADIUS}
           fill="none"
-          stroke="#d4d0c4"
-          strokeWidth="1.5"
+          stroke={TIMER_RING_INK}
+          strokeWidth={RING_STROKE_IN_VIEWBOX}
           strokeLinecap="round"
           strokeDasharray={RING_CIRC}
           style={{

@@ -377,7 +377,6 @@ export const mk: RulesLangData = {
     colPoints: "Поени",
     colPower: "Сила",
     meldKinds: { belot: "Пар во адут", set: "Каре", run: "Низа" },
-    ovReference: "Упатство",
     ovTitle: "Правила на Бељот",
     ovChapters: "Поглавја",
     ovFullRef: "Целосно упатство:",

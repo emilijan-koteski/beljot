@@ -5,8 +5,10 @@ import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Card, Suit } from "@/shared/types/matchTypes";
 
+import { BUTTON_RADIUS_PX, DISABLED_OPACITY } from "../lib/buttonShape";
 import type { CardDeck } from "../lib/cardFace";
 import { CARD_FACE_BACKGROUND, CARD_FACE_BORDER, resolveCardDeck } from "../lib/cardFace";
+import { floatingPanelStyle } from "../lib/floatingPanel";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors } from "../lib/tableTheme";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
@@ -58,7 +60,7 @@ function SuitPickerGrid({
             onClick={() => onPick(suit)}
             aria-label={t(suitNameKey(suit, deck))}
             data-testid={`trump-prompt-suit-${suit}`}
-            className="flex items-center justify-center rounded-md transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
+            className="flex items-center justify-center rounded-lg transition-[filter,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass focus-visible:ring-offset-2 focus-visible:ring-offset-(--felt-deep,#072a14) disabled:cursor-not-allowed not-disabled:cursor-pointer not-disabled:hover:brightness-105 not-disabled:motion-safe:hover:-translate-y-0.5"
             style={{
               height: 52,
               background: CARD_FACE_BACKGROUND,
@@ -68,7 +70,7 @@ function SuitPickerGrid({
               fontFamily: "var(--font-suit)",
               fontSize: 28,
               lineHeight: 1,
-              opacity: isLocked ? 0.4 : 1,
+              opacity: isLocked ? DISABLED_OPACITY : 1,
               filter: isLocked ? "grayscale(0.85)" : undefined,
             }}
           >
@@ -94,7 +96,7 @@ function MustPickNote() {
       className="inline-flex items-center px-3.5 py-2 text-sm sm:px-4.5 sm:py-2.5 sm:text-sm"
       style={{
         border: "1px dashed var(--brass-40)",
-        borderRadius: 8,
+        borderRadius: BUTTON_RADIUS_PX,
         background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
         color: "var(--ink-light)",
         fontWeight: 600,
@@ -134,12 +136,7 @@ export function TrumpPrompt({
       >
         <div
           className="mx-4 flex max-w-[24rem] items-center gap-3 rounded-lg px-4 py-3"
-          style={{
-            background: "var(--panel-dark, rgba(20,45,30,0.85))",
-            border: "1px solid var(--brass-40)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-          }}
+          style={floatingPanelStyle()}
         >
           {trumpCandidate && (
             <div className="shrink-0">
@@ -147,7 +144,7 @@ export function TrumpPrompt({
             </div>
           )}
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm leading-snug" style={{ color: "rgba(245,242,232,0.85)" }}>
+            <p className="text-sm leading-snug" style={{ color: "var(--ink-light)" }}>
               <Trans
                 i18nKey={
                   !canPass
@@ -213,7 +210,7 @@ export function TrumpPrompt({
       : t("match.trumpPrompt.subtitleRound2");
 
   return (
-    <OverlayBackdrop dim={0.5}>
+    <OverlayBackdrop dim="prompt">
       <div
         ref={promptRef}
         role="dialog"
@@ -223,39 +220,27 @@ export function TrumpPrompt({
         className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
       >
         <ClassicPanel
-          width={560}
+          size="wide"
           title={<span id="trump-prompt-title">{title}</span>}
           subtitle={subtitle}
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
-          {biddingRound === 1 && trumpCandidate ? (
+          {trumpCandidate && (
             <div className="flex items-center gap-5 mb-5">
               <PlayingCard card={trumpCandidate} state="default" size="lg" withTransition={false} />
               <p
                 className="text-sm leading-relaxed flex-1"
                 style={{ color: "var(--ink-light)", opacity: 0.8 }}
+                data-testid="trump-prompt-candidate-note"
               >
-                {t("match.trumpPrompt.bodyRound1")}
+                {biddingRound === 1
+                  ? t("match.trumpPrompt.bodyRound1")
+                  : t("match.trumpPrompt.bodyRound2")}
               </p>
             </div>
-          ) : (
-            <>
-              {trumpCandidate && (
-                <div className="flex justify-center mb-4">
-                  <PlayingCard
-                    card={trumpCandidate}
-                    state="default"
-                    size="lg"
-                    withTransition={false}
-                  />
-                </div>
-              )}
-              <SuitPickerGrid
-                lockedSuit={trumpCandidate?.suit ?? null}
-                onPick={onPick}
-                deck={deck}
-              />
-            </>
+          )}
+          {(biddingRound !== 1 || !trumpCandidate) && (
+            <SuitPickerGrid lockedSuit={trumpCandidate?.suit ?? null} onPick={onPick} deck={deck} />
           )}
 
           <div className="flex items-center justify-between gap-3">

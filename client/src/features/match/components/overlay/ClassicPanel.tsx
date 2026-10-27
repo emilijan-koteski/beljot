@@ -1,7 +1,19 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { cn } from "@/shared/lib/utils";
+
+/** Panel widths: `notice` for a reveal card, `dialog` for most dialogs, `wide` for score-heavy ones, `reference` for the rules. */
+export type ClassicPanelSize = "notice" | "dialog" | "wide" | "reference";
+
+const PANEL_WIDTH: Record<ClassicPanelSize, number> = {
+  notice: 264,
+  dialog: 480,
+  wide: 520,
+  reference: 860,
+};
+
 interface ClassicPanelProps {
-  width?: number | string;
+  size?: ClassicPanelSize;
   title?: ReactNode;
   subtitle?: ReactNode;
   glowColor?: string;
@@ -11,19 +23,20 @@ interface ClassicPanelProps {
   children: ReactNode;
 }
 
-const PANEL_BG = "linear-gradient(180deg, rgba(30,60,40,0.98) 0%, rgba(14,40,24,0.98) 100%)";
+const PANEL_BG =
+  "linear-gradient(180deg, var(--dialog-felt-top) 0%, var(--dialog-felt-bottom) 100%)";
 
 /**
- * Felt-gradient dialog shell for every classic overlay, with an optional team-tinted `glowColor` ring.
+ * Felt-gradient shell for every in-match dialog and reveal, with an optional team-tinted `glowColor` ring.
  * Caps at the viewport in both axes and scrolls its body, so bottom controls always stay reachable.
  */
 export function ClassicPanel({
-  width = 480,
+  size = "dialog",
   title,
   subtitle,
   glowColor,
   bodyPadding,
-  className = "",
+  className,
   style,
   children,
 }: ClassicPanelProps) {
@@ -35,12 +48,12 @@ export function ClassicPanel({
 
   return (
     <div
-      className={`flex flex-col overflow-hidden ${className}`}
+      className={cn(
+        "flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl",
+        className,
+      )}
       style={{
-        width,
-        maxWidth: "calc(100vw - 2rem)",
-        maxHeight: "calc(100vh - 2rem)",
-        borderRadius: 14,
+        width: PANEL_WIDTH[size],
         background: PANEL_BG,
         border: "1px solid var(--brass-55)",
         boxShadow: `${glowShadow}${baseShadow}`,
@@ -72,7 +85,10 @@ export function ClassicPanel({
         </div>
       )}
       <div
-        className={`min-h-0 overflow-y-auto ${bodyPadding === undefined ? "p-4 sm:p-6" : ""}`}
+        className={cn(
+          "min-h-0 flex-auto overflow-y-auto",
+          bodyPadding === undefined && "p-4 sm:p-6",
+        )}
         style={bodyPadding === undefined ? undefined : { padding: bodyPadding }}
       >
         {children}

@@ -199,8 +199,9 @@ describe("SettingsDialog sound section", () => {
     expect(music).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: "Sound effects" })).toBe(sound);
     expect(screen.getByRole("switch", { name: "Music" })).toBe(music);
-    expect(sound.parentElement).toHaveAttribute("role", "group");
-    expect(screen.getByRole("group", { name: "Sound" })).toBe(sound.parentElement);
+    const group = screen.getByRole("group", { name: "Sound" });
+    expect(group).toContainElement(sound);
+    expect(group).toContainElement(music);
   });
 
   it("reads a missing switch as ON", () => {
@@ -308,7 +309,9 @@ describe("SettingsDialog volume sliders", () => {
     expect(screen.getByTestId("settings-music-volume")).toHaveTextContent("30%");
 
     const group = screen.getByRole("group", { name: "Sound" });
-    const order = Array.from(group.children).map((el) => el.getAttribute("data-testid"));
+    const order = within(group)
+      .getAllByTestId(/^settings-(sound|music)-(toggle|volume)$/)
+      .map((el) => el.getAttribute("data-testid"));
     expect(order).toEqual([
       "settings-sound-toggle",
       "settings-sound-volume",

@@ -10,6 +10,7 @@ import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
+import { ClassicPanel } from "./overlay/ClassicPanel";
 import { PlayingCard } from "./PlayingCard";
 
 interface BelotRevealProps {
@@ -80,77 +81,70 @@ export function BelotReveal({
       data-testid="belot-reveal"
     >
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-xl text-center max-w-[calc(100vw-1.5rem)]"
-        style={{
-          width: 264,
-          padding: "20px 24px 22px",
-          background: "linear-gradient(180deg, rgba(32,64,43,0.98) 0%, rgba(13,38,23,0.98) 100%)",
-          border: "1px solid var(--brass-55)",
-          boxShadow: `var(--shadow-felt-xl), 0 0 0 2px ${glowColor}66, 0 0 32px ${glowColor}55, inset 0 1px 0 var(--brass-25)`,
-          color: "var(--ink-light)",
-        }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
         data-team={team}
       >
-        <div className="absolute top-3 right-3 z-3">
-          <AutoCloseRing
-            duration={prefersReducedMotion ? 1.5 : 8}
-            onClose={handleClose}
-            ariaLabel={t("match.belot.reveal.dismiss", { defaultValue: "Dismiss" })}
-            testId="belot-reveal-close"
-          />
-        </div>
-
-        <div
-          className="text-2xs uppercase tracking-caps"
-          style={{
-            color: "var(--brass)",
-            padding: "0 18px",
-            marginBottom: 14,
-          }}
-          data-testid="belot-reveal-label"
-        >
-          {t(labelKey)}
-        </div>
-
-        <div className="relative mb-4 inline-block">
-          <div
-            aria-hidden
-            className="absolute rounded-lg"
-            style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
-          />
-          <div className="relative z-1">
-            <PlayingCard
-              card={parseCardId(cardId)}
-              state="default"
-              size="lg"
-              withTransition={false}
+        <ClassicPanel size="notice" glowColor={glowColor} className="relative text-center">
+          <div className="absolute top-3 right-3 z-3">
+            <AutoCloseRing
+              duration={prefersReducedMotion ? 1.5 : 8}
+              onClose={handleClose}
+              ariaLabel={t("match.belot.reveal.dismiss", { defaultValue: "Dismiss" })}
+              testId="belot-reveal-close"
             />
           </div>
-        </div>
 
-        <div
-          className="font-semibold leading-snug"
-          style={{ fontSize: 18 }}
-          data-testid="belot-reveal-title"
-          data-seat={playerSeat}
-        >
-          {titleText}
-        </div>
+          <div
+            className="text-2xs uppercase tracking-caps"
+            style={{
+              color: "var(--brass)",
+              padding: "0 18px",
+              marginBottom: 14,
+            }}
+            data-testid="belot-reveal-label"
+          >
+            {t(labelKey)}
+          </div>
 
-        <div className="mt-3 flex justify-center">
-          <Badge size="sm" style={{ background: `${glowColor}22`, color: glowColor }}>
-            <span
+          <div className="relative mb-4 inline-block">
+            <div
               aria-hidden
-              className="rounded-full"
-              style={{ width: 5, height: 5, background: glowColor }}
+              className="absolute rounded-lg"
+              style={{ inset: -10, boxShadow: `0 0 32px ${glowColor}55`, zIndex: 0 }}
             />
-            {teamLabel}
-          </Badge>
-        </div>
+            <div className="relative z-1">
+              <PlayingCard
+                card={parseCardId(cardId)}
+                state="default"
+                size="lg"
+                withTransition={false}
+              />
+            </div>
+          </div>
 
-        <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
-          {t("match.belot.reveal.bonus", { defaultValue: "+20 to your team's score" })}
-        </div>
+          <div
+            className="font-semibold leading-snug"
+            style={{ fontSize: 18 }}
+            data-testid="belot-reveal-title"
+            data-seat={playerSeat}
+          >
+            {titleText}
+          </div>
+
+          <div className="mt-3 flex justify-center">
+            <Badge
+              size="sm"
+              tint={glowColor}
+              icon={<span aria-hidden className="size-1.25 rounded-full bg-current" />}
+            >
+              {teamLabel}
+            </Badge>
+          </div>
+
+          <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
+            {t(team === "gold" ? "match.belot.reveal.bonusUs" : "match.belot.reveal.bonusThem")}
+          </div>
+        </ClassicPanel>
       </div>
     </div>
   );

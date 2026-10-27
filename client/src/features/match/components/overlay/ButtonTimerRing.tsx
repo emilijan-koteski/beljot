@@ -4,8 +4,12 @@ import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { remainingMsUntil } from "@/shared/lib/clockSync";
 import { MOTION } from "@/shared/lib/motion";
 
+import { BUTTON_RADIUS_PX } from "../../lib/buttonShape";
 import {
   ringDrainStyle,
+  TIMER_RING_INK,
+  TIMER_RING_STROKE,
+  TIMER_RING_TRACK,
   URGENT_FRACTION,
   useRingDrain,
   useTurnCountdown,
@@ -30,7 +34,7 @@ export function ButtonTimerRing({
   totalDuration,
   clientCountdown = false,
   onExpire,
-  radius = 8,
+  radius = BUTTON_RADIUS_PX,
   hideRing = false,
   children,
 }: ButtonTimerRingProps) {
@@ -86,9 +90,9 @@ export function ButtonTimerRing({
 
   const pct = totalDuration > 0 ? Math.min(1, Math.max(0, secondsLeft) / totalDuration) : 0;
   const isUrgent = totalDuration > 0 && pct <= URGENT_FRACTION;
-  const stroke = isUrgent ? "var(--danger)" : "#d4d0c4";
+  const stroke = isUrgent ? "var(--danger)" : TIMER_RING_INK;
   const pad = 4;
-  const strokeW = 1.75;
+  const strokeW = TIMER_RING_STROKE;
   const w = size.w + pad * 2;
   const h = size.h + pad * 2;
   const perim = 2 * (w + h) - 8 * radius + 2 * Math.PI * radius;
@@ -134,7 +138,7 @@ export function ButtonTimerRing({
             rx={radius + pad - strokeW / 2}
             ry={radius + pad - strokeW / 2}
             fill="none"
-            stroke="rgba(255,255,255,0.12)"
+            stroke={TIMER_RING_TRACK}
             strokeWidth={strokeW}
           />
           <rect

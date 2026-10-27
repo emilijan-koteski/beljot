@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
@@ -11,10 +11,11 @@ import type { HandScoredPayload } from "@/shared/types/wsEvents";
 import { resolveCardDeck } from "../lib/cardFace";
 import { suitNameKey } from "../lib/suitArt";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
-import { ringDrainStyle } from "../lib/turnCountdown";
+import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { SummaryStrip } from "./overlay/SummaryStrip";
 
 interface ScoreRevealProps {
   data: HandScoredPayload;
@@ -44,85 +45,9 @@ function failedSubtitleKey(toViewer: boolean, declarationsTransfer: boolean): st
 
 const AUTO_CONTINUE_MS = MOTION.SCORE_REVEAL_AUTO_CONTINUE;
 
-const BUTTON_RADIUS = 8;
-
-/**
- * Decorative countdown border that drains around the Continue button over the auto-continue window.
- * `sweep` carries the drain animation style; undefined renders a static full border for reduced motion.
- */
-function ButtonProgressBorder({ sweep }: { sweep?: CSSProperties }) {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-
-  useLayoutEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      setSize({ w: r.width, h: r.height });
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const { w, h } = size;
-  const inset = 1.5;
-
-  return (
-    <svg
-      ref={svgRef}
-      aria-hidden
-      data-testid="score-reveal-countdown"
-      viewBox={w && h ? `0 0 ${w} ${h}` : undefined}
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        pointerEvents: "none",
-        overflow: "visible",
-      }}
-    >
-      {w > 0 && h > 0 && (
-        <>
-          <rect
-            x={inset}
-            y={inset}
-            width={w - inset * 2}
-            height={h - inset * 2}
-            rx={BUTTON_RADIUS - inset}
-            ry={BUTTON_RADIUS - inset}
-            fill="none"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth={2}
-          />
-          <rect
-            x={inset}
-            y={inset}
-            width={w - inset * 2}
-            height={h - inset * 2}
-            rx={BUTTON_RADIUS - inset}
-            ry={BUTTON_RADIUS - inset}
-            fill="none"
-            stroke="#d4d0c4"
-            strokeWidth={2}
-            strokeLinecap="round"
-            pathLength={1}
-            strokeDasharray={1}
-            style={{ strokeDashoffset: 0, ...sweep }}
-          />
-        </>
-      )}
-    </svg>
-  );
-}
-
 /**
  * End-of-hand score reveal breaking down card points, declarations and bonuses above the match score.
- * A countdown border on Continue auto-acknowledges the dialog so an AFK player cannot stall the table.
+ * A timer ring on Continue auto-acknowledges the dialog so an AFK player cannot stall the table.
  */
 export function ScoreReveal({
   data,
@@ -151,19 +76,6 @@ export function ScoreReveal({
     }, AUTO_CONTINUE_MS);
     return () => clearTimeout(fire);
   }, [acknowledged]);
-
-  const borderSweep = useMemo(() => ringDrainStyle(AUTO_CONTINUE_MS, AUTO_CONTINUE_MS, 1), []);
-
-  const [reducedPct, setReducedPct] = useState(1);
-  useEffect(() => {
-    if (!prefersReducedMotion || acknowledged) return;
-    const deadline = Date.now() + AUTO_CONTINUE_MS;
-    const update = () => setReducedPct(Math.max(0, (deadline - Date.now()) / AUTO_CONTINUE_MS));
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [prefersReducedMotion, acknowledged]);
-  const reducedSweep: CSSProperties = { strokeDashoffset: 1 - reducedPct };
 
   const teamAGradient: TeamGradient = viewerTeam === "teamA" ? TEAM_GOLD : TEAM_SILVER;
   const teamBGradient: TeamGradient = viewerTeam === "teamB" ? TEAM_GOLD : TEAM_SILVER;
@@ -199,7 +111,7 @@ export function ScoreReveal({
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="score-reveal">
-      <OverlayBackdrop dim={0.6}>
+      <OverlayBackdrop dim="blocker">
         <div
           className={
             prefersReducedMotion
@@ -208,7 +120,7 @@ export function ScoreReveal({
           }
         >
           <ClassicPanel
-            width={560}
+            size="wide"
             title={<span data-testid="score-reveal-title">{title}</span>}
             subtitle={subtitle ?? undefined}
           >
@@ -274,22 +186,10 @@ export function ScoreReveal({
               />
             </div>
 
-            <div
-              className="rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 mt-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4"
-              style={{
-                background: "var(--brass-10)",
-                border: "1px solid var(--brass-25)",
-              }}
-              data-testid="row-match-total"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span
-                  className="text-2xs uppercase tracking-widest"
-                  style={{ color: "var(--brass)" }}
-                >
-                  {t("match.scoreReveal.matchTotal")}
-                </span>
-                <div className="flex items-baseline gap-1.5 sm:gap-2 text-base sm:text-lg font-bold tabular-nums whitespace-nowrap">
+            <SummaryStrip
+              label={t("match.scoreReveal.matchTotal")}
+              value={
+                <>
                   <span style={{ color: teamAGradient[0] }} data-team="teamA">
                     {data.teamAMatchScore}
                   </span>
@@ -297,15 +197,21 @@ export function ScoreReveal({
                   <span style={{ color: teamBGradient[0] }} data-team="teamB">
                     {data.teamBMatchScore}
                   </span>
-                  <span
-                    className="text-xs sm:text-xs font-normal"
-                    style={{ color: "var(--ink-light)", opacity: 0.5 }}
-                  >
+                  <span className="text-xs font-normal" style={{ opacity: 0.5 }}>
                     / {matchTarget}
                   </span>
-                </div>
-              </div>
-              <span className="relative inline-flex ml-auto">
+                </>
+              }
+              testId="row-match-total"
+              className="mt-4"
+            />
+
+            <div className="mt-4 flex justify-end">
+              <ButtonTimerRing
+                totalDuration={AUTO_CONTINUE_MS / 1000}
+                clientCountdown={!acknowledged}
+                hideRing={acknowledged}
+              >
                 <ClassicButton
                   variant="ghost"
                   onClick={onContinue}
@@ -314,10 +220,7 @@ export function ScoreReveal({
                 >
                   {acknowledged ? t("match.scoreReveal.waiting") : t("match.scoreReveal.continue")}
                 </ClassicButton>
-                {!acknowledged && (
-                  <ButtonProgressBorder sweep={prefersReducedMotion ? reducedSweep : borderSweep} />
-                )}
-              </span>
+              </ButtonTimerRing>
             </div>
           </ClassicPanel>
         </div>

@@ -6,6 +6,7 @@ import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
 
 interface ScorePanelProps {
@@ -23,8 +24,6 @@ interface ScorePanelProps {
   variantLabel?: string;
 }
 
-const PANEL_BG = "var(--panel-dark, rgba(20,45,30,0.85))";
-const PANEL_BORDER = "1px solid var(--brass-40)";
 const INK = "var(--ink-light)";
 const BRASS_LABEL = "var(--brass)";
 
@@ -207,11 +206,7 @@ export function ScorePanel({
         className="fixed top-3 left-3 flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 md:hidden"
         style={{
           zIndex: Z.HUD,
-          background: PANEL_BG,
-          border: PANEL_BORDER,
-          boxShadow: "var(--shadow-felt-md)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          ...floatingPanelStyle(),
         }}
         data-testid="score-panel-mobile"
         aria-live="polite"
@@ -253,14 +248,10 @@ export function ScorePanel({
       </div>
 
       <div
-        className="fixed top-4 left-4 hidden overflow-hidden rounded-xl md:block"
+        className="fixed top-4 left-4 hidden overflow-hidden rounded-lg md:block"
         style={{
           zIndex: Z.HUD,
-          background: PANEL_BG,
-          border: PANEL_BORDER,
-          boxShadow: "var(--shadow-felt-md)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          ...floatingPanelStyle(),
           minWidth: 240,
         }}
         data-testid="score-panel"

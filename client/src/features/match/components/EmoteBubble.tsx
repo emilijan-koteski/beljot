@@ -5,6 +5,8 @@ import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import type { EmoteID } from "@/shared/types/wsEvents";
 
+import { floatingPanelStyle } from "../lib/floatingPanel";
+
 const EMOTE_GLYPHS: Record<EmoteID, string> = {
   thumbs_up: "👍",
   clap: "👏",
@@ -83,9 +85,7 @@ export function EmoteBubble({
           compact ? "h-10 w-10 text-2xl" : "h-12 w-12 text-3xl"
         }`}
         style={{
-          background: "var(--panel-dark, rgba(20,45,30,0.85))",
-          border: "1px solid var(--brass)",
-          boxShadow: "var(--shadow-felt-md), inset 0 1px 0 rgba(255,255,255,0.06)",
+          ...floatingPanelStyle({ edge: "announce" }),
         }}
         aria-hidden="true"
       >
