@@ -3,14 +3,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
-import { Z } from "@/shared/lib/zLayers";
-
 import { HUDButton } from "./HUDButton";
-import { ClassicButton } from "./overlay/ClassicButton";
-import { ClassicPanel } from "./overlay/ClassicPanel";
-import { ExplainerStrip } from "./overlay/ExplainerStrip";
-import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
+import { SurrenderDialog } from "./SurrenderDialog";
 
 interface SurrenderButtonProps {
   canRequest: boolean;
@@ -18,8 +12,6 @@ interface SurrenderButtonProps {
   isPending: boolean;
   onConfirm: () => void;
 }
-
-const DANGER = "var(--danger-light)";
 
 export function SurrenderButton({
   canRequest,
@@ -76,56 +68,23 @@ interface SurrenderConfirmDialogProps {
  */
 export function SurrenderConfirmDialog({ onCancel, onConfirm }: SurrenderConfirmDialogProps) {
   const { t } = useTranslation();
-  const dialogRef = useFocusTrap<HTMLDivElement>({ onEscape: onCancel });
 
-  const dialog = (
-    <div
-      className="fixed inset-0"
-      style={{ zIndex: Z.SURRENDER }}
-      data-testid="surrender-confirm-overlay"
-    >
-      <OverlayBackdrop dim="prompt">
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="surrender-confirm-title"
-          className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-150"
-        >
-          <ClassicPanel
-            size="dialog"
-            glowColor={DANGER}
-            title={
-              <span id="surrender-confirm-title" className="inline-flex items-center gap-2.5">
-                <Flag size={20} style={{ color: DANGER }} aria-hidden="true" />
-                {t("match.surrender.confirm.title")}
-              </span>
-            }
-          >
-            <p
-              className="text-sm mb-4"
-              style={{ color: "var(--ink-light)", opacity: 0.78, lineHeight: 1.6 }}
-            >
-              {t("match.surrender.confirm.body")}
-            </p>
-
-            <ExplainerStrip tone="danger" className="mb-4">
-              {t("match.surrender.confirm.consumeWarning")}
-            </ExplainerStrip>
-
-            <div className="flex justify-end items-center gap-3.5">
-              <ClassicButton variant="danger" onClick={onConfirm} data-testid="surrender-confirm">
-                {t("match.surrender.confirm.confirm")}
-              </ClassicButton>
-              <ClassicButton onClick={onCancel} data-testid="surrender-cancel">
-                {t("match.surrender.confirm.cancel")}
-              </ClassicButton>
-            </div>
-          </ClassicPanel>
-        </div>
-      </OverlayBackdrop>
-    </div>
+  return createPortal(
+    <SurrenderDialog
+      titleId="surrender-confirm-title"
+      title={t("match.surrender.confirm.title")}
+      body={t("match.surrender.confirm.body")}
+      cost={t("match.surrender.confirm.consumeWarning")}
+      confirmLabel={t("match.surrender.confirm.confirm")}
+      cancelLabel={t("match.surrender.confirm.cancel")}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      testIds={{
+        overlay: "surrender-confirm-overlay",
+        confirm: "surrender-confirm",
+        cancel: "surrender-cancel",
+      }}
+    />,
+    document.body,
   );
-
-  return createPortal(dialog, document.body);
 }

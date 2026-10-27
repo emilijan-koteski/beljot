@@ -1111,15 +1111,15 @@
       "pending": "Surrender pending…",
       "confirm": {
         "title": "Surrender the match?",
-        "body": "Your teammate must accept. If they decline, your one surrender attempt is consumed.",
-        "consumeWarning": "One-shot action — declined proposals burn your only attempt.",
+        "body": "Your teammate has to accept. If they do, the match ends as a win for the opponents.",
+        "consumeWarning": "You get one surrender per match. If your teammate declines, it's used up.",
         "confirm": "Propose surrender",
         "cancel": "Cancel"
       },
       "prompt": {
         "title": "Your teammate wants to surrender",
-        "body": "{{username}} is proposing to forfeit the match. Accepting ends the match as a win for the opponents.",
-        "consequence": "Accepting ends the match in the opponents' favour.",
+        "body": "{{username}} is proposing to forfeit the match. If you decline, play continues.",
+        "consequence": "Accepting ends the match as a win for the opponents.",
         "accept": "Accept surrender",
         "decline": "Decline"
       },

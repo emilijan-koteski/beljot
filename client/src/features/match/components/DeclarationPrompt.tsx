@@ -140,7 +140,7 @@ export function DeclarationPrompt({
               </p>
             )}
 
-            <div className="flex justify-end items-center gap-3">
+            <div className="flex justify-end items-center gap-3.5">
               <ClassicButton
                 variant="primary"
                 onClick={handleDeclare}

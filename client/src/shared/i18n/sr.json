@@ -1111,15 +1111,15 @@
       "pending": "Predaja na čekanju…",
       "confirm": {
         "title": "Predati meč?",
-        "body": "Tvoj saigrač mora da prihvati. Ako odbije, tvoj jedini pokušaj predaje je iskorišćen.",
-        "consumeWarning": "Jednokratna radnja, odbijen predlog troši tvoj jedini pokušaj.",
+        "body": "Tvoj saigrač mora da prihvati. Ako prihvati, meč se završava kao pobeda protivnika.",
+        "consumeWarning": "Imaš jednu predaju po meču. Ako saigrač odbije, iskorišćena je.",
         "confirm": "Predloži predaju",
         "cancel": "Otkaži"
       },
       "prompt": {
         "title": "Tvoj saigrač želi da preda meč",
-        "body": "{{username}} predlaže da predate meč. Ako prihvatiš, meč se završava kao pobeda protivnika.",
-        "consequence": "Prihvatanjem se meč završava u korist protivnika.",
+        "body": "{{username}} predlaže da predate meč. Ako odbiješ, igra se nastavlja.",
+        "consequence": "Ako prihvatiš, meč se završava kao pobeda protivnika.",
         "accept": "Prihvati predaju",
         "decline": "Odbij"
       },
