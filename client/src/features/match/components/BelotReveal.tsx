@@ -143,7 +143,7 @@ export function BelotReveal({
           </div>
 
           <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
-            {t("match.belot.reveal.bonus", { defaultValue: "+20 to your team's score" })}
+            {t(team === "gold" ? "match.belot.reveal.bonusUs" : "match.belot.reveal.bonusThem")}
           </div>
         </ClassicPanel>
       </div>

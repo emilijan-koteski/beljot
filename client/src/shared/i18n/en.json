@@ -993,7 +993,8 @@
         "rebelot": "Rebelote",
         "titleBelot": "{{name}} declared Belote.",
         "titleRebelot": "{{name}} declared Rebelote.",
-        "bonus": "+20 to your team's score",
+        "bonusUs": "+20 to your team's score",
+        "bonusThem": "+20 to their team's score",
         "dismiss": "Dismiss"
       }
     },

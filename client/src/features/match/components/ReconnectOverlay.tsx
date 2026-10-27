@@ -131,6 +131,7 @@ export function ReconnectOverlay({
     const themValue = viewerTeam === "teamA" ? teamBValue : teamAValue;
     const showResultLine = result !== null;
     const viewerLost = result === "loss";
+    const resultColor = result === null ? RING_DANGER : viewerLost ? TEAM_SILVER[0] : TEAM_GOLD[0];
 
     return (
       <div
@@ -140,7 +141,7 @@ export function ReconnectOverlay({
         aria-live="assertive"
       >
         <OverlayBackdrop dim="blocker">
-          <ClassicPanel size="wide" glowColor={RING_DANGER}>
+          <ClassicPanel size="wide" glowColor={resultColor}>
             <div className="flex flex-col items-center text-center gap-3">
               <span
                 className="text-2xs uppercase tracking-caps"
@@ -151,8 +152,9 @@ export function ReconnectOverlay({
 
               <h2
                 className="text-2xl font-semibold tracking-tight"
-                style={{ color: RING_DANGER }}
+                style={{ color: resultColor }}
                 data-testid="abandon-title"
+                data-result={result ?? undefined}
               >
                 {t("match.disconnect.matchAbandoned", {
                   player: disconnectedPlayerName,
