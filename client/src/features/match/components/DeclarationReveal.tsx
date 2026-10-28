@@ -115,26 +115,14 @@ export function DeclarationReveal({
               {t("match.declaration.resolved")}
             </div>
             <div
-              className="flex items-center justify-center gap-2.5 font-semibold leading-tight"
+              className="font-semibold leading-tight"
               style={{
                 fontSize: 24,
               }}
               data-testid="declaration-reveal-team"
               data-team={winnerTeamString}
             >
-              <span
-                aria-hidden
-                className="rounded-full inline-block"
-                style={{
-                  width: 9,
-                  height: 9,
-                  background: glowColor,
-                  boxShadow: `0 0 12px ${glowColor}`,
-                }}
-              />
-              <span>
-                {isUs ? t("match.declaration.headlineUs") : t("match.declaration.headlineThem")}
-              </span>
+              {isUs ? t("match.declaration.headlineUs") : t("match.declaration.headlineThem")}
             </div>
             {showTiebreaker && highestDeclarer && highestLabel && (
               <div
