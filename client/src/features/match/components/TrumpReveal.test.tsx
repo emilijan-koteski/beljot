@@ -87,7 +87,7 @@ beforeEach(() => {
 });
 
 describe("TrumpReveal — Wax Seal", () => {
-  it("round 1 (took candidate): hero card, taker, eyebrow, '{suit} is trump this hand', seal, no candidate subline", () => {
+  it("round 1: hero card, taker, eyebrow, '{suit} is trump' and the seal", () => {
     render(
       <TrumpReveal
         playerSeat={2}
@@ -102,8 +102,7 @@ describe("TrumpReveal — Wax Seal", () => {
     expect(screen.getByTestId("playing-card-7S")).toBeInTheDocument();
     expect(screen.getByTestId("trump-reveal-taker")).toHaveTextContent("Carol");
     expect(screen.getByTestId("trump-reveal-eyebrow")).toHaveTextContent("Trump taken");
-    expect(screen.getByTestId("trump-reveal-eyebrow").textContent).not.toContain("free pick");
-    expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("Spades is trump this hand");
+    expect(screen.getByTestId("trump-reveal-copy").textContent).toBe("Spades is trump");
     const seal = screen.getByTestId("trump-reveal-seal");
     expect(seal.getAttribute("data-suit")).toBe("S");
     expect(seal.className).toContain("absolute");
@@ -111,7 +110,7 @@ describe("TrumpReveal — Wax Seal", () => {
     expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
   });
 
-  it("round 2 (free pick): STILL renders the candidate card, seal shows the chosen suit, copy 'chose {suit}' + candidate subline", () => {
+  it("round 2: still shows the revealed card, while the seal and the one line name the chosen suit", () => {
     render(
       <TrumpReveal
         playerSeat={2}
@@ -124,16 +123,12 @@ describe("TrumpReveal — Wax Seal", () => {
     );
     expect(screen.getByTestId("playing-card-9S")).toBeInTheDocument();
     expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("D");
-    expect(screen.getByTestId("trump-reveal-eyebrow")).toHaveTextContent("free pick");
-    const copy = screen.getByTestId("trump-reveal-copy");
-    expect(copy.textContent).toContain("Diamonds");
-    expect(copy.textContent).not.toContain("is trump this hand");
-    const candidate = screen.getByTestId("trump-reveal-candidate");
-    expect(candidate.textContent).toContain("Nine");
-    expect(candidate.textContent).toContain("Spades");
+    expect(screen.getByTestId("trump-reveal-eyebrow").textContent).toBe("Trump taken");
+    expect(screen.getByTestId("trump-reveal-copy").textContent).toBe("Diamonds is trump");
+    expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
   });
 
-  it("candidate subline uses full English words — never glyphs or bare rank codes (T-rank)", () => {
+  it("names the suit in full words, never a glyph", () => {
     render(
       <TrumpReveal
         playerSeat={2}
@@ -144,14 +139,11 @@ describe("TrumpReveal — Wax Seal", () => {
         onComplete={vi.fn()}
       />,
     );
-    const text = screen.getByTestId("trump-reveal-candidate").textContent ?? "";
-    expect(text).toContain("Ten");
-    expect(text).toContain("Clubs");
-    expect(text).not.toContain("TC");
+    const text = screen.getByTestId("trump-reveal-copy").textContent ?? "";
+    expect(text).toBe("Hearts is trump");
     for (const glyph of ["♠", "♥", "♦", "♣"]) {
       expect(text).not.toContain(glyph);
     }
-    expect(/\b[TJQKA]\b/.test(text)).toBe(false);
     expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("H");
   });
 
@@ -242,7 +234,7 @@ describe("TrumpReveal — Wax Seal", () => {
   });
 
   describe("no trump candidate (empty cardId)", () => {
-    it("renders the panel, the seal, and 'named {suit} as trump' with no hero card", () => {
+    it("renders the panel, the seal, and '{suit} is trump' with no hero card", () => {
       render(
         <TrumpReveal
           playerSeat={2}
@@ -256,12 +248,12 @@ describe("TrumpReveal — Wax Seal", () => {
       expect(screen.getByTestId("trump-reveal")).toBeInTheDocument();
       expect(screen.getByTestId("trump-reveal-taker")).toHaveTextContent("Carol");
       expect(screen.getByTestId("trump-reveal-seal").getAttribute("data-suit")).toBe("C");
-      expect(screen.getByTestId("trump-reveal-copy")).toHaveTextContent("named Clubs as trump");
+      expect(screen.getByTestId("trump-reveal-copy").textContent).toBe("Clubs is trump");
       expect(screen.queryByTestId(/^playing-card-/)).not.toBeInTheDocument();
       expect(screen.queryByTestId("trump-reveal-candidate")).toBeNull();
     });
 
-    it("uses the plain eyebrow, not the 'free pick' contrast (no suit was turned down)", () => {
+    it("uses the same eyebrow as the Bitola rounds", () => {
       render(
         <TrumpReveal
           playerSeat={1}
@@ -272,9 +264,7 @@ describe("TrumpReveal — Wax Seal", () => {
           onComplete={vi.fn()}
         />,
       );
-      const eyebrow = screen.getByTestId("trump-reveal-eyebrow");
-      expect(eyebrow).toHaveTextContent("Trump taken");
-      expect(eyebrow.textContent).not.toContain("free pick");
+      expect(screen.getByTestId("trump-reveal-eyebrow").textContent).toBe("Trump taken");
     });
 
     it("still auto-dismisses and still resolves the viewer-relative team glow", () => {

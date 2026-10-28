@@ -2410,7 +2410,7 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       const prompt = screen.getByTestId("trump-prompt");
-      expect(prompt).toHaveTextContent(/name a suit/i);
+      expect(prompt).toHaveTextContent(/choose a suit/i);
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 

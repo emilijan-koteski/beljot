@@ -922,11 +922,7 @@
     "trumpReveal": {
       "unknownPlayer": "Adut zvan",
       "eyebrow": "Adut zvan",
-      "eyebrowFreeChoice": "Adut zvan · slobodan izbor",
-      "isTrump": "<suit>{{suit}}</suit> je adut u ovoj ruci",
-      "chose": "izabrao <suit>{{suit}}</suit>",
-      "namedTrump": "zvao <suit>{{suit}}</suit> za adut",
-      "candidateOnTable": "{{rank}} {{suit}} bila je na stolu",
+      "isTrump": "<suit>{{suit}}</suit> je adut",
       "dismiss": "Zatvori"
     },
     "dealerIndicator": {
@@ -934,20 +930,18 @@
       "label": "Delilac: {{name}}"
     },
     "trumpPrompt": {
-      "titleRound1": "Zovi adut ili dalje",
-      "titleRound2": "Izaberi bilo koju boju ili dalje",
-      "subtitleRound1": "Prihvati ovu boju ili prepusti sledećem igraču.",
-      "subtitleRound2": "Bilo koja boja osim kandidata.",
-      "titleFreePick": "Zovi adut u bilo kojoj boji",
-      "subtitleFreePick": "Sve četiri boje su ti na raspolaganju.",
-      "bodyRound1": "Kandidat karta je okrenuta. Prihvati je kao adut za svoj tim, ili prepusti sledećem igraču.",
-      "bodyRound2": "Čak i ako za adut izabereš drugu boju, ovu kartu i dalje dobijaš iz špila.",
+      "title": "Zovi adut",
+      "subtitleRound1": "Samo otkrivena boja.",
+      "subtitleRound2": "Bilo koja boja osim otkrivene.",
+      "subtitleFreePick": "Bilo koja od četiri boje.",
+      "bodyRound1": "Ako zoveš, {{suit}} je adut i ova karta je tvoja.",
+      "bodyRound2": "Koju god boju izabereš, ova karta je tvoja.",
       "roundLabel": "Krug {{round}} / 2",
       "pick": "Zovi",
       "pass": "Dalje",
       "mustPick": "Moraš izabrati boju",
-      "waitingRound1": "Čeka se da <name>{{name}}</name> zove adut ili propusti",
-      "waitingRound2": "Čeka se da <name>{{name}}</name> izabere boju ili propusti",
+      "waitingRound1": "Čeka se da <name>{{name}}</name> zove adut ili kaže dalje",
+      "waitingRound2": "Čeka se da <name>{{name}}</name> izabere boju ili kaže dalje",
       "waitingForcedPick": "Čeka se da <name>{{name}}</name> izabere boju"
     },
     "deal": {
@@ -1006,7 +1000,7 @@
       "pauseExhausted": "Već ste iskoristili pauzu",
       "noActivePause": "Nemate aktivnu pauzu",
       "notRoomOwner": "Samo domaćin može ovo da uradi",
-      "mustPickTrump": "Moraš izabrati boju za adut, ovde ne možeš dalje"
+      "mustPickTrump": "Ovde ne možeš dalje. Izaberi boju."
     },
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",

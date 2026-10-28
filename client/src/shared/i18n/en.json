@@ -922,11 +922,7 @@
     "trumpReveal": {
       "unknownPlayer": "Trump taken",
       "eyebrow": "Trump taken",
-      "eyebrowFreeChoice": "Trump taken · free pick",
-      "isTrump": "<suit>{{suit}}</suit> is trump this hand",
-      "chose": "chose <suit>{{suit}}</suit>",
-      "namedTrump": "named <suit>{{suit}}</suit> as trump",
-      "candidateOnTable": "{{rank}} of {{suit}} was on the table",
+      "isTrump": "<suit>{{suit}}</suit> is trump",
       "dismiss": "Dismiss"
     },
     "dealerIndicator": {
@@ -934,21 +930,19 @@
       "label": "Dealer: {{name}}"
     },
     "trumpPrompt": {
-      "titleRound1": "Take trump or pass",
-      "titleRound2": "Choose any suit — or pass",
-      "subtitleRound1": "Adopt this suit, or pass to the next player.",
-      "subtitleRound2": "Any suit except the candidate.",
-      "titleFreePick": "Take trump — any suit",
-      "subtitleFreePick": "All four suits are yours to take.",
-      "bodyRound1": "The candidate card was turned face-up. Take it as trump for your team, or pass to the next player.",
-      "bodyRound2": "Even if you name a different suit as trump, you still get this card from the deck.",
+      "title": "Take trump",
+      "subtitleRound1": "Only the revealed suit.",
+      "subtitleRound2": "Any suit except the revealed one.",
+      "subtitleFreePick": "Any of the four suits.",
+      "bodyRound1": "If you take it, {{suit}} is trump and this card is yours.",
+      "bodyRound2": "Whichever suit you choose, this card is yours.",
       "roundLabel": "Round {{round}} / 2",
       "pick": "Take",
       "pass": "Pass",
-      "mustPick": "You must name a suit",
-      "waitingRound1": "Waiting for <name>{{name}}</name> to take or pass the trump",
-      "waitingRound2": "Waiting for <name>{{name}}</name> to pick a suit or pass",
-      "waitingForcedPick": "Waiting for <name>{{name}}</name> to name a suit"
+      "mustPick": "You must choose a suit",
+      "waitingRound1": "Waiting for <name>{{name}}</name> to take trump or pass",
+      "waitingRound2": "Waiting for <name>{{name}}</name> to choose a suit or pass",
+      "waitingForcedPick": "Waiting for <name>{{name}}</name> to choose a suit"
     },
     "deal": {
       "dealing": "Dealing cards…"
@@ -1006,7 +1000,7 @@
       "pauseExhausted": "You have already used your pause",
       "noActivePause": "You don't have an active pause",
       "notRoomOwner": "Only the host can do this",
-      "mustPickTrump": "You must name a trump suit — passing isn't allowed here"
+      "mustPickTrump": "You can't pass here. Choose a suit."
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
