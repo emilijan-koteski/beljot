@@ -29,9 +29,7 @@ export function RemoveFriendDialog({
       icon={<UserMinus />}
       title={t("friends.removeDialog.title", { username })}
       description={
-        <span data-testid="remove-friend-description">
-          {t("friends.removeDialog.description")}
-        </span>
+        <span data-testid="remove-friend-description">{t("friends.removeDialog.description")}</span>
       }
       pending={pending}
       primary={{

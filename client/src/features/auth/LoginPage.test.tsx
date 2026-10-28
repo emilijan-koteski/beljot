@@ -565,7 +565,7 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(screen.queryByTestId("link-account-dialog")).not.toBeInTheDocument();
       });
-      expect(toast.error).toHaveBeenCalledWith("Couldn't link your account. Please try again.");
+      expect(toast.error).toHaveBeenCalledWith("Couldn't link your account. Try again.");
       expect(mockNavigate).not.toHaveBeenCalled();
     });
 

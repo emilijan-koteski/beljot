@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import type { MatchFilter } from "@/shared/api/matches";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { FriendButton } from "@/shared/components/friends/FriendButton";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { usePublicProfileQuery } from "@/shared/hooks/queries/usePublicProfile";
@@ -46,20 +47,21 @@ export function PublicPlayerProfilePage() {
   if (isNotFound) {
     return (
       <div className="mx-auto max-w-330 px-4 py-8 md:px-7">
-        <div
-          className="bg-surface border-border space-y-3 rounded-lg border border-dashed p-10 text-center text-sm"
-          data-testid="public-profile-not-found"
+        <EmptyState
+          testId="public-profile-not-found"
+          title={t("publicProfile.notFound.title")}
+          action={
+            <Link
+              to="/lobby"
+              className="text-accent inline-flex items-center text-sm underline-offset-2 hover:underline"
+              data-testid="public-profile-not-found-cta"
+            >
+              {t("publicProfile.notFound.cta")}
+            </Link>
+          }
         >
-          <p className="text-ink text-lg font-semibold">{t("publicProfile.notFound.title")}</p>
-          <p className="text-ink-dim m-0">{t("publicProfile.notFound.body")}</p>
-          <Link
-            to="/lobby"
-            className="text-accent inline-flex items-center underline-offset-2 hover:underline"
-            data-testid="public-profile-not-found-cta"
-          >
-            {t("publicProfile.notFound.cta")}
-          </Link>
-        </div>
+          {t("publicProfile.notFound.body")}
+        </EmptyState>
       </div>
     );
   }
@@ -154,7 +156,7 @@ export function PublicPlayerProfilePage() {
           data-testid="public-profile-sidebar"
         >
           {career.isError ? (
-            <p className="text-ink-mute text-sm" data-testid="public-profile-career-error">
+            <p className="text-danger text-sm" data-testid="public-profile-career-error">
               {t("profile.careerError")}
             </p>
           ) : career.data ? (

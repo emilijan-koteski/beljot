@@ -160,7 +160,7 @@ export function ProfilePage() {
           <InvitePrivacyPanel />
 
           {career.isError ? (
-            <p className="text-ink-mute text-sm" data-testid="profile-career-error">
+            <p className="text-danger text-sm" data-testid="profile-career-error">
               {t("profile.careerError")}
             </p>
           ) : career.data ? (

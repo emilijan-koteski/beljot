@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
@@ -232,9 +233,9 @@ function InviteList({
   }
   if (!rows || rows.length === 0) {
     return (
-      <p className="text-ink-dim px-1 py-2 text-xs" data-testid={`${stateTestId}-empty`}>
+      <EmptyState compact testId={`${stateTestId}-empty`}>
         {emptyText}
-      </p>
+      </EmptyState>
     );
   }
 

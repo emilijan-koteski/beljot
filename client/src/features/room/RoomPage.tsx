@@ -37,6 +37,7 @@ import {
 } from "@/features/room/OwnerConfirmDialogs";
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
@@ -844,9 +845,7 @@ export function RoomPage() {
                     {t("room.inRoomList.title")}
                   </div>
                   {players.length === 0 ? (
-                    <p className="text-ink-mute px-2 py-1.5 text-xs">
-                      {t("room.inRoomList.empty")}
-                    </p>
+                    <EmptyState compact>{t("room.inRoomList.empty")}</EmptyState>
                   ) : (
                     <ul className="flex flex-col">
                       {players.map((p) => {

@@ -2,6 +2,7 @@ import { History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { EmptyState } from "@/shared/components/EmptyState";
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
@@ -51,9 +52,9 @@ export function LastMatchDialog({
           {t("room.lastMatch.loading")}
         </p>
       ) : query.data === undefined ? (
-        <p className="text-ink-dim px-1 py-2 text-xs" data-testid="last-match-unavailable">
+        <EmptyState compact testId="last-match-unavailable">
           {t("room.lastMatch.unavailable")}
-        </p>
+        </EmptyState>
       ) : (
         <ul className="m-0 max-h-[70vh] list-none overflow-y-auto p-0">
           <MatchStatsCard

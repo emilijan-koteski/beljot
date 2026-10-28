@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import { FriendRequests } from "@/features/friends/FriendRequests";
 import { PlayerSearch } from "@/features/lobby/components/PlayerSearch";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { useFriends } from "@/shared/hooks/queries/useFriends";
 import { useChatStore } from "@/shared/stores/chatStore";
@@ -51,9 +52,9 @@ export function FriendList() {
       {isPending ? (
         <p className="text-ink-mute px-2.5 py-2 text-xs">{t("friends.list.loading")}</p>
       ) : !friends || friends.length === 0 ? (
-        <p className="text-ink-dim px-2.5 py-2 text-xs" data-testid="friend-list-empty">
+        <EmptyState compact testId="friend-list-empty">
           {t("friends.list.empty")}
-        </p>
+        </EmptyState>
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] list-none gap-1.5 p-0">
           {friends.map((friend) => (

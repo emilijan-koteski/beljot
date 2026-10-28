@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { SectionHeader } from "@/features/profile/components/SectionHeader";
 import { queryKeys } from "@/shared/api/queryKeys";
 import type { SeasonSelector } from "@/shared/api/season";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
 import { Chips } from "@/shared/components/ui/chips";
 import {
@@ -109,14 +110,9 @@ export function LeaderboardPage() {
     );
   } else if (items.length === 0) {
     body = (
-      <div
-        className="bg-surface border-border rounded-lg border border-dashed p-10 text-center text-sm"
-        data-testid="leaderboard-empty"
-      >
-        <p className="text-ink-dim m-0">
-          {t(isPastSeason ? "season.leaderboard.emptyPast" : "season.leaderboard.empty")}
-        </p>
-      </div>
+      <EmptyState testId="leaderboard-empty">
+        {t(isPastSeason ? "season.leaderboard.emptyPast" : "season.leaderboard.empty")}
+      </EmptyState>
     );
   } else {
     const showLoadMore = query.hasNextPage;

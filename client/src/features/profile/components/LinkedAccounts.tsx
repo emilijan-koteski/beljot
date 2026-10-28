@@ -90,7 +90,7 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
           data-testid="linked-accounts-loading"
         />
       ) : isError || !data ? (
-        <p className="text-ink-mute text-sm" data-testid="linked-accounts-error">
+        <p className="text-danger text-sm" data-testid="linked-accounts-error">
           {t("profile.linkedAccounts.loadError")}
         </p>
       ) : (
