@@ -80,7 +80,7 @@
     "avatar": {
       "title": "Profilna slika",
       "edit": "Promijeni profilnu sliku",
-      "hint": "JPEG, PNG ili WebP, do 2 MB. Slika se obrezuje na kvadrat iz sredine.",
+      "hint": "JPEG, PNG ili WebP, do 2 MB.",
       "previewAlt": "Pregled nove slike",
       "pick": "Odaberi sliku",
       "upload": "Prenesi",
@@ -92,13 +92,13 @@
       "success": "Profilna slika je ažurirana",
       "removed": "Profilna slika je uklonjena",
       "errors": {
-        "tooLarge": "Slika je prevelika. Odaberi datoteku do 2 MB, najviše 4096 piksela po stranici i 16 megapiksela ukupno.",
-        "tooSmall": "Slika je premala. Kraća stranica mora imati najmanje 128 piksela.",
-        "unsupported": "Taj format nije podržan. Odaberi sliku JPEG, PNG ili WebP bez animacije.",
+        "tooLarge": "Slika je prevelika: do 2 MB, 4096 px po stranici, 16 MP.",
+        "tooSmall": "Slika je premala: najmanje 128 px na kraćoj stranici.",
+        "unsupported": "Odaberi JPEG, PNG ili WebP sliku bez animacije.",
         "rateLimited": "Previše prijenosa u posljednjih sat vremena. Pokušaj kasnije.",
         "busy": "Poslužitelj je zauzet. Pokušaj ponovno za trenutak.",
         "unavailable": "Prijenos slika trenutno nije dostupan.",
-        "generic": "Nije moguće ažurirati sliku, pokušaj ponovno"
+        "generic": "Ažuriranje slike nije uspjelo. Pokušaj ponovno."
       }
     },
     "streak": {
@@ -451,12 +451,11 @@
     },
     "privacy": {
       "dialogTitle": "Privatnost sobe",
-      "dialogDescription": "Učini sobu privatnom uz lozinku ili je otvori svima. Igrači koji već sjede nikada se ne izbacuju.",
+      "dialogDescription": "Igrači koji sjede ostaju u svakom slučaju.",
       "modeLabel": "Pristup",
       "public": "Javna",
       "private": "Privatna",
-      "passwordLabel": "Lozinka sobe",
-      "passwordPlaceholder": "Unesi lozinku",
+      "passwordLabel": "Lozinka",
       "passwordHint": "Najmanje {{min}} znakova",
       "cancel": "Odustani",
       "save": "Spremi",
@@ -552,7 +551,6 @@
     "lastMatch": {
       "openButton": "Posljednji meč",
       "title": "Posljednji meč",
-      "description": "Kako je prošao posljednji meč za ovim stolom, ruku po ruku.",
       "loading": "Učitavanje posljednjeg meča…",
       "unavailable": "Posljednji meč trenutno nije dostupan."
     }
@@ -572,7 +570,6 @@
     "panel": {
       "openButton": "Pozovi igrače",
       "title": "Pozovi igrače",
-      "description": "Prijatelji koji su online i igrači koji su slobodni u lobiju mogu se pozvati u ovu sobu.",
       "tabsLabel": "Koga pozvati",
       "tabFriends": "Prijatelji",
       "tabLobby": "Lobi",
@@ -586,7 +583,8 @@
       "lobbyEmpty": "Trenutno nema drugih slobodnih igrača u lobiju.",
       "lobbyNoMatch": "Nema igrača u lobiju sa „{{query}}“",
       "invite": "Pozovi",
-      "invited": "Pozvan"
+      "invited": "Pozvan",
+      "done": "Gotovo"
     },
     "reasons": {
       "offline": "Offline",
@@ -684,7 +682,6 @@
         "ownHonorTooLow": "Tvoja čast je {{honor}}, pa ne možeš sjesti u sobu s minimumom {{minHonor}}. Spusti minimum da nastaviš.",
         "ownNewPlayerNotAllowed": "Još si novi igrač i ne možeš sjesti u vlastitu sobu. Dozvoli nove igrače da nastaviš."
       },
-      "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
       "roomNameInfo": "{{min}}–{{max}} znakova. Već ti je generiran nasumičan naziv, pritisni ↻ za drugi ili upiši svoj.",
       "roomNameShuffleAria": "Novi nasumičan naziv",
@@ -724,9 +721,8 @@
       "submit": "Stvori sobu",
       "submitting": "Stvaram…",
       "preview": {
-        "title": "Pregled uživo · ovako soba izgleda u lobiju",
+        "title": "Pregled u lobiju",
         "joinLabel": "Pridruži se",
-        "justNow": "upravo sad",
         "codeLabel": "KOD",
         "seated": "{{current}}/4"
       },
@@ -745,9 +741,7 @@
       "roomPassword": "Lozinka sobe",
       "roomPasswordPlaceholder": "Unesi lozinku",
       "minHonor": "Tko može sjesti",
-      "minHonorHint": "Igrači s ovolikom ili višom ocjenom časti",
       "minHonorAnyone": "Svatko",
-      "minHonorYou": "ti {{honor}}",
       "minHonorInfoBands": "Svaki prag je granica tijera časti: {{bands}}.",
       "minHonorInfoYou": "Tvoja čast je {{honor}} · {{tier}}.",
       "allowNewPlayers": "Novi igrači",
@@ -1366,9 +1360,9 @@
     },
     "contact": {
       "title": "Kontakt",
-      "lead": "Beljot je izradio Emilijan Koteski. Pitanja, prijave grešaka i povratne informacije su dobrodošli.",
+      "lead": "Pitanja, prijave grešaka i prijedlozi su dobrodošli.",
       "linkedin": "LinkedIn",
-      "disclaimer": "Ovo je beta verzija za testiranje, nije gotov proizvod."
+      "disclaimer": "Beta verzija, još u testiranju."
     }
   },
   "bots": {
@@ -1480,9 +1474,8 @@
     "label": "Podrži Beljot.online",
     "note": "Hobi projekt. Uvijek mi možeš <action>kupiti kavu</action>.",
     "dialog": {
-      "eyebrow": "Hobi projekt",
       "title": "Beljot.online radim u slobodno vrijeme",
-      "body": "Server i domenu plaćam iz svog džepa. Jedna kava pokriva dio toga, a igranje i pozivanje prijatelja pomažu jednako.",
+      "body": "Server i domenu plaćam iz svog džepa. Kava pomaže, kao i igranje i dovođenje prijatelja.",
       "cta": "Kupi mi kavu",
       "qrToggle": "Skeniraj mobitelom",
       "qrAlt": "QR kod koji vodi na Buy Me a Coffee stranicu Emilijana Koteskog"

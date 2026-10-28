@@ -5,16 +5,9 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
 import {
   useRemoveAvatarMutation,
   useUploadAvatarMutation,
@@ -154,44 +147,55 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
   const progressPct = Math.round(Math.min(1, Math.max(0, progress)) * 100);
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next) close();
+      onClose={close}
+      icon={<ImageUp />}
+      title={t("profile.avatar.title")}
+      description={t("profile.avatar.hint")}
+      error={error}
+      errorTestId="avatar-dialog-error"
+      pending={pending}
+      primary={{
+        label: upload.isPending ? t("profile.avatar.uploading") : t("profile.avatar.upload"),
+        onClick: onUpload,
+        disabled: file === null,
+        testId: "avatar-dialog-upload",
       }}
+      secondary={{
+        label: t("profile.avatar.cancel"),
+        onClick: close,
+        testId: "avatar-dialog-cancel",
+      }}
+      testId="avatar-dialog"
     >
-      <DialogContent showCloseButton={false} data-testid="avatar-dialog">
-        <DialogHeader>
-          <DialogTitle>{t("profile.avatar.title")}</DialogTitle>
-          <DialogDescription>{t("profile.avatar.hint")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center gap-3">
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt={t("profile.avatar.previewAlt")}
-              width={PREVIEW_SIZE}
-              height={PREVIEW_SIZE}
-              decoding="async"
-              className="rounded-full object-cover"
-              style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
-              data-testid="avatar-dialog-preview"
-            />
-          ) : (
-            <Avatar name={username} avatarUrl={avatarUrl} eager size={PREVIEW_SIZE} />
-          )}
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_TYPES.join(",")}
-            className="sr-only"
-            tabIndex={-1}
-            onChange={onPick}
-            disabled={pending}
-            data-testid="avatar-dialog-input"
+      <div className="flex flex-col items-center gap-3">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={t("profile.avatar.previewAlt")}
+            width={PREVIEW_SIZE}
+            height={PREVIEW_SIZE}
+            decoding="async"
+            className="rounded-full object-cover"
+            style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
+            data-testid="avatar-dialog-preview"
           />
+        ) : (
+          <Avatar name={username} avatarUrl={avatarUrl} eager size={PREVIEW_SIZE} />
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_TYPES.join(",")}
+          className="sr-only"
+          tabIndex={-1}
+          onChange={onPick}
+          disabled={pending}
+          data-testid="avatar-dialog-input"
+        />
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -202,39 +206,10 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
             <ImageUp aria-hidden="true" />
             {t("profile.avatar.pick")}
           </Button>
-
-          {upload.isPending && (
-            <div
-              className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progressPct}
-              aria-label={t("profile.avatar.progressLabel")}
-              data-testid="avatar-dialog-progress"
-            >
-              <div
-                className="bg-accent h-full rounded-full transition-[width] duration-200 ease-out"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          )}
-
-          <div aria-live="polite" className="text-center" data-testid="avatar-dialog-live">
-            {error && (
-              <p className="text-danger text-xs font-medium" data-testid="avatar-dialog-error">
-                {error}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
           {avatarUrl !== null && (
             <Button
               type="button"
               variant="destructive"
-              className="sm:mr-auto"
               onClick={onRemove}
               disabled={pending}
               data-testid="avatar-dialog-remove"
@@ -243,25 +218,25 @@ export function AvatarDialog({ open, onClose, userId, username, avatarUrl }: Ava
               {remove.isPending ? t("profile.avatar.removing") : t("profile.avatar.remove")}
             </Button>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={close}
-            disabled={pending}
-            data-testid="avatar-dialog-cancel"
+        </div>
+
+        {upload.isPending && (
+          <div
+            className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPct}
+            aria-label={t("profile.avatar.progressLabel")}
+            data-testid="avatar-dialog-progress"
           >
-            {t("profile.avatar.cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={onUpload}
-            disabled={file === null || pending}
-            data-testid="avatar-dialog-upload"
-          >
-            {upload.isPending ? t("profile.avatar.uploading") : t("profile.avatar.upload")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div
+              className="bg-accent h-full rounded-full transition-[width] duration-200 ease-out"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        )}
+      </div>
+    </AppDialog>
   );
 }

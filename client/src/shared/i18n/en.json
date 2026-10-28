@@ -80,7 +80,7 @@
     "avatar": {
       "title": "Profile picture",
       "edit": "Change profile picture",
-      "hint": "JPEG, PNG or WebP, up to 2 MB. It is cropped to a square from the center.",
+      "hint": "JPEG, PNG or WebP, up to 2 MB.",
       "previewAlt": "Preview of the new picture",
       "pick": "Choose image",
       "upload": "Upload",
@@ -92,13 +92,13 @@
       "success": "Profile picture updated",
       "removed": "Profile picture removed",
       "errors": {
-        "tooLarge": "That image is too large. Use a file up to 2 MB, at most 4096 pixels per side and 16 megapixels in total.",
-        "tooSmall": "That image is too small. Its shorter side must be at least 128 pixels.",
-        "unsupported": "That format isn't supported. Choose a JPEG, PNG or WebP image without animation.",
+        "tooLarge": "That image is too large: up to 2 MB, 4096 px per side, 16 MP.",
+        "tooSmall": "That image is too small: at least 128 px on the shorter side.",
+        "unsupported": "Choose a JPEG, PNG or WebP image without animation.",
         "rateLimited": "Too many uploads in the last hour. Try again later.",
         "busy": "The server is busy. Try again in a moment.",
         "unavailable": "Picture uploads are unavailable right now.",
-        "generic": "Could not update your picture — please try again"
+        "generic": "Couldn't update your picture. Try again."
       }
     },
     "streak": {
@@ -451,12 +451,11 @@
     },
     "privacy": {
       "dialogTitle": "Room privacy",
-      "dialogDescription": "Make this room private with a password, or open it to everyone. Seated players are never removed.",
+      "dialogDescription": "Seated players stay either way.",
       "modeLabel": "Access",
       "public": "Public",
       "private": "Private",
-      "passwordLabel": "Room password",
-      "passwordPlaceholder": "Enter password",
+      "passwordLabel": "Password",
       "passwordHint": "At least {{min}} characters",
       "cancel": "Cancel",
       "save": "Save",
@@ -552,7 +551,6 @@
     "lastMatch": {
       "openButton": "Last match",
       "title": "Last match",
-      "description": "How this table's most recent match went, hand by hand.",
       "loading": "Loading the last match…",
       "unavailable": "The last match isn't available right now."
     }
@@ -572,7 +570,6 @@
     "panel": {
       "openButton": "Invite players",
       "title": "Invite players",
-      "description": "Friends who are online and players who are free in the lobby can be invited to this room.",
       "tabsLabel": "Who to invite",
       "tabFriends": "Friends",
       "tabLobby": "Lobby",
@@ -586,7 +583,8 @@
       "lobbyEmpty": "Nobody else is free in the lobby right now.",
       "lobbyNoMatch": "No lobby players match \"{{query}}\"",
       "invite": "Invite",
-      "invited": "Invited"
+      "invited": "Invited",
+      "done": "Done"
     },
     "reasons": {
       "offline": "Offline",
@@ -684,7 +682,6 @@
         "ownHonorTooLow": "Your honor is {{honor}}, so you can't sit in a room with a minimum of {{minHonor}}. Lower the minimum to continue.",
         "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
-      "eyebrow": "New room",
       "headline": "Create a room",
       "roomNameInfo": "{{min}}–{{max}} characters. A random name is already filled in — press ↻ for another, or type your own.",
       "roomNameShuffleAria": "New random name",
@@ -724,9 +721,8 @@
       "submit": "Create room",
       "submitting": "Creating…",
       "preview": {
-        "title": "Live preview · how the room appears in the lobby",
+        "title": "Lobby preview",
         "joinLabel": "Join",
-        "justNow": "just now",
         "codeLabel": "CODE",
         "seated": "{{current}}/4"
       },
@@ -745,9 +741,7 @@
       "roomPassword": "Room password",
       "roomPasswordPlaceholder": "Enter password",
       "minHonor": "Who can sit down",
-      "minHonorHint": "Players with this honor score or higher",
       "minHonorAnyone": "Anyone",
-      "minHonorYou": "you {{honor}}",
       "minHonorInfoBands": "Each threshold is an honor-tier boundary: {{bands}}.",
       "minHonorInfoYou": "Your honor is {{honor}} · {{tier}}.",
       "allowNewPlayers": "New players",
@@ -1366,9 +1360,9 @@
     },
     "contact": {
       "title": "Contact",
-      "lead": "Beljot is built by Emilijan Koteski. Questions, bug reports and feedback are welcome.",
+      "lead": "Questions, bug reports and feedback are welcome.",
       "linkedin": "LinkedIn",
-      "disclaimer": "This is a beta build for testing purposes — not a finished production product."
+      "disclaimer": "Beta build, still in testing."
     }
   },
   "bots": {
@@ -1480,9 +1474,8 @@
     "label": "Support Beljot.online",
     "note": "A hobby project — you can always <action>buy me a coffee</action>.",
     "dialog": {
-      "eyebrow": "Hobby project",
       "title": "I build Beljot.online in my free time",
-      "body": "The server and the domain come out of my own pocket. A coffee covers a bit of it — playing and bringing friends along helps just as much.",
+      "body": "The server and domain come out of my pocket. A coffee helps, and so does playing and bringing friends.",
       "cta": "Buy me a coffee",
       "qrToggle": "Scan with your phone",
       "qrAlt": "QR code linking to Emilijan's Buy Me a Coffee page"

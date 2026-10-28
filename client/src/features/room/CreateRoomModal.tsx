@@ -8,6 +8,7 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  Plus,
   RotateCcw,
   RotateCw,
   Settings,
@@ -25,11 +26,12 @@ import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
+import { AppDialogTile } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
-import { Dialog, DialogContent } from "@/shared/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog";
 import { DurationSlider } from "@/shared/components/ui/duration-slider";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { Field } from "@/shared/components/ui/field";
@@ -357,29 +359,23 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="bg-surface border-border flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border p-0 shadow-xl ring-1 ring-brass/18 sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
+        className="bg-surface ring-brass-soft flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-xl sm:max-w-[min(1100px,calc(100vw-4rem))] md:max-h-[min(720px,calc(100vh-4rem))]"
         showCloseButton={false}
         data-testid="create-room-modal"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
-        />
-
         <form
           onSubmit={handleSubmit}
           className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] md:grid-cols-[1.05fr_0.95fr]"
           noValidate
         >
           <div className="bg-surface flex min-h-0 flex-col">
-            <header className="flex shrink-0 flex-col gap-2 px-8 pt-7 pb-1.5">
-              <Eyebrow tone="accent">
-                <span className="bg-accent inline-block size-1.5 rounded-full" />
-                {t("lobby.createRoomModal.eyebrow")}
-              </Eyebrow>
-              <h2 className="text-ink m-0 text-3xl leading-tight font-bold tracking-tight">
+            <header className="flex shrink-0 items-center gap-4 px-8 pt-6 pb-1.5">
+              <AppDialogTile>
+                <Plus />
+              </AppDialogTile>
+              <DialogTitle className="text-ink text-xl leading-tight font-semibold tracking-tight">
                 {t("lobby.createRoomModal.headline")}
-              </h2>
+              </DialogTitle>
             </header>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-4">
@@ -734,7 +730,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               </div>
             )}
 
-            <footer className="border-border bg-surface flex shrink-0 items-center justify-end gap-2 border-t px-8 py-3.5">
+            <footer className="border-border bg-surface-sunken/50 flex shrink-0 flex-col gap-2 border-t px-8 py-4 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
                 size="cta"
@@ -750,6 +746,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               <Button
                 type="button"
                 variant="ghost"
+                size="cta"
                 onClick={() => handleOpenChange(false)}
                 data-testid="cancel-button"
               >

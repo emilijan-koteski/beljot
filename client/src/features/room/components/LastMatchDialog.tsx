@@ -1,15 +1,10 @@
+import { History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { useRoomLastMatchQuery } from "@/shared/hooks/queries/useMatches";
 
 interface LastMatchDialogProps {
@@ -38,39 +33,44 @@ export function LastMatchDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl" data-testid="last-match-dialog">
-        <DialogHeader>
-          <DialogTitle>{t("room.lastMatch.title")}</DialogTitle>
-          <DialogDescription>{t("room.lastMatch.description")}</DialogDescription>
-        </DialogHeader>
-
-        {query.isPending ? (
-          <p className="text-ink-mute px-1 py-2 text-xs" data-testid="last-match-loading">
-            {t("room.lastMatch.loading")}
-          </p>
-        ) : query.data === undefined ? (
-          <p className="text-ink-dim px-1 py-2 text-xs" data-testid="last-match-unavailable">
-            {t("room.lastMatch.unavailable")}
-          </p>
-        ) : (
-          <ul className="m-0 max-h-[70vh] list-none overflow-y-auto p-0">
-            <MatchStatsCard
-              match={query.data}
-              isOpen={expanded}
-              onToggle={() => setExpanded((v) => !v)}
-              footer={
-                <MatchPlayerActions
-                  match={query.data}
-                  roomId={roomId}
-                  showReinvite
-                  playersInRoom={playersInRoom}
-                />
-              }
-            />
-          </ul>
-        )}
-      </DialogContent>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      size="lg"
+      icon={<History />}
+      title={t("room.lastMatch.title")}
+      primary={{
+        label: t("common.close"),
+        onClick: () => onOpenChange(false),
+        testId: "last-match-close",
+      }}
+      testId="last-match-dialog"
+    >
+      {query.isPending ? (
+        <p className="text-ink-mute px-1 py-2 text-xs" data-testid="last-match-loading">
+          {t("room.lastMatch.loading")}
+        </p>
+      ) : query.data === undefined ? (
+        <p className="text-ink-dim px-1 py-2 text-xs" data-testid="last-match-unavailable">
+          {t("room.lastMatch.unavailable")}
+        </p>
+      ) : (
+        <ul className="m-0 max-h-[70vh] list-none overflow-y-auto p-0">
+          <MatchStatsCard
+            match={query.data}
+            isOpen={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            footer={
+              <MatchPlayerActions
+                match={query.data}
+                roomId={roomId}
+                showReinvite
+                playersInRoom={playersInRoom}
+              />
+            }
+          />
+        </ul>
+      )}
+    </AppDialog>
   );
 }

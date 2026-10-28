@@ -31,10 +31,12 @@ describe("SupportDialog", () => {
   it("explains why support is being asked for", () => {
     renderDialog();
     expect(screen.getByTestId("support-dialog")).toBeInTheDocument();
-    expect(screen.getByText("Hobby project")).toBeInTheDocument();
-    expect(screen.getByText("I build Beljot.online in my free time")).toBeInTheDocument();
-    expect(screen.getByText(/come out of my own pocket/)).toBeInTheDocument();
-    expect(screen.getByText(/helps just as much/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "I build Beljot.online in my free time" }),
+    ).toHaveAccessibleDescription(
+      "The server and domain come out of my pocket. A coffee helps, and so does playing and bringing friends.",
+    );
+    expect(screen.queryByText("Hobby project")).toBeNull();
   });
 
   it("points the call to action at the canonical page in a safe new tab", () => {

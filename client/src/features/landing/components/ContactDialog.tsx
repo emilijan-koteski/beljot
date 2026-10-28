@@ -1,35 +1,37 @@
 import { ExternalLink, Mail } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 
 const EMAIL = "emilijankoteski@pm.me";
 const LINKEDIN_URL = "https://www.linkedin.com/in/emilijan-koteski/";
 
-// Footer "Contact" link that opens a dialog with the maker's email, LinkedIn and a beta disclaimer.
+/** Footer "Contact" link that opens a dialog with the maker's email, LinkedIn and a beta note. */
 export function ContactDialog() {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+
   return (
-    <Dialog>
-      <DialogTrigger
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
         data-testid="landing-contact"
         className="hover:text-ink cursor-pointer transition-colors"
       >
         {t("landing.foot.contact")}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("landing.contact.title")}</DialogTitle>
-          <DialogDescription>{t("landing.contact.lead")}</DialogDescription>
-        </DialogHeader>
-
+      </button>
+      <AppDialog
+        open={open}
+        onClose={close}
+        icon={<Mail />}
+        title={t("landing.contact.title")}
+        description={t("landing.contact.lead")}
+        primary={{ label: t("common.close"), onClick: close, testId: "contact-close" }}
+        testId="contact-dialog"
+      >
         <div className="flex flex-col gap-2.5">
           <div className="text-ink text-sm font-semibold">Emilijan Koteski</div>
           <a
@@ -51,11 +53,8 @@ export function ContactDialog() {
             {t("landing.contact.linkedin")}
           </a>
         </div>
-
-        <div className="border-border bg-surface-sunken text-ink-dim rounded-lg border px-3.5 py-3 text-xs leading-relaxed">
-          {t("landing.contact.disclaimer")}
-        </div>
-      </DialogContent>
-    </Dialog>
+        <p className="text-ink-mute mt-4 mb-0 text-xs">{t("landing.contact.disclaimer")}</p>
+      </AppDialog>
+    </>
   );
 }
