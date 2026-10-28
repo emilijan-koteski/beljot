@@ -32,7 +32,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 - **Bitola:** declared during trick 1 and revealed at the start of trick 2. A card can belong to only one declaration, so overlapping groups keep the higher one.
 - **Croatian:** a dedicated declaration phase sits between bidding and trick 1, and one card may count in several declarations.
 - The highest declaration decides the winning team. Only that team's declarations score, and the losing team's are never revealed.
-- Belote and Rebelote (trump K and Q in one hand) score 20 only when announced. Announcing on the Queen is Belote, on the King is Rebelote. Declining on the first card forfeits the bonus.
+- Belote (trump K and Q in one hand) scores 20 only when announced. Bitola calls it Belote when announced on the Queen and Rebelote on the King; Croatian calls it Belote on either. Declining on the first card forfeits the bonus.
 
 ## Card play (`validation.go`, mirrored in the client's `legalCards`)
 

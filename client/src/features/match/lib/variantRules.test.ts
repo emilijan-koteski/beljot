@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { rulesForVariant } from "./variantRules";
 
 describe("rulesForVariant", () => {
-  it("mirrors the Go presets", () => {
-    expect(rulesForVariant("bitola")).toEqual({ declarationOverlap: false });
-    expect(rulesForVariant("croatia")).toEqual({ declarationOverlap: true });
+  it("returns each variant's facts", () => {
+    expect(rulesForVariant("bitola")).toEqual({ declarationOverlap: false, kingIsRebelote: true });
+    expect(rulesForVariant("croatia")).toEqual({ declarationOverlap: true, kingIsRebelote: false });
   });
 
   it("falls back to Bitola for an unknown or missing variant", () => {
@@ -17,7 +17,7 @@ describe("rulesForVariant", () => {
   it("falls back to Bitola for Object.prototype keys", () => {
     for (const key of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
       const facts = rulesForVariant(key as never);
-      expect(facts).toEqual({ declarationOverlap: false });
+      expect(facts).toEqual(rulesForVariant("bitola"));
       expect(facts.declarationOverlap).toBe(false);
     }
   });

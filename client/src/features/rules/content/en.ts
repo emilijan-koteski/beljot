@@ -16,10 +16,10 @@ export const en: RulesLangData = {
 
   declarations: {
     belot: {
-      name: "Belote-Rebelote",
+      name: "Belote",
       summary: "The King and Queen of trump, both sitting in one hand.",
       detail:
-        "The Queen is the Belote, the King the Rebelote — announce each as you play it, and it carries +20 points for your team.",
+        "Announce it as you play the first of the two, and it carries +20 points for your team.",
     },
     terca: {
       name: "Tierce",
@@ -219,7 +219,20 @@ export const en: RulesLangData = {
       blocks: [
         {
           kind: "p",
-          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair — the Queen is the Belote, the King the Rebelote. Belote and Rebelote are the odd ones out — you announce each as you play that card, wherever in the hand it falls.",
+          text: "Once the cards are dealt and trump is set, check your hand for declarations: runs of cards in a row in one suit, four of a kind, and the King-and-Queen-of-trump pair, the Belote. Belote is the odd one out — you announce it as you play the first of the two, wherever in the hand it falls.",
+        },
+        {
+          kind: "p",
+          variant: "bitola",
+          otherVariantNote: "Croatian rules call it Belote whichever of the two you play first.",
+          text: "Announced on the Queen it is Belote, announced on the King it is Rebelote. Both are worth the same.",
+        },
+        {
+          kind: "p",
+          variant: "croatia",
+          otherVariantNote:
+            "Bitola rules call it Belote when announced on the Queen and Rebelote when announced on the King.",
+          text: "It is Belote whichever of the two you play first, the Queen or the King.",
         },
         {
           kind: "p",
@@ -239,7 +252,7 @@ export const en: RulesLangData = {
         {
           kind: "rule",
           title: "Only one team gets paid for declarations",
-          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. Worth the same? A four-of-a-kind beats a run — a carré of Aces (100) takes it over a quint (100). A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote and Rebelote sit outside this contest — whoever announces them always scores them.",
+          text: "Each side puts forward its single best declaration. Whoever’s is stronger scoops up every declaration across both their hands — the other team scores nothing for theirs. Worth the same? A four-of-a-kind beats a run — a carré of Aces (100) takes it over a quint (100). A longer run beats a shorter one — up to a quint. Once both runs are quints (five cards or more), length stops mattering: the higher top card wins, as it does between two runs of equal length. Still level? A run in trump takes it — and if neither is trump, the tie falls to whichever player comes first in the turn order, starting to the dealer’s right. Belote sits outside this contest — whoever announces it always scores it.",
         },
         {
           kind: "rule",
@@ -278,7 +291,7 @@ export const en: RulesLangData = {
             },
             {
               t: "Add the declarations",
-              d: "The side that won the declarations contest adds up every combination across both partners’ hands. Any Belote or Rebelote called during the hand goes on top, for whoever announced it.",
+              d: "The side that won the declarations contest adds up every combination across both partners’ hands. Any Belote called during the hand goes on top, for whoever announced it.",
             },
           ],
         },

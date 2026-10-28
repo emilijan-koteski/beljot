@@ -8,14 +8,12 @@ vi.mock("react-i18next", () => ({
         "team.us": "Us",
         "team.them": "Them",
         "match.declaration.resolved": "Declarations",
-        "match.declaration.addedToHand": "Added to this hand's score",
         "match.declaration.total": "Total",
       };
-      if (key === "match.declaration.teamDeclared" && opts) return `${opts.team} declared`;
       if (key === "match.declaration.headlineUs") return "We won the declarations";
       if (key === "match.declaration.headlineThem") return "They won the declarations";
       if (key === "match.declaration.tiebreaker" && opts)
-        return `${opts.player}'s ${opts.label} — highest meld at the table`;
+        return `${opts.player}'s ${opts.label} is highest`;
       if (key === "match.declaration.byPlayer" && opts) return `by ${opts.name}`;
       if (key === "match.declaration.tierce") return "Tierce";
       if (key === "match.declaration.quarte") return "Quarte";
@@ -306,7 +304,7 @@ describe("DeclarationReveal", () => {
       />,
     );
     expect(screen.getByTestId("declaration-reveal-tiebreaker")).toHaveTextContent(
-      "dave's Carré — highest meld at the table",
+      "dave's Carré is highest",
     );
   });
 
@@ -329,7 +327,7 @@ describe("DeclarationReveal", () => {
     expect(screen.getByTestId("declaration-reveal-tiebreaker")).toBeInTheDocument();
   });
 
-  it("renders the total label in the brass strip", () => {
+  it("renders the total in the brass strip without a caption", () => {
     render(
       <DeclarationReveal
         payload={mockPayload}
@@ -338,10 +336,7 @@ describe("DeclarationReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("declaration-reveal-total")).toHaveTextContent("Total");
-    expect(screen.getByTestId("declaration-reveal-total")).toHaveTextContent(
-      "Added to this hand's score",
-    );
+    expect(screen.getByTestId("declaration-reveal-total")).toHaveTextContent(/^Total\+\d+$/);
   });
 
   it("falls back to seat marker when player is unknown", () => {

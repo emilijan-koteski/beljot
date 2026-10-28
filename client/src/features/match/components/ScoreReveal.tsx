@@ -84,10 +84,7 @@ export function ScoreReveal({
 
   const title =
     handNumber !== undefined
-      ? t("match.scoreReveal.titleWithHand", {
-          hand: handNumber,
-          defaultValue: `Hand ${handNumber} — results`,
-        })
+      ? t("match.score.handLabel", { hand: handNumber })
       : t("match.scoreReveal.title");
 
   const callerTeam: TeamString | null =
@@ -102,9 +99,7 @@ export function ScoreReveal({
     subtitle = t(failedSubtitleKey(beneficiary === viewerTeam, declarationsTransfer));
   } else if (trumpSuitName && callerTeam) {
     subtitle = t(
-      callerWasViewer
-        ? "match.scoreReveal.subtitleHeldYour"
-        : "match.scoreReveal.subtitleHeldTheir",
+      callerWasViewer ? "match.scoreReveal.subtitleHeldUs" : "match.scoreReveal.subtitleHeldThem",
       { suit: trumpSuitName },
     );
   }

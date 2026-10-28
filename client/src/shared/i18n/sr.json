@@ -897,7 +897,7 @@
   "match": {
     "seat": {
       "waiting": "Čeka se…",
-      "calledSuit": "Zvao {{suit}}",
+      "calledSuit": "Zove {{suit}}",
       "you": "Ti"
     },
     "chat": {
@@ -910,7 +910,7 @@
     "starting": "Meč počinje…",
     "reconnecting": "Ponovno povezivanje na igru…",
     "noActiveMatch": "Meč više nije aktivan. Povratak u lobi…",
-    "notMember": "Niste igrač u ovom meču. Povratak u lobi…",
+    "notMember": "Nisi igrač u ovom meču. Povratak u lobi…",
     "roomNotFound": "Meč nije pronađen. Povratak u lobi…",
     "leaveConfirm": "Napusti igru? Možeš izgubiti napredak.",
     "trumpIndicator": {
@@ -955,7 +955,6 @@
       "declare": "Zovi",
       "skip": "Preskoči",
       "noneTitle": "Nemaš zvanja",
-      "noneBody": "U ovoj ruci nemaš šta da zoveš.",
       "waitingOthers": "Čekaju se ostali… {{answered}}/4",
       "total": "Ukupno",
       "tierce": "Terca",
@@ -963,42 +962,32 @@
       "quint": "Kvinta",
       "carre": "Kare",
       "resolved": "Zvanja",
-      "teamDeclared": "Zvanje · {{team}}",
       "headlineUs": "Mi smo osvojili zvanja",
       "headlineThem": "Oni su osvojili zvanja",
-      "tiebreaker": "{{player}} · {{label}} · najviše zvanje za stolom",
+      "tiebreaker": "Najviše zvanje: {{label}} · {{player}}",
       "byPlayer": "od {{name}}",
-      "addedToHand": "Dodato na rezultat ove ruke",
       "dismiss": "Zatvori",
       "declaredBanner": "{{username}} ima zvanje"
     },
     "belot": {
-      "titleBelot": "Zovi Belu?",
-      "titleRebelot": "Zovi Rebelu?",
-      "subtitleBelot": "Imaš Kralja i Damu u adutu. Zvanjem sada dobijaš +20. Dama je karta za ovaj štih.",
-      "subtitleRebelot": "Imaš Kralja i Damu u adutu. Zvanjem sada dobijaš +20. Kralj je karta za ovaj štih.",
-      "accentStripBelot": "Zvanje Bele je tvoj potez, +20 poena za tim.",
-      "accentStripRebelot": "Zvanje Rebele je tvoj potez, +20 poena za tim.",
-      "announceBelot": "Zovi Belu +20",
-      "announceRebelot": "Zovi Rebelu +20",
+      "titleBelot": "Zovi Belu",
+      "titleRebelot": "Zovi Rebelu",
+      "subtitle": "Imaš Kralja i Damu u adutu.",
+      "announce": "Zovi +20",
       "decline": "Preskoči",
       "reveal": {
         "belot": "Bela",
         "rebelot": "Rebela",
-        "titleBelot": "{{name}} je zvao Belu.",
-        "titleRebelot": "{{name}} je zvao Rebelu.",
-        "bonusUs": "+20 poena za tvoj tim",
-        "bonusThem": "+20 poena za njihov tim",
         "dismiss": "Zatvori"
       }
     },
     "errors": {
-      "wrongPhase": "Akcija nije dostupna u ovoj fazi",
+      "wrongPhase": "To sada ne možeš",
       "notYourTurn": "Nije tvoj red",
       "invalidAction": "Nevažeća akcija",
-      "illegalPlay": "Ta karta ne može da se odigra",
-      "pauseExhausted": "Već ste iskoristili pauzu",
-      "noActivePause": "Nemate aktivnu pauzu",
+      "illegalPlay": "Ne možeš da odigraš tu kartu",
+      "pauseExhausted": "Pauza je već iskorišćena",
+      "noActivePause": "Nemaš aktivnu pauzu",
       "notRoomOwner": "Samo domaćin može ovo da uradi",
       "mustPickTrump": "Ovde ne možeš dalje. Izaberi boju."
     },
@@ -1019,9 +1008,8 @@
     },
     "scoreReveal": {
       "title": "Rezultat deljenja",
-      "titleWithHand": "Deljenje {{hand}} · rezultat",
-      "subtitleHeldYour": "Prošli · vi ste zvali adut {{suit}}",
-      "subtitleHeldTheir": "Prošli · oni su zvali adut {{suit}}",
+      "subtitleHeldUs": "Prošli · mi smo zvali {{suit}}",
+      "subtitleHeldThem": "Prošli · oni su zvali {{suit}}",
       "subtitleFailedUs": "Pali · svi poeni za nas",
       "subtitleFailedThem": "Pali · svi poeni za njih",
       "subtitleFailedCardsUs": "Pali · poeni iz karata za nas",
@@ -1030,16 +1018,15 @@
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus poslednjeg štiha",
       "capotBonus": "Kapot bonus",
-      "failedContract": "Pala ruka",
       "handTotal": "Ukupno deljenje",
       "matchTotal": "Rezultat meča",
       "continue": "Nastavi",
-      "waiting": "Čeka se na ostale…"
+      "waiting": "Čekaju se ostali…"
     },
     "capot": {
       "title": "KAPOT!",
-      "eyebrowUs": "Svaki štih · mi smo pokupili sve",
-      "eyebrowThem": "Svaki štih · oni su pokupili sve",
+      "eyebrowUs": "Uzeli smo sve štihove",
+      "eyebrowThem": "Uzeli su sve štihove",
       "bonusUs": "+{{points}} za nas",
       "bonusThem": "+{{points}} za njih"
     },
@@ -1078,13 +1065,13 @@
       "duration": "Trajanje meča",
       "returnToLobby": "Nazad u lobi",
       "returnToRoom": "Nazad u sobu",
-      "returnToRoomError": "Povratak u sobu nije uspeo. Možda više nije dostupna.",
+      "returnToRoomError": "Povratak u sobu nije uspeo.",
       "returnToRoomAlreadyStarted": "Sledeći meč je već počeo bez tebe.",
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
-      "surrenderNote": "{{username}} je predao meč",
+      "surrenderNote": "Predaja: {{username}}",
       "statsShow": "Prikaži detalje deljenja",
       "statsHide": "Sakrij detalje deljenja",
-      "targetReachedNote": "Mač je završio u trenutku kad je jedan tim dostigao cilj, pa ova ruka nije dovršena."
+      "targetReachedNote": "Meč je završen usred deljenja, kad je ekipa dostigla cilj."
     },
     "emote": {
       "button": "Pošalji emotikon",
@@ -1106,32 +1093,30 @@
       "pending": "Predaja na čekanju…",
       "confirm": {
         "title": "Predati meč?",
-        "body": "Tvoj saigrač mora da prihvati. Ako prihvati, meč se završava kao pobeda protivnika.",
-        "consumeWarning": "Imaš jednu predaju po meču. Ako saigrač odbije, iskorišćena je.",
+        "body": "Saigrač mora da prihvati. Tada protivnici dobijaju meč.",
+        "consumeWarning": "Jedna predaja po meču. Troši se i kad je odbijena.",
         "confirm": "Predloži predaju",
         "cancel": "Otkaži"
       },
       "prompt": {
         "title": "Tvoj saigrač želi da preda meč",
-        "body": "{{username}} predlaže da predate meč. Ako odbiješ, igra se nastavlja.",
-        "consequence": "Ako prihvatiš, meč se završava kao pobeda protivnika.",
+        "body": "Ako odbiješ, igra se nastavlja.",
+        "consequence": "Ako prihvatiš, protivnici dobijaju meč.",
         "accept": "Prihvati predaju",
         "decline": "Odbij"
       },
       "opponentBanner": "{{username}} predlaže predaju",
-      "declinedToast": "Predaja odbijena, igra se nastavlja",
+      "declinedToast": "Predaja odbijena",
       "errors": {
-        "exhausted": "Već si iskoristio svoju predaju za ovaj meč.",
-        "actionRequired": "Prvo razreši predlog predaje koji je u toku.",
-        "wrongPhase": "Predaja je dostupna samo tokom žive ruke."
+        "exhausted": "Predaja je već iskorišćena.",
+        "actionRequired": "Prvo odgovori na predlog predaje.",
+        "wrongPhase": "Predaja je moguća samo tokom deljenja."
       },
       "unknownProposer": "protivnik"
     },
     "pause": {
       "title": "Meč pauziran",
-      "pausedBy": "{{player}} je pauzirao igru",
-      "pausedByMany": "{{player}} su pauzirali igru",
-      "waitingToResume": "Čekanje da igrači nastave…",
+      "waitingToResume": "Čeka se nastavak…",
       "resume": "Nastavi",
       "pauseButton": "Pauza",
       "pauseUsed": "Pauza iskorišćena",
@@ -1139,24 +1124,23 @@
       "pauseAvailable": "pauza dostupna",
       "pauseUsedRow": "pauza iskorišćena",
       "resumeAll": "Nastavi sve",
-      "ownerResumedToast": "Vlasnik sobe je nastavio igru"
+      "ownerResumedToast": "Domaćin je nastavio igru"
     },
     "disconnect": {
-      "playerDisconnected": "{{player}} je prekinuo vezu",
-      "playerReconnected": "{{player}} se ponovo povezao",
+      "playerDisconnected": "{{player}} · veza prekinuta",
+      "playerReconnected": "{{player}} je ponovo u igri",
       "reconnecting": "Ponovno povezivanje…",
-      "waitingMessage": "Igra je pauzirana dok čekamo da se {{player}} vrati.",
-      "waitingMessageMany": "Igra je pauzirana dok čekamo da se {{count}} igrača vrate.",
+      "waitingMessage": "Čeka se da se {{player}} vrati.",
+      "waitingMessageMany": "Čeka se da se {{count}} igrača vrate.",
       "countdownLabel": "Preostalo vreme",
-      "honorNoteOther": "Ako vreme istekne, računa se kao napuštanje. Čast igrača koji je napustio se smanjuje.",
-      "honorNoteSelf": "Ostani na ovoj stranici. Ponovno povezivanje te ne košta ništa, ali istek vremena se računa kao napuštanje i tvoja čast pada.",
-      "reconnectFailed": "Ponovno povezivanje nije uspelo, meč je možda završen",
-      "matchAbandoned": "{{player}} je prekinuo vezu, meč završen",
+      "honorNoteOther": "Ako vreme istekne, to je napuštanje meča i gubi se čast.",
+      "honorNoteSelf": "Ostani na ovoj stranici. Ako vreme istekne, napuštaš meč i gubiš čast.",
+      "matchAbandoned": "{{player}} · meč napušten",
       "matchAbandonedScores": "Rezultat: Mi {{us}} : Oni {{them}}",
-      "abandonCountsWin": "Računa se kao pobeda za tvoj tim",
-      "abandonCountsLoss": "Računa se kao poraz za tvoj tim",
+      "abandonCountsWin": "Računa se kao pobeda",
+      "abandonCountsLoss": "Računa se kao poraz",
       "returningToLobby": "Povratak u lobi…",
-      "matchEnded": "Meč je završen"
+      "timeRanOut": "Vreme je isteklo"
     },
     "hud": {
       "pause": "Pauza",
@@ -1177,15 +1161,15 @@
       "close": "Zatvori"
     },
     "settlement": {
-      "won": "Osvojio si {{amount}} novčića",
-      "lost": "Izgubio si {{amount}} novčića",
+      "won": "Osvojeno: {{amount}} novčića",
+      "lost": "Izgubljeno: {{amount}} novčića",
       "honorTierChanged": "{{before}} → {{after}}"
     },
     "stake": {
       "label": "Ulog"
     },
     "rules": {
-      "stopAtTargetNote": "Ovaj stol igra sa dosta: mač završava u trenutku kad jedan tim dostigne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde se ruka prvo odigra do kraja.",
+      "stopAtTargetNote": "Za ovim stolom se igra sa dosta: meč završava u trenutku kad jedan tim dostigne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde se ruka prvo odigra do kraja.",
       "noDeclarationsTransferNote": "Na ovom stolu se zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju umesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gde ta zvanja idu drugoj ekipi.",
       "clockwiseNote": "Na ovom stolu igra se kreće ulevo: deljenje, licitiranje, štihovi i sledeći delilac idu ulevo. Poglavlja niže opisuju uobičajenu igru udesno."
     }

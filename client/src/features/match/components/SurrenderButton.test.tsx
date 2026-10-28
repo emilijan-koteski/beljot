@@ -102,7 +102,7 @@ describe("SurrenderButton", () => {
     );
 
     await user.click(screen.getByTestId("surrender-button"));
-    expect(screen.getByRole("note")).toHaveTextContent("one surrender per match");
+    expect(screen.getByRole("note")).toHaveTextContent("One surrender per match");
     await user.keyboard("{Escape}");
 
     expect(screen.queryByTestId("surrender-confirm-overlay")).not.toBeInTheDocument();

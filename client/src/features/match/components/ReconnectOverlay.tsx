@@ -215,12 +215,8 @@ export function ReconnectOverlay({
                 color={RING_DANGER}
                 data-testid="match-ended-title"
               >
-                {t("match.disconnect.matchEnded", { defaultValue: "Match has ended" })}
+                {t("match.disconnect.timeRanOut")}
               </ResultHeading>
-
-              <p className="text-sm" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
-                {t("match.disconnect.reconnectFailed")}
-              </p>
 
               <p
                 className="text-xs mt-1 animate-pulse"

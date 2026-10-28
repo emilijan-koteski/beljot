@@ -106,7 +106,7 @@ describe("card-deck suit name casing", () => {
 });
 
 describe("declaration phase copy", () => {
-  const KEYS = ["noneTitle", "noneBody", "waitingOthers"] as const;
+  const KEYS = ["noneTitle", "waitingOthers"] as const;
 
   function decl(locale: Record<string, unknown>): Record<string, string> {
     const match = locale.match as Record<string, unknown>;

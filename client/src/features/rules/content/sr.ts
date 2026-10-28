@@ -16,10 +16,9 @@ export const sr: RulesLangData = {
 
   declarations: {
     belot: {
-      name: "Bela-Rebela",
+      name: "Bela",
       summary: "Kralj i Dama u adutu, obe karte u istoj ruci.",
-      detail:
-        "Dama je Bela, Kralj je Rebela. Svaku zoveš kad je odigraš, a par nosi +20 poena za tim.",
+      detail: "Zoveš je kad odigraš prvu od te dve karte, a nosi +20 poena za tim.",
     },
     terca: {
       name: "Terca",
@@ -218,7 +217,21 @@ export const sr: RulesLangData = {
       blocks: [
         {
           kind: "p",
-          text: "Čim su karte podeljene i adut određen, proveri ruku za zvanja: nizove karata u nizu u jednoj boji, četiri iste, i par Kralj-i-Dama u adutu. Dama je Bela, Kralj je Rebela. Bela i Rebela su izuzetak. Svaku zoveš kad igraš tu kartu, u kom se god delu ruke to dogodi.",
+          text: "Čim su karte podeljene i adut određen, proveri ruku za zvanja: nizove karata u nizu u jednoj boji, četiri iste, i par Kralj-i-Dama u adutu, Belu. Bela je izuzetak. Zoveš je kad igraš prvu od te dve karte, u kom se god delu ruke to dogodi.",
+        },
+        {
+          kind: "p",
+          variant: "bitola",
+          otherVariantNote:
+            "U hrvatskim pravilima to je Bela, koju god od te dve karte prvo odigraš.",
+          text: "Zvana na Dami je Bela, zvana na Kralju je Rebela. Obe vrede isto.",
+        },
+        {
+          kind: "p",
+          variant: "croatia",
+          otherVariantNote:
+            "U bitolskim pravilima zvana na Dami je Bela, a zvana na Kralju Rebela.",
+          text: "To je Bela, koju god od te dve karte prvo odigraš, Damu ili Kralja.",
         },
         {
           kind: "p",
@@ -238,7 +251,7 @@ export const sr: RulesLangData = {
         {
           kind: "rule",
           title: "Samo jedan tim je plaćen za zvanja",
-          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obe ruke tima, a drugi tim ne dobija ništa za svoja. Jednako vrede? Kare pobeđuje niz, pa kare asova (100) pobeđuje kvintu (100). Duži niz pobeđuje kraći, ali samo do kvinte. Kad obe strane imaju kvintu (pet ili više karata), dužina više ne znači ništa, nego pobeđuje niz sa višom gornjom kartom, isto kao i kod dva niza iste dužine. Još uvek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je pre na redu, počev zdesna od delioca. Bela i Rebela stoje van ovog takmičenja, ko ih zove, uvek ih boduje.",
+          text: "Svaka strana ističe svoje jedino najbolje zvanje. Čije je jače, skuplja sva zvanja iz obe ruke tima, a drugi tim ne dobija ništa za svoja. Jednako vrede? Kare pobeđuje niz, pa kare asova (100) pobeđuje kvintu (100). Duži niz pobeđuje kraći, ali samo do kvinte. Kad obe strane imaju kvintu (pet ili više karata), dužina više ne znači ništa, nego pobeđuje niz sa višom gornjom kartom, isto kao i kod dva niza iste dužine. Još uvek izjednačeno? Niz u adutu nosi. A ako nijedan niz nije adut, prednost ima onaj od dvojice igrača koji je pre na redu, počev zdesna od delioca. Bela stoji van ovog takmičenja, ko je zove, uvek je boduje.",
         },
         {
           kind: "rule",
@@ -277,7 +290,7 @@ export const sr: RulesLangData = {
             },
             {
               t: "Dodaj zvanja",
-              d: "Strana koja je dobila takmičenje zvanja sabira sve kombinacije iz ruku oba partnera. Bilo koja Bela ili Rebela zvana tokom igre dolazi povrh toga, za onoga ko ju je zvao.",
+              d: "Strana koja je dobila takmičenje zvanja sabira sve kombinacije iz ruku oba partnera. Bilo koja Bela zvana tokom igre dolazi povrh toga, za onoga ko ju je zvao.",
             },
           ],
         },
