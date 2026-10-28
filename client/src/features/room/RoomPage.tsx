@@ -1,7 +1,6 @@
 import {
   Ban,
   Bot,
-  ChevronDown,
   Clock,
   Coins,
   Crown,
@@ -16,8 +15,6 @@ import {
   Trophy,
   Unlink,
   UserCheck,
-  Users,
-  UserX,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -29,6 +26,7 @@ import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPrompt
 import { InviteFriendsDialog } from "@/features/room/components/InviteFriendsDialog";
 import { LastMatchDialog } from "@/features/room/components/LastMatchDialog";
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
+import { RoomPlayersMenu } from "@/features/room/components/RoomPlayersMenu";
 import { SeatTile } from "@/features/room/components/SeatTile";
 import {
   KickPlayerDialog,
@@ -37,17 +35,10 @@ import {
 } from "@/features/room/OwnerConfirmDialogs";
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
-import { EmptyState } from "@/shared/components/EmptyState";
 import { HonorShield } from "@/shared/components/HonorShield";
-import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { CodeChip } from "@/shared/components/ui/code-chip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/shared/components/ui/dropdown-menu";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useAddBotMutation,
@@ -824,128 +815,20 @@ export function RoomPage() {
               <span className="text-faint" aria-hidden>
                 ·
               </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className="text-ink hover:bg-surface-sunken focus-visible:ring-accent inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 outline-none transition-colors focus-visible:ring-2"
-                  aria-label={t("room.inRoomList.ariaLabel")}
-                  data-testid="in-room-count"
-                >
-                  <Users className="text-ink-dim size-3.5" />
-                  <span>{t("room.inRoomCount", { count: players.length })}</span>
-                  <ChevronDown className="text-ink-mute size-3" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-64" data-testid="in-room-list">
-                  <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-2xs font-semibold tracking-caps uppercase">
-                    {t("room.inRoomList.title")}
-                  </div>
-                  {players.length === 0 ? (
-                    <EmptyState compact>{t("room.inRoomList.empty")}</EmptyState>
-                  ) : (
-                    <ul className="flex flex-col">
-                      {players.map((p) => {
-                        const isBotRow = p.isBot === true;
-                        const isYou = !isBotRow && currentUser?.id === p.userId;
-                        const isRoomOwner = !isBotRow && p.userId === room.ownerId;
-                        const isWaiting = room.status === "waiting";
-                        const ownerCanActOnRow =
-                          isOwner && isWaiting && !isRoomOwner && !isYou && !isBotRow;
-                        const ownerCanKickRow = ownerCanActOnRow;
-                        const ownerCanPromoteRow = ownerCanActOnRow && p.seat !== null;
-                        const seated = p.seat !== null;
-                        const rowName = isBotRow ? botDisplayName(t, p.seat) : p.username;
-                        const seatLabel = seated
-                          ? t("room.inRoomList.seated", {
-                              seat: (p.seat as number) + 1,
-                            })
-                          : t("room.inRoomList.notSeated");
-                        return (
-                          <li
-                            key={isBotRow ? `bot-${p.seat}` : p.userId}
-                            className="flex items-center gap-2 px-2 py-1.5 text-sm"
-                            data-testid={
-                              isBotRow
-                                ? `in-room-list-bot-${p.seat}`
-                                : `in-room-list-item-${p.userId}`
-                            }
-                          >
-                            <Avatar
-                              name={rowName}
-                              avatarUrl={isBotRow ? null : p.avatarUrl}
-                              size={24}
-                              team={rosterTeam(p)}
-                              icon={isBotRow ? <Bot aria-hidden="true" /> : undefined}
-                            />
-                            <span className="text-ink flex min-w-0 flex-1 items-center gap-1">
-                              {isRoomOwner && (
-                                <Crown className="text-brass-deep size-3 shrink-0" aria-hidden />
-                              )}
-                              <span className="truncate font-medium">{rowName}</span>
-                              {isYou && (
-                                <span className="text-accent shrink-0 text-xs font-semibold">
-                                  · {t("room.seatYouInline")}
-                                </span>
-                              )}
-                            </span>
-                            <Badge tone={seated ? "accent" : "neutral"} size="sm">
-                              {seatLabel}
-                            </Badge>
-                            {ownerCanPromoteRow && (
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                className="text-ink-mute hover:text-brass-deep"
-                                aria-label={t("room.promoteIconLabel", {
-                                  username: p.username,
-                                })}
-                                title={t("room.promoteIconLabel", {
-                                  username: p.username,
-                                })}
-                                data-testid={`promote-player-${p.userId}`}
-                                disabled={transferOwnershipMutation.isPending}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTransferConfirm({
-                                    userId: p.userId,
-                                    username: p.username,
-                                  });
-                                }}
-                              >
-                                <Crown className="size-3.5" />
-                              </Button>
-                            )}
-                            {ownerCanKickRow && (
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                className="text-ink-mute hover:text-danger"
-                                aria-label={t("room.kickIconLabel", {
-                                  username: p.username,
-                                })}
-                                title={t("room.kickIconLabel", {
-                                  username: p.username,
-                                })}
-                                data-testid={`kick-list-${p.userId}`}
-                                disabled={kickPlayerMutation.isPending}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSwapSourceSeat(null);
-                                  setKickConfirm({
-                                    seat: p.seat ?? -1,
-                                    userId: p.userId,
-                                    username: p.username,
-                                  });
-                                }}
-                              >
-                                <UserX className="size-3.5" />
-                              </Button>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <RoomPlayersMenu
+                players={players}
+                ownerId={room.ownerId}
+                viewerId={currentUser?.id ?? null}
+                canManage={isOwner && room.status === "waiting"}
+                teamOf={rosterTeam}
+                promotePending={transferOwnershipMutation.isPending}
+                kickPending={kickPlayerMutation.isPending}
+                onPromote={(p) => setTransferConfirm({ userId: p.userId, username: p.username })}
+                onKick={(p) => {
+                  setSwapSourceSeat(null);
+                  setKickConfirm({ seat: p.seat ?? -1, userId: p.userId, username: p.username });
+                }}
+              />
               <span className="text-faint" aria-hidden>
                 ·
               </span>
