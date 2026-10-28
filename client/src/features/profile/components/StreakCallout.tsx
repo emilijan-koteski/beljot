@@ -10,17 +10,17 @@ type StreakCalloutProps = {
 };
 
 const COLD_STREAK_ICE = {
-  fill: "#EAF4FA",
-  border: "rgba(46,131,176,0.32)",
-  disc: "#D6ECF6",
-  icon: "#2C82AD",
-  title: "#1F5E80",
-  buttonBg: "#2A6C8F",
-  buttonText: "#F2FAFE",
+  fill: "var(--team-b-tint)",
+  border: "var(--team-b-edge-soft)",
+  disc: "var(--team-b-fill)",
+  icon: "var(--team-b)",
+  title: "var(--team-b)",
+  buttonBg: "var(--team-b)",
+  buttonText: "var(--accent-ink)",
 } as const;
 
 /**
- * Win/loss streak banner between the hero and stats grid: felt green for wins, ice for losses.
+ * Win/loss streak banner between the hero and stats grid: felt green for wins, steel blue for losses.
  * Renders nothing when there is no active streak.
  */
 export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutProps) {
@@ -34,7 +34,9 @@ export function StreakCallout({ streak, subjectIsSelf = true }: StreakCalloutPro
       className="border-border mb-5 flex items-center gap-3.5 rounded-lg border p-3.5"
       style={{
         background: isWin ? "var(--accent-soft)" : COLD_STREAK_ICE.fill,
-        borderColor: isWin ? "rgba(25,101,54,0.33)" : COLD_STREAK_ICE.border,
+        borderColor: isWin
+          ? "color-mix(in srgb, var(--accent) 33%, transparent)"
+          : COLD_STREAK_ICE.border,
       }}
       data-testid="profile-streak"
       data-streak-kind={streak.kind}
