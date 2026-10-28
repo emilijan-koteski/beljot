@@ -48,6 +48,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useAddBotMutation,
   useJoinRoomMutation,
@@ -616,13 +617,10 @@ export function RoomPage() {
   if (roomQuery.isPending) {
     return (
       <div className="mx-auto max-w-330 px-8 py-8" data-testid="room-page-loading">
-        <div className="bg-surface-sunken mb-6 h-8 w-48 animate-pulse rounded" />
+        <Skeleton className="mb-6 h-8 w-48 rounded" />
         <div className="grid grid-cols-2 gap-6">
           {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="bg-surface border-border h-32 animate-pulse rounded-xl border"
-            />
+            <Skeleton key={i} className="border-border h-32 rounded-xl border" />
           ))}
         </div>
       </div>

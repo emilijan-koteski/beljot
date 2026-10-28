@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/shared/components/EmptyState";
+import { LoadingLine } from "@/shared/components/LoadingLine";
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
@@ -48,9 +49,7 @@ export function LastMatchDialog({
       testId="last-match-dialog"
     >
       {query.isPending ? (
-        <p className="text-ink-mute px-1 py-2 text-xs" data-testid="last-match-loading">
-          {t("room.lastMatch.loading")}
-        </p>
+        <LoadingLine testId="last-match-loading">{t("room.lastMatch.loading")}</LoadingLine>
       ) : query.data === undefined ? (
         <EmptyState compact testId="last-match-unavailable">
           {t("room.lastMatch.unavailable")}

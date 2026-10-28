@@ -11,6 +11,7 @@ import { useGoogleSso } from "@/features/auth/useGoogleSso";
 import { FetchError } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
+import { FormError } from "@/shared/components/ui/form-error";
 import { Input } from "@/shared/components/ui/input";
 import { useLoginMutation } from "@/shared/hooks/mutations/useAuth";
 
@@ -163,14 +164,7 @@ export function LoginPage() {
           </div>
         </Field>
 
-        {formError && (
-          <div
-            className="text-danger rounded-md border border-danger/30 bg-danger/6 px-3 py-2 text-xs font-medium"
-            data-testid="form-error"
-          >
-            {formError}
-          </div>
-        )}
+        {formError && <FormError testId="form-error">{formError}</FormError>}
 
         <div className="mt-1.5">
           <Button

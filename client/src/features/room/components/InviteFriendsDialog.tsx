@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { EmptyState } from "@/shared/components/EmptyState";
+import { LoadingLine } from "@/shared/components/LoadingLine";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
@@ -215,11 +216,7 @@ function InviteList({
   const { t } = useTranslation();
 
   if (isPending) {
-    return (
-      <p className="text-ink-mute px-1 py-2 text-xs" data-testid={`${stateTestId}-loading`}>
-        {loadingText}
-      </p>
-    );
+    return <LoadingLine testId={`${stateTestId}-loading`}>{loadingText}</LoadingLine>;
   }
   if (isError) {
     return (

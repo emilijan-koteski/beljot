@@ -9,6 +9,7 @@ import { EmptyState } from "@/shared/components/EmptyState";
 import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useSeasonLeaderboardInfiniteQuery,
   useSeasonsQuery,
@@ -99,7 +100,7 @@ export function LeaderboardPage() {
         aria-label={t("season.leaderboard.loading")}
       >
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-surface h-10 animate-pulse rounded-md" />
+          <Skeleton key={i} className="h-10 rounded-md" />
         ))}
       </div>
     );

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router";
 import { FriendRequests } from "@/features/friends/FriendRequests";
 import { PlayerSearch } from "@/features/lobby/components/PlayerSearch";
 import { EmptyState } from "@/shared/components/EmptyState";
+import { LoadingLine } from "@/shared/components/LoadingLine";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { useFriends } from "@/shared/hooks/queries/useFriends";
@@ -52,7 +53,7 @@ export function FriendList() {
       <FriendRequests />
 
       {isPending ? (
-        <p className="text-ink-mute px-2.5 py-2 text-xs">{t("friends.list.loading")}</p>
+        <LoadingLine>{t("friends.list.loading")}</LoadingLine>
       ) : !friends || friends.length === 0 ? (
         <EmptyState compact testId="friend-list-empty">
           {t("friends.list.empty")}

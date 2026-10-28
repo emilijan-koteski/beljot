@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { MatchmakingDiagram } from "@/features/lobby/components/MatchmakingDiagram";
 import { FetchError } from "@/shared/api/axiosClient";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useLeaveRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
@@ -160,7 +161,7 @@ export function MatchmakingPage() {
         className="mx-auto flex min-h-[60vh] max-w-330 items-center justify-center px-7 py-10"
         data-testid="matchmaking-loading"
       >
-        <div className="bg-surface-sunken size-24 animate-pulse rounded-full" />
+        <Skeleton className="size-24 rounded-full" />
       </div>
     );
   }

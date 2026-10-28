@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialo
 import { DurationSlider } from "@/shared/components/ui/duration-slider";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import { Field } from "@/shared/components/ui/field";
+import { FormError } from "@/shared/components/ui/form-error";
 import { Input } from "@/shared/components/ui/input";
 import { Segmented } from "@/shared/components/ui/segmented";
 import { useCreateRoomMutation } from "@/shared/hooks/mutations/useRooms";
@@ -649,7 +650,6 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                             id="room-password"
                             type={showPassword ? "text" : "password"}
                             autoComplete="new-password"
-                            placeholder={t("lobby.createRoomModal.roomPasswordPlaceholder")}
                             value={roomPassword}
                             onChange={(e) =>
                               setRoomPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD))
@@ -721,13 +721,9 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             </div>
 
             {formError && (
-              <div
-                role="alert"
-                data-testid="create-room-form-error"
-                className="text-danger border-border shrink-0 border-t px-8 py-2.5 text-sm font-medium"
-              >
+              <FormError testId="create-room-form-error" className="shrink-0 px-8 pt-3">
                 {formError}
-              </div>
+              </FormError>
             )}
 
             <footer className="border-border bg-surface-sunken/50 flex shrink-0 flex-col gap-2 border-t px-8 py-4 sm:flex-row sm:justify-end">

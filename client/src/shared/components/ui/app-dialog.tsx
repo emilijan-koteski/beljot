@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
+import { FormError } from "@/shared/components/ui/form-error";
 import { cn } from "@/shared/lib/utils";
 
 export type AppDialogTone = "default" | "danger" | "celebration";
@@ -155,9 +156,9 @@ export function AppDialog({
         </div>
       )}
       {error !== undefined && error !== null && error !== false && (
-        <p role="alert" data-testid={errorTestId} className="text-danger px-6 pt-3 text-sm">
+        <FormError testId={errorTestId} className="px-6 pt-3">
           {error}
-        </p>
+        </FormError>
       )}
       {celebration ? (
         <div className="p-6">{primaryButton}</div>

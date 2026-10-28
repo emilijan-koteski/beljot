@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MatchFilter } from "@/shared/api/matches";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
 import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
@@ -67,10 +68,10 @@ export function ProfilePage() {
   if (isPending) {
     return (
       <div className="mx-auto max-w-330 px-4 py-8 md:px-7" data-testid="profile-loading">
-        <div className="bg-surface h-40 animate-pulse rounded-lg" />
+        <Skeleton className="h-40 rounded-lg" />
         <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-surface h-28 animate-pulse rounded-lg" />
+            <Skeleton key={i} className="h-28 rounded-lg" />
           ))}
         </div>
       </div>
@@ -176,7 +177,7 @@ export function ProfilePage() {
             </>
           ) : (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-surface h-36 animate-pulse rounded-lg" />
+              <Skeleton key={i} className="h-36 rounded-lg" />
             ))
           )}
         </aside>

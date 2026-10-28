@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { EmptyState } from "@/shared/components/EmptyState";
+import { LoadingLine } from "@/shared/components/LoadingLine";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { SearchInput } from "@/shared/components/ui/search-input";
 import { useUserSearch } from "@/shared/hooks/queries/useUserSearch";
@@ -81,15 +83,17 @@ export function PlayerSearch({ onClose }: PlayerSearchProps) {
       )}
 
       {showLoading && (
-        <p data-testid="player-search-loading" className="text-ink-mute mt-2 px-2.5 py-2 text-xs">
-          {t("lobby.playerSearch.loading")}
-        </p>
+        <div className="mt-2">
+          <LoadingLine testId="player-search-loading">
+            {t("lobby.playerSearch.loading")}
+          </LoadingLine>
+        </div>
       )}
 
       {showEmpty && (
-        <p data-testid="player-search-empty" className="text-ink-dim mt-2 px-2.5 py-2 text-xs">
+        <EmptyState compact testId="player-search-empty" className="mt-2">
           {t("lobby.playerSearch.empty", { query: trimmed })}
-        </p>
+        </EmptyState>
       )}
     </div>
   );

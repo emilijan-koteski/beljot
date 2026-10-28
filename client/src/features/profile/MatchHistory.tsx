@@ -6,6 +6,7 @@ import type { MatchFilter, MatchListItem, MatchSort } from "@/shared/api/matches
 import { EmptyState } from "@/shared/components/EmptyState";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
 import { Button, buttonVariants } from "@/shared/components/ui/button";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 
 import { HistoryFilters } from "./components/HistoryFilters";
@@ -86,9 +87,9 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
   if (query.isPending) {
     body = (
       <div className="space-y-2.5" data-testid="match-history-loading">
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
       </div>
     );
   } else if (query.isError) {
