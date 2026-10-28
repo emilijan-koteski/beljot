@@ -823,11 +823,11 @@ describe("CreateRoomModal", () => {
     await openAdvanced(user);
 
     await user.click(screen.getByTestId("declarations-info-toggle"));
-    expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
+    expect(screen.getByText(/no declarations or Belote/i)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
     await user.click(screen.getByTestId("declarations-info-toggle"));
-    expect(screen.getByText(/no declarations and no Belote/i)).toBeInTheDocument();
+    expect(screen.getByText(/no declarations or Belote/i)).toBeInTheDocument();
   });
 
   it("resets the toggle back to ON when the modal is dismissed", async () => {

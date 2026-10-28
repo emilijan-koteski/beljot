@@ -40,7 +40,7 @@
     "invites": {
       "eyebrow": "Privatnost",
       "title": "Pozivi u sobu",
-      "description": "Igrači koji vam nisu prijatelji mogu da vas pozovu u sobu dok ste slobodni u lobiju. Prijatelji uvek mogu da vas pozovu.",
+      "description": "Igrači koji ti nisu prijatelji mogu da te pozovu dok si slobodan u lobiju. Prijatelji uvek mogu.",
       "allowNonFriends": "Pozivi od igrača koji vam nisu prijatelji"
     },
     "eyebrow": "Profil",
@@ -112,7 +112,7 @@
     },
     "stats": {
       "eyebrow": "Karijera",
-      "sub": "Ukupni rezultati kroz sve mečeve: zvanja, kapoti, pale ruke i sve ostalo.",
+      "sub": "Ukupno kroz sve mečeve.",
       "totalGamesPlayed": "Odigrani mečevi",
       "wins": "Pobede",
       "losses": "Porazi",
@@ -173,7 +173,7 @@
     "matchHistory": {
       "eyebrow": "Aktivnost",
       "title": "Istorija mečeva",
-      "sub": "Svaki odigrani meč. Klikni na zapis za prikaz bodovanja po deljenjima: zvanja, kapoti i pale ruke.",
+      "sub": "Otvori meč da ga vidiš ruku po ruku.",
       "empty": "Nema mečeva. Pokreni Brzu igru.",
       "emptyCta": "U lobi",
       "emptyPublic": "Ovaj igrač još nije odigrao nijedan meč.",
@@ -645,7 +645,7 @@
     },
     "matchmaking": {
       "title": "Brza igra",
-      "subtitle": "Smestićemo te čim bude spremno još tri igrača. Meč počinje čim se popuni poslednje mesto.",
+      "subtitle": "Meč počinje čim četiri igrača budu spremna.",
       "eyebrow": "Tražim igrače",
       "elapsed": "proteklo",
       "seated": "{{found}} / 4 popunjeno",
@@ -727,7 +727,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitolska deli pet karata i okreće adutsku kartu, hrvatska deli šest i adut se zove slobodno",
-      "matchModeHint": "501 za kratak meč, 701 za srednji, 1001 za punu trku",
+      "matchModeHint": "501 je kratak, 701 srednji, 1001 puna trka",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · podrazumevano 30s",
       "coinBuyIn": "Ulog",
@@ -746,16 +746,16 @@
       "allowNewPlayers": "Novi igrači",
       "allowNewPlayersYes": "Dozvoli",
       "allowNewPlayersNo": "Samo iskusni",
-      "allowNewPlayersHint": "Novi igrači nemaju dovoljno odigranih mečeva za ocenu časti. „Samo iskusni“ ih isključuje.",
+      "allowNewPlayersHint": "Novi igrači još nemaju ocenu časti. „Samo iskusni“ ih isključuje.",
       "roomPasswordHint": "Najmanje {{min}} znakova",
       "declarations": "Zvanja",
       "declarationsOn": "Uključena",
       "declarationsOff": "Isključena",
-      "declarationsHint": "Bez zvanja nema ni Bele, a deljenja se broje samo na poene iz karata",
+      "declarationsHint": "Isključeno: bez zvanja i Bele, samo poeni iz karata",
       "declarationsTransfer": "Zvanja pri padu",
       "declarationsTransferOn": "Pobednicima",
       "declarationsTransferOff": "Poništavaju se",
-      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njena zvanja i Bela obično idu drugoj ekipi. „Poništavaju se“ znači da ih niko ne dobija",
+      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njena zvanja i Bela idu drugoj ekipi; kad se poništavaju, niko ih ne dobija",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši deljenje",
       "matchEndStop": "Dosta",
@@ -763,7 +763,7 @@
       "direction": "Smer igre",
       "directionCounterClockwise": "Udesno",
       "directionClockwise": "Ulevo",
-      "directionHint": "Udesno je uobičajeni smer, suprotno od kazaljke na satu; ulevo igra ide u smeru kazaljke",
+      "directionHint": "Uobičajeno igra ide udesno; u smeru kazaljke ide ulevo",
       "advanced": {
         "title": "Napredna podešavanja",
         "changedCount": "{{count}} izmenjeno",
@@ -811,7 +811,7 @@
     },
     "empty": {
       "title": "Nema otvorenih soba za tvoje filtere",
-      "description": "Očisti filtere, klikni Brza igra ili kreiraj sobu i pozovi prijatelje.",
+      "description": "Očisti filtere, probaj Brzu igru ili kreiraj sobu.",
       "clear": "Očisti pretragu"
     },
     "card": {
@@ -1243,14 +1243,14 @@
     "forgotPassword": {
       "eyebrow": "Zaboravljena lozinka",
       "title": "Resetuj lozinku",
-      "subtitle": "Unesi svoj email i poslaćemo ti link za postavljanje nove lozinke.",
+      "subtitle": "Poslaćemo ti link za novu lozinku.",
       "emailLabel": "Email",
       "emailPlaceholder": "ime@primer.com",
       "submitButton": "Pošalji link",
       "submitting": "Slanje…",
       "successTitle": "Proveri svoj inboks",
       "successBody": "Ako nalog za tu adresu postoji, poslali smo link za reset lozinke.",
-      "successHint": "Link ističe za 1 sat. Ne zaboravi da proveriš spam folder.",
+      "successHint": "Link ističe za 1 sat. Proveri i spam folder.",
       "altPrompt": "Setio si se?",
       "altCta": "Nazad na prijavu",
       "errors": {
@@ -1271,7 +1271,7 @@
       "submitting": "Resetovanje…",
       "success": "Lozinka je ažurirana. Prijavi se.",
       "invalidTitle": "Link je istekao",
-      "invalidBody": "Ovaj link za reset je nevažeći ili je istekao. Zatraži novi da nastaviš.",
+      "invalidBody": "Link je nevažeći ili je istekao. Zatraži novi.",
       "requestNewLink": "Zatraži novi link",
       "altPrompt": "Setio si se?",
       "altCta": "Nazad na prijavu",
@@ -1302,22 +1302,22 @@
       "eyebrow": "Tri koraka do prvog štiha",
       "title": "U igri si pre nego što se kafa ohladi.",
       "s1t": "Napravi besplatan nalog",
-      "s1b": "Izaberi ime, bez preuzimanja. U predvorju si za manje od minuta.",
+      "s1b": "Izaberi ime, bez preuzimanja. Za minut si u lobiju.",
       "s2t": "Zauzmi mesto",
-      "s2b": "Pritisni Brza igra i naći ćemo tvoju četvorku, ili otvori sopstvenu sobu i podeli kod sa prijateljima.",
+      "s2b": "Pritisni Brza igra i naći ćemo ti partnere, ili otvori sobu i podeli kod.",
       "s3t": "Zovi aduta i igraj",
-      "s3b": "Zovi aduta, osvajaj štihove uz svog partnera i vodi tim do 1001 poena."
+      "s3b": "Zovi aduta, osvajaj štihove sa partnerom, trka do 1001."
     },
     "feat": {
       "f1tag": "Predvorje · uživo",
       "f1title": "Gledaj kako se sobe pune uživo",
-      "f1body": "Svaka otvorena soba, svako mesto, ažurira se u trenu. Filtriraj po tajmeru ili poenima, traži po kodu ili samo pritisni Brza igra i smestićemo te.",
+      "f1body": "Svaka otvorena soba i mesto, uživo. Filtriraj po tajmeru ili poenima, traži po kodu ili pritisni Brza igra.",
       "f2tag": "Timovi · zlato protiv srebra",
       "f2title": "To je partnerstvo, ne svako za sebe",
-      "f2body": "Dvoje protiv dvoje, onako kako je Bela zamišljena. Sedi naspram partnera, čitaj zvanja i igraj dugu igru do 1001. Ugrađeni čet i emotikoni drže sto u razgovoru.",
+      "f2body": "Dvoje protiv dvoje, partneri jedan naspram drugog, trka do 1001. Čet i emotikoni drže sto u razgovoru.",
       "f3tag": "Profil · istorija mečeva",
       "f3title": "Svaka ruka se računa u tvoj učinak",
-      "f3body": "Prati odigrane mečeve, procenat pobeda i poraza, uz potpunu istoriju mečeva ruku po ruku. Vidi s kim pobeđuješ i kako je prošlo večeras."
+      "f3body": "Odigrani mečevi, procenat pobeda i istorija ruku po ruku. Vidi s kim pobeđuješ."
     },
     "room": {
       "join": "Uđi",

@@ -40,7 +40,7 @@
     "invites": {
       "eyebrow": "Privacy",
       "title": "Room invites",
-      "description": "Players who aren't your friends can invite you to a room while you're free in the lobby. Friends can always invite you.",
+      "description": "Non-friends can invite you while you're free in the lobby. Friends always can.",
       "allowNonFriends": "Invites from non-friends"
     },
     "eyebrow": "Profile",
@@ -112,7 +112,7 @@
     },
     "stats": {
       "eyebrow": "Career",
-      "sub": "Career totals across every match: declarations, capots, failed hands and all.",
+      "sub": "Totals across every match.",
       "totalGamesPlayed": "Matches played",
       "wins": "Wins",
       "losses": "Losses",
@@ -173,7 +173,7 @@
     "matchHistory": {
       "eyebrow": "Activity",
       "title": "Match history",
-      "sub": "Every completed match. Open a row to see hand-by-hand scoring, declarations, capots and failed hands.",
+      "sub": "Open a match to see it hand by hand.",
       "empty": "No matches yet. Quick Play to get started.",
       "emptyCta": "Go to lobby",
       "emptyPublic": "This player hasn't played any matches yet.",
@@ -645,7 +645,7 @@
     },
     "matchmaking": {
       "title": "Quick Play",
-      "subtitle": "You'll be seated as soon as three other players are ready. The match starts the moment the last seat fills.",
+      "subtitle": "The match starts as soon as four players are ready.",
       "eyebrow": "Searching for players",
       "elapsed": "elapsed",
       "seated": "{{found}} / 4 seated",
@@ -727,7 +727,7 @@
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
-      "matchModeHint": "501 for a quick match, 701 for a medium one, 1001 for the full race",
+      "matchModeHint": "501 is quick, 701 medium, 1001 the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
       "coinBuyIn": "Buy-in",
@@ -746,16 +746,16 @@
       "allowNewPlayers": "New players",
       "allowNewPlayersYes": "Welcome",
       "allowNewPlayersNo": "Veterans only",
-      "allowNewPlayersHint": "New players haven't played enough matches to have an honor score yet. \"Veterans only\" excludes them.",
+      "allowNewPlayersHint": "New players have no honor score yet. \"Veterans only\" keeps them out.",
       "roomPasswordHint": "At least {{min}} characters",
       "declarations": "Declarations",
       "declarationsOn": "On",
       "declarationsOff": "Off",
-      "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone",
+      "declarationsHint": "Off: no declarations or Belote, card points only",
       "declarationsTransfer": "Declarations on a fall",
       "declarationsTransferOn": "To the winners",
       "declarationsTransferOff": "Voided",
-      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote normally go to the other team. Voided means nobody scores them",
+      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote go to the other team; voided, nobody scores them",
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
@@ -763,7 +763,7 @@
       "direction": "Direction of play",
       "directionCounterClockwise": "Counter-clockwise",
       "directionClockwise": "Clockwise",
-      "directionHint": "Counter-clockwise passes the turn to the right, as usual; clockwise passes it to the left",
+      "directionHint": "Counter-clockwise passes the turn right, as usual; clockwise passes it left",
       "advanced": {
         "title": "Advanced settings",
         "changedCount": "{{count}} changed",
@@ -811,7 +811,7 @@
     },
     "empty": {
       "title": "No open rooms match your filters",
-      "description": "Try clearing filters, hit Quick Play, or create a room and invite your friends.",
+      "description": "Clear the filters, try Quick Play, or create a room.",
       "clear": "Clear search"
     },
     "card": {
@@ -1243,14 +1243,14 @@
     "forgotPassword": {
       "eyebrow": "Forgot password",
       "title": "Reset your password",
-      "subtitle": "Enter your email and we'll send you a link to set a new password.",
+      "subtitle": "We'll email you a link to set a new password.",
       "emailLabel": "Email",
       "emailPlaceholder": "your@email.com",
       "submitButton": "Send reset link",
       "submitting": "Sending…",
       "successTitle": "Check your inbox",
       "successBody": "If an account exists for that email, we've sent a link to reset your password.",
-      "successHint": "The link expires in 1 hour. Don't forget to check your spam folder.",
+      "successHint": "The link expires in 1 hour. Check your spam folder too.",
       "altPrompt": "Remembered it?",
       "altCta": "Back to log in",
       "errors": {
@@ -1271,7 +1271,7 @@
       "submitting": "Resetting…",
       "success": "Password updated. Log in.",
       "invalidTitle": "Link expired",
-      "invalidBody": "This reset link is invalid or has expired. Request a new one to continue.",
+      "invalidBody": "This link is invalid or has expired. Request a new one.",
       "requestNewLink": "Request a new link",
       "altPrompt": "Remembered it?",
       "altCta": "Back to log in",
@@ -1302,22 +1302,22 @@
       "eyebrow": "Three steps to the first trick",
       "title": "You're dealt in before the coffee cools.",
       "s1t": "Make a free account",
-      "s1b": "Pick a name, no downloads. You're in the lobby in under a minute.",
+      "s1b": "Pick a name, no downloads. You're in the lobby in a minute.",
       "s2t": "Take a seat",
-      "s2b": "Hit Quick Play and we'll matchmake your four, or open a custom room and share the code with friends.",
+      "s2b": "Hit Quick Play to be matched, or open a room and share the code.",
       "s3t": "Take trump & play",
-      "s3b": "Take the trump suit, win tricks alongside your partner, and race your team to 1001 points."
+      "s3b": "Call trump, win tricks with your partner, race to 1001."
     },
     "feat": {
       "f1tag": "The lobby · live",
       "f1title": "Watch the rooms fill in real time",
-      "f1body": "Every open room, every seat, updated as it happens. Filter by timer style or points, search by code, or just hit Quick Play and let us seat you.",
+      "f1body": "Every open room and seat, live. Filter by timer or points, search by code, or hit Quick Play.",
       "f2tag": "Teams · gold vs silver",
       "f2title": "It's a partnership, not a free-for-all",
-      "f2body": "Two against two, the way Belote is built. Sit across from your partner, read the declarations, and play the long game to 1001. Built-in chat and emotes keep the table talking.",
+      "f2body": "Two against two, partners across the table, race to 1001. Chat and emotes keep the table talking.",
       "f3tag": "Profile · match history",
       "f3title": "Every hand counts toward your record",
-      "f3body": "Track your matches played, win and loss rate, with a full match history hand by hand. See who you win alongside and how tonight stacked up."
+      "f3body": "Matches played, win rate and a hand-by-hand history. See who you win with."
     },
     "room": {
       "join": "Join",
