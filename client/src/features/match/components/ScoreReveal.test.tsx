@@ -23,11 +23,11 @@ vi.mock("react-i18next", () => ({
         "match.scoreReveal.subtitleFailedCardsUs": "Went down · card points to us",
         "match.scoreReveal.subtitleFailedCardsThem": "Went down · card points to them",
       };
-      if (key === "match.scoreReveal.subtitleHeldYour" && opts) {
-        return `Pulled it off · you took trump on ${opts.suit}`;
+      if (key === "match.scoreReveal.subtitleHeldUs" && opts) {
+        return `Made it · we took ${opts.suit}`;
       }
-      if (key === "match.scoreReveal.subtitleHeldTheir" && opts) {
-        return `Pulled it off · they took trump on ${opts.suit}`;
+      if (key === "match.scoreReveal.subtitleHeldThem" && opts) {
+        return `Made it · they took ${opts.suit}`;
       }
       return translations[key] ?? key;
     },
@@ -248,7 +248,7 @@ describe("ScoreReveal", () => {
         trumpCallerSeat={0}
       />,
     );
-    expect(container.textContent).toContain("Pulled it off · you took trump on");
+    expect(container.textContent).toContain("Made it · we took");
   });
 
   it.each([

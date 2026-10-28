@@ -1029,7 +1029,7 @@ export function MatchPage() {
   }, [clearGame, returnToLobby, setMatchAbandonedData]);
 
   const promptPlayer = matchState?.players.find((p) => p.seat === myPlayerSeat);
-  const declarationOverlap = rulesForVariant(matchState?.variant).declarationOverlap;
+  const { declarationOverlap, kingIsRebelote } = rulesForVariant(matchState?.variant);
   const promptHandKey = (promptPlayer?.hand ?? []).map((c) => `${c.rank}${c.suit}`).join(",");
   const promptDeclarations = useMemo(
     () =>
@@ -1429,11 +1429,7 @@ export function MatchPage() {
       )}
 
       {isPartnerOfProposer && matchEndData === null && matchAbandonedData === null && (
-        <SurrenderPrompt
-          proposerUsername={proposerUsername}
-          onAccept={handleSurrenderAccept}
-          onDecline={handleSurrenderDecline}
-        />
+        <SurrenderPrompt onAccept={handleSurrenderAccept} onDecline={handleSurrenderDecline} />
       )}
 
       {!isCompactTable && showSurrenderBanner && surrenderProposerSeat !== null && (
@@ -1544,6 +1540,7 @@ export function MatchPage() {
       {showLocalBelotPrompt && matchState.trumpSuit && (
         <BelotPrompt
           isKing={localBelotIsKing}
+          isRebelote={kingIsRebelote && localBelotIsKing}
           trumpSuit={matchState.trumpSuit}
           onAnnounce={() => handleLocalBelotDecision(true)}
           onDecline={() => handleLocalBelotDecision(false)}
@@ -1555,6 +1552,7 @@ export function MatchPage() {
       {showBelotPrompt && matchState.trumpSuit && (
         <BelotPrompt
           isKing={belotPromptIsKing}
+          isRebelote={kingIsRebelote && belotPromptIsKing}
           trumpSuit={matchState.trumpSuit}
           onAnnounce={handleAnnounceBelot}
           onDecline={handleDeclineBelot}
@@ -1579,7 +1577,7 @@ export function MatchPage() {
           playerSeat={belotReveal.playerSeat}
           myPlayerSeat={myPlayerSeat}
           cardId={belotReveal.cardId}
-          isKing={belotReveal.cardId.startsWith("K")}
+          isRebelote={kingIsRebelote && belotReveal.cardId.startsWith("K")}
           players={matchState.players}
           onComplete={handleBelotRevealComplete}
           soundKey={payloadSoundKey(belotReveal)}

@@ -11,19 +11,18 @@ vi.mock("react-i18next", () => ({
         "match.disconnect.reconnecting": "Reconnecting...",
         "match.disconnect.countdownLabel": "Time remaining",
         "match.disconnect.returningToLobby": "Returning to lobby...",
-        "match.disconnect.matchEnded": "Match has ended",
-        "match.disconnect.reconnectFailed": "Reconnection failed — the match may have ended",
-        "match.disconnect.abandonCountsWin": "Counts as a win for your team",
-        "match.disconnect.abandonCountsLoss": "Counts as a loss for your team",
+        "match.disconnect.timeRanOut": "Time ran out",
+        "match.disconnect.abandonCountsWin": "Counts as a win",
+        "match.disconnect.abandonCountsLoss": "Counts as a loss",
         "match.matchResult.title": "Match complete",
         "team.us": "Us",
         "team.them": "Them",
       };
       if (key === "match.disconnect.waitingMessage" && opts?.player) {
-        return `The game is on hold while we wait for ${opts.player} to reconnect.`;
+        return `Waiting for ${opts.player} to reconnect.`;
       }
       if (key === "match.disconnect.matchAbandoned" && opts?.player) {
-        return `${opts.player} disconnected — match ended`;
+        return `${opts.player} abandoned the match`;
       }
       if (key === "match.disconnect.matchAbandonedScores" && opts) {
         return `Final: Us ${opts.us} : Them ${opts.them}`;
@@ -58,7 +57,7 @@ describe("ReconnectOverlay", () => {
     render(<ReconnectOverlay disconnectedPlayerName="Alice" reconnectExpiresAt={expiresAt} />);
 
     expect(screen.getByText("Reconnecting...")).toBeInTheDocument();
-    expect(screen.getByText(/wait for Alice to reconnect/)).toBeInTheDocument();
+    expect(screen.getByText("Waiting for Alice to reconnect.")).toBeInTheDocument();
     expect(screen.getByTestId("reconnect-countdown")).toBeInTheDocument();
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("2:00");
   });
@@ -76,12 +75,13 @@ describe("ReconnectOverlay", () => {
     expect(screen.getByTestId("reconnect-countdown").textContent).toBe("0:55");
   });
 
-  it("falls back to a 'match ended' panel when the window expired without an abandon event", () => {
+  it("falls back to a time-ran-out panel when the window expired without an abandon event", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
     render(<ReconnectOverlay disconnectedPlayerName="Carol" reconnectExpiresAt={expiresAt} />);
 
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
-    expect(screen.getByTestId("match-ended-title")).toBeInTheDocument();
+    expect(screen.getByTestId("match-ended-title")).toHaveTextContent("Time ran out");
+    expect(screen.queryByText(/Reconnection failed/)).not.toBeInTheDocument();
     expect(screen.getByText("Returning to lobby...")).toBeInTheDocument();
   });
 
@@ -132,7 +132,7 @@ describe("ReconnectOverlay", () => {
       />,
     );
 
-    expect(screen.getByTestId("abandon-title")).toHaveTextContent("Eve disconnected — match ended");
+    expect(screen.getByTestId("abandon-title")).toHaveTextContent("Eve abandoned the match");
     expect(screen.getByTestId("abandon-scores")).toHaveTextContent("Final: Us 450 : Them 380");
     expect(screen.getByText("Returning to lobby...")).toBeInTheDocument();
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
@@ -226,7 +226,7 @@ describe("ReconnectOverlay", () => {
 
     const line = screen.getByTestId("abandon-result-line");
     expect(line).toHaveAttribute("data-result", "loss");
-    expect(line).toHaveTextContent("Counts as a loss for your team");
+    expect(line).toHaveTextContent("Counts as a loss");
   });
 
   it("shows the win result line when the viewer is on the opposing team", () => {
@@ -251,7 +251,7 @@ describe("ReconnectOverlay", () => {
 
     const line = screen.getByTestId("abandon-result-line");
     expect(line).toHaveAttribute("data-result", "win");
-    expect(line).toHaveTextContent("Counts as a win for your team");
+    expect(line).toHaveTextContent("Counts as a win");
   });
 
   it("flips the result line for a teamB viewer (seat parity, not raw team A/B)", () => {

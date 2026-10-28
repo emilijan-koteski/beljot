@@ -177,10 +177,12 @@ export interface MatchResumedPayload {
 }
 
 /**
- * Non-card auto-action taken on move-timer expiry; card auto-play uses
- * CardPlayedPayload.autoPlayed. "pick_trump" names trump for a dealer who has no legal pass.
+ * Non-card auto-action taken on move-timer expiry; card auto-play uses CardPlayedPayload.autoPlayed.
+ * "pick_trump" serves a dealer with no legal pass, and other seats get "timeout" in place of a skip
+ * that would reveal a hand.
  */
-export type AutoActionType = "pass_trump" | "skip_declare" | "skip_belot" | "pick_trump";
+export type AutoActionType =
+  "pass_trump" | "skip_declare" | "skip_belot" | "pick_trump" | "timeout";
 
 export interface AutoActionPayload {
   playerSeat: number;

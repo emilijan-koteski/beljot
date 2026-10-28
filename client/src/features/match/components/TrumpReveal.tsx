@@ -12,7 +12,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import type { PlayerState, Rank, Suit } from "@/shared/types/matchTypes";
 
 import { resolveCardDeck } from "../lib/cardFace";
-import { rankNameKey, suitAccent, suitInkOnFelt, suitNameKey } from "../lib/suitArt";
+import { suitAccent, suitInkOnFelt, suitNameKey } from "../lib/suitArt";
 import { seatTeam, teamColors } from "../lib/tableTheme";
 import { AutoCloseRing } from "./overlay/AutoCloseRing";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -70,11 +70,7 @@ export function TrumpReveal({
   const pickerName = playerDisplayName(t, picker ?? null);
   const card = cardId === "" ? null : parseCardId(cardId);
 
-  const isFreePick = card !== null && card.suit !== trumpSuit;
-
   const suitName = t(suitNameKey(trumpSuit, deck));
-  const candidateRankName = card ? t(rankNameKey(card.rank)) : "";
-  const candidateSuitName = card ? t(suitNameKey(card.suit, deck)) : "";
 
   const team = myPlayerSeat !== null ? seatTeam(playerSeat, myPlayerSeat) : null;
   const teamGradient = team ? teamColors(team) : null;
@@ -85,9 +81,7 @@ export function TrumpReveal({
   const sealRing = suitAccent(trumpSuit, deck);
   const chosenColor = suitInkOnFelt(trumpSuit, deck);
 
-  const eyebrow = isFreePick
-    ? t("match.trumpReveal.eyebrowFreeChoice", { defaultValue: "Trump taken · free pick" })
-    : t("match.trumpReveal.eyebrow", { defaultValue: "Trump taken" });
+  const eyebrow = t("match.trumpReveal.eyebrow", { defaultValue: "Trump taken" });
 
   return (
     <div
@@ -197,30 +191,11 @@ export function TrumpReveal({
             data-testid="trump-reveal-copy"
           >
             <Trans
-              i18nKey={
-                card === null
-                  ? "match.trumpReveal.namedTrump"
-                  : isFreePick
-                    ? "match.trumpReveal.chose"
-                    : "match.trumpReveal.isTrump"
-              }
+              i18nKey="match.trumpReveal.isTrump"
               values={{ suit: suitName }}
               components={{ suit: <b style={{ color: chosenColor }} /> }}
             />
           </div>
-
-          {isFreePick && (
-            <div
-              className="mt-1"
-              style={{ fontSize: 12, opacity: 0.6 }}
-              data-testid="trump-reveal-candidate"
-            >
-              {t("match.trumpReveal.candidateOnTable", {
-                rank: candidateRankName,
-                suit: candidateSuitName,
-              })}
-            </div>
-          )}
 
           {team && teamLabel && (
             <div className="mt-3.5 flex justify-center">

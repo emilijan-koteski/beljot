@@ -229,6 +229,7 @@ export const AutoActionPayloadSchema = z.strictObject({
     z.literal("skip_declare"),
     z.literal("skip_belot"),
     z.literal("pick_trump"),
+    z.literal("timeout"),
   ]),
 });
 

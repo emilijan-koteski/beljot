@@ -24,7 +24,7 @@ describe("BelotReveal", () => {
         playerSeat={0}
         myPlayerSeat={0}
         cardId="QC"
-        isKing={false}
+        isRebelote={false}
         onComplete={vi.fn()}
       />,
     );
@@ -39,12 +39,25 @@ describe("BelotReveal", () => {
         playerSeat={2}
         myPlayerSeat={0}
         cardId="KC"
-        isKing={true}
+        isRebelote={true}
         onComplete={vi.fn()}
       />,
     );
     expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent("Rebelote");
     expect(screen.getByTestId("playing-card-KC")).toBeInTheDocument();
+  });
+
+  it("labels a King-first announcement Belote when the variant has no Rebelote", () => {
+    render(
+      <BelotReveal
+        playerSeat={2}
+        myPlayerSeat={0}
+        cardId="KC"
+        isRebelote={false}
+        onComplete={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("belot-reveal-label")).toHaveTextContent(/^Belote$/);
   });
 
   it("credits the viewer's team when a partner announces", () => {
@@ -53,26 +66,30 @@ describe("BelotReveal", () => {
         playerSeat={2}
         myPlayerSeat={0}
         cardId="QH"
-        isKing={false}
+        isRebelote={false}
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20 to your team's score");
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20");
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("Us");
   });
 
   it("credits the other team when an opponent announces", () => {
-    render(<BelotReveal playerSeat={1} myPlayerSeat={0} cardId="KH" isKing onComplete={vi.fn()} />);
-    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20 to their team's score");
-    expect(screen.getByTestId("belot-reveal")).not.toHaveTextContent("your team");
+    render(
+      <BelotReveal playerSeat={1} myPlayerSeat={0} cardId="KH" isRebelote onComplete={vi.fn()} />,
+    );
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("+20");
+    expect(screen.getByTestId("belot-reveal")).toHaveTextContent("Them");
+    expect(screen.getByTestId("belot-reveal")).not.toHaveTextContent("Us");
   });
 
-  it("renders the announcer's name in the title when players is provided", () => {
+  it("titles the reveal with just the announcer's name when players is provided", () => {
     render(
       <BelotReveal
         playerSeat={2}
         myPlayerSeat={0}
         cardId="KC"
-        isKing={true}
+        isRebelote={true}
         players={[
           {
             seat: 0,
@@ -138,7 +155,7 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent("Stefan declared Rebelote.");
+    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent(/^Stefan$/);
   });
 
   it("falls back to the team label when players is not provided", () => {
@@ -147,7 +164,7 @@ describe("BelotReveal", () => {
         playerSeat={0}
         myPlayerSeat={0}
         cardId="QC"
-        isKing={false}
+        isRebelote={false}
         onComplete={vi.fn()}
       />,
     );
@@ -162,7 +179,7 @@ describe("BelotReveal", () => {
         playerSeat={0}
         myPlayerSeat={0}
         cardId="QC"
-        isKing={false}
+        isRebelote={false}
         onComplete={onComplete}
       />,
     );
@@ -194,7 +211,7 @@ describe("BelotReveal", () => {
         playerSeat={0}
         myPlayerSeat={0}
         cardId="QC"
-        isKing={false}
+        isRebelote={false}
         onComplete={onComplete}
       />,
     );

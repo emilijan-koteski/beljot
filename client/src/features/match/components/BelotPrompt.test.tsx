@@ -10,12 +10,16 @@ import { BelotPrompt } from "./BelotPrompt";
 
 describe("BelotPrompt", () => {
   it("renders the belot prompt overlay", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
     expect(screen.getByTestId("belot-prompt")).toBeInTheDocument();
   });
 
   it("shows ANNOUNCE and SKIP buttons", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
     expect(screen.getByTestId("belot-prompt-announce")).toBeInTheDocument();
     expect(screen.getByTestId("belot-prompt-decline")).toBeInTheDocument();
   });
@@ -23,7 +27,9 @@ describe("BelotPrompt", () => {
   it("calls onAnnounce when ANNOUNCE is clicked", async () => {
     const user = userEvent.setup();
     const onAnnounce = vi.fn();
-    render(<BelotPrompt isKing={false} onAnnounce={onAnnounce} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={onAnnounce} onDecline={vi.fn()} />,
+    );
     await user.click(screen.getByTestId("belot-prompt-announce"));
     expect(onAnnounce).toHaveBeenCalledOnce();
   });
@@ -31,27 +37,51 @@ describe("BelotPrompt", () => {
   it("calls onDecline when SKIP is clicked", async () => {
     const user = userEvent.setup();
     const onDecline = vi.fn();
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={onDecline} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={onDecline} />,
+    );
     await user.click(screen.getByTestId("belot-prompt-decline"));
     expect(onDecline).toHaveBeenCalledOnce();
   });
 
   it("has role dialog and aria-modal", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
   });
 
   it("shows Belote copy when playing the Queen first", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
-    expect(screen.getByText("Declare Belote?")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Declare Belote");
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
+    expect(screen.getByText("Declare Belote")).toBeInTheDocument();
+    expect(screen.getByText("You hold the trump King and Queen.")).toBeInTheDocument();
+    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent(/^Declare \+20$/);
   });
 
-  it("shows Rebelote copy when playing the King first", () => {
-    render(<BelotPrompt isKing={true} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
-    expect(screen.getByText("Declare Rebelote?")).toBeInTheDocument();
-    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent("Declare Rebelote");
+  it("shows Rebelote copy when the King comes first and the variant names it", () => {
+    render(
+      <BelotPrompt isKing={true} isRebelote={true} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
+    expect(screen.getByText("Declare Rebelote")).toBeInTheDocument();
+    expect(screen.getByTestId("belot-prompt-announce")).toHaveTextContent(/^Declare \+20$/);
+  });
+
+  it("keeps the Belote name on the King when the variant has no Rebelote", () => {
+    render(
+      <BelotPrompt isKing={true} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
+    expect(screen.getByText("Declare Belote")).toBeInTheDocument();
+    expect(screen.queryByText(/Rebelote/)).not.toBeInTheDocument();
+  });
+
+  it("says the +20 once, on the button", () => {
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
+    expect(screen.getAllByText(/\+20/)).toHaveLength(1);
   });
 
   it("wraps the Decline button with the button-timer ring when per-move", () => {
@@ -59,6 +89,7 @@ describe("BelotPrompt", () => {
     render(
       <BelotPrompt
         isKing={false}
+        isRebelote={false}
         onAnnounce={vi.fn()}
         onDecline={vi.fn()}
         turnExpiresAt={expiry}
@@ -74,6 +105,7 @@ describe("BelotPrompt", () => {
     render(
       <BelotPrompt
         isKing={false}
+        isRebelote={false}
         onAnnounce={vi.fn()}
         onDecline={vi.fn()}
         turnExpiresAt={null}
@@ -88,6 +120,7 @@ describe("BelotPrompt", () => {
     render(
       <BelotPrompt
         isKing={false}
+        isRebelote={false}
         onAnnounce={vi.fn()}
         onDecline={vi.fn()}
         turnExpiresAt={expiry}
@@ -100,14 +133,18 @@ describe("BelotPrompt", () => {
 
   it("Escape key triggers onDecline (AC7)", () => {
     const onDecline = vi.fn();
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={onDecline} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={onDecline} />,
+    );
     const dialog = screen.getByRole("dialog");
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onDecline).toHaveBeenCalledTimes(1);
   });
 
   it("outer wrapper uses fixed positioning (AC7)", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
     const wrapper = screen.getByTestId("belot-prompt");
     expect(wrapper.className).toContain("fixed");
     expect(wrapper.className).not.toMatch(/(^|\s)absolute(\s|$)/);
@@ -127,6 +164,7 @@ describe("BelotPrompt", () => {
       render(
         <BelotPrompt
           isKing={false}
+          isRebelote={false}
           onAnnounce={vi.fn()}
           onDecline={onDecline}
           turnExpiresAt={expiry}
@@ -145,7 +183,9 @@ describe("BelotPrompt", () => {
 
 describe("BelotPrompt footer order", () => {
   it("places announce before decline so the action sits left of the status quo", () => {
-    render(<BelotPrompt isKing={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />);
+    render(
+      <BelotPrompt isKing={false} isRebelote={false} onAnnounce={vi.fn()} onDecline={vi.fn()} />,
+    );
     expectActionBeforeStatusQuo("belot-prompt-announce", "belot-prompt-decline");
   });
 });

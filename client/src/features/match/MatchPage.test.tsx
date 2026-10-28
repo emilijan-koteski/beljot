@@ -838,7 +838,7 @@ describe("MatchPage", () => {
       useMatchStore.getState().setLastError("error:illegal_play");
     });
 
-    expect(toastMock.error).toHaveBeenCalledWith("That card cannot be played", {
+    expect(toastMock.error).toHaveBeenCalledWith("You can't play that card", {
       id: "match-error",
       duration: MOTION.TOAST_ERROR,
       closeButton: true,
@@ -2191,7 +2191,7 @@ describe("MatchPage", () => {
       expect(within(prompt).getByTestId("declaration-prompt-declare")).toBeDisabled();
       const skip = within(prompt).getByTestId("declaration-prompt-skip");
       expect(skip).toBeDisabled();
-      expect(skip).toHaveTextContent("Waiting for the others");
+      expect(skip).toHaveTextContent("Waiting for others");
     });
 
     it("reports how many seats have answered", () => {
@@ -2410,7 +2410,7 @@ describe("MatchPage", () => {
       renderMatchPage();
 
       const prompt = screen.getByTestId("trump-prompt");
-      expect(prompt).toHaveTextContent(/name a suit/i);
+      expect(prompt).toHaveTextContent(/choose a suit/i);
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 

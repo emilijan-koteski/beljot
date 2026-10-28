@@ -17,11 +17,13 @@ interface BelotRevealProps {
   playerSeat: number;
   myPlayerSeat: number;
   cardId: string;
-  isKing: boolean;
+  isRebelote: boolean;
   onComplete: () => void;
   players?: readonly PlayerState[];
   soundKey?: string | null;
 }
+
+const BELOT_BONUS = 20;
 
 function parseCardId(id: string) {
   return { rank: id[0] as Rank, suit: id[1] as Suit };
@@ -32,7 +34,7 @@ export function BelotReveal({
   playerSeat,
   myPlayerSeat,
   cardId,
-  isKing,
+  isRebelote,
   onComplete,
   players,
   soundKey,
@@ -63,12 +65,8 @@ export function BelotReveal({
   const glowColor = teamGradient[0];
   const teamLabel = t(team === "gold" ? "team.us" : "team.them");
 
-  const labelKey = isKing ? "match.belot.reveal.rebelot" : "match.belot.reveal.belot";
-  const titleKey = isKing ? "match.belot.reveal.titleRebelot" : "match.belot.reveal.titleBelot";
+  const labelKey = isRebelote ? "match.belot.reveal.rebelot" : "match.belot.reveal.belot";
   const announcer = playerDisplayName(t, players?.find((p) => p.seat === playerSeat) ?? null);
-  const titleText = announcer
-    ? t(titleKey, { name: announcer })
-    : t(team === "gold" ? "team.us" : "team.them");
 
   return (
     <div
@@ -128,7 +126,7 @@ export function BelotReveal({
             data-testid="belot-reveal-title"
             data-seat={playerSeat}
           >
-            {titleText}
+            {announcer ?? teamLabel}
           </div>
 
           <div className="mt-3 flex justify-center">
@@ -142,7 +140,7 @@ export function BelotReveal({
           </div>
 
           <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
-            {t(team === "gold" ? "match.belot.reveal.bonusUs" : "match.belot.reveal.bonusThem")}
+            +{BELOT_BONUS}
           </div>
         </ClassicPanel>
       </div>

@@ -6,8 +6,8 @@ vi.mock("react-i18next", () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
       const translations: Record<string, string> = {
         "match.capot.title": "CAPOT!",
-        "match.capot.eyebrowUs": "Every trick · we swept the hand",
-        "match.capot.eyebrowThem": "Every trick · they swept the hand",
+        "match.capot.eyebrowUs": "We took every trick",
+        "match.capot.eyebrowThem": "They took every trick",
         "match.capot.bonusUs": "+{{points}} to us",
         "match.capot.bonusThem": "+{{points}} to them",
       };
@@ -61,9 +61,7 @@ describe("CapotAnimation", () => {
     render(<CapotAnimation capotTeam={0} viewerSeat={0} capotBonus={100} onComplete={vi.fn()} />);
 
     expect(screen.getByTestId("capot-text")).toHaveAttribute("data-team", "gold");
-    expect(screen.getByTestId("capot-eyebrow")).toHaveTextContent(
-      "Every trick · we swept the hand",
-    );
+    expect(screen.getByTestId("capot-eyebrow")).toHaveTextContent("We took every trick");
     expect(screen.getByTestId("capot-bonus")).toHaveTextContent("+100 to us");
   });
 
@@ -71,9 +69,7 @@ describe("CapotAnimation", () => {
     render(<CapotAnimation capotTeam={0} viewerSeat={1} capotBonus={100} onComplete={vi.fn()} />);
 
     expect(screen.getByTestId("capot-text")).toHaveAttribute("data-team", "silver");
-    expect(screen.getByTestId("capot-eyebrow")).toHaveTextContent(
-      "Every trick · they swept the hand",
-    );
+    expect(screen.getByTestId("capot-eyebrow")).toHaveTextContent("They took every trick");
     expect(screen.getByTestId("capot-bonus")).toHaveTextContent("+100 to them");
   });
 

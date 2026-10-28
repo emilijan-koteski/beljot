@@ -460,11 +460,11 @@ describe("TrumpPrompt", () => {
           onPass={vi.fn()}
         />,
       );
-      expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
-      expect(screen.getByText("All four suits are yours to take.")).toBeInTheDocument();
+      expect(screen.getByText("Take trump")).toBeInTheDocument();
+      expect(screen.getByText("Any of the four suits.")).toBeInTheDocument();
       const panel = screen.getByTestId("trump-prompt");
       expect(panel.textContent).not.toContain("match.trumpPrompt");
-      expect(panel.textContent).not.toContain("Take trump or pass");
+      expect(panel.textContent).not.toContain("revealed");
     });
 
     it("uses the same free-pick copy in round 2", () => {
@@ -477,8 +477,8 @@ describe("TrumpPrompt", () => {
           onPass={vi.fn()}
         />,
       );
-      expect(screen.getByText("Take trump — any suit")).toBeInTheDocument();
-      expect(screen.getByText("All four suits are yours to take.")).toBeInTheDocument();
+      expect(screen.getByText("Take trump")).toBeInTheDocument();
+      expect(screen.getByText("Any of the four suits.")).toBeInTheDocument();
     });
 
     it("shows waiting players all four suit chips in round 1, none locked", () => {
@@ -501,7 +501,7 @@ describe("TrumpPrompt", () => {
     });
   });
 
-  it("keeps Bitola's candidate-bound titles unchanged in both rounds", () => {
+  it("titles every round Take trump and lets the subtitle name the allowed suits", () => {
     const { unmount } = render(
       <TrumpPrompt
         trumpCandidate={trumpCandidate}
@@ -511,8 +511,8 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    expect(screen.getByText("Take trump or pass")).toBeInTheDocument();
-    expect(screen.getByText("Adopt this suit, or pass to the next player.")).toBeInTheDocument();
+    expect(screen.getByText("Take trump")).toBeInTheDocument();
+    expect(screen.getByText("Only the revealed suit.")).toBeInTheDocument();
     unmount();
 
     render(
@@ -524,8 +524,8 @@ describe("TrumpPrompt", () => {
         onPass={vi.fn()}
       />,
     );
-    expect(screen.getByText("Choose any suit — or pass")).toBeInTheDocument();
-    expect(screen.getByText("Any suit except the candidate.")).toBeInTheDocument();
+    expect(screen.getByText("Take trump")).toBeInTheDocument();
+    expect(screen.getByText("Any suit except the revealed one.")).toBeInTheDocument();
   });
 
   it("round 1 with a candidate still renders the Take button and NO suit grid", () => {
@@ -622,7 +622,7 @@ describe("TrumpPrompt", () => {
       );
       const prompt = screen.getByTestId("trump-prompt");
       expect(prompt).toHaveTextContent("dealer");
-      expect(prompt).toHaveTextContent(/name a suit/i);
+      expect(prompt).toHaveTextContent(/choose a suit/i);
       expect(prompt).not.toHaveTextContent(/or pass/i);
     });
 
@@ -822,12 +822,12 @@ describe("TrumpPrompt candidate note", () => {
     );
 
     expect(screen.getByTestId("trump-prompt-candidate-note")).toHaveTextContent(
-      "Even if you name a different suit as trump, you still get this card from the deck.",
+      "Whichever suit you choose, this card is yours.",
     );
     expect(screen.getByTestId("trump-prompt-suit-S")).toBeInTheDocument();
   });
 
-  it("keeps the take-or-pass note in round 1", () => {
+  it("tells a round 1 bidder what taking means, naming the suit", () => {
     render(
       <TrumpPrompt
         trumpCandidate={{ rank: "J", suit: "H" }}
@@ -839,7 +839,7 @@ describe("TrumpPrompt candidate note", () => {
     );
 
     expect(screen.getByTestId("trump-prompt-candidate-note")).toHaveTextContent(
-      "The candidate card was turned face-up.",
+      "If you take it, Hearts is trump and this card is yours.",
     );
     expect(screen.queryByTestId("trump-prompt-suit-S")).not.toBeInTheDocument();
   });

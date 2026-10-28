@@ -37,9 +37,6 @@ export function PauseOverlay({
   const { t } = useTranslation();
   const hasActivePause = pausedPlayers[myPlayerSeat];
   const canStackPause = !hasActivePause && !pauseUsed[myPlayerSeat];
-  const pausedNames = pausedPlayers
-    .map((isPaused, seat) => (isPaused ? playerDisplayName(t, players[seat]) : null))
-    .filter(Boolean);
 
   return (
     <div
@@ -49,14 +46,7 @@ export function PauseOverlay({
       aria-live="polite"
     >
       <OverlayBackdrop dim="blocker">
-        <ClassicPanel
-          size="dialog"
-          title={t("match.pause.title")}
-          subtitle={t(
-            pausedNames.length > 1 ? "match.pause.pausedByMany" : "match.pause.pausedBy",
-            { player: pausedNames.join(", ") },
-          )}
-        >
+        <ClassicPanel size="dialog" title={t("match.pause.title")}>
           <div className="flex flex-col gap-2 mb-4">
             {players.map((player) => {
               const team = seatTeam(player.seat, myPlayerSeat);

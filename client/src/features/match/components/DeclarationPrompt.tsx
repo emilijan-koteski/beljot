@@ -1,3 +1,4 @@
+import { Ban } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -131,13 +132,13 @@ export function DeclarationPrompt({
                 />
               </>
             ) : (
-              <p
-                className="text-sm leading-snug mb-4 py-6 text-center"
-                style={{ color: "var(--ink-light)", opacity: 0.75 }}
+              <div
+                className="mb-4 flex justify-center py-6"
+                style={{ color: "var(--ink-light)", opacity: 0.3 }}
                 data-testid="declaration-prompt-none"
               >
-                {t("match.declaration.noneBody")}
-              </p>
+                <Ban size={44} strokeWidth={1.5} aria-hidden="true" />
+              </div>
             )}
 
             <div className="flex justify-end items-center gap-3.5">

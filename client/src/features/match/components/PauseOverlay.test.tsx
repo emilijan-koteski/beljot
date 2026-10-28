@@ -5,17 +5,15 @@ import { PauseOverlay } from "./PauseOverlay";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: Record<string, string>) => {
+    t: (key: string) => {
       const translations: Record<string, string> = {
         "match.pause.title": "Game Paused",
         "match.pause.resume": "Resume",
         "match.pause.pauseButton": "Pause",
-        "match.pause.waitingToResume": "Waiting for players to resume...",
+        "match.pause.waitingToResume": "Waiting to resume...",
         "match.pause.resumeAll": "Resume all",
+        "match.pause.pausedNow": "paused now",
       };
-      if ((key === "match.pause.pausedBy" || key === "match.pause.pausedByMany") && opts?.player) {
-        return `${opts.player} paused the game`;
-      }
       return translations[key] ?? key;
     },
   }),
@@ -87,7 +85,7 @@ const mockPlayers = [
 type PauseOverlayProps = Parameters<typeof PauseOverlay>[0];
 
 describe("PauseOverlay", () => {
-  it("renders paused player names", () => {
+  it("marks the pausing player in their row, with no subtitle repeating it", () => {
     render(
       <PauseOverlay
         pausedPlayers={[true, false, false, false]}
@@ -100,8 +98,10 @@ describe("PauseOverlay", () => {
         onOwnerResume={vi.fn()}
       />,
     );
-    expect(screen.getByText("Alice paused the game")).toBeInTheDocument();
+    expect(screen.getByTestId("pause-player-0")).toHaveTextContent("Alice");
+    expect(screen.getByTestId("pause-player-0")).toHaveTextContent("paused now");
     expect(screen.getByText("Game Paused")).toBeInTheDocument();
+    expect(screen.queryByText(/paused the game/)).not.toBeInTheDocument();
   });
 
   it("shows Resume button for player who paused", () => {

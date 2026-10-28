@@ -197,12 +197,6 @@ export function TrumpPrompt({
 
   const isFreeSuitPick = trumpCandidate === null;
 
-  const title = isFreeSuitPick
-    ? t("match.trumpPrompt.titleFreePick")
-    : biddingRound === 1
-      ? t("match.trumpPrompt.titleRound1")
-      : t("match.trumpPrompt.titleRound2");
-
   const subtitle = isFreeSuitPick
     ? t("match.trumpPrompt.subtitleFreePick")
     : biddingRound === 1
@@ -221,7 +215,7 @@ export function TrumpPrompt({
       >
         <ClassicPanel
           size="wide"
-          title={<span id="trump-prompt-title">{title}</span>}
+          title={<span id="trump-prompt-title">{t("match.trumpPrompt.title")}</span>}
           subtitle={subtitle}
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
@@ -234,7 +228,9 @@ export function TrumpPrompt({
                 data-testid="trump-prompt-candidate-note"
               >
                 {biddingRound === 1
-                  ? t("match.trumpPrompt.bodyRound1")
+                  ? t("match.trumpPrompt.bodyRound1", {
+                      suit: t(suitNameKey(trumpCandidate.suit, deck)),
+                    })
                   : t("match.trumpPrompt.bodyRound2")}
               </p>
             </div>

@@ -7,12 +7,12 @@ import type { Suit } from "@/shared/types/matchTypes";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
-import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 import { PlayingCard } from "./PlayingCard";
 
 interface BelotPromptProps {
   isKing: boolean;
+  isRebelote: boolean;
   trumpSuit?: Suit;
   onAnnounce: () => void;
   onDecline: () => void;
@@ -23,6 +23,7 @@ interface BelotPromptProps {
 
 export function BelotPrompt({
   isKing,
+  isRebelote,
   trumpSuit = "S",
   onAnnounce,
   onDecline,
@@ -34,10 +35,7 @@ export function BelotPrompt({
   const promptRef = useFocusTrap<HTMLDivElement>({ onEscape: onDecline });
   const showRing = isActivePlayer && Boolean(turnExpiresAt) && (timerDurationSec ?? 0) > 0;
 
-  const titleKey = isKing ? "match.belot.titleRebelot" : "match.belot.titleBelot";
-  const announceKey = isKing ? "match.belot.announceRebelot" : "match.belot.announceBelot";
-  const subtitleKey = isKing ? "match.belot.subtitleRebelot" : "match.belot.subtitleBelot";
-  const accentStripKey = isKing ? "match.belot.accentStripRebelot" : "match.belot.accentStripBelot";
+  const titleKey = isRebelote ? "match.belot.titleRebelot" : "match.belot.titleBelot";
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z.PROMPT }} data-testid="belot-prompt">
@@ -52,7 +50,7 @@ export function BelotPrompt({
           <ClassicPanel
             size="dialog"
             title={<span id="belot-prompt-title">{t(titleKey)}</span>}
-            subtitle={t(subtitleKey)}
+            subtitle={t("match.belot.subtitle")}
           >
             <div className="flex justify-center items-end gap-3.5 mt-2 mb-5">
               <PlayingCard
@@ -69,15 +67,13 @@ export function BelotPrompt({
               />
             </div>
 
-            <ExplainerStrip className="mb-4">{t(accentStripKey)}</ExplainerStrip>
-
             <div className="flex justify-end items-center gap-3.5">
               <ClassicButton
                 variant="primary"
                 onClick={onAnnounce}
                 data-testid="belot-prompt-announce"
               >
-                {t(announceKey)}
+                {t("match.belot.announce")}
               </ClassicButton>
               {showRing ? (
                 <ButtonTimerRing

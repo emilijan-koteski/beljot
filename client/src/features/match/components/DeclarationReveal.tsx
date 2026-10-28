@@ -175,7 +175,6 @@ export function DeclarationReveal({
 
           <SummaryStrip
             label={t("match.declaration.total")}
-            caption={t("match.declaration.addedToHand")}
             value={`+${totalAwarded}`}
             testId="declaration-reveal-total"
             valueTestId="declaration-reveal-total-value"

@@ -241,10 +241,7 @@ describe("PlayerSeat", () => {
         />,
       );
 
-      expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute(
-        "title",
-        "Called Bells",
-      );
+      expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute("title", "Took Bells");
     });
 
     it("titles the chip with the French name on the French deck", () => {
@@ -264,7 +261,7 @@ describe("PlayerSeat", () => {
 
       expect(screen.getByTestId("player-seat-caller-chip")).toHaveAttribute(
         "title",
-        "Called Diamonds",
+        "Took Diamonds",
       );
     });
 

@@ -148,8 +148,8 @@ type MatchResumedPayload struct {
 	OwnerOverride bool `json:"ownerOverride"`
 }
 
-// AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry.
-// Card auto-play uses the AutoPlayed flag on EventCardPlayed instead.
+// AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry; the other seats get "timeout"
+// in place of a skip that would reveal a hand. Card auto-play uses the AutoPlayed flag on EventCardPlayed instead.
 type AutoActionType string
 
 const (
@@ -157,6 +157,7 @@ const (
 	AutoActionSkipDeclare AutoActionType = "skip_declare"
 	AutoActionSkipBelot   AutoActionType = "skip_belot"
 	AutoActionPickTrump   AutoActionType = "pick_trump"
+	AutoActionTimeout     AutoActionType = "timeout"
 )
 
 // AutoActionPayload is the typed payload for EventAutoAction, used by clients to toast the timed-out player.

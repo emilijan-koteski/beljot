@@ -227,7 +227,9 @@ describe("DeclarationPrompt", () => {
 
       expect(onSkip).toHaveBeenCalledTimes(1);
       expect(screen.getByText("No declarations")).toBeInTheDocument();
-      expect(screen.getByTestId("declaration-prompt-none")).toBeInTheDocument();
+      const none = screen.getByTestId("declaration-prompt-none");
+      expect(none).toHaveTextContent(/^$/);
+      expect(none.querySelector("svg")).toBeInTheDocument();
       expect(screen.queryByTestId("declaration-prompt-total")).not.toBeInTheDocument();
       expect(screen.getByTestId("declaration-prompt-declare")).toBeDisabled();
       const skip = screen.getByTestId("declaration-prompt-skip");

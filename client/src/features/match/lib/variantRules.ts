@@ -1,16 +1,17 @@
 import type { Variant } from "@/shared/types/matchTypes";
 
 /**
- * Client mirror of the server's `game.VariantRules` facts the UI needs, derived from the
- * variant string. The server never sends this config over the wire.
+ * Per-variant facts the UI needs: mirrors of the server's `game.VariantRules` plus UI-only naming,
+ * derived from the variant string because the server never sends this config over the wire.
  */
 interface VariantRuleFacts {
   readonly declarationOverlap: boolean;
+  readonly kingIsRebelote: boolean;
 }
 
 const PRESETS: Record<Variant, VariantRuleFacts> = {
-  bitola: Object.freeze({ declarationOverlap: false }),
-  croatia: Object.freeze({ declarationOverlap: true }),
+  bitola: Object.freeze({ declarationOverlap: false, kingIsRebelote: true }),
+  croatia: Object.freeze({ declarationOverlap: true, kingIsRebelote: false }),
 };
 
 /**
