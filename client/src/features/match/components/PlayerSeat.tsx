@@ -13,6 +13,12 @@ import {
   resolveCardDeck,
   SEAT_STACK_CARD_WIDTH,
 } from "../lib/cardFace";
+import {
+  SEAT_BORDER_PX,
+  SEAT_DISC_PX,
+  SEAT_DISC_PX_COMPACT,
+  seatFramePx,
+} from "../lib/seatGeometry";
 import { suitAccent, suitNameKey } from "../lib/suitArt";
 import { type SeatTeam, teamColors, teamLabelKey } from "../lib/tableTheme";
 import { isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
@@ -36,13 +42,9 @@ interface PlayerSeatProps {
   compact?: boolean;
 }
 
-const AVATAR_DISC_PX = 64;
-const AVATAR_DISC_PX_COMPACT = 44;
-const FRAME_PAD_PX = 16;
-
-const TURN_LIME = "var(--accent)";
+const TURN_LIME = "var(--accent-light)";
 const COLOR_URGENT = "var(--danger)";
-const TURN_LIME_GLOW = "color-mix(in srgb, var(--accent) 60%, transparent)";
+const TURN_LIME_GLOW = "color-mix(in srgb, var(--accent-light) 60%, transparent)";
 
 /**
  * Status indicator chip — 30 px circle with a thick felt-toned border so it
@@ -179,8 +181,8 @@ export function PlayerSeat({
   const teamLabel = t(teamLabelKey(seatTeam));
   const teamGradient = teamColors(seatTeam);
 
-  const discPx = compact ? AVATAR_DISC_PX_COMPACT : AVATAR_DISC_PX;
-  const framePx = discPx + FRAME_PAD_PX;
+  const discPx = compact ? SEAT_DISC_PX_COMPACT : SEAT_DISC_PX;
+  const framePx = seatFramePx(compact);
 
   const secondsLeft = useTurnCountdown(turnExpiresAt ?? null);
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
@@ -285,7 +287,7 @@ export function PlayerSeat({
             position: "absolute",
             inset: 0,
             background: `conic-gradient(from 0deg, ${teamGradient[0]}, ${teamGradient[1]}, ${teamGradient[0]})`,
-            padding: 3,
+            padding: SEAT_BORDER_PX,
             boxShadow:
               isActive && !isDisconnected
                 ? `0 0 0 2px ${TURN_LIME}, 0 0 24px ${TURN_LIME_GLOW}`

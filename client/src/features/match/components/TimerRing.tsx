@@ -1,6 +1,7 @@
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 
+import { seatInnerPx } from "../lib/seatGeometry";
 import { URGENT_FRACTION, useRingDrain, useTurnCountdown } from "../lib/turnCountdown";
 
 interface TimerRingProps {
@@ -12,16 +13,16 @@ interface TimerRingProps {
 }
 
 const SIZE_CONFIG = {
-  seat: { px: 70, strokeWidth: 2.5, labelClass: "text-xs" },
-  seatCompact: { px: 50, strokeWidth: 2, labelClass: "text-2xs" },
+  seat: { px: seatInnerPx(false), strokeWidth: 2.5, labelClass: "text-xs" },
+  seatCompact: { px: seatInnerPx(true), strokeWidth: 2, labelClass: "text-2xs" },
   button: { px: 36, strokeWidth: 2, labelClass: "text-2xs" },
 } as const;
 
-const COLOR_LIME = "var(--accent)";
+const COLOR_LIME = "var(--accent-light)";
 const COLOR_URGENT = "var(--danger)";
 
 /**
- * SVG countdown ring around a seat avatar or an action button.
+ * SVG countdown ring for a seat avatar, drawn flush inside the seat's team-colour border, or around a button.
  * Turns red once at most 1/8 of `totalDuration` remains.
  */
 export function TimerRing({
