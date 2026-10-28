@@ -30,7 +30,7 @@ export function MeldRow({ label, cards, value, byline, testId }: MeldRowProps) {
   return (
     <div
       className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg px-3.5 py-3"
-      style={{ background: "rgba(0,0,0,0.22)", border: "1px solid var(--brass-25)" }}
+      style={{ background: "var(--shade-20)", border: "1px solid var(--brass-25)" }}
       data-testid={testId}
     >
       <div className="flex shrink-0">

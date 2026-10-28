@@ -46,7 +46,14 @@ vi.mock("@/shared/providers/WebSocketContext", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    loading: vi.fn(),
+    dismiss: vi.fn(),
+  },
 }));
 
 afterEach(() => {
@@ -548,7 +555,7 @@ describe("LobbyPage support note", () => {
     renderLobbyPage();
 
     const note = screen.getByTestId("support-note");
-    expect(note.textContent).toContain("A hobby project — you can always buy me a coffee.");
+    expect(note.textContent).toContain("A hobby project. You can always buy me a coffee.");
     const footnote = screen.getByText(/Showing/);
     expect(footnote.compareDocumentPosition(note)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });

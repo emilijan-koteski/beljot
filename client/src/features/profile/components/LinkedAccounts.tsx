@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButton";
 import { FetchError } from "@/shared/api/axiosClient";
 import { Button } from "@/shared/components/ui/button";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useLinkIdentityMutation,
   useUnlinkIdentityMutation,
@@ -85,12 +86,9 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
       testId="profile-linked-accounts"
     >
       {isPending ? (
-        <div
-          className="bg-surface-elevated h-14 animate-pulse rounded-md"
-          data-testid="linked-accounts-loading"
-        />
+        <Skeleton className="h-14 rounded-md" testId="linked-accounts-loading" />
       ) : isError || !data ? (
-        <p className="text-ink-mute text-sm" data-testid="linked-accounts-error">
+        <p className="text-danger text-sm" data-testid="linked-accounts-error">
           {t("profile.linkedAccounts.loadError")}
         </p>
       ) : (

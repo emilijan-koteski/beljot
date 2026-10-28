@@ -66,10 +66,7 @@ export function LanguageSelector({
         <span className="text-ink hidden tracking-wider md:inline">{currentLang}</span>
         <ChevronDown className="hidden size-3 opacity-70 md:block" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="bg-surface-elevated min-w-40 border border-border p-1 shadow-lg"
-      >
+      <DropdownMenuContent align="end" className="min-w-40">
         {languagesLatinThenCyrillic.map((lang) => {
           const active = lang.code === i18n.language;
           return (

@@ -3,44 +3,14 @@ import { useRules } from "@/features/rules/RulesContext";
 
 function Fact({ label, value, caption }: FactData) {
   return (
-    <div
-      style={{
-        flex: "1 1 140px",
-        minWidth: 140,
-        padding: "12px 14px",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-      }}
-    >
-      <span
-        className="font-mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "var(--brass-deep)",
-          fontWeight: 700,
-        }}
-      >
+    <div className="bg-surface border-border flex min-w-35 flex-[1_1_140px] flex-col gap-0.5 rounded-lg border px-3.5 py-3">
+      <span className="text-brass-deep font-mono text-2xs font-bold tracking-caps uppercase">
         {label}
       </span>
-      <span
-        className="tabular-nums"
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          color: "var(--ink)",
-          letterSpacing: "-0.025em",
-          lineHeight: 1.2,
-        }}
-      >
+      <span className="text-ink text-3xl leading-tight font-bold tracking-tight tabular-nums">
         {value}
       </span>
-      <span style={{ fontSize: 12, color: "var(--ink-dim)" }}>{caption}</span>
+      <span className="text-ink-dim text-xs">{caption}</span>
     </div>
   );
 }
@@ -49,41 +19,18 @@ function Fact({ label, value, caption }: FactData) {
 export function RulesHero() {
   const { ui } = useRules();
   return (
-    <header style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 28 }}>
-      <div
-        className="font-mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "var(--brass-deep)",
-          fontWeight: 600,
-        }}
-      >
+    <header className="flex flex-col gap-4.5 pb-7">
+      <div className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
         {ui.heroEyebrow}
       </div>
 
-      <h1
-        className=""
-        style={{
-          margin: 0,
-          fontSize: 48,
-          fontWeight: 700,
-          letterSpacing: "-0.025em",
-          lineHeight: 1,
-          color: "var(--ink)",
-        }}
-      >
+      <h1 className="text-ink m-0 text-5xl leading-none font-bold tracking-tight">
         {ui.heroTitle}
       </h1>
 
-      <p
-        style={{ margin: 0, fontSize: 18, lineHeight: 1.6, color: "var(--ink-dim)", maxWidth: 640 }}
-      >
-        {ui.heroIntro}
-      </p>
+      <p className="text-ink-dim m-0 max-w-160 text-lg leading-relaxed">{ui.heroIntro}</p>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 4 }}>
+      <div className="flex flex-wrap gap-2.5 pt-1">
         {ui.facts.map((f, i) => (
           <Fact key={i} label={f.label} value={f.value} caption={f.caption} />
         ))}

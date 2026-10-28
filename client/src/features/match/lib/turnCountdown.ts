@@ -38,7 +38,7 @@ export function useTurnCountdown(turnExpiresAt: string | null): number {
 export const URGENT_FRACTION = 0.125;
 
 export const TIMER_RING_INK = "#d4d0c4";
-export const TIMER_RING_TRACK = "rgba(255,255,255,0.12)";
+export const TIMER_RING_TRACK = "var(--sheen-15)";
 export const TIMER_RING_STROKE = 2;
 
 /**

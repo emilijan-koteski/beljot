@@ -150,7 +150,7 @@ describe("declaration phase copy", () => {
 
 describe("support copy", () => {
   const PROSE_KEYS = ["label", "note"] as const;
-  const DIALOG_KEYS = ["eyebrow", "title", "body", "cta", "qrToggle"] as const;
+  const DIALOG_KEYS = ["title", "body", "cta", "qrToggle"] as const;
 
   type Support = {
     label: string;

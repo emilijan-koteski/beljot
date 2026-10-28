@@ -105,7 +105,7 @@ function ScoreRow({
             style={{
               height: 4,
               borderRadius: 2,
-              background: "rgba(255,255,255,0.1)",
+              background: "var(--sheen-10)",
               overflow: "hidden",
             }}
           >
@@ -261,7 +261,7 @@ export function ScorePanel({
           className="flex items-center gap-1.5 px-4 py-2 text-2xs uppercase tracking-wider"
           style={{
             color: BRASS_LABEL,
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            borderBottom: "1px solid var(--sheen-6)",
           }}
         >
           <span>{t("match.score.heading", { defaultValue: "Scoreboard" })}</span>
@@ -300,7 +300,7 @@ export function ScorePanel({
               tricks={teamATricks}
               matchTarget={matchTarget}
             />
-            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <div style={{ height: 1, background: "var(--sheen-6)" }} />
             <ScoreRow
               label={teamBLabel}
               rowTestId="score-row-b"
@@ -328,7 +328,7 @@ export function ScorePanel({
               tricks={teamBTricks}
               matchTarget={matchTarget}
             />
-            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <div style={{ height: 1, background: "var(--sheen-6)" }} />
             <ScoreRow
               label={teamALabel}
               rowTestId="score-row-a"

@@ -16,7 +16,7 @@ export function TableBackdrop({ compact = false }: { compact?: boolean }) {
           background:
             "linear-gradient(135deg, var(--wood-base) 0%, var(--wood-light) 20%, var(--wood-dark) 50%, var(--wood-light) 80%, var(--wood-base) 100%)",
           boxShadow:
-            "inset 0 0 0 1px var(--brass-55), inset 0 0 30px rgba(0,0,0,0.6), var(--shadow-felt-xl)",
+            "inset 0 0 0 1px var(--brass-55), inset 0 0 30px var(--shade-60), var(--shadow-felt-xl)",
         }}
       />
       <div
@@ -24,11 +24,11 @@ export function TableBackdrop({ compact = false }: { compact?: boolean }) {
         style={{
           background: `
             radial-gradient(ellipse at 50% 50%, var(--felt-light) 0%, var(--felt-dark) 70%, var(--felt-deep) 100%),
-            repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,0.04) 3px 4px),
-            repeating-linear-gradient(-45deg, transparent 0 3px, rgba(255,255,255,0.015) 3px 4px)
+            repeating-linear-gradient(45deg, transparent 0 3px, var(--shade-5) 3px 4px),
+            repeating-linear-gradient(-45deg, transparent 0 3px, var(--sheen-2) 3px 4px)
           `,
           backgroundBlendMode: "normal, overlay, overlay",
-          boxShadow: "inset 0 0 60px rgba(0,0,0,0.55), inset 0 0 200px rgba(0,0,0,0.25)",
+          boxShadow: "inset 0 0 60px var(--shade-60), inset 0 0 200px var(--shade-25)",
         }}
       />
       <div className="absolute inset-0 md:inset-9">

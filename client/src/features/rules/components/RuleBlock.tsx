@@ -6,38 +6,18 @@ import { DiffMarker } from "@/features/rules/components/DiffMarker";
 import { MeldsGrid } from "@/features/rules/components/MeldsGrid";
 import type { RuleBlock as RuleBlockType } from "@/features/rules/content/types";
 import { isVisibleFor, visibleFor } from "@/features/rules/content/visibility";
-import { useRules, useRulesVariant } from "@/features/rules/RulesContext";
+import { useRules, useRulesDense, useRulesVariant } from "@/features/rules/RulesContext";
 import { HONOR_TIER_BANDS, HONOR_TIER_COLOR, type HonorTier } from "@/shared/lib/honor";
+import { cn } from "@/shared/lib/utils";
+
+const RULE_CARD =
+  "bg-surface-2 border-border border-l-accent flex flex-col gap-1 rounded-lg border border-l-3 py-3.5 pr-4 pl-4.5";
 
 function NoteBlock({ text, marker }: { text: string; marker: ReactNode }) {
   const { ui } = useRules();
   return (
-    <div
-      style={{
-        padding: "12px 14px",
-        background: "var(--brass-soft)",
-        border: "1px dashed var(--brass)",
-        borderRadius: 10,
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 10,
-        fontSize: 12,
-        lineHeight: 1.6,
-        color: "var(--ink-dim)",
-      }}
-    >
-      <span
-        className="font-mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "var(--brass-deep)",
-          fontWeight: 700,
-          flexShrink: 0,
-          paddingTop: 1,
-        }}
-      >
+    <div className="bg-brass-soft border-brass text-ink-dim flex items-start gap-2.5 rounded-lg border border-dashed px-3.5 py-3 text-xs leading-relaxed">
+      <span className="text-brass-deep shrink-0 pt-px font-mono text-2xs font-bold tracking-caps uppercase">
         {ui.noteLabel}
       </span>
       <span>
@@ -67,49 +47,26 @@ function TiersBlock({
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      style={{
-        padding: "14px 16px 14px 18px",
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderLeft: "3px solid var(--accent)",
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-      }}
-    >
-      <div className="" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+    <div className={RULE_CARD}>
+      <div className="text-ink text-sm font-semibold">
         {block.title}
         {marker}
       </div>
-      <ul
-        style={{
-          margin: 0,
-          padding: 0,
-          listStyle: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: 3,
-        }}
-      >
+      <ul className="m-0 flex list-none flex-col gap-0.75 p-0">
         {block.items.map((it) => (
           <li
             key={it.tier}
             data-testid={`rules-tier-${it.tier}`}
-            style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}
+            className="text-ink-dim text-sm leading-relaxed"
           >
-            <strong style={{ fontWeight: 700, color: HONOR_TIER_COLOR[it.tier] }}>
+            <strong className="font-bold" style={{ color: HONOR_TIER_COLOR[it.tier] }}>
               {t(`profile.honor.tier.${it.tier}`)}
             </strong>{" "}
-            <span className="font-mono" style={{ fontSize: 12 }}>
-              ({tierRange(it.tier)})
-            </span>{" "}
-            {it.d}
+            <span className="font-mono text-xs">({tierRange(it.tier)})</span> {it.d}
           </li>
         ))}
       </ul>
-      <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>{block.text}</div>
+      <div className="text-ink-dim text-sm leading-relaxed">{block.text}</div>
     </div>
   );
 }
@@ -121,26 +78,16 @@ function CardBlock() {
       <CardLadder
         testId="ladder-trump"
         title={ui.ladderTrumpTitle}
-        accent={{
-          eyebrow: ui.ladderTrumpEyebrow,
-          ink: "var(--accent)",
-          edge: "rgba(25,101,54,0.45)",
-          tint: "rgba(25,101,54,0.10)",
-          softTint: "rgba(25,101,54,0.05)",
-        }}
+        eyebrow={ui.ladderTrumpEyebrow}
+        tone="trump"
         suit="C"
         rows={cardsTrump}
       />
       <CardLadder
         testId="ladder-plain"
         title={ui.ladderPlainTitle}
-        accent={{
-          eyebrow: ui.ladderPlainEyebrow,
-          ink: "var(--brass-deep)",
-          edge: "var(--brass)",
-          tint: "var(--brass-soft)",
-          softTint: "var(--brass-10)",
-        }}
+        eyebrow={ui.ladderPlainEyebrow}
+        tone="plain"
         suit="H"
         rows={cardsPlain}
       />
@@ -154,18 +101,20 @@ function CardBlock() {
  */
 export function RuleBlock({ block }: { block: RuleBlockType }) {
   const activeVariant = useRulesVariant();
+  const dense = useRulesDense();
   const { ui } = useRules();
 
   if (!isVisibleFor(block, activeVariant)) return null;
 
+  const tone = dense ? "dark" : "light";
   const marker = block.otherVariantNote ? (
-    <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} />
+    <DiffMarker note={block.otherVariantNote} label={ui.diffLabel} tone={tone} />
   ) : null;
 
   switch (block.kind) {
     case "p":
       return (
-        <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: "var(--ink-dim)" }}>
+        <p className={cn("text-ink-dim m-0 leading-relaxed", dense ? "text-sm" : "text-base")}>
           {block.text}
           {marker}
         </p>
@@ -173,23 +122,12 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
 
     case "rule":
       return (
-        <div
-          style={{
-            padding: "14px 16px 14px 18px",
-            background: "var(--surface-2)",
-            border: "1px solid var(--border)",
-            borderLeft: "3px solid var(--accent)",
-            borderRadius: "var(--radius-lg)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
-          <div className="" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+        <div className={RULE_CARD}>
+          <div className="text-ink text-sm font-semibold">
             {block.title}
             {marker}
           </div>
-          <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>{block.text}</div>
+          <div className="text-ink-dim text-sm leading-relaxed">{block.text}</div>
         </div>
       );
 
@@ -202,68 +140,25 @@ export function RuleBlock({ block }: { block: RuleBlockType }) {
     case "steps": {
       const visibleItems = visibleFor(block.items, activeVariant);
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {marker ? (
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>{marker}</div>
-          ) : null}
-          <ol
-            style={{
-              margin: 0,
-              padding: 0,
-              listStyle: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
+        <div className="flex flex-col gap-2">
+          {marker ? <div className="flex justify-end">{marker}</div> : null}
+          <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
             {visibleItems.map((it, i) => (
               <li
                 key={i}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "36px 1fr",
-                  gap: 14,
-                  padding: "12px 14px",
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-lg)",
-                }}
+                className="bg-surface-2 border-border grid grid-cols-[36px_1fr] gap-3.5 rounded-lg border px-3.5 py-3"
               >
-                <span
-                  className="font-mono"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    background: "var(--accent-soft)",
-                    color: "var(--accent)",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: "0.05em",
-                  }}
-                >
+                <span className="bg-accent-soft text-accent inline-flex size-7 items-center justify-center rounded-md font-mono text-xs font-bold tracking-wider">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  <span
-                    className=""
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "var(--ink)",
-                    }}
-                  >
+                <div className="flex flex-col gap-0.75">
+                  <span className="text-ink text-sm font-semibold">
                     {it.t}
                     {it.otherVariantNote ? (
-                      <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} />
+                      <DiffMarker note={it.otherVariantNote} label={ui.diffLabel} tone={tone} />
                     ) : null}
                   </span>
-                  <span style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-dim)" }}>
-                    {it.d}
-                  </span>
+                  <span className="text-ink-dim text-sm leading-relaxed">{it.d}</span>
                 </div>
               </li>
             ))}

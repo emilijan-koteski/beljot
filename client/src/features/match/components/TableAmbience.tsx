@@ -21,7 +21,7 @@ const PARTICLE_COUNT = 30;
  * Decorative felt ambience: a soft top beam plus floating particles, computed once per mount.
  * Under reduced motion the particles render as a static field.
  */
-export function TableAmbience({ intensity = 0.9, tint = "#ffe9b0" }: TableAmbienceProps) {
+export function TableAmbience({ intensity = 0.9, tint = "var(--lamp-warm)" }: TableAmbienceProps) {
   const reducedMotion = useReducedMotion();
   const particles = useMemo<Particle[]>(
     () =>
@@ -50,7 +50,7 @@ export function TableAmbience({ intensity = 0.9, tint = "#ffe9b0" }: TableAmbien
           width: 1000,
           height: 600,
           transform: "translateX(-50%)",
-          background: `radial-gradient(ellipse at center, ${tint}22 0%, transparent 65%)`,
+          background: `radial-gradient(ellipse at center, color-mix(in srgb, ${tint} 13%, transparent) 0%, transparent 65%)`,
         }}
       />
       {particles.map((p, i) => (

@@ -8,7 +8,6 @@ import { RulesHero } from "@/features/rules/components/RulesHero";
 import { getRulesContent } from "@/features/rules/content/rulesContent";
 import { RulesProvider } from "@/features/rules/RulesContext";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { variantLabel } from "@/shared/lib/roomLabels";
 import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
@@ -50,52 +49,42 @@ export function RulesPage() {
 
   return (
     <RulesProvider value={{ content, variant }}>
-      <TooltipProvider delay={0}>
-        <div
-          className="mx-auto flex max-w-270 items-start gap-10 px-7 py-10"
-          data-testid="rules-page"
-        >
-          <ChapterIndex activeId={activeId} onJump={jump} />
+      <div
+        className="mx-auto flex max-w-270 items-start gap-10 px-7 py-10"
+        data-testid="rules-page"
+      >
+        <ChapterIndex activeId={activeId} onJump={jump} />
 
-          <div className="min-w-0 flex-1">
-            <RulesHero />
+        <div className="min-w-0 flex-1">
+          <RulesHero />
 
-            <div
-              className="flex flex-col gap-2 pb-2"
-              data-testid="rules-variant-tabs"
-              style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}
+          <div
+            className="border-border flex flex-col gap-2 border-t pt-5 pb-2"
+            data-testid="rules-variant-tabs"
+          >
+            <span
+              id={VARIANT_LABEL_ID}
+              className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase"
             >
-              <span
-                id={VARIANT_LABEL_ID}
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: "var(--brass-deep)",
-                  fontWeight: 600,
-                }}
-              >
-                {content.ui.variantLabel}
-              </span>
-              <Tabs value={variant} onValueChange={(value) => setVariant(normalizeVariant(value))}>
-                <TabsList aria-labelledby={VARIANT_LABEL_ID}>
-                  {VARIANTS.map((v) => (
-                    <TabsTrigger key={v} value={v} data-testid={`rules-variant-${v}`}>
-                      {variantLabel(t, v)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {sections.map((s, i) => (
-              <Chapter key={s.id} idx={i} section={s} registerRef={registerRef} />
-            ))}
-            <RulesFooter />
+              {content.ui.variantLabel}
+            </span>
+            <Tabs value={variant} onValueChange={(value) => setVariant(normalizeVariant(value))}>
+              <TabsList aria-labelledby={VARIANT_LABEL_ID}>
+                {VARIANTS.map((v) => (
+                  <TabsTrigger key={v} value={v} data-testid={`rules-variant-${v}`}>
+                    {variantLabel(t, v)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
+
+          {sections.map((s, i) => (
+            <Chapter key={s.id} idx={i} section={s} registerRef={registerRef} />
+          ))}
+          <RulesFooter />
         </div>
-      </TooltipProvider>
+      </div>
     </RulesProvider>
   );
 }

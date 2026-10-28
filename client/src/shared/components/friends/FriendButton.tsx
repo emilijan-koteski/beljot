@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/shared/components/ui/button";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useAcceptFriendRequestMutation,
   useDeclineFriendRequestMutation,
@@ -46,10 +47,9 @@ export function FriendButton({
 
   if (status.isPending) {
     return (
-      <div
-        className={`bg-surface-sunken h-8 w-28 animate-pulse rounded-md ${compact ? "" : "my-5"}`}
-        data-testid="friend-button-loading"
-        aria-hidden="true"
+      <Skeleton
+        className={compact ? "h-8 w-28 rounded-md" : "my-5 h-8 w-28 rounded-md"}
+        testId="friend-button-loading"
       />
     );
   }

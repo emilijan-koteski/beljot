@@ -2,6 +2,8 @@ import { DoorOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { RoomCard } from "@/features/lobby/components/RoomCard";
+import { EmptyState } from "@/shared/components/EmptyState";
+import { Button } from "@/shared/components/ui/button";
 import type { Room } from "@/shared/types/apiTypes";
 
 type Props = {
@@ -20,25 +22,26 @@ export function RoomGrid({ rooms, onJoin, hasSearch, onClearSearch }: Props) {
 
   if (rooms.length === 0) {
     return (
-      <div
-        data-testid={hasSearch ? "room-list-empty-search" : "room-list-empty"}
-        className="bg-surface flex flex-col items-center gap-3 rounded-lg border border-dashed border-brass px-5 py-14 text-center"
+      <EmptyState
+        testId={hasSearch ? "room-list-empty-search" : "room-list-empty"}
+        icon={<DoorOpen />}
+        title={t("lobby.empty.title")}
+        action={
+          hasSearch &&
+          onClearSearch && (
+            <Button
+              variant="link"
+              size="inline"
+              onClick={onClearSearch}
+              data-testid="room-list-clear-search-empty"
+            >
+              {t("lobby.empty.clear")}
+            </Button>
+          )
+        }
       >
-        <span className="bg-accent-soft text-accent flex size-14 items-center justify-center rounded-full">
-          <DoorOpen className="size-6" />
-        </span>
-        <h3 className="text-ink m-0 text-lg font-semibold">{t("lobby.empty.title")}</h3>
-        <p className="text-ink-dim m-0 max-w-90 text-xs">{t("lobby.empty.description")}</p>
-        {hasSearch && onClearSearch && (
-          <button
-            onClick={onClearSearch}
-            data-testid="room-list-clear-search-empty"
-            className="text-accent text-xs font-semibold hover:underline"
-          >
-            {t("lobby.empty.clear")}
-          </button>
-        )}
-      </div>
+        {t("lobby.empty.description")}
+      </EmptyState>
     );
   }
 

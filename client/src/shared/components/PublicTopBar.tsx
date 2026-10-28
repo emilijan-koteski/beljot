@@ -10,7 +10,7 @@ export function PublicTopBar() {
   const { t } = useTranslation();
   return (
     <nav
-      className="border-border sticky top-0 z-50 flex h-15 items-center border-b bg-[rgba(245,242,232,0.85)] px-7 backdrop-blur-md"
+      className="border-border sticky top-0 z-50 flex h-15 items-center border-b bg-background/85 px-7 backdrop-blur-md"
       data-testid="public-nav"
     >
       <Link to="/" className="flex items-center gap-2.5" data-testid="public-logo">

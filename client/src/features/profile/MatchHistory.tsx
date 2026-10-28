@@ -3,7 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import type { MatchFilter, MatchListItem, MatchSort } from "@/shared/api/matches";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
+import { Button, buttonVariants } from "@/shared/components/ui/button";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 
 import { HistoryFilters } from "./components/HistoryFilters";
@@ -50,23 +53,22 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
     return (
       <section data-testid="match-history">
         {header}
-        <div
-          className="bg-surface border-border space-y-3 rounded-lg border border-dashed p-10 text-center text-sm"
-          data-testid="match-history-empty"
+        <EmptyState
+          testId="match-history-empty"
+          action={
+            subjectIsSelf && (
+              <Link
+                to="/lobby"
+                className={buttonVariants({ variant: "link", size: "inline" })}
+                data-testid="match-history-empty-cta"
+              >
+                {t("profile.matchHistory.emptyCta")}
+              </Link>
+            )
+          }
         >
-          <p className="text-ink-dim m-0">
-            {t(subjectIsSelf ? "profile.matchHistory.empty" : "profile.matchHistory.emptyPublic")}
-          </p>
-          {subjectIsSelf && (
-            <Link
-              to="/lobby"
-              className="text-accent inline-flex items-center underline-offset-2 hover:underline"
-              data-testid="match-history-empty-cta"
-            >
-              {t("profile.matchHistory.emptyCta")}
-            </Link>
-          )}
-        </div>
+          {t(subjectIsSelf ? "profile.matchHistory.empty" : "profile.matchHistory.emptyPublic")}
+        </EmptyState>
       </section>
     );
   }
@@ -85,9 +87,9 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
   if (query.isPending) {
     body = (
       <div className="space-y-2.5" data-testid="match-history-loading">
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
-        <div className="bg-surface h-20 animate-pulse rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
       </div>
     );
   } else if (query.isError) {
@@ -98,12 +100,9 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
     );
   } else if (items.length === 0) {
     body = (
-      <div
-        className="bg-surface border-border rounded-lg border border-dashed p-10 text-center text-sm"
-        data-testid="match-history-empty-filtered"
-      >
-        <p className="text-ink-dim m-0">{t("profile.matchHistory.emptyFiltered")}</p>
-      </div>
+      <EmptyState testId="match-history-empty-filtered">
+        {t("profile.matchHistory.emptyFiltered")}
+      </EmptyState>
     );
   } else {
     const total = query.data?.pages[0]?.total ?? 0;
@@ -122,17 +121,17 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
           ))}
         </ul>
         {showLoadMore && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => query.fetchNextPage()}
             disabled={query.isFetchingNextPage}
-            className="bg-surface border-border text-ink hover:bg-surface-elevated mt-2.5 w-full rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 h-9 w-full"
             data-testid="match-history-load-more"
           >
             {query.isFetchingNextPage
               ? t("profile.matchHistory.loading")
               : t("profile.matchHistory.loadMore")}
-          </button>
+          </Button>
         )}
         <p className="text-ink-mute mt-4 text-center text-xs" data-testid="match-history-count">
           {t("profile.matchHistory.showing", { shown: items.length, total })}

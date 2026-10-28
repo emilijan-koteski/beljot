@@ -10,6 +10,7 @@ import type { RulesContent } from "./content/types";
 type RulesContextValue = {
   content: RulesContent;
   variant: Variant;
+  dense?: boolean;
 };
 
 const RulesContext = createContext<RulesContextValue | null>(null);
@@ -29,4 +30,9 @@ export function useRules(): RulesContent {
 /** The variant tab whose scoped blocks are rendering right now. */
 export function useRulesVariant(): Variant {
   return useRulesContext().variant;
+}
+
+/** True inside the in-match rules dialog, which sets the same chapters a size smaller. */
+export function useRulesDense(): boolean {
+  return useRulesContext().dense === true;
 }

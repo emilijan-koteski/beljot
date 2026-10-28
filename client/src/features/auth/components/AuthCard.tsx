@@ -23,7 +23,7 @@ type AuthCardProps = {
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
   return (
     <div
-      className="bg-surface relative w-full max-w-120 rounded-2xl border border-border px-10 pt-10 pb-8 shadow-lg inset-shadow-bevel"
+      className="bg-surface relative w-full max-w-120 rounded-xl border border-border px-10 pt-10 pb-8 shadow-lg inset-shadow-bevel"
       data-testid="auth-card"
     >
       <div

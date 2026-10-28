@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
 import { normalizeHonorTier } from "@/shared/lib/honor";
@@ -106,7 +107,7 @@ export function SeatTile({
         disabled={!isClickable || isPending}
         data-testid={`player-seat-${seatIndex}`}
         className={cn(
-          "flex min-h-22 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2.5 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
+          "flex min-h-22 w-full flex-col items-center justify-center gap-1 rounded-xl p-2.5 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
           isClickable && !isPending ? "cursor-pointer" : "cursor-default",
           isPending && "pointer-events-none opacity-60",
         )}
@@ -228,8 +229,9 @@ export function SeatTile({
       </button>
 
       {showAddBot && (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="icon-sm"
           onClick={(e) => {
             e.stopPropagation();
             onAddBot?.();
@@ -238,16 +240,17 @@ export function SeatTile({
           aria-label={t("room.addBot")}
           title={t("room.addBot")}
           data-testid={`add-bot-seat-${seatIndex}`}
-          className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:text-bot-deep absolute top-2 right-2 z-10 inline-flex size-8 items-center justify-center rounded-md border disabled:opacity-40 md:size-7"
+          className="bg-bot-soft border-bot-edge text-bot hover:border-bot hover:bg-bot-soft hover:text-bot-deep absolute top-2 right-2 z-10 size-8 md:size-7"
         >
           <Bot className="size-5 -translate-y-[5%] md:size-3.5" />
-        </button>
+        </Button>
       )}
 
       {showRemoveBot && (
         <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon-sm"
             onClick={(e) => {
               e.stopPropagation();
               onRemoveBot?.();
@@ -255,18 +258,19 @@ export function SeatTile({
             aria-label={t("room.removeBotIconLabel", { name: displayName })}
             title={t("room.removeBotIconLabel", { name: displayName })}
             data-testid={`remove-bot-${seatIndex}`}
-            className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-7 items-center justify-center rounded-md border disabled:opacity-40"
+            className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 hover:text-danger"
           >
             <UserX className="size-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {showOwnerControls && player && (
         <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {onPromote && (
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="icon-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 onPromote();
@@ -274,14 +278,15 @@ export function SeatTile({
               aria-label={t("room.promoteIconLabel", { username: player.username })}
               title={t("room.promoteIconLabel", { username: player.username })}
               data-testid={`promote-seat-${seatIndex}`}
-              className="bg-surface-elevated border-border text-brass-deep inline-flex size-7 items-center justify-center rounded-md border hover:border-brass disabled:opacity-40"
+              className="bg-surface-elevated text-brass-deep hover:border-brass hover:text-brass-deep"
             >
               <Crown className="size-3.5" />
-            </button>
+            </Button>
           )}
           {onKick && (
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="icon-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 onKick();
@@ -289,10 +294,10 @@ export function SeatTile({
               aria-label={t("room.kickIconLabel", { username: player.username })}
               title={t("room.kickIconLabel", { username: player.username })}
               data-testid={`kick-player-${seatIndex}`}
-              className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 inline-flex size-7 items-center justify-center rounded-md border disabled:opacity-40"
+              className="bg-surface-elevated text-danger border-danger/30 hover:border-danger/60 hover:text-danger"
             >
               <UserX className="size-3.5" />
-            </button>
+            </Button>
           )}
         </div>
       )}

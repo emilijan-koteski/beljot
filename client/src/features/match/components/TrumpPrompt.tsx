@@ -97,7 +97,8 @@ function MustPickNote() {
       style={{
         border: "1px dashed var(--brass-40)",
         borderRadius: BUTTON_RADIUS_PX,
-        background: "linear-gradient(180deg, rgba(60,90,70,0.35), rgba(30,50,35,0.35))",
+        background:
+          "linear-gradient(180deg, color-mix(in srgb, var(--felt-ghost-top) 60%, transparent), color-mix(in srgb, var(--felt-ghost-bottom) 60%, transparent))",
         color: "var(--ink-light)",
         fontWeight: 600,
       }}

@@ -135,7 +135,7 @@ describe("RoomEjectionModal", () => {
     expect(useRoomStore.getState().roomEjection).toBeNull();
   });
 
-  it("draws the honour comparison to scale, with the numbers alongside", () => {
+  it("states the room's honor bar and the player's honor in one line", () => {
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 0,
@@ -146,11 +146,12 @@ describe("RoomEjectionModal", () => {
     });
     renderModal();
 
-    expect(screen.getByTestId("room-ejection-you")).toHaveAttribute("data-value", "55");
-    expect(screen.getByTestId("room-ejection-table")).toHaveAttribute("data-value", "80");
+    expect(screen.getByRole("dialog", { name: "Not enough honor" })).toHaveAccessibleDescription(
+      "This room needs 80 honor. You have 55.",
+    );
   });
 
-  it("renders a real honour score of 0 in the comparison", () => {
+  it("states a real honor score of 0", () => {
     useRoomStore.getState().setRoomEjection({
       roomId: 7,
       buyIn: 0,
@@ -161,7 +162,7 @@ describe("RoomEjectionModal", () => {
     });
     renderModal();
 
-    expect(screen.getByTestId("room-ejection-you")).toHaveAttribute("data-value", "0");
+    expect(screen.getByTestId("room-ejection-body")).toHaveTextContent("You have 0.");
   });
 
   it("offers a door out to the rooms the player can actually join", async () => {
@@ -191,7 +192,6 @@ describe("RoomEjectionModal", () => {
     renderModal();
 
     expect(screen.queryByTestId("room-ejection-browse")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("room-ejection-you")).not.toBeInTheDocument();
   });
 });
 

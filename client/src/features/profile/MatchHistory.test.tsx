@@ -255,7 +255,7 @@ describe("MatchHistory", () => {
     const row = await screen.findByTestId("match-history-row");
     const marker = within(row).getByTestId("match-history-ended-early");
     expect(marker).toHaveAttribute("data-end-reason", "abandonment");
-    expect(marker).toHaveTextContent("Ended early — a player abandoned");
+    expect(marker).toHaveTextContent("Ended early: a player abandoned");
   });
 
   it("shows the ended-early marker with distinct surrender wording", async () => {

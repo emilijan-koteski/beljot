@@ -1,15 +1,7 @@
 import { UserMinus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 
 interface RemoveFriendDialogProps {
   open: boolean;
@@ -30,46 +22,27 @@ export function RemoveFriendDialog({
   const { t } = useTranslation();
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next && !pending) onClose();
+      onClose={onClose}
+      tone="danger"
+      icon={<UserMinus />}
+      title={t("friends.removeDialog.title", { username })}
+      description={
+        <span data-testid="remove-friend-description">{t("friends.removeDialog.description")}</span>
+      }
+      pending={pending}
+      primary={{
+        label: pending ? t("friends.removeDialog.submitting") : t("friends.removeDialog.confirm"),
+        onClick: onConfirm,
+        testId: "remove-friend-confirm",
       }}
-    >
-      <DialogContent showCloseButton={false} data-testid="remove-friend-dialog">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">
-              <UserMinus className="size-5" />
-            </div>
-            <DialogTitle>{t("friends.removeDialog.title")}</DialogTitle>
-          </div>
-          <DialogDescription data-testid="remove-friend-description">
-            {t("friends.removeDialog.description", { username })}
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending}
-            onClick={onConfirm}
-            data-testid="remove-friend-confirm"
-          >
-            {pending ? t("friends.removeDialog.submitting") : t("friends.removeDialog.confirm")}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={pending}
-            onClick={onClose}
-            data-testid="remove-friend-cancel"
-          >
-            {t("friends.removeDialog.cancel")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      secondary={{
+        label: t("friends.removeDialog.cancel"),
+        onClick: onClose,
+        testId: "remove-friend-cancel",
+      }}
+      testId="remove-friend-dialog"
+    />
   );
 }

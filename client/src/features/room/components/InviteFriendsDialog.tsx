@@ -1,19 +1,16 @@
 import type { TFunction } from "i18next";
-import { Check, Search, Send } from "lucide-react";
+import { Check, Send, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
+import { EmptyState } from "@/shared/components/EmptyState";
+import { LoadingLine } from "@/shared/components/LoadingLine";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { SearchInput } from "@/shared/components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useInviteToRoomMutation } from "@/shared/hooks/mutations/useRooms";
 import { useInvitableFriends } from "@/shared/hooks/queries/useInvitableFriends";
@@ -115,13 +112,19 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="invite-friends-dialog">
-        <DialogHeader>
-          <DialogTitle>{t("roomInvite.panel.title")}</DialogTitle>
-          <DialogDescription>{t("roomInvite.panel.description")}</DialogDescription>
-        </DialogHeader>
-
+    <AppDialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      icon={<UserPlus />}
+      title={t("roomInvite.panel.title")}
+      primary={{
+        label: t("roomInvite.panel.done"),
+        onClick: () => onOpenChange(false),
+        testId: "invite-friends-done",
+      }}
+      testId="invite-friends-dialog"
+    >
+      <div className="flex flex-col gap-4">
         <Tabs
           value={tab}
           onValueChange={(value) => {
@@ -151,17 +154,13 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
           />
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="bg-surface-elevated border-border flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/70">
-              <Search className="text-ink-mute size-3.5 shrink-0" aria-hidden="true" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("roomInvite.panel.searchPlaceholder")}
-                aria-label={t("roomInvite.panel.searchLabel")}
-                data-testid="invite-lobby-search"
-                className="text-ink placeholder:text-ink-mute min-w-0 flex-1 truncate bg-transparent text-sm outline-none"
-              />
-            </div>
+            <SearchInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder={t("roomInvite.panel.searchPlaceholder")}
+              aria-label={t("roomInvite.panel.searchLabel")}
+              data-testid="invite-lobby-search"
+            />
             <InviteList
               rows={lobbyQuery.data}
               isPending={lobbyQuery.isPending}
@@ -179,8 +178,8 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
             />
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </AppDialog>
   );
 }
 
@@ -217,11 +216,7 @@ function InviteList({
   const { t } = useTranslation();
 
   if (isPending) {
-    return (
-      <p className="text-ink-mute px-1 py-2 text-xs" data-testid={`${stateTestId}-loading`}>
-        {loadingText}
-      </p>
-    );
+    return <LoadingLine testId={`${stateTestId}-loading`}>{loadingText}</LoadingLine>;
   }
   if (isError) {
     return (
@@ -232,9 +227,9 @@ function InviteList({
   }
   if (!rows || rows.length === 0) {
     return (
-      <p className="text-ink-dim px-1 py-2 text-xs" data-testid={`${stateTestId}-empty`}>
+      <EmptyState compact testId={`${stateTestId}-empty`}>
         {emptyText}
-      </p>
+      </EmptyState>
     );
   }
 

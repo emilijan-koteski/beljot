@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Button } from "@/shared/components/ui/button";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
 import {
   useAcceptFriendRequestMutation,
@@ -61,8 +62,9 @@ export function FriendRequests() {
               />
               <span className="text-ink truncate text-sm font-medium">{request.fromUsername}</span>
             </button>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               data-testid="friend-request-accept"
               disabled={busy}
               onClick={() =>
@@ -70,12 +72,13 @@ export function FriendRequests() {
               }
               aria-label={t("friends.accept")}
               title={t("friends.accept")}
-              className="text-accent hover:text-accent-deep focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
+              className="text-accent hover:text-accent-deep"
             >
-              <Check className="size-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
+              <Check aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
               data-testid="friend-request-decline"
               disabled={busy}
               onClick={() =>
@@ -83,10 +86,10 @@ export function FriendRequests() {
               }
               aria-label={t("friends.decline")}
               title={t("friends.decline")}
-              className="text-ink-mute hover:text-danger focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none disabled:opacity-50"
+              className="text-ink-mute hover:text-danger"
             >
-              <X className="size-4" aria-hidden="true" />
-            </button>
+              <X aria-hidden="true" />
+            </Button>
           </li>
         ))}
       </ul>

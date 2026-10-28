@@ -96,13 +96,11 @@ describe("AvatarDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    expect(screen.getByTestId("avatar-dialog-live")).toBeEmptyDOMElement();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     await user.upload(input(), jpeg("huge.jpg", 2_097_153));
 
-    expect(screen.getByTestId("avatar-dialog-live")).toContainElement(
-      screen.getByTestId("avatar-dialog-error"),
-    );
+    expect(screen.getByRole("alert")).toBe(screen.getByTestId("avatar-dialog-error"));
     expect(screen.getByTestId("avatar-dialog-error")).toHaveTextContent(
       i18n.t("profile.avatar.errors.tooLarge"),
     );

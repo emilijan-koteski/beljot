@@ -6,6 +6,7 @@ import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -58,10 +59,8 @@ export function PauseOverlay({
                   key={player.seat}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg"
                   style={{
-                    background: isPaused ? "var(--brass-10)" : "rgba(0,0,0,0.18)",
-                    border: isPaused
-                      ? "1px solid var(--brass-40)"
-                      : "1px solid rgba(255,255,255,0.05)",
+                    background: isPaused ? "var(--brass-10)" : "var(--shade-20)",
+                    border: isPaused ? "1px solid var(--brass-40)" : "1px solid var(--sheen-6)",
                   }}
                   data-testid={isPaused ? `pause-player-${player.seat}` : undefined}
                 >
@@ -94,10 +93,7 @@ export function PauseOverlay({
             })}
           </div>
 
-          <div
-            className="mt-4 flex flex-wrap items-center justify-end gap-3.5"
-            data-testid="pause-actions"
-          >
+          <ClassicActions className="mt-4" testId="pause-actions">
             {hasActivePause ? (
               <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
                 {t("match.pause.resume")}
@@ -128,7 +124,7 @@ export function PauseOverlay({
                 </span>
               </ClassicButton>
             )}
-          </div>
+          </ClassicActions>
         </ClassicPanel>
       </OverlayBackdrop>
     </div>

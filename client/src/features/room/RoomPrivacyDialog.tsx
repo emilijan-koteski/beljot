@@ -5,15 +5,7 @@ import { toast } from "sonner";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { Segmented } from "@/shared/components/ui/segmented";
@@ -58,8 +50,7 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
     (password.length >= MIN_ROOM_PASSWORD &&
       new TextEncoder().encode(password).length <= MAX_ROOM_PASSWORD);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (mutation.isPending || !passwordValid) return;
     setErrorKey(null);
     try {
@@ -85,95 +76,84 @@ export function RoomPrivacyDialog({ open, room, onClose }: RoomPrivacyDialogProp
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent showCloseButton={false} data-testid="room-privacy-dialog">
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <DialogHeader>
-            <DialogTitle>{t("room.privacy.dialogTitle")}</DialogTitle>
-            <DialogDescription>{t("room.privacy.dialogDescription")}</DialogDescription>
-          </DialogHeader>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={makePrivate ? <Lock /> : <LockOpen />}
+      title={t("room.privacy.dialogTitle")}
+      description={t("room.privacy.dialogDescription")}
+      error={errorKey !== null ? t(errorKey) : null}
+      errorTestId="room-privacy-error"
+      pending={mutation.isPending}
+      onSubmit={() => void handleSubmit()}
+      primary={{
+        label: mutation.isPending ? t("room.privacy.saving") : t("room.privacy.save"),
+        disabled: !passwordValid,
+        testId: "room-privacy-submit",
+      }}
+      secondary={{
+        label: t("room.privacy.cancel"),
+        onClick: onClose,
+        testId: "room-privacy-cancel",
+      }}
+      testId="room-privacy-dialog"
+    >
+      <div className="grid gap-4">
+        <Field label={t("room.privacy.modeLabel")}>
+          <Segmented
+            value={makePrivate ? "private" : "public"}
+            onValueChange={(v) => {
+              setMakePrivate(v === "private");
+              setErrorKey(null);
+              if (v === "public") setPassword("");
+            }}
+            options={[
+              {
+                value: "public",
+                label: t("room.privacy.public"),
+                icon: <LockOpen className="size-3.5" />,
+              },
+              {
+                value: "private",
+                label: t("room.privacy.private"),
+                icon: <Lock className="size-3.5" />,
+              },
+            ]}
+            testId="room-privacy-mode"
+            ariaLabel={t("room.privacy.modeLabel")}
+          />
+        </Field>
 
-          <Field label={t("room.privacy.modeLabel")}>
-            <Segmented
-              value={makePrivate ? "private" : "public"}
-              onValueChange={(v) => {
-                setMakePrivate(v === "private");
-                setErrorKey(null);
-                if (v === "public") setPassword("");
-              }}
-              options={[
-                {
-                  value: "public",
-                  label: t("room.privacy.public"),
-                  icon: <LockOpen className="size-3.5" />,
-                },
-                {
-                  value: "private",
-                  label: t("room.privacy.private"),
-                  icon: <Lock className="size-3.5" />,
-                },
-              ]}
-              testId="room-privacy-mode"
-              ariaLabel={t("room.privacy.modeLabel")}
-            />
+        {makePrivate && (
+          <Field
+            label={t("room.privacy.passwordLabel")}
+            htmlFor="room-privacy-password"
+            hint={t("room.privacy.passwordHint", { min: MIN_ROOM_PASSWORD })}
+            required
+          >
+            <div className="relative">
+              <Input
+                id="room-privacy-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD));
+                  setErrorKey(null);
+                }}
+                maxLength={MAX_ROOM_PASSWORD}
+                data-testid="room-privacy-password-input"
+                className="h-11 pr-10"
+              />
+              <PasswordToggle
+                shown={showPassword}
+                onToggle={() => setShowPassword(!showPassword)}
+                testId="room-privacy-password-toggle"
+              />
+            </div>
           </Field>
-
-          {makePrivate && (
-            <Field
-              label={t("room.privacy.passwordLabel")}
-              htmlFor="room-privacy-password"
-              hint={t("room.privacy.passwordHint", { min: MIN_ROOM_PASSWORD })}
-              required
-            >
-              <div className="relative">
-                <Input
-                  id="room-privacy-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder={t("room.privacy.passwordPlaceholder")}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value.slice(0, MAX_ROOM_PASSWORD));
-                    setErrorKey(null);
-                  }}
-                  maxLength={MAX_ROOM_PASSWORD}
-                  data-testid="room-privacy-password-input"
-                  className="h-11 pr-10"
-                />
-                <PasswordToggle
-                  shown={showPassword}
-                  onToggle={() => setShowPassword(!showPassword)}
-                  testId="room-privacy-password-toggle"
-                />
-              </div>
-            </Field>
-          )}
-
-          {errorKey !== null && (
-            <p role="alert" data-testid="room-privacy-error" className="text-danger text-sm">
-              {t(errorKey)}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !passwordValid}
-              data-testid="room-privacy-submit"
-            >
-              {mutation.isPending ? t("room.privacy.saving") : t("room.privacy.save")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              data-testid="room-privacy-cancel"
-            >
-              {t("room.privacy.cancel")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+      </div>
+    </AppDialog>
   );
 }

@@ -3,7 +3,12 @@
     "appName": "Beljot",
     "close": "Close",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "crash": {
+      "title": "Something went wrong",
+      "retry": "Try again",
+      "backToLobby": "Back to lobby"
+    }
   },
   "team": {
     "us": "Us",
@@ -40,14 +45,14 @@
     "invites": {
       "eyebrow": "Privacy",
       "title": "Room invites",
-      "description": "Players who aren't your friends can invite you to a room while you're free in the lobby. Friends can always invite you.",
+      "description": "Non-friends can invite you while you're free in the lobby. Friends always can.",
       "allowNonFriends": "Invites from non-friends"
     },
     "eyebrow": "Profile",
     "memberSince": "Member since {{date}}",
     "winRate": "Win rate",
     "statsHeading": "Stats",
-    "careerError": "Could not load career stats — try again",
+    "careerError": "Couldn't load career stats. Try again.",
     "lastPlayed": {
       "today": "Played today",
       "yesterday": "Played yesterday",
@@ -72,15 +77,15 @@
         "invalidChars": "Only letters, numbers, and underscores are allowed",
         "taken": "That username is already taken",
         "unchanged": "That is already your username",
-        "tooSoon": "You changed your username too recently — you can try again on {{date}}",
-        "tooSoonGeneric": "You changed your username too recently — please try again later",
-        "generic": "Could not update username — please try again"
+        "tooSoon": "Your username was changed recently. Try again on {{date}}.",
+        "tooSoonGeneric": "Your username was changed recently. Try again later.",
+        "generic": "Couldn't update your username. Try again."
       }
     },
     "avatar": {
       "title": "Profile picture",
       "edit": "Change profile picture",
-      "hint": "JPEG, PNG or WebP, up to 2 MB. It is cropped to a square from the center.",
+      "hint": "JPEG, PNG or WebP, up to 2 MB.",
       "previewAlt": "Preview of the new picture",
       "pick": "Choose image",
       "upload": "Upload",
@@ -92,34 +97,34 @@
       "success": "Profile picture updated",
       "removed": "Profile picture removed",
       "errors": {
-        "tooLarge": "That image is too large. Use a file up to 2 MB, at most 4096 pixels per side and 16 megapixels in total.",
-        "tooSmall": "That image is too small. Its shorter side must be at least 128 pixels.",
-        "unsupported": "That format isn't supported. Choose a JPEG, PNG or WebP image without animation.",
+        "tooLarge": "That image is too large: up to 2 MB, 4096 px per side, 16 MP.",
+        "tooSmall": "That image is too small: at least 128 px on the shorter side.",
+        "unsupported": "Choose a JPEG, PNG or WebP image without animation.",
         "rateLimited": "Too many uploads in the last hour. Try again later.",
         "busy": "The server is busy. Try again in a moment.",
         "unavailable": "Picture uploads are unavailable right now.",
-        "generic": "Could not update your picture — please try again"
+        "generic": "Couldn't update your picture. Try again."
       }
     },
     "streak": {
-      "winTitle": "Win streak — {{count}} in a row",
-      "lossTitle": "Cold streak — {{count}} losses in a row",
-      "winSubtitle": "Keep it going — your next match counts toward the streak.",
+      "winTitle": "Win streak: {{count}} in a row",
+      "lossTitle": "Cold streak: {{count}} losses in a row",
+      "winSubtitle": "Keep it going. Your next match counts toward the streak.",
       "winSubtitlePublic": "Their next match counts toward the streak.",
-      "lossSubtitle": "Shake it off — Quick Play to break the run.",
+      "lossSubtitle": "Shake it off. Quick Play to break the run.",
       "lossSubtitlePublic": "The run breaks with their next win.",
       "play": "Play"
     },
     "stats": {
       "eyebrow": "Career",
-      "sub": "Career totals across every match — declarations, capots, failed hands and all.",
+      "sub": "Totals across every match.",
       "totalGamesPlayed": "Matches played",
       "wins": "Wins",
       "losses": "Losses",
       "abandoned": "Abandoned",
       "winRate": "Win rate",
       "winRateEmpty": "–",
-      "error": "Could not load stats — try again",
+      "error": "Couldn't load stats. Try again.",
       "outcomeSplit": "Outcome split",
       "legendWins": "{{count}} wins",
       "legendLosses": "{{count}} losses",
@@ -138,19 +143,17 @@
       "explainer": {
         "open": "How it works",
         "title": "How honor works",
-        "lede": "The score shows one thing — whether you finish the matches you start.",
-        "finishLabel": "Finish a match",
-        "finishBody": "— win or lose, it lifts your score.",
-        "dropLabel": "If you drop out and don't come back,",
-        "dropBody": "your score falls. Nothing else lowers it.",
-        "surrenderLabel": "Surrender doesn't count.",
-        "surrenderBody": "A finished match is a finished match.",
-        "decayLabel": "Old abandonments fade.",
-        "decayBody": "Recent matches count for far more.",
-        "standing": "You're at {{score}} — <tierWord>{{tier}}</tierWord>.",
-        "standingNew": "Finish 5 matches and your score appears here.",
+        "lede": "Honor shows whether you finish the matches you start.",
+        "standing": "You're at {{score}}, <tierWord>{{tier}}</tierWord>.",
+        "standingNew": "Finish 5 matches to see your score.",
         "fullRules": "Full rules",
-        "close": "Got it"
+        "close": "Got it",
+        "facts": {
+          "finish": "Finishing a match raises it, win or lose.",
+          "drop": "Only leaving a match for good lowers it.",
+          "surrender": "Surrendering counts as finishing.",
+          "decay": "Old abandonments fade; recent matches count most."
+        }
       },
       "tier": {
         "exemplary": "Exemplary",
@@ -175,13 +178,13 @@
     "matchHistory": {
       "eyebrow": "Activity",
       "title": "Match history",
-      "sub": "Every completed match — open a row to see hand-by-hand scoring, declarations, capots and failed hands.",
-      "empty": "No matches yet — Quick Play to get started",
+      "sub": "Open a match to see it hand by hand.",
+      "empty": "No matches yet. Quick Play to get started.",
       "emptyCta": "Go to lobby",
       "emptyPublic": "This player hasn't played any matches yet.",
       "emptyFiltered": "No matches for this filter yet.",
       "loading": "Loading matches…",
-      "error": "Could not load match history — try again",
+      "error": "Couldn't load match history. Try again.",
       "loadMore": "Load more",
       "showing": "Showing {{shown}} of {{total}} matches",
       "durationDhms": "{{d}}d {{h}}:{{m}}:{{s}}",
@@ -198,7 +201,7 @@
       "outcomeWin": "Win",
       "outcomeLoss": "Loss",
       "outcomeAbandoned": "Abandoned",
-      "endedEarlyAbandonment": "Ended early — a player abandoned",
+      "endedEarlyAbandonment": "Ended early: a player abandoned",
       "endedEarlySurrender": "Ended early by surrender",
       "expandRow": "Show hand details",
       "collapseRow": "Hide hand details",
@@ -242,20 +245,20 @@
           "failedUs": "failed · us",
           "failedThem": "failed · them"
         },
-        "unfinished": "Unfinished hand — target reached"
+        "unfinished": "Unfinished hand: target reached"
       }
     },
     "partners": {
       "eyebrow": "Spotlight",
       "title": "Most-played partner",
       "matchesTogether": "{{count}} matches together",
-      "empty": "No regular partners yet — play a few matches.",
+      "empty": "No regular partners yet. Play a few matches.",
       "emptyPublic": "No regular partners yet."
     },
     "rivals": {
       "eyebrow": "Rivalry",
       "title": "Across the table",
-      "empty": "No rivals yet — play a few matches.",
+      "empty": "No rivals yet. Play a few matches.",
       "emptyPublic": "No rivals yet."
     },
     "linkedAccounts": {
@@ -267,13 +270,13 @@
       "notLinked": "Not linked",
       "unlink": "Unlink",
       "passwordlessHint": "Set a password before unlinking your only sign-in method.",
-      "loadError": "Could not load linked accounts. Try again.",
+      "loadError": "Couldn't load linked accounts. Try again.",
       "linkedToast": "Google account linked.",
       "unlinkedToast": "Google account unlinked.",
       "unlinkDialog": {
-        "title": "Unlink {{provider}}?",
-        "description": "Remove {{provider}} ({{email}}) from your account. You can link it again anytime.",
-        "descriptionNoEmail": "Remove {{provider}} from your account. You can link it again anytime.",
+        "title": "Unlink {{provider}}",
+        "description": "You can link {{email}} again any time.",
+        "descriptionNoEmail": "You can link it again any time.",
         "cancel": "Cancel",
         "confirm": "Unlink",
         "submitting": "Unlinking…"
@@ -282,9 +285,9 @@
         "alreadyLinked": "That Google account is already linked to another account.",
         "emailUnverified": "Your Google email isn't verified. Verify it with Google and try again.",
         "credentialExpired": "Your Google sign-in expired. Tap the Google button and try again.",
-        "linkFailed": "Couldn't link your account. Please try again.",
+        "linkFailed": "Couldn't link your account. Try again.",
         "cannotUnlinkLast": "Set a password before unlinking your only sign-in method.",
-        "unlinkFailed": "Couldn't unlink your account. Please try again."
+        "unlinkFailed": "Couldn't unlink your account. Try again."
       }
     },
     "milestones": {
@@ -334,17 +337,17 @@
       "heading": "Friend requests"
     },
     "removeDialog": {
-      "title": "Remove friend?",
-      "description": "Remove {{username}} from your friends. You can send a new friend request later.",
+      "title": "Remove {{username}}",
+      "description": "You can send a friend request again later.",
       "cancel": "Cancel",
       "confirm": "Remove",
       "submitting": "Removing…"
     },
     "errors": {
-      "sendFailed": "Couldn't send friend request. Please try again.",
-      "acceptFailed": "Couldn't accept the request — it may no longer be available.",
-      "declineFailed": "Couldn't decline the request — it may no longer be available.",
-      "removeFailed": "Couldn't remove this friend — you may no longer be friends."
+      "sendFailed": "Couldn't send the friend request. Try again.",
+      "acceptFailed": "Couldn't accept the request. It may no longer be available.",
+      "declineFailed": "Couldn't decline the request. It may no longer be available.",
+      "removeFailed": "Couldn't remove this friend. You may no longer be friends."
     }
   },
   "language": {
@@ -414,51 +417,50 @@
       "sendLabel": "Send message"
     },
     "errors": {
-      "matchStartFailed": "Failed to start the match. Please try again.",
-      "alreadyStarted": "The match has already started — you can't leave now.",
-      "seatFailed": "Failed to select seat — try again",
-      "startFailed": "Failed to start the match — try again",
+      "matchStartFailed": "Couldn't start the match. Try again.",
+      "alreadyStarted": "The match has already started. You can't leave now.",
+      "seatFailed": "Couldn't take the seat. Try again.",
+      "startFailed": "Couldn't start the match. Try again.",
       "notOwner": "Only the host can start the match",
       "notOwnerAction": "Only the host can do that",
       "notAllSeated": "All 4 players must be seated to start",
-      "roomStarted": "The match has already started — kick and seat-swap are no longer available.",
+      "roomStarted": "The match has already started. Kick and seat swap are no longer available.",
       "seatNotOccupied": "Pick two seated players to swap.",
-      "kickFailed": "Failed to remove player — try again",
-      "swapFailed": "Failed to swap seats — try again",
-      "leaveSeatFailed": "Failed to leave seat — try again",
-      "leaveSeatQuickPlay": "You can't leave your seat in quick play — leave the room instead.",
-      "leaveSeatOwner": "The host can't leave their seat — leave the room instead.",
-      "transferFailed": "Failed to transfer the host role — try again",
+      "kickFailed": "Couldn't kick the player. Try again.",
+      "swapFailed": "Couldn't swap seats. Try again.",
+      "leaveSeatFailed": "Couldn't leave the seat. Try again.",
+      "leaveSeatQuickPlay": "You can't leave your seat in quick play. Leave the room instead.",
+      "leaveSeatOwner": "The host can't leave their seat. Leave the room instead.",
+      "transferFailed": "Couldn't hand over the host role. Try again.",
       "promoteUnseated": "The new host must be seated.",
       "promoteNotInRoom": "That player is no longer in the room.",
-      "addBotFailed": "Failed to add the bot — try again",
-      "removeBotFailed": "Failed to remove the bot — try again",
+      "addBotFailed": "Couldn't add the bot. Try again.",
+      "removeBotFailed": "Couldn't remove the bot. Try again.",
       "botsNotAllowed": "Bots can't be added to this room",
-      "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
+      "insufficientCoins": "You need {{buyIn}} coins to join this room. You have {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
-      "insufficientCoinsStart": "A player can't stake that much — the match didn't start.",
-      "wrongPassword": "Incorrect room password.",
-      "honorTooLow": "This room asks for honor {{minHonor}} or higher. Yours is {{honor}} — finish a few matches to bring it up.",
+      "insufficientCoinsStart": "A player can't stake that much. The match didn't start.",
+      "wrongPassword": "Wrong password.",
+      "honorTooLow": "This room needs {{minHonor}} honor. You have {{honor}}.",
       "honorTooLowGeneric": "Your honor score is below this room's minimum.",
       "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it.",
-      "honorGateStart": "A player doesn't meet this room's honor requirement — the match didn't start."
+      "honorGateStart": "A player doesn't meet this room's honor bar. The match didn't start."
     },
     "passwordPrompt": {
       "title": "Private room",
-      "description": "Enter the password to join \"{{name}}\".",
-      "placeholder": "Room password",
+      "description": "Enter the password for {{name}}.",
+      "placeholder": "Password",
       "submit": "Join",
       "submitting": "Joining…",
       "cancel": "Cancel"
     },
     "privacy": {
       "dialogTitle": "Room privacy",
-      "dialogDescription": "Make this room private with a password, or open it to everyone. Seated players are never removed.",
+      "dialogDescription": "Seated players stay either way.",
       "modeLabel": "Access",
       "public": "Public",
       "private": "Private",
-      "passwordLabel": "Room password",
-      "passwordPlaceholder": "Enter password",
+      "passwordLabel": "Password",
       "passwordHint": "At least {{min}} characters",
       "cancel": "Cancel",
       "save": "Save",
@@ -471,18 +473,18 @@
       "manageButtonPublic": "Privacy: Public",
       "errors": {
         "passwordRequired": "Set a password for the private room",
-        "passwordTooShort": "Password needs at least 4 characters",
+        "passwordTooShort": "Password must be at least 4 characters",
         "passwordTooLong": "Password must be at most 72 characters",
         "notOwner": "Only the host can change room privacy",
         "notWaiting": "Privacy can only change before the match starts",
-        "unexpected": "Could not update privacy. Try again."
+        "unexpected": "Couldn't update privacy. Try again."
       }
     },
     "waitingForPlayers": "Waiting for players",
     "waitingForReturn": "Waiting for players to return",
     "copyLinkAriaLabel": "Copy room code {{code}}",
     "copyLinkSuccess": "Room code copied!",
-    "copyLinkFailed": "Failed to copy — code: {{code}}",
+    "copyLinkFailed": "Couldn't copy. The code is {{code}}.",
     "leaveRoom": "Leave room",
     "seatYou": "You",
     "seatYouInline": "you",
@@ -510,42 +512,26 @@
     "autoStarting": "Starting match…",
     "kickIconLabel": "Kick {{username}}",
     "kickConfirm": {
-      "title": "Kick <name>{{name}}</name> from the room?",
-      "lede": "This is a kick, not a permanent ban — <strong>{{name}}</strong> can rejoin any time.",
+      "title": "Kick {{name}}",
+      "description": "They can rejoin any time.",
       "confirm": "Kick",
       "cancel": "Cancel"
     },
     "addBot": "Add a bot",
     "removeBotIconLabel": "Remove {{name}}",
     "removeBotConfirm": {
-      "title": "Remove <name>{{name}}</name> from the table?",
-      "lede": "The seat opens up right away — seat another bot or leave it for a player.",
+      "title": "Remove {{name}}",
+      "description": "The seat opens right away.",
       "confirm": "Remove",
       "cancel": "Cancel"
     },
     "kickedToast": "You were removed from room {{name}}",
     "promoteIconLabel": "Make {{username}} the host",
     "transferConfirm": {
-      "title": "Transfer room ownership to another player?",
-      "lede": "You stay in the room, but <strong>{{toName}}</strong> becomes the host. Only a host can hand the ownership back — you can't take it yourself.",
+      "title": "Make {{name}} host",
+      "description": "Only the new host can hand it back.",
       "confirm": "Make host",
       "cancel": "Cancel"
-    },
-    "ownerConfirm": {
-      "eyebrow": "Host action",
-      "close": "Close",
-      "seatLabel": "Seat {{n}}",
-      "standing": "Standing",
-      "youHost": "You · current host",
-      "newHost": "{{name}} · New host",
-      "handOver": "You'll hand over",
-      "capabilities": {
-        "start": "Starting the match",
-        "seats": "Swapping & arranging seats",
-        "players": "Kicking & promoting players",
-        "bots": "Adding & removing bots",
-        "privacy": "Room privacy"
-      }
     },
     "legendNeutral": "Open seats · teams reveal once you sit down",
     "legendOpen": "open",
@@ -570,7 +556,6 @@
     "lastMatch": {
       "openButton": "Last match",
       "title": "Last match",
-      "description": "How this table's most recent match went, hand by hand.",
       "loading": "Loading the last match…",
       "unavailable": "The last match isn't available right now."
     }
@@ -579,32 +564,32 @@
     "someone": "Someone",
     "popup": {
       "title": "Room invite",
-      "body": "{{inviter}} invited you to join \"{{roomName}}\".",
+      "body": "{{inviter}} invited you to {{roomName}}.",
       "buyIn": "Buy-in {{buyIn}}",
-      "privateHostInvite": "Private room — your invite gets you in",
-      "privatePasswordNeeded": "Private room — password required",
-      "accept": "Join room",
+      "privateHostInvite": "No password needed",
+      "privatePasswordNeeded": "Password needed",
+      "accept": "Join",
       "accepting": "Joining…",
       "decline": "Not now"
     },
     "panel": {
       "openButton": "Invite players",
       "title": "Invite players",
-      "description": "Friends who are online and players who are free in the lobby can be invited to this room.",
       "tabsLabel": "Who to invite",
       "tabFriends": "Friends",
       "tabLobby": "Lobby",
       "loading": "Loading friends…",
-      "loadFailed": "Couldn't load your friends. Please try again.",
+      "loadFailed": "Couldn't load your friends. Try again.",
       "empty": "No friends yet. Find players and send a friend request.",
       "searchLabel": "Search lobby players",
       "searchPlaceholder": "Search by username…",
       "lobbyLoading": "Loading players…",
-      "lobbyLoadFailed": "Couldn't load lobby players. Please try again.",
+      "lobbyLoadFailed": "Couldn't load lobby players. Try again.",
       "lobbyEmpty": "Nobody else is free in the lobby right now.",
       "lobbyNoMatch": "No lobby players match \"{{query}}\"",
       "invite": "Invite",
-      "invited": "Invited"
+      "invited": "Invited",
+      "done": "Done"
     },
     "reasons": {
       "offline": "Offline",
@@ -619,7 +604,7 @@
       "roomFull": "This room is full",
       "notFriends": "This player only accepts invites from friends",
       "alreadyPending": "They already have an invite to this room",
-      "sendFailed": "Couldn't send the invite. Please try again.",
+      "sendFailed": "Couldn't send the invite. Try again.",
       "expired": "That invite is no longer valid.",
       "roomGone": "This room is no longer available."
     }
@@ -654,21 +639,18 @@
       "online": "online"
     },
     "roomEjection": {
-      "eyebrow": "Heads up",
       "insolventTitle": "Not enough coins",
-      "insolventBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
-      "honorTitle": "Honor below the room's bar",
-      "honorBody": "Your honor dropped below this room's minimum of {{minHonor}} — it's now {{honor}}. Finish your next matches and it climbs back.",
+      "insolventBody": "This room needs {{buyIn}}. You have {{balance}}.",
+      "honorTitle": "Not enough honor",
+      "honorBody": "This room needs {{minHonor}} honor. You have {{honor}}.",
       "roomClosedTitle": "Room closed",
-      "roomClosedBody": "This room closed — no remaining player could be its host.",
+      "roomClosedBody": "No player left could host it.",
       "action": "Got it",
-      "youLabel": "You",
-      "tableLabel": "Table",
       "browseQualifying": "Rooms I qualify for"
     },
     "matchmaking": {
       "title": "Quick Play",
-      "subtitle": "You'll be seated as soon as three other players are ready. The match starts the moment the last seat fills.",
+      "subtitle": "The match starts as soon as four players are ready.",
       "eyebrow": "Searching for players",
       "elapsed": "elapsed",
       "seated": "{{found}} / 4 seated",
@@ -694,20 +676,19 @@
       "errors": {
         "nameRequired": "Room name is required",
         "nameTaken": "That name is taken",
-        "unexpected": "Could not create room. Try again.",
-        "nameTooShort": "Name needs at least {{min}} characters",
+        "unexpected": "Couldn't create the room. Try again.",
+        "nameTooShort": "Name must be at least {{min}} characters",
         "buyInTooHigh": "Buy-in exceeds your balance of {{balance}}",
-        "alreadyInRoom": "You're already in a room — leave it before creating a new one",
+        "alreadyInRoom": "You're already in a room. Leave it before creating a new one.",
         "passwordRequired": "Set a password for the private room",
-        "passwordTooShort": "Password needs at least {{min}} characters",
+        "passwordTooShort": "Password must be at least {{min}} characters",
         "passwordTooLong": "Password must be at most {{max}} characters",
         "invalidMinHonor": "Minimum honor must be between {{min}} and {{max}}.",
         "ownHonorTooLow": "Your honor is {{honor}}, so you can't sit in a room with a minimum of {{minHonor}}. Lower the minimum to continue.",
         "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
-      "eyebrow": "New room",
       "headline": "Create a room",
-      "roomNameInfo": "{{min}}–{{max}} characters. A random name is already filled in — press ↻ for another, or type your own.",
+      "roomNameInfo": "{{min}}–{{max}} characters. Press ↻ for another random name, or type your own.",
       "roomNameShuffleAria": "New random name",
       "randomName": {
         "adjectives": [
@@ -745,14 +726,13 @@
       "submit": "Create room",
       "submitting": "Creating…",
       "preview": {
-        "title": "Live preview · how the room appears in the lobby",
+        "title": "Lobby preview",
         "joinLabel": "Join",
-        "justNow": "just now",
         "codeLabel": "CODE",
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
-      "matchModeHint": "501 for a quick match, 701 for a medium one, 1001 for the full race",
+      "matchModeHint": "501 is quick, 701 medium, 1001 the full race",
       "timerHintRelaxed": "No timer",
       "timerDurationHint": "10–120s · default 30s",
       "coinBuyIn": "Buy-in",
@@ -763,27 +743,24 @@
       "privateRoomHint": "Private rooms stay listed but need a password to join",
       "privacyPublic": "Public",
       "privacyPrivate": "Private",
-      "roomPassword": "Room password",
-      "roomPasswordPlaceholder": "Enter password",
+      "roomPassword": "Password",
       "minHonor": "Who can sit down",
-      "minHonorHint": "Players with this honor score or higher",
       "minHonorAnyone": "Anyone",
-      "minHonorYou": "you {{honor}}",
       "minHonorInfoBands": "Each threshold is an honor-tier boundary: {{bands}}.",
       "minHonorInfoYou": "Your honor is {{honor}} · {{tier}}.",
       "allowNewPlayers": "New players",
       "allowNewPlayersYes": "Welcome",
       "allowNewPlayersNo": "Veterans only",
-      "allowNewPlayersHint": "New players haven't played enough matches to have an honor score yet. \"Veterans only\" excludes them.",
+      "allowNewPlayersHint": "New players have no honor score yet. \"Veterans only\" keeps them out.",
       "roomPasswordHint": "At least {{min}} characters",
       "declarations": "Declarations",
       "declarationsOn": "On",
       "declarationsOff": "Off",
-      "declarationsHint": "Off means no declarations and no Belote: hands score on card points alone",
+      "declarationsHint": "Off: no declarations or Belote, card points only",
       "declarationsTransfer": "Declarations on a fall",
       "declarationsTransferOn": "To the winners",
       "declarationsTransferOff": "Voided",
-      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote normally go to the other team. Voided means nobody scores them",
+      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote go to the other team; voided, nobody scores them",
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
@@ -791,7 +768,7 @@
       "direction": "Direction of play",
       "directionCounterClockwise": "Counter-clockwise",
       "directionClockwise": "Clockwise",
-      "directionHint": "Counter-clockwise passes the turn to the right, as usual; clockwise passes it to the left",
+      "directionHint": "Counter-clockwise passes the turn right, as usual; clockwise passes it left",
       "advanced": {
         "title": "Advanced settings",
         "changedCount": "{{count}} changed",
@@ -839,7 +816,7 @@
     },
     "empty": {
       "title": "No open rooms match your filters",
-      "description": "Try clearing filters, hit Quick Play, or create a room and invite your friends.",
+      "description": "Clear the filters, try Quick Play, or create a room.",
       "clear": "Clear search"
     },
     "card": {
@@ -860,9 +837,9 @@
       "matchModeGeneric": "{{points}} pts",
       "buyInFree": "No stake",
       "private": "Private",
-      "privateLockAriaLabel": "Private room — password required to join",
+      "privateLockAriaLabel": "Private room, password required to join",
       "public": "Public",
-      "publicAriaLabel": "Public room — anyone can join",
+      "publicAriaLabel": "Public room, anyone can join",
       "minHonor": "{{minHonor}}",
       "minHonorAriaLabel": "Minimum honor {{minHonor}}",
       "veteransOnly": "Veterans only",
@@ -889,9 +866,9 @@
       "roomFull": "Room is full",
       "roomNotFound": "Room not found",
       "alreadyInRoom": "You are already in a room",
-      "joinFailed": "Could not join. Try another room.",
-      "matchmakingFailed": "Matchmaking failed. Try again.",
-      "quickPlayBracketMismatch": "This room is for a different coin bracket — tap Quick Play to find yours."
+      "joinFailed": "Couldn't join. Try another room.",
+      "matchmakingFailed": "Couldn't start matchmaking. Try again.",
+      "quickPlayBracketMismatch": "This room is for a different coin bracket. Tap Quick Play to find yours."
     }
   },
   "match": {
@@ -1170,9 +1147,9 @@
       "label": "Stake"
     },
     "rules": {
-      "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand. The scoring chapter below describes the usual rule, where the hand is played out first.",
-      "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team. The scoring chapter below describes the usual rule, where those declarations go to the other team.",
-      "clockwiseNote": "On this table, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left. The chapters below describe the usual rightward play."
+      "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand.",
+      "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team.",
+      "clockwiseNote": "On this table, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left."
     }
   },
   "auth": {
@@ -1192,10 +1169,10 @@
         "emailInvalid": "Enter a valid email address",
         "passwordRequired": "Password is required",
         "invalidCredentials": "Invalid email or password",
-        "loginFailed": "Login failed. Please try again."
+        "loginFailed": "Couldn't log in. Try again."
       },
       "eyebrow": "Welcome back",
-      "subtitle": "Sit back down at the table — your seat's still warm.",
+      "subtitle": "Sit back down at the table. Your seat's still warm.",
       "altPrompt": "New to Beljot?",
       "altCta": "Create an account",
       "forgotLink": "Forgot?"
@@ -1230,7 +1207,7 @@
         "passwordTooShort": "Password must be at least 8 characters",
         "passwordTooLong": "Password must be at most 72 characters",
         "consentRequired": "You must accept the Terms of Service and Privacy Policy",
-        "registrationFailed": "Registration failed. Please try again."
+        "registrationFailed": "Couldn't create your account. Try again."
       },
       "eyebrow": "Pull up a chair",
       "subtitle": "Pick a name, get a seat. Four players to a table, two to a team.",
@@ -1248,20 +1225,20 @@
       },
       "linkDialog": {
         "title": "Link your account",
-        "description": "An account for {{email}} already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
-        "descriptionNoEmail": "An account with this email already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
-        "passwordPlaceholder": "Account password",
+        "description": "Enter the password for {{email}} to link Google sign-in.",
+        "descriptionNoEmail": "Enter your password to link Google sign-in.",
+        "passwordPlaceholder": "Password",
         "cancel": "Cancel",
         "submit": "Link and log in",
         "submitting": "Linking…",
         "errors": {
-          "wrongPassword": "Incorrect password. Try again.",
-          "linkFailed": "Couldn't link your account. Please try again."
+          "wrongPassword": "Wrong password.",
+          "linkFailed": "Couldn't link your account. Try again."
         }
       },
       "errors": {
         "emailUnverified": "Your Google email isn't verified. Verify it with Google and try again.",
-        "ssoFailed": "Google sign-in failed. Please try again.",
+        "ssoFailed": "Couldn't sign in with Google. Try again.",
         "credentialExpired": "Your Google sign-in expired. Tap the Google button and try again."
       }
     },
@@ -1271,20 +1248,20 @@
     "forgotPassword": {
       "eyebrow": "Forgot password",
       "title": "Reset your password",
-      "subtitle": "Enter your email and we'll send you a link to set a new password.",
+      "subtitle": "We'll email you a link to set a new password.",
       "emailLabel": "Email",
       "emailPlaceholder": "your@email.com",
       "submitButton": "Send reset link",
       "submitting": "Sending…",
       "successTitle": "Check your inbox",
       "successBody": "If an account exists for that email, we've sent a link to reset your password.",
-      "successHint": "The link expires in 1 hour. Don't forget to check your spam folder.",
+      "successHint": "The link expires in 1 hour. Check your spam folder too.",
       "altPrompt": "Remembered it?",
       "altCta": "Back to log in",
       "errors": {
         "emailRequired": "Email is required",
         "emailInvalid": "Enter a valid email address",
-        "requestFailed": "Something went wrong. Please try again."
+        "requestFailed": "Couldn't send the reset link. Try again."
       }
     },
     "resetPassword": {
@@ -1297,9 +1274,9 @@
       "confirmPlaceholder": "Re-enter your password",
       "submitButton": "Reset password",
       "submitting": "Resetting…",
-      "success": "Password updated — please log in.",
+      "success": "Password updated. Log in.",
       "invalidTitle": "Link expired",
-      "invalidBody": "This reset link is invalid or has expired. Request a new one to continue.",
+      "invalidBody": "This link is invalid or has expired. Request a new one.",
       "requestNewLink": "Request a new link",
       "altPrompt": "Remembered it?",
       "altCta": "Back to log in",
@@ -1308,7 +1285,7 @@
         "passwordTooShort": "Password must be at least 8 characters",
         "passwordTooLong": "Password must be at most 72 characters",
         "passwordsMismatch": "Passwords don't match",
-        "resetFailed": "Something went wrong. Please try again."
+        "resetFailed": "Couldn't reset your password. Try again."
       }
     }
   },
@@ -1321,7 +1298,7 @@
       "eyebrow": "Beljot Online · 2 v 2 · Free to play",
       "title1": "Sit down at",
       "title2": "the table.",
-      "subtitle": "Belote is the classic four-player card game — two teams, race to 1001. Find a room in seconds, or invite your usual four with a code.",
+      "subtitle": "Belote is the classic four-player card game: two teams, race to 1001. Find a room in seconds, or invite your usual four with a code.",
       "cta": "Create free account",
       "playing": "playing right now",
       "openTables": "open rooms"
@@ -1330,22 +1307,22 @@
       "eyebrow": "Three steps to the first trick",
       "title": "You're dealt in before the coffee cools.",
       "s1t": "Make a free account",
-      "s1b": "Pick a name, no downloads. You're in the lobby in under a minute.",
+      "s1b": "Pick a name, no downloads. You're in the lobby in a minute.",
       "s2t": "Take a seat",
-      "s2b": "Hit Quick Play and we'll matchmake your four, or open a custom room and share the code with friends.",
+      "s2b": "Hit Quick Play to be matched, or open a room and share the code.",
       "s3t": "Take trump & play",
-      "s3b": "Take the trump suit, win tricks alongside your partner, and race your team to 1001 points."
+      "s3b": "Call trump, win tricks with your partner, race to 1001."
     },
     "feat": {
       "f1tag": "The lobby · live",
       "f1title": "Watch the rooms fill in real time",
-      "f1body": "Every open room, every seat, updated as it happens. Filter by timer style or points, search by code, or just hit Quick Play and let us seat you.",
+      "f1body": "Every open room and seat, live. Filter by timer or points, search by code, or hit Quick Play.",
       "f2tag": "Teams · gold vs silver",
       "f2title": "It's a partnership, not a free-for-all",
-      "f2body": "Two against two, the way Belote is built. Sit across from your partner, read the declarations, and play the long game to 1001. Built-in chat and emotes keep the table talking.",
+      "f2body": "Two against two, partners across the table, race to 1001. Chat and emotes keep the table talking.",
       "f3tag": "Profile · match history",
       "f3title": "Every hand counts toward your record",
-      "f3body": "Track your matches played, win and loss rate, with a full match history hand by hand. See who you win alongside and how tonight stacked up."
+      "f3body": "Matches played, win rate and a hand-by-hand history. See who you win with."
     },
     "room": {
       "join": "Join",
@@ -1353,7 +1330,7 @@
       "r1title": "Saturday night long game",
       "r1meta": "Bitola · 1001 pts · 30s",
       "r1ago": "4m ago",
-      "r2title": "Quick 501 — no timer",
+      "r2title": "Quick 501, no timer",
       "r2meta": "Croatian · 501 pts · relaxed",
       "r2ago": "just now"
     },
@@ -1387,9 +1364,9 @@
     },
     "contact": {
       "title": "Contact",
-      "lead": "Beljot is built by Emilijan Koteski. Questions, bug reports and feedback are welcome.",
+      "lead": "Questions, bug reports and feedback are welcome.",
       "linkedin": "LinkedIn",
-      "disclaimer": "This is a beta build for testing purposes — not a finished production product."
+      "disclaimer": "Beta build, still in testing."
     }
   },
   "bots": {
@@ -1401,9 +1378,7 @@
     "dailyReward": {
       "title": "Daily reward",
       "streakMaxed": "Streak maxed",
-      "coinsAdded": "coins added to your wallet",
       "streak": "Day {{streak}}",
-      "newBalance": "New balance",
       "continue": "Continue"
     }
   },
@@ -1418,7 +1393,7 @@
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Level {{level}}, {{current}} / {{next}} XP",
     "levelUpDialog": {
-      "title": "Level up!",
+      "title": "Level up",
       "earned": "+{{amount}} XP",
       "continue": "Continue"
     }
@@ -1459,13 +1434,13 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Rank up!"
+      "title": "Rank up"
     },
     "rankDownDialog": {
       "title": "Rank down"
     },
     "rankDialog": {
-      "sp": "{{change}} SP this match",
+      "sp": "{{change}} SP",
       "continue": "Continue"
     },
     "result": {
@@ -1479,7 +1454,7 @@
       "sub": "Who is climbing fastest this season, by Season Points.",
       "subPast": "Final standings for {{season}}, by Season Points.",
       "loading": "Loading…",
-      "error": "Could not load the leaderboard — try again",
+      "error": "Couldn't load the leaderboard. Try again.",
       "empty": "Nobody has earned Season Points yet this season.",
       "emptyPast": "Nobody earned Season Points in this season.",
       "loadMore": "Load more",
@@ -1501,11 +1476,10 @@
   },
   "support": {
     "label": "Support Beljot.online",
-    "note": "A hobby project — you can always <action>buy me a coffee</action>.",
+    "note": "A hobby project. You can always <action>buy me a coffee</action>.",
     "dialog": {
-      "eyebrow": "Hobby project",
       "title": "I build Beljot.online in my free time",
-      "body": "The server and the domain come out of my own pocket. A coffee covers a bit of it — playing and bringing friends along helps just as much.",
+      "body": "The server and domain come out of my pocket. A coffee helps, and so does playing and bringing friends.",
       "cta": "Buy me a coffee",
       "qrToggle": "Scan with your phone",
       "qrAlt": "QR code linking to Emilijan's Buy Me a Coffee page"

@@ -1,13 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { TierBadge } from "@/shared/components/season/TierBadge";
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import {
   formatSpChange,
   SEASON_TIER_COLOR,
@@ -36,8 +30,8 @@ interface RankChangeDialogProps {
 }
 
 /**
- * Post-match season rank-change announcement: a forced modal closed only through Continue.
- * Promotions get the celebratory brass and glow styling; demotions get the same layout kept neutral.
+ * Post-match season rank-change announcement on the celebration shell.
+ * Promotions colour the rank and light the badge; demotions keep the same layout neutral.
  */
 export function RankChangeDialog({
   open,
@@ -61,115 +55,80 @@ export function RankChangeDialog({
   const pct = progress ? Math.round(seasonBarFill(intoStep, forNextStep) * 100) : 0;
 
   return (
-    <Dialog open={open} disablePointerDismissal onOpenChange={() => {}}>
-      <DialogContent
-        showCloseButton={false}
-        data-testid="rank-change-dialog"
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      tone="celebration"
+      art={<TierBadge tier={tier} size="lg" glow={promoted} data-testid="rank-change-badge" />}
+      title={
+        <>
+          {title} <span className="sr-only">{rank}</span>
+        </>
+      }
+      primary={{
+        label: t("season.rankDialog.continue"),
+        onClick: onClose,
+        testId: "rank-change-continue",
+      }}
+      testId="rank-change-dialog"
+    >
+      <p
+        data-testid="rank-change-rank"
         data-direction={direction}
         className={cn(
-          "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
-          promoted ? "shadow-xl inset-ring inset-ring-brass/18" : "shadow-xl",
+          "m-0 text-5xl leading-none font-bold tracking-tight",
+          !promoted && "text-ink",
         )}
+        style={promoted ? { color } : undefined}
       >
-        {promoted ? (
-          <>
-            <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
-            <div
-              aria-hidden="true"
-              data-testid="rank-change-halo"
-              className="pointer-events-none absolute inset-x-0 top-0 h-[180px] bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(232,194,90,0.18),transparent_70%)]"
-            />
-          </>
-        ) : (
-          <div className="bg-border h-[3px]" />
-        )}
-
-        <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          <DialogTitle
-            aria-label={`${title} ${rank}`}
-            className={cn(
-              "text-2xs font-bold tracking-caps uppercase",
-              promoted ? "text-brass-deep" : "text-ink-dim",
-            )}
-          >
-            {title}
-          </DialogTitle>
-
-          <TierBadge tier={tier} size="lg" glow={promoted} data-testid="rank-change-badge" />
-
-          <div>
-            <div
-              data-testid="rank-change-rank"
-              className={cn(
-                "text-4xl leading-none font-bold tracking-tight",
-                !promoted && "text-ink",
-              )}
-              style={promoted ? { color } : undefined}
-            >
-              {rank}
-            </div>
-            <DialogDescription
-              data-testid="rank-change-sp"
-              className="text-ink-dim mt-1.5 text-sm tabular-nums"
-            >
-              {t("season.rankDialog.sp", { change: formatSpChange(spChange) })}
-            </DialogDescription>
+        {rank}
+      </p>
+      <p data-testid="rank-change-sp" className="text-ink-dim mt-2 mb-0 text-sm tabular-nums">
+        {t("season.rankDialog.sp", { change: formatSpChange(spChange) })}
+      </p>
+      {progress ? (
+        <div className="mt-5 w-full">
+          <div className="text-ink-dim mb-1 flex justify-end text-xs tabular-nums">
+            {atTop
+              ? t("season.banner.atTop")
+              : t("season.banner.progress", {
+                  current: intoStep.toLocaleString(),
+                  next: forNextStep.toLocaleString(),
+                })}
           </div>
-
-          {progress ? (
-            <div className="w-full">
-              <div className="text-ink-dim mb-1 flex justify-end text-xs tabular-nums">
-                {atTop
-                  ? t("season.banner.atTop")
-                  : t("season.banner.progress", {
-                      current: intoStep.toLocaleString(),
-                      next: forNextStep.toLocaleString(),
-                    })}
-              </div>
-              <div
-                data-testid="rank-change-progress"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={pct}
-                aria-label={
-                  atTop
-                    ? t("season.banner.progressLabelTop", { tier: rank, sp: sp.toLocaleString() })
-                    : t("season.banner.progressLabel", {
-                        tier: rank,
-                        current: intoStep.toLocaleString(),
-                        next: forNextStep.toLocaleString(),
-                      })
-                }
-                className="bg-surface-sunken h-1.5 overflow-hidden rounded-full"
-              >
-                <div
-                  className="h-full rounded-full transition-[width] duration-500 ease-out"
-                  style={{ width: `${pct}%`, background: color }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div
-              aria-hidden="true"
-              data-testid="rank-change-progress-placeholder"
-              className="w-full"
-            >
-              <div className="mb-1 text-xs">{"\u00a0"}</div>
-              <div className="bg-surface-sunken h-1.5 rounded-full" />
-            </div>
-          )}
-
-          <Button
-            onClick={onClose}
-            size="cta"
-            className="w-full"
-            data-testid="rank-change-continue"
+          <div
+            data-testid="rank-change-progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+            aria-label={
+              atTop
+                ? t("season.banner.progressLabelTop", { tier: rank, sp: sp.toLocaleString() })
+                : t("season.banner.progressLabel", {
+                    tier: rank,
+                    current: intoStep.toLocaleString(),
+                    next: forNextStep.toLocaleString(),
+                  })
+            }
+            className="bg-surface-sunken h-1.5 overflow-hidden rounded-full"
           >
-            {t("season.rankDialog.continue")}
-          </Button>
+            <div
+              className="h-full rounded-full transition-[width] duration-500 ease-out"
+              style={{ width: `${pct}%`, background: color }}
+            />
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      ) : (
+        <div
+          aria-hidden="true"
+          data-testid="rank-change-progress-placeholder"
+          className="mt-5 w-full"
+        >
+          <div className="mb-1 text-xs">{" "}</div>
+          <div className="bg-surface-sunken h-1.5 rounded-full" />
+        </div>
+      )}
+    </AppDialog>
   );
 }

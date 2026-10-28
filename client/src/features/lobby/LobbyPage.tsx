@@ -11,7 +11,6 @@ import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
-import { Toast } from "@/features/lobby/components/Toast";
 import { CreateRoomModal } from "@/features/room/CreateRoomModal";
 import { FetchError } from "@/shared/api/axiosClient";
 import { SupportNote } from "@/shared/components/support/SupportNote";
@@ -27,6 +26,8 @@ import { type HonorGateViewer, honorQualifies } from "@/shared/lib/honor";
 import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
+
+const JOINING_TOAST_ID = "lobby-joining";
 
 function filterAndSort(
   rooms: Room[],
@@ -87,7 +88,6 @@ export function LobbyPage() {
   );
   const [sort, setSort] = useState<LobbySort>("filling");
   const [showCreate, setShowCreate] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [pendingPrivateRoom, setPendingPrivateRoom] = useState<Room | null>(null);
   const [passwordErrorKey, setPasswordErrorKey] = useState<string | null>(null);
 
@@ -154,13 +154,16 @@ export function LobbyPage() {
   }
 
   async function joinRoomFlow(room: Room, password?: string) {
-    if (password === undefined) setToastMsg(t("lobby.card.joining", { name: room.name }));
+    if (password === undefined) {
+      toast.loading(t("lobby.card.joining", { name: room.name }), { id: JOINING_TOAST_ID });
+    }
     try {
       await joinRoomMutation.mutateAsync({ id: room.id, password });
       setPendingPrivateRoom(null);
+      toast.dismiss(JOINING_TOAST_ID);
       navigate(`/rooms/${room.id}`);
     } catch (err) {
-      setToastMsg(null);
+      toast.dismiss(JOINING_TOAST_ID);
       const code = err instanceof FetchError ? err.code : null;
       if (code === "WRONG_ROOM_PASSWORD") {
         setPasswordErrorKey("room.errors.wrongPassword");
@@ -221,12 +224,10 @@ export function LobbyPage() {
         onClose={() => {
           setPendingPrivateRoom(null);
           setPasswordErrorKey(null);
-          setToastMsg(null);
         }}
       />
       <RoomEjectionModal />
       <LobbyChatDock />
-      <Toast message={toastMsg} onClear={() => setToastMsg(null)} />
     </div>
   );
 }

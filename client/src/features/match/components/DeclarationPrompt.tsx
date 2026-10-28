@@ -9,6 +9,7 @@ import type { Declaration } from "@/shared/types/matchTypes";
 
 import { declarationLabelKey } from "../lib/declarations";
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { MeldRow } from "./overlay/MeldRow";
@@ -141,15 +142,14 @@ export function DeclarationPrompt({
               </div>
             )}
 
-            <div className="flex justify-end items-center gap-3.5">
-              <ClassicButton
-                variant="primary"
-                onClick={handleDeclare}
-                disabled={!hasDeclarations || waiting}
-                data-testid="declaration-prompt-declare"
-              >
-                {t("match.declaration.declare")}
-              </ClassicButton>
+            <ClassicActions
+              primary={{
+                label: t("match.declaration.declare"),
+                onClick: handleDeclare,
+                disabled: !hasDeclarations || waiting,
+                testId: "declaration-prompt-declare",
+              }}
+            >
               {showRing ? (
                 <ButtonTimerRing
                   turnExpiresAt={simultaneous ? null : turnExpiresAt}
@@ -162,7 +162,7 @@ export function DeclarationPrompt({
               ) : (
                 skipButton
               )}
-            </div>
+            </ClassicActions>
           </ClassicPanel>
         </div>
       </OverlayBackdrop>

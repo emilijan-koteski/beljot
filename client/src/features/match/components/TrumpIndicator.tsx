@@ -100,9 +100,9 @@ export function TrumpIndicator({
         style={{
           width: 44,
           height: 44,
-          background: `radial-gradient(circle, ${accent}22, transparent 70%), linear-gradient(180deg, #fdfaf0, #f0e8d0)`,
+          background: `radial-gradient(circle, ${accent}22, transparent 70%), linear-gradient(180deg, var(--card-face), var(--card-face-shade))`,
           border: `2px solid ${accent}`,
-          boxShadow: `0 0 12px ${accent}${glowAlpha}, inset 0 1px 0 rgba(255,255,255,0.6)`,
+          boxShadow: `0 0 12px ${accent}${glowAlpha}, inset 0 1px 0 var(--sheen-70)`,
         }}
       >
         <SuitMark

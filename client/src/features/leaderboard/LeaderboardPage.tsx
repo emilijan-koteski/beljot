@@ -5,8 +5,11 @@ import { useTranslation } from "react-i18next";
 import { SectionHeader } from "@/features/profile/components/SectionHeader";
 import { queryKeys } from "@/shared/api/queryKeys";
 import type { SeasonSelector } from "@/shared/api/season";
+import { EmptyState } from "@/shared/components/EmptyState";
 import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
+import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useSeasonLeaderboardInfiniteQuery,
   useSeasonsQuery,
@@ -97,7 +100,7 @@ export function LeaderboardPage() {
         aria-label={t("season.leaderboard.loading")}
       >
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-surface h-10 animate-pulse rounded-md" />
+          <Skeleton key={i} className="h-10 rounded-md" />
         ))}
       </div>
     );
@@ -109,14 +112,9 @@ export function LeaderboardPage() {
     );
   } else if (items.length === 0) {
     body = (
-      <div
-        className="bg-surface border-border rounded-lg border border-dashed p-10 text-center text-sm"
-        data-testid="leaderboard-empty"
-      >
-        <p className="text-ink-dim m-0">
-          {t(isPastSeason ? "season.leaderboard.emptyPast" : "season.leaderboard.empty")}
-        </p>
-      </div>
+      <EmptyState testId="leaderboard-empty">
+        {t(isPastSeason ? "season.leaderboard.emptyPast" : "season.leaderboard.empty")}
+      </EmptyState>
     );
   } else {
     const showLoadMore = query.hasNextPage;
@@ -169,29 +167,30 @@ export function LeaderboardPage() {
             <p className="text-danger m-0 text-xs" role="status">
               {t("season.leaderboard.error")}
             </p>
-            <button
-              type="button"
+            <Button
+              variant="link"
+              size="inline"
               onClick={() => query.fetchNextPage()}
-              className="text-accent cursor-pointer text-xs underline-offset-2 hover:underline"
+              className="text-xs"
               data-testid="leaderboard-retry"
             >
               {t("season.leaderboard.retry")}
-            </button>
+            </Button>
           </div>
         )}
 
         {showLoadMore && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => query.fetchNextPage()}
             disabled={query.isFetchingNextPage}
-            className="bg-surface border-border text-ink hover:bg-surface-elevated mt-2.5 w-full rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 h-9 w-full"
             data-testid="leaderboard-load-more"
           >
             {query.isFetchingNextPage
               ? t("season.leaderboard.loading")
               : t("season.leaderboard.loadMore")}
-          </button>
+          </Button>
         )}
 
         <p

@@ -5,7 +5,7 @@ import { floatingPanelStyle } from "./floatingPanel";
 describe("floatingPanelStyle", () => {
   it("draws a hairline brass edge, felt-md shadow and 8px blur by default", () => {
     expect(floatingPanelStyle()).toEqual({
-      background: "var(--panel-dark, rgba(20, 45, 30, 0.85))",
+      background: "var(--panel-dark)",
       border: "1px solid var(--brass-40)",
       boxShadow: "var(--shadow-felt-md)",
       backdropFilter: "blur(8px)",

@@ -519,9 +519,7 @@ describe("RegisterPage", () => {
       await user.click(screen.getByTestId("link-account-submit"));
 
       await waitFor(() => {
-        expect(screen.getByTestId("link-account-error")).toHaveTextContent(
-          "Incorrect password. Try again.",
-        );
+        expect(screen.getByTestId("link-account-error")).toHaveTextContent("Wrong password.");
       });
       expect(screen.getByTestId("link-account-dialog")).toBeInTheDocument();
       expect(mockNavigate).not.toHaveBeenCalled();

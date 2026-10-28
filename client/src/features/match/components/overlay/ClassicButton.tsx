@@ -16,20 +16,20 @@ const VARIANT_STYLE: Record<ClassicButtonVariant, CSSProperties> = {
     background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",
     color: "var(--brass-ink)",
     boxShadow:
-      "0 8px 24px -12px color-mix(in srgb, var(--brass) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
+      "0 8px 24px -12px color-mix(in srgb, var(--brass) 70%, transparent), inset 0 1px 0 var(--sheen-25)",
   },
   ghost: {
     border: "1px solid var(--brass-40)",
-    background: "linear-gradient(180deg, rgba(60,90,70,0.6), rgba(30,50,35,0.6))",
+    background: "linear-gradient(180deg, var(--felt-ghost-top), var(--felt-ghost-bottom))",
     color: "var(--ink-light)",
     boxShadow: "var(--shadow-felt-sm)",
   },
   danger: {
-    border: "1px solid color-mix(in srgb, var(--danger-light) 70%, transparent)",
-    background: "linear-gradient(180deg, #d96a5a 0%, #8a3024 100%)",
-    color: "#fff8f3",
+    border: "1px solid var(--danger-deep)",
+    background: "linear-gradient(180deg, var(--suit-red) 0%, var(--danger-deep) 100%)",
+    color: "var(--ink-light)",
     boxShadow:
-      "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
+      "0 8px 24px -12px color-mix(in srgb, var(--suit-red) 70%, transparent), inset 0 1px 0 var(--sheen-15)",
   },
 };
 

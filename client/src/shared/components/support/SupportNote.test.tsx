@@ -11,7 +11,7 @@ describe("SupportNote", () => {
   it.each(["auth", "lobby"] as const)("renders the same wording in the %s note", (variant) => {
     render(<SupportNote variant={variant} />);
     expect(screen.getByTestId("support-note").textContent).toContain(
-      "A hobby project — you can always buy me a coffee.",
+      "A hobby project. You can always buy me a coffee.",
     );
     expect(screen.getByTestId("support-note-link")).toHaveTextContent("buy me a coffee");
   });

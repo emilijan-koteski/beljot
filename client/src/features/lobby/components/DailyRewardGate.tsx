@@ -11,7 +11,6 @@ export function DailyRewardGate() {
       open={open}
       amount={reward?.amount ?? 0}
       streakDay={reward?.streakDay ?? 0}
-      newBalance={reward?.newBalance ?? 0}
       onClose={close}
     />
   );

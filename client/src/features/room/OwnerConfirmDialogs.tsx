@@ -1,630 +1,109 @@
-import { Bot, Crown, Lock, Shuffle, UserX, X, Zap } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { Bot, Crown, UserX } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-import { Avatar } from "@/shared/components/ui/avatar";
-import { Badge } from "@/shared/components/ui/badge";
-import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 
-type Tone = "brass" | "danger";
-type ButtonTone = Tone | "ghost";
-
-/** Target player a host action acts on (team is viewer-relative: A = your team). */
-interface DialogTarget {
-  name: string;
-  seat: number | null;
-  team: "A" | "B" | null;
-  avatarUrl?: string | null;
-}
-
-const BUTTON_TONES: Record<ButtonTone, CSSProperties> = {
-  ghost: {
-    background: "transparent",
-    color: "var(--ink-dim)",
-    border: "1px solid var(--border)",
-  },
-  brass: {
-    background: "linear-gradient(180deg, var(--brass) 0%, var(--brass-deep) 100%)",
-    color: "var(--brass-ink)",
-    border: "1px solid var(--brass-deep)",
-    boxShadow:
-      "0 8px 24px -12px color-mix(in srgb, var(--brass-deep) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
-  },
-  danger: {
-    background: "linear-gradient(180deg, #a8362a 0%, var(--danger) 100%)",
-    color: "#fbeae6",
-    border: "1px solid #6f2018",
-    boxShadow:
-      "0 8px 24px -12px color-mix(in srgb, var(--danger) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
-  },
-};
-
-function DialogButton({
-  children,
-  tone = "ghost",
-  icon,
-  onClick,
-  disabled,
-  testId,
-}: {
-  children: ReactNode;
-  tone?: ButtonTone;
-  icon?: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  testId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      data-testid={testId}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 7,
-        padding: "8px 14px",
-        borderRadius: "var(--radius-sm)",
-        fontSize: 14,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        whiteSpace: "nowrap",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-        transition: "all .15s ease",
-        ...BUTTON_TONES[tone],
-      }}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-function OwnerConfirmDialog({
-  open,
-  onOpenChange,
-  tone,
-  eyebrow,
-  icon,
-  title,
-  titleTestId,
-  lede,
-  children,
-  confirmLabel,
-  confirmIcon,
-  onConfirm,
-  confirmPending,
-  confirmTestId,
-  cancelLabel,
-  cancelTestId,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  tone: Tone;
-  eyebrow: string;
-  icon: ReactNode;
-  title: ReactNode;
-  titleTestId: string;
-  lede: ReactNode;
-  children: ReactNode;
-  confirmLabel: string;
-  confirmIcon: ReactNode;
-  onConfirm: () => void;
-  confirmPending: boolean;
-  confirmTestId: string;
-  cancelLabel: string;
-  cancelTestId: string;
-}) {
-  const { t } = useTranslation();
-  const isDanger = tone === "danger";
-  const accentColor = isDanger ? "var(--danger)" : "var(--brass-deep)";
-  const badgeBg = isDanger
-    ? "color-mix(in srgb, var(--danger) 10%, transparent)"
-    : "var(--brass-soft)";
-  const badgeRing = isDanger
-    ? "color-mix(in srgb, var(--danger) 30%, transparent)"
-    : "color-mix(in srgb, var(--brass) 45%, transparent)";
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        style={{
-          display: "block",
-          width: 480,
-          maxWidth: "calc(100% - 48px)",
-          padding: 0,
-          overflow: "hidden",
-          background: "var(--surface)",
-          border: "1px solid var(--brass)",
-          borderRadius: "var(--radius-lg)",
-          color: "var(--ink)",
-          boxShadow: "var(--shadow-xl), 0 0 0 1px var(--brass-soft)",
-        }}
-      >
-        <div
-          style={{
-            height: 3,
-            width: "100%",
-            opacity: 0.7,
-            background: isDanger
-              ? "linear-gradient(90deg, transparent, var(--danger), transparent)"
-              : "linear-gradient(90deg, transparent, var(--brass), transparent)",
-          }}
-        />
-
-        <DialogClose
-          aria-label={t("room.ownerConfirm.close", { defaultValue: "Close" })}
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--ink-mute)",
-            background: "transparent",
-            border: "1px solid transparent",
-            cursor: "pointer",
-          }}
-        >
-          <X size={16} />
-        </DialogClose>
-
-        <div style={{ display: "flex", gap: 16, padding: "26px clamp(18px, 5vw, 28px) 6px" }}>
-          <div
-            style={{
-              flexShrink: 0,
-              width: 52,
-              height: 52,
-              borderRadius: 14,
-              background: badgeBg,
-              border: `1px solid ${badgeRing}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: isDanger ? "none" : "inset 0 0 0 4px var(--brass-10)",
-            }}
-          >
-            {icon}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 10,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                fontWeight: 600,
-                color: accentColor,
-              }}
-            >
-              {eyebrow}
-            </span>
-            <h2
-              data-testid={titleTestId}
-              style={{
-                margin: "6px 0 0",
-                fontWeight: 700,
-                fontSize: "clamp(18px, 4.8vw, 24px)",
-                letterSpacing: "-0.025em",
-                color: "var(--ink)",
-                lineHeight: 1.2,
-              }}
-            >
-              {title}
-            </h2>
-          </div>
-        </div>
-
-        <p
-          style={{
-            margin: 0,
-            padding: "10px clamp(18px, 5vw, 28px) 0",
-            fontSize: 14,
-            color: "var(--ink-dim)",
-            lineHeight: 1.6,
-          }}
-        >
-          {lede}
-        </p>
-
-        <div style={{ padding: "18px clamp(18px, 5vw, 28px) 4px" }}>{children}</div>
-
-        <div
-          style={{
-            marginTop: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 10,
-            padding: "16px clamp(18px, 5vw, 28px)",
-            borderTop: "1px solid var(--border)",
-            background: "color-mix(in srgb, var(--surface-3) 45%, transparent)",
-          }}
-        >
-          <DialogButton
-            tone={tone}
-            icon={confirmIcon}
-            onClick={onConfirm}
-            disabled={confirmPending}
-            testId={confirmTestId}
-          >
-            {confirmLabel}
-          </DialogButton>
-          <DialogButton tone="ghost" testId={cancelTestId} onClick={() => onOpenChange(false)}>
-            {cancelLabel}
-          </DialogButton>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function PlayerRow({ name, seat, team, avatarUrl, icon }: DialogTarget & { icon?: ReactNode }) {
-  const { t } = useTranslation();
-  const seated = seat !== null && seat !== undefined;
-  const relation = team === "A" ? "partner" : team === "B" ? "opponent" : null;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 14px",
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
-      <Avatar name={name} avatarUrl={avatarUrl} size={44} team={team} icon={icon} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontWeight: 600,
-            fontSize: 16,
-            letterSpacing: "-0.025em",
-            color: "var(--ink)",
-          }}
-        >
-          {name}
-        </div>
-        <div style={{ marginTop: 2, fontSize: 12, color: "var(--ink-mute)" }}>
-          <span style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.05em" }}>
-            {seated
-              ? t("room.ownerConfirm.seatLabel", { n: (seat as number) + 1 })
-              : t("room.ownerConfirm.standing")}
-          </span>
-        </div>
-      </div>
-      {seated && relation && (
-        <Badge tone={relation === "partner" ? "teamA" : "teamB"}>
-          {t(relation === "partner" ? "room.seatTile.partner" : "room.seatTile.opponent")}
-        </Badge>
-      )}
-    </div>
-  );
-}
-
-interface ActionDialogProps {
+interface OwnerConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   pending: boolean;
-  target: DialogTarget;
+  name: string;
 }
 
+/** The host's kick confirmation: the danger tone, titled by the player's name. */
 export function KickPlayerDialog({
   open,
   onOpenChange,
   onConfirm,
   pending,
-  target,
-}: ActionDialogProps) {
+  name,
+}: OwnerConfirmDialogProps) {
   const { t } = useTranslation();
   return (
-    <OwnerConfirmDialog
+    <AppDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onClose={() => onOpenChange(false)}
       tone="danger"
-      eyebrow={t("room.ownerConfirm.eyebrow")}
-      icon={<UserX size={24} color="var(--danger)" />}
-      titleTestId="kick-dialog-title"
-      title={
-        <Trans
-          i18nKey="room.kickConfirm.title"
-          values={{ name: target.name }}
-          components={{ name: <span style={{ color: "var(--danger)" }} /> }}
-        />
-      }
-      lede={
-        <Trans
-          i18nKey="room.kickConfirm.lede"
-          values={{ name: target.name }}
-          components={{ strong: <strong style={{ color: "var(--ink)" }} /> }}
-        />
-      }
-      confirmLabel={t("room.kickConfirm.confirm")}
-      confirmIcon={<UserX size={16} color="#fbeae6" />}
-      onConfirm={onConfirm}
-      confirmPending={pending}
-      confirmTestId="kick-confirm"
-      cancelLabel={t("room.kickConfirm.cancel")}
-      cancelTestId="kick-cancel"
-    >
-      <PlayerRow
-        name={target.name}
-        seat={target.seat}
-        team={target.team}
-        avatarUrl={target.avatarUrl}
-      />
-    </OwnerConfirmDialog>
+      icon={<UserX />}
+      title={<span data-testid="kick-dialog-title">{t("room.kickConfirm.title", { name })}</span>}
+      description={t("room.kickConfirm.description")}
+      pending={pending}
+      primary={{ label: t("room.kickConfirm.confirm"), onClick: onConfirm, testId: "kick-confirm" }}
+      secondary={{
+        label: t("room.kickConfirm.cancel"),
+        onClick: () => onOpenChange(false),
+        testId: "kick-cancel",
+      }}
+    />
   );
 }
 
+/** The host's confirmation before taking a bot off the table. */
 export function RemoveBotDialog({
   open,
   onOpenChange,
   onConfirm,
   pending,
-  target,
-}: ActionDialogProps) {
+  name,
+}: OwnerConfirmDialogProps) {
   const { t } = useTranslation();
   return (
-    <OwnerConfirmDialog
+    <AppDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onClose={() => onOpenChange(false)}
       tone="danger"
-      eyebrow={t("room.ownerConfirm.eyebrow")}
-      icon={<Bot size={24} color="var(--danger)" />}
-      titleTestId="remove-bot-dialog-title"
+      icon={<Bot />}
       title={
-        <Trans
-          i18nKey="room.removeBotConfirm.title"
-          values={{ name: target.name }}
-          components={{ name: <span style={{ color: "var(--danger)" }} /> }}
-        />
+        <span data-testid="remove-bot-dialog-title">
+          {t("room.removeBotConfirm.title", { name })}
+        </span>
       }
-      lede={
-        <Trans
-          i18nKey="room.removeBotConfirm.lede"
-          values={{ name: target.name }}
-          components={{ strong: <strong style={{ color: "var(--ink)" }} /> }}
-        />
-      }
-      confirmLabel={t("room.removeBotConfirm.confirm")}
-      confirmIcon={<UserX size={16} color="#fbeae6" />}
-      onConfirm={onConfirm}
-      confirmPending={pending}
-      confirmTestId="remove-bot-confirm"
-      cancelLabel={t("room.removeBotConfirm.cancel")}
-      cancelTestId="remove-bot-cancel"
-    >
-      <PlayerRow
-        name={target.name}
-        seat={target.seat}
-        team={target.team}
-        icon={<Bot aria-hidden="true" />}
-      />
-    </OwnerConfirmDialog>
+      description={t("room.removeBotConfirm.description")}
+      pending={pending}
+      primary={{
+        label: t("room.removeBotConfirm.confirm"),
+        onClick: onConfirm,
+        testId: "remove-bot-confirm",
+      }}
+      secondary={{
+        label: t("room.removeBotConfirm.cancel"),
+        onClick: () => onOpenChange(false),
+        testId: "remove-bot-cancel",
+      }}
+    />
   );
 }
 
+/** The host's confirmation before handing the room to another player. */
 export function TransferOwnershipDialog({
   open,
   onOpenChange,
   onConfirm,
   pending,
-  fromName,
-  fromAvatarUrl = null,
-  target,
-}: ActionDialogProps & { fromName: string; fromAvatarUrl?: string | null }) {
+  name,
+}: OwnerConfirmDialogProps) {
   const { t } = useTranslation();
-  const capabilities = [
-    {
-      icon: <Zap size={14} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.start"),
-    },
-    {
-      icon: <Shuffle size={14} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.seats"),
-    },
-    {
-      icon: <UserX size={14} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.players"),
-    },
-    {
-      icon: <Bot size={14} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.bots"),
-    },
-    {
-      icon: <Lock size={14} color="var(--brass-deep)" />,
-      label: t("room.ownerConfirm.capabilities.privacy"),
-    },
-  ];
-  const captionStyle: CSSProperties = {
-    fontFamily: "var(--font-mono)",
-    fontSize: 10,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-    fontWeight: 600,
-    textAlign: "center",
-  };
   return (
-    <OwnerConfirmDialog
+    <AppDialog
       open={open}
-      onOpenChange={onOpenChange}
-      tone="brass"
-      eyebrow={t("room.ownerConfirm.eyebrow")}
-      icon={<Crown size={24} color="var(--brass-deep)" />}
-      titleTestId="transfer-dialog-title"
-      title={t("room.transferConfirm.title")}
-      lede={
-        <Trans
-          i18nKey="room.transferConfirm.lede"
-          values={{ toName: target.name }}
-          components={{ strong: <strong style={{ color: "var(--ink)" }} /> }}
-        />
+      onClose={() => onOpenChange(false)}
+      icon={<Crown />}
+      title={
+        <span data-testid="transfer-dialog-title">{t("room.transferConfirm.title", { name })}</span>
       }
-      confirmLabel={t("room.transferConfirm.confirm")}
-      confirmIcon={<Crown size={16} color="var(--brass-ink)" />}
-      onConfirm={onConfirm}
-      confirmPending={pending}
-      confirmTestId="transfer-confirm"
-      cancelLabel={t("room.transferConfirm.cancel")}
-      cancelTestId="transfer-cancel"
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "14px 16px",
-          marginBottom: 14,
-          background: "var(--surface-2)",
-          border: "1px solid var(--border)",
-          borderRadius: 14,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 6,
-            flex: 1,
-          }}
-        >
-          <Avatar name={fromName} avatarUrl={fromAvatarUrl} size={44} />
-          <span style={{ ...captionStyle, color: "var(--ink-mute)" }}>
-            {t("room.ownerConfirm.youHost")}
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 5,
-            padding: "0 4px",
-          }}
-        >
-          <span
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: "var(--brass-soft)",
-              border: "1px solid color-mix(in srgb, var(--brass) 45%, transparent)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Crown size={14} color="var(--brass-deep)" />
-          </span>
-          <svg
-            width="46"
-            height="10"
-            viewBox="0 0 46 10"
-            fill="none"
-            stroke="var(--brass)"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M2 5h40" strokeDasharray="3 3" />
-            <path d="M38 1l5 4-5 4" />
-          </svg>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 6,
-            flex: 1,
-          }}
-        >
-          <div style={{ position: "relative" }}>
-            <Avatar name={target.name} avatarUrl={target.avatarUrl} size={44} team={target.team} />
-            <span
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: -4,
-                borderRadius: "50%",
-                border: "2px solid var(--brass)",
-                opacity: 0.55,
-              }}
-            />
-          </div>
-          <span style={{ ...captionStyle, color: "var(--brass-deep)", fontWeight: 700 }}>
-            {t("room.ownerConfirm.newHost", { name: target.name })}
-          </span>
-        </div>
-      </div>
-
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          fontWeight: 600,
-          color: "var(--brass-deep)",
-        }}
-      >
-        {t("room.ownerConfirm.handOver")}
-      </span>
-      <ul
-        style={{
-          margin: "10px 0 0",
-          padding: 0,
-          listStyle: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: 9,
-        }}
-      >
-        {capabilities.map((c) => (
-          <li
-            key={c.label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              fontSize: 14,
-              lineHeight: 1.2,
-              color: "var(--ink-dim)",
-              fontWeight: 500,
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                flexShrink: 0,
-                width: 18,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {c.icon}
-            </span>
-            <span style={{ minWidth: 0 }}>{c.label}</span>
-          </li>
-        ))}
-      </ul>
-    </OwnerConfirmDialog>
+      description={t("room.transferConfirm.description")}
+      pending={pending}
+      primary={{
+        label: t("room.transferConfirm.confirm"),
+        onClick: onConfirm,
+        testId: "transfer-confirm",
+      }}
+      secondary={{
+        label: t("room.transferConfirm.cancel"),
+        onClick: () => onOpenChange(false),
+        testId: "transfer-cancel",
+      }}
+    />
   );
 }

@@ -4,12 +4,13 @@ import type { ReactNode } from "react";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { Z } from "@/shared/lib/zLayers";
 
-import { ClassicButton } from "./overlay/ClassicButton";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
-const DANGER = "var(--danger-light)";
+const DANGER_INK = "var(--danger-light)";
+const DANGER_RING = "var(--suit-red)";
 
 interface SurrenderDialogTestIds {
   overlay: string;
@@ -58,10 +59,10 @@ export function SurrenderDialog({
         >
           <ClassicPanel
             size="dialog"
-            glowColor={DANGER}
+            glowColor={DANGER_RING}
             title={
               <span id={titleId} className="inline-flex items-center gap-2.5">
-                <Flag size={20} style={{ color: DANGER }} aria-hidden="true" />
+                <Flag size={20} style={{ color: DANGER_INK }} aria-hidden="true" />
                 {title}
               </span>
             }
@@ -75,14 +76,11 @@ export function SurrenderDialog({
             <ExplainerStrip tone="danger" className="mb-4">
               {cost}
             </ExplainerStrip>
-            <div className="flex items-center justify-end gap-3.5">
-              <ClassicButton variant="danger" onClick={onConfirm} data-testid={testIds.confirm}>
-                {confirmLabel}
-              </ClassicButton>
-              <ClassicButton onClick={onCancel} data-testid={testIds.cancel}>
-                {cancelLabel}
-              </ClassicButton>
-            </div>
+            <ClassicActions
+              tone="danger"
+              primary={{ label: confirmLabel, onClick: onConfirm, testId: testIds.confirm }}
+              secondary={{ label: cancelLabel, onClick: onCancel, testId: testIds.cancel }}
+            />
           </ClassicPanel>
         </div>
       </OverlayBackdrop>

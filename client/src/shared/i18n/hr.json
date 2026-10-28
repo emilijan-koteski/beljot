@@ -3,7 +3,12 @@
     "appName": "Beljot",
     "close": "Zatvori",
     "showPassword": "Prikaži lozinku",
-    "hidePassword": "Sakrij lozinku"
+    "hidePassword": "Sakrij lozinku",
+    "crash": {
+      "title": "Nešto je pošlo po zlu",
+      "retry": "Pokušaj ponovno",
+      "backToLobby": "Natrag u lobi"
+    }
   },
   "team": {
     "us": "Mi",
@@ -40,14 +45,14 @@
     "invites": {
       "eyebrow": "Privatnost",
       "title": "Pozivi u sobu",
-      "description": "Igrači koji vam nisu prijatelji mogu vas pozvati u sobu dok ste slobodni u lobiju. Prijatelji vas uvijek mogu pozvati.",
+      "description": "Igrači koji ti nisu prijatelji mogu te pozvati dok si slobodan u lobiju. Prijatelji uvijek mogu.",
       "allowNonFriends": "Pozivi od igrača koji vam nisu prijatelji"
     },
     "eyebrow": "Profil",
     "memberSince": "Član od {{date}}",
     "winRate": "Postotak pobjeda",
     "statsHeading": "Statistika",
-    "careerError": "Učitavanje karijere nije uspjelo. Pokušaj ponovno",
+    "careerError": "Učitavanje karijere nije uspjelo. Pokušaj ponovno.",
     "lastPlayed": {
       "today": "Igrao/la danas",
       "yesterday": "Igrao/la jučer",
@@ -72,15 +77,15 @@
         "invalidChars": "Dopušteni su samo slova, brojevi i donje crte",
         "taken": "To korisničko ime je već zauzeto",
         "unchanged": "To je već tvoje korisničko ime",
-        "tooSoon": "Nedavno si promijenio korisničko ime, pokušaj ponovno {{date}}",
-        "tooSoonGeneric": "Nedavno si promijenio korisničko ime, pokušaj kasnije",
-        "generic": "Nije moguće ažurirati korisničko ime, pokušaj ponovno"
+        "tooSoon": "Korisničko ime je nedavno promijenjeno. Pokušaj ponovno {{date}}.",
+        "tooSoonGeneric": "Korisničko ime je nedavno promijenjeno. Pokušaj kasnije.",
+        "generic": "Promjena korisničkog imena nije uspjela. Pokušaj ponovno."
       }
     },
     "avatar": {
       "title": "Profilna slika",
       "edit": "Promijeni profilnu sliku",
-      "hint": "JPEG, PNG ili WebP, do 2 MB. Slika se obrezuje na kvadrat iz sredine.",
+      "hint": "JPEG, PNG ili WebP, do 2 MB.",
       "previewAlt": "Pregled nove slike",
       "pick": "Odaberi sliku",
       "upload": "Prenesi",
@@ -92,13 +97,13 @@
       "success": "Profilna slika je ažurirana",
       "removed": "Profilna slika je uklonjena",
       "errors": {
-        "tooLarge": "Slika je prevelika. Odaberi datoteku do 2 MB, najviše 4096 piksela po stranici i 16 megapiksela ukupno.",
-        "tooSmall": "Slika je premala. Kraća stranica mora imati najmanje 128 piksela.",
-        "unsupported": "Taj format nije podržan. Odaberi sliku JPEG, PNG ili WebP bez animacije.",
+        "tooLarge": "Slika je prevelika: do 2 MB, 4096 px po stranici, 16 MP.",
+        "tooSmall": "Slika je premala: najmanje 128 px na kraćoj stranici.",
+        "unsupported": "Odaberi JPEG, PNG ili WebP sliku bez animacije.",
         "rateLimited": "Previše prijenosa u posljednjih sat vremena. Pokušaj kasnije.",
         "busy": "Poslužitelj je zauzet. Pokušaj ponovno za trenutak.",
         "unavailable": "Prijenos slika trenutno nije dostupan.",
-        "generic": "Nije moguće ažurirati sliku, pokušaj ponovno"
+        "generic": "Ažuriranje slike nije uspjelo. Pokušaj ponovno."
       }
     },
     "streak": {
@@ -112,14 +117,14 @@
     },
     "stats": {
       "eyebrow": "Karijera",
-      "sub": "Ukupni rezultati kroz sve mečeve: zvanja, štiglje, pale ruke i sve ostalo.",
+      "sub": "Ukupno kroz sve mečeve.",
       "totalGamesPlayed": "Odigrani mečevi",
       "wins": "Pobjede",
       "losses": "Porazi",
       "abandoned": "Prekinuti",
       "winRate": "Postotak pobjeda",
       "winRateEmpty": "–",
-      "error": "Učitavanje statistike nije uspjelo. Pokušaj ponovno",
+      "error": "Učitavanje statistike nije uspjelo. Pokušaj ponovno.",
       "outcomeSplit": "Omjer ishoda",
       "legendWins": "{{count}} pobjeda",
       "legendLosses": "{{count}} poraza",
@@ -138,19 +143,17 @@
       "explainer": {
         "open": "Kako funkcionira",
         "title": "Kako funkcionira čast",
-        "lede": "Ocjena pokazuje završavaš li mečeve koje započneš.",
-        "finishLabel": "Završi meč",
-        "finishBody": "i ocjena raste, bez obzira na pobjedu ili poraz.",
-        "dropLabel": "Ako napustiš i ne vratiš se,",
-        "dropBody": "ocjena pada. Jedino to je snižava.",
-        "surrenderLabel": "Predaja se ne računa.",
-        "surrenderBody": "Završen meč je završen meč.",
-        "decayLabel": "Stara napuštanja blijede.",
-        "decayBody": "Noviji mečevi vrijede mnogo više.",
+        "lede": "Čast pokazuje završavaš li mečeve koje započneš.",
         "standing": "Trenutno si na {{score}}, <tierWord>{{tier}}</tierWord>.",
-        "standingNew": "Odigraj 5 mečeva i tvoja ocjena pojavit će se ovdje.",
+        "standingNew": "Odigraj 5 mečeva da vidiš svoju ocjenu.",
         "fullRules": "Sva pravila",
-        "close": "Razumijem"
+        "close": "Razumijem",
+        "facts": {
+          "finish": "Završen meč je podiže, bez obzira na ishod.",
+          "drop": "Snižava je samo napuštanje meča bez povratka.",
+          "surrender": "Predaja se računa kao završen meč.",
+          "decay": "Stara napuštanja blijede, najviše vrijede noviji mečevi."
+        }
       },
       "tier": {
         "exemplary": "Uzoran",
@@ -175,13 +178,13 @@
     "matchHistory": {
       "eyebrow": "Aktivnost",
       "title": "Povijest mečeva",
-      "sub": "Svaki odigrani meč. Klikni na zapis za prikaz bodovanja po dijeljenjima: zvanja, štiglje i pale ruke.",
-      "empty": "Nema mečeva. Pokreni Brzu igru",
+      "sub": "Otvori meč da ga vidiš ruku po ruku.",
+      "empty": "Nema mečeva. Pokreni Brzu igru.",
       "emptyCta": "U lobi",
       "emptyPublic": "Ovaj igrač još nije odigrao nijedan meč.",
       "emptyFiltered": "Nema mečeva za ovaj filtar.",
       "loading": "Učitavanje mečeva…",
-      "error": "Učitavanje povijesti nije uspjelo. Pokušaj ponovno",
+      "error": "Učitavanje povijesti nije uspjelo. Pokušaj ponovno.",
       "loadMore": "Učitaj više",
       "showing": "Prikazano {{shown}} od {{total}} mečeva",
       "durationDhms": "{{d}}d {{h}}:{{m}}:{{s}}",
@@ -267,13 +270,13 @@
       "notLinked": "Nije povezano",
       "unlink": "Odspoji",
       "passwordlessHint": "Postavite lozinku prije odspajanja jedinog načina prijave.",
-      "loadError": "Nije moguće učitati povezane račune. Pokušajte ponovno.",
+      "loadError": "Učitavanje povezanih računa nije uspjelo. Pokušaj ponovno.",
       "linkedToast": "Google račun povezan.",
       "unlinkedToast": "Google račun odspojen.",
       "unlinkDialog": {
-        "title": "Odspojiti {{provider}}?",
-        "description": "Uklonite {{provider}} ({{email}}) sa svog računa. Možete ga ponovno povezati bilo kada.",
-        "descriptionNoEmail": "Uklonite {{provider}} sa svog računa. Možete ga ponovno povezati bilo kada.",
+        "title": "Odspoji {{provider}}",
+        "description": "Račun {{email}} možeš ponovno povezati bilo kada.",
+        "descriptionNoEmail": "Možeš ga ponovno povezati bilo kada.",
         "cancel": "Odustani",
         "confirm": "Odspoji",
         "submitting": "Odspajanje…"
@@ -282,9 +285,9 @@
         "alreadyLinked": "Taj Google račun već je povezan s drugim računom.",
         "emailUnverified": "Vaša Google e-pošta nije potvrđena. Potvrdite je na Googleu i pokušajte ponovno.",
         "credentialExpired": "Vaša Google prijava je istekla. Dodirnite gumb Google i pokušajte ponovno.",
-        "linkFailed": "Povezivanje računa nije uspjelo. Pokušajte ponovno.",
+        "linkFailed": "Povezivanje računa nije uspjelo. Pokušaj ponovno.",
         "cannotUnlinkLast": "Postavite lozinku prije odspajanja jedinog načina prijave.",
-        "unlinkFailed": "Odspajanje računa nije uspjelo. Pokušajte ponovno."
+        "unlinkFailed": "Odspajanje računa nije uspjelo. Pokušaj ponovno."
       }
     },
     "milestones": {
@@ -334,14 +337,14 @@
       "heading": "Zahtjevi za prijateljstvo"
     },
     "removeDialog": {
-      "title": "Ukloniti prijatelja?",
-      "description": "Uklonite {{username}} s popisa prijatelja. Kasnije možete ponovno poslati zahtjev za prijateljstvo.",
+      "title": "Ukloni {{username}}",
+      "description": "Kasnije možeš ponovno poslati zahtjev za prijateljstvo.",
       "cancel": "Odustani",
       "confirm": "Ukloni",
       "submitting": "Uklanjanje…"
     },
     "errors": {
-      "sendFailed": "Slanje zahtjeva za prijateljstvo nije uspjelo. Pokušajte ponovo.",
+      "sendFailed": "Slanje zahtjeva za prijateljstvo nije uspjelo. Pokušaj ponovno.",
       "acceptFailed": "Prihvaćanje zahtjeva nije uspjelo. Možda više nije dostupan.",
       "declineFailed": "Odbijanje zahtjeva nije uspjelo. Možda više nije dostupan.",
       "removeFailed": "Uklanjanje prijatelja nije uspjelo. Možda više niste prijatelji."
@@ -416,49 +419,48 @@
     "errors": {
       "matchStartFailed": "Pokretanje meča nije uspjelo. Pokušaj ponovno.",
       "alreadyStarted": "Meč je već počeo. Ne možeš sada izaći.",
-      "seatFailed": "Odabir mjesta nije uspio. Pokušaj ponovno",
-      "startFailed": "Pokretanje meča nije uspjelo. Pokušaj ponovno",
+      "seatFailed": "Odabir mjesta nije uspio. Pokušaj ponovno.",
+      "startFailed": "Pokretanje meča nije uspjelo. Pokušaj ponovno.",
       "notOwner": "Samo domaćin može pokrenuti meč",
       "notOwnerAction": "To može samo domaćin",
       "notAllSeated": "Sva 4 igrača moraju sjesti da bi počelo",
       "roomStarted": "Meč je već počeo. Izbacivanje i zamjena mjesta više nisu dostupni.",
       "seatNotOccupied": "Odaberi dva zauzeta mjesta za zamjenu.",
-      "kickFailed": "Izbacivanje igrača nije uspjelo. Pokušaj ponovno",
-      "swapFailed": "Zamjena mjesta nije uspjela. Pokušaj ponovno",
-      "leaveSeatFailed": "Napuštanje mjesta nije uspjelo. Pokušaj ponovno",
+      "kickFailed": "Izbacivanje igrača nije uspjelo. Pokušaj ponovno.",
+      "swapFailed": "Zamjena mjesta nije uspjela. Pokušaj ponovno.",
+      "leaveSeatFailed": "Napuštanje mjesta nije uspjelo. Pokušaj ponovno.",
       "leaveSeatQuickPlay": "Ne možeš napustiti mjesto u brzoj igri. Napusti sobu.",
       "leaveSeatOwner": "Domaćin ne može napustiti mjesto. Napusti sobu.",
-      "transferFailed": "Prijenos uloge domaćina nije uspio. Pokušaj ponovno",
+      "transferFailed": "Prijenos uloge domaćina nije uspio. Pokušaj ponovno.",
       "promoteUnseated": "Novi domaćin mora sjediti.",
       "promoteNotInRoom": "Taj igrač više nije u sobi.",
-      "addBotFailed": "Dodavanje bota nije uspjelo. Pokušaj ponovno",
-      "removeBotFailed": "Uklanjanje bota nije uspjelo. Pokušaj ponovno",
+      "addBotFailed": "Dodavanje bota nije uspjelo. Pokušaj ponovno.",
+      "removeBotFailed": "Uklanjanje bota nije uspjelo. Pokušaj ponovno.",
       "botsNotAllowed": "U ovu sobu se ne mogu dodavati botovi",
-      "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
+      "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Imaš {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
       "insufficientCoinsStart": "Igrač ne može uložiti toliko. Meč nije počeo.",
-      "wrongPassword": "Pogrešna lozinka sobe.",
-      "honorTooLow": "Ova soba traži čast {{minHonor}} ili više. Tvoja je {{honor}}. Odigraj još nekoliko mečeva da je podigneš.",
+      "wrongPassword": "Pogrešna lozinka.",
+      "honorTooLow": "Ova soba traži {{minHonor}} časti. Imaš {{honor}}.",
       "honorTooLowGeneric": "Tvoja ocjena časti je ispod minimuma ove sobe.",
       "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe.",
       "honorGateStart": "Igrač ne zadovoljava uvjet časti ove sobe. Meč nije počeo."
     },
     "passwordPrompt": {
       "title": "Privatna soba",
-      "description": "Unesi lozinku za ulazak u \"{{name}}\".",
-      "placeholder": "Lozinka sobe",
+      "description": "Unesi lozinku za {{name}}.",
+      "placeholder": "Lozinka",
       "submit": "Uđi",
-      "submitting": "Pridruživanje…",
+      "submitting": "Ulazak…",
       "cancel": "Odustani"
     },
     "privacy": {
       "dialogTitle": "Privatnost sobe",
-      "dialogDescription": "Učini sobu privatnom uz lozinku ili je otvori svima. Igrači koji već sjede nikada se ne izbacuju.",
+      "dialogDescription": "Igrači koji sjede ostaju u svakom slučaju.",
       "modeLabel": "Pristup",
       "public": "Javna",
       "private": "Privatna",
-      "passwordLabel": "Lozinka sobe",
-      "passwordPlaceholder": "Unesi lozinku",
+      "passwordLabel": "Lozinka",
       "passwordHint": "Najmanje {{min}} znakova",
       "cancel": "Odustani",
       "save": "Spremi",
@@ -471,7 +473,7 @@
       "manageButtonPublic": "Privatnost: javna",
       "errors": {
         "passwordRequired": "Postavi lozinku za privatnu sobu",
-        "passwordTooShort": "Lozinka mora imati barem 4 znaka",
+        "passwordTooShort": "Lozinka mora imati najmanje 4 znaka",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
         "notOwner": "Samo domaćin može promijeniti privatnost sobe",
         "notWaiting": "Privatnost se može promijeniti samo prije početka meča",
@@ -482,7 +484,7 @@
     "waitingForReturn": "Čekanje da se igrači vrate",
     "copyLinkAriaLabel": "Kopiraj kod sobe {{code}}",
     "copyLinkSuccess": "Kod sobe kopiran!",
-    "copyLinkFailed": "Kopiranje nije uspjelo, kod: {{code}}",
+    "copyLinkFailed": "Kopiranje nije uspjelo. Kod je {{code}}.",
     "leaveRoom": "Napusti sobu",
     "seatYou": "Ti",
     "seatYouInline": "ti",
@@ -510,42 +512,26 @@
     "autoStarting": "Pokretanje meča…",
     "kickIconLabel": "Izbaci {{username}}",
     "kickConfirm": {
-      "title": "Izbaciti <name>{{name}}</name> iz sobe?",
-      "lede": "Ovo je izbacivanje, ne trajna zabrana. <strong>{{name}}</strong> se može vratiti bilo kada.",
+      "title": "Izbaci {{name}}",
+      "description": "Može se vratiti bilo kada.",
       "confirm": "Izbaci",
       "cancel": "Odustani"
     },
     "addBot": "Dodaj bota",
     "removeBotIconLabel": "Ukloni {{name}}",
     "removeBotConfirm": {
-      "title": "Ukloniti <name>{{name}}</name> sa stola?",
-      "lede": "Mjesto se odmah oslobađa. Možeš postaviti drugog bota ili ga ostaviti za igrača.",
+      "title": "Ukloni {{name}}",
+      "description": "Mjesto se odmah oslobađa.",
       "confirm": "Ukloni",
       "cancel": "Odustani"
     },
     "kickedToast": "Izbačen si iz sobe {{name}}",
     "promoteIconLabel": "Postavi {{username}} za domaćina",
     "transferConfirm": {
-      "title": "Prenijeti vlasništvo nad sobom drugom igraču?",
-      "lede": "Ostaješ u sobi, ali <strong>{{toName}}</strong> postaje domaćin. Samo domaćin može vratiti vlasništvo, ne možeš ga uzeti sam.",
+      "title": "Postavi {{name}} za domaćina",
+      "description": "Ulogu ti može vratiti samo novi domaćin.",
       "confirm": "Postavi domaćina",
       "cancel": "Odustani"
-    },
-    "ownerConfirm": {
-      "eyebrow": "Akcija domaćina",
-      "close": "Zatvori",
-      "seatLabel": "Mjesto {{n}}",
-      "standing": "Stoji",
-      "youHost": "Ti · trenutni domaćin",
-      "newHost": "{{name}} · novi domaćin",
-      "handOver": "Predaješ",
-      "capabilities": {
-        "start": "Pokretanje meča",
-        "seats": "Zamjenu i raspored mjesta",
-        "players": "Izbacivanje i postavljanje igrača",
-        "bots": "Dodavanje i uklanjanje botova",
-        "privacy": "Privatnost sobe"
-      }
     },
     "legendNeutral": "Slobodna mjesta · timovi se otkrivaju kad sjedneš",
     "legendOpen": "slobodno",
@@ -570,7 +556,6 @@
     "lastMatch": {
       "openButton": "Posljednji meč",
       "title": "Posljednji meč",
-      "description": "Kako je prošao posljednji meč za ovim stolom, ruku po ruku.",
       "loading": "Učitavanje posljednjeg meča…",
       "unavailable": "Posljednji meč trenutno nije dostupan."
     }
@@ -579,32 +564,32 @@
     "someone": "Netko",
     "popup": {
       "title": "Poziv u sobu",
-      "body": "{{inviter}} te zove u sobu „{{roomName}}“.",
+      "body": "{{inviter}} te zove u {{roomName}}.",
       "buyIn": "Ulog {{buyIn}}",
-      "privateHostInvite": "Privatna soba, poziv te pušta unutra",
-      "privatePasswordNeeded": "Privatna soba, potrebna je lozinka",
-      "accept": "Uđi u sobu",
-      "accepting": "Pridruživanje…",
+      "privateHostInvite": "Bez lozinke",
+      "privatePasswordNeeded": "Potrebna lozinka",
+      "accept": "Uđi",
+      "accepting": "Ulazak…",
       "decline": "Ne sada"
     },
     "panel": {
       "openButton": "Pozovi igrače",
       "title": "Pozovi igrače",
-      "description": "Prijatelji koji su online i igrači koji su slobodni u lobiju mogu se pozvati u ovu sobu.",
       "tabsLabel": "Koga pozvati",
       "tabFriends": "Prijatelji",
       "tabLobby": "Lobi",
       "loading": "Učitavanje prijatelja…",
-      "loadFailed": "Učitavanje prijatelja nije uspjelo. Pokušaj ponovo.",
+      "loadFailed": "Učitavanje prijatelja nije uspjelo. Pokušaj ponovno.",
       "empty": "Još nemaš prijatelja. Pronađi igrače i pošalji zahtjev za prijateljstvo.",
       "searchLabel": "Pretraži igrače u lobiju",
       "searchPlaceholder": "Pretraži po korisničkom imenu…",
       "lobbyLoading": "Učitavanje igrača…",
-      "lobbyLoadFailed": "Učitavanje igrača nije uspjelo. Pokušaj ponovo.",
+      "lobbyLoadFailed": "Učitavanje igrača nije uspjelo. Pokušaj ponovno.",
       "lobbyEmpty": "Trenutno nema drugih slobodnih igrača u lobiju.",
       "lobbyNoMatch": "Nema igrača u lobiju sa „{{query}}“",
       "invite": "Pozovi",
-      "invited": "Pozvan"
+      "invited": "Pozvan",
+      "done": "Gotovo"
     },
     "reasons": {
       "offline": "Offline",
@@ -619,7 +604,7 @@
       "roomFull": "Ova soba je puna",
       "notFriends": "Ovaj igrač prima pozive samo od prijatelja",
       "alreadyPending": "Već ima poziv za ovu sobu",
-      "sendFailed": "Slanje poziva nije uspjelo. Pokušaj ponovo.",
+      "sendFailed": "Slanje poziva nije uspjelo. Pokušaj ponovno.",
       "expired": "Ovaj poziv više ne vrijedi.",
       "roomGone": "Ova soba više nije dostupna."
     }
@@ -654,21 +639,18 @@
       "online": "online"
     },
     "roomEjection": {
-      "eyebrow": "Pažnja",
       "insolventTitle": "Nemaš dovoljno novčića",
-      "insolventBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
-      "honorTitle": "Čast ispod granice sobe",
-      "honorBody": "Tvoja čast je pala ispod minimuma ove sobe ({{minHonor}}), sada je {{honor}}. Odigraj sljedeće mečeve i vratit će se.",
+      "insolventBody": "Ova soba traži {{buyIn}}. Imaš {{balance}}.",
+      "honorTitle": "Nemaš dovoljno časti",
+      "honorBody": "Ova soba traži {{minHonor}} časti. Imaš {{honor}}.",
       "roomClosedTitle": "Soba je zatvorena",
-      "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao biti domaćin.",
+      "roomClosedBody": "Nijedan preostali igrač nije mogao biti domaćin.",
       "action": "U redu",
-      "youLabel": "Ti",
-      "tableLabel": "Stol",
       "browseQualifying": "Sobe za mene"
     },
     "matchmaking": {
       "title": "Brza igra",
-      "subtitle": "Smjestit ćemo te čim budu spremna još tri igrača. Meč počinje čim se popuni zadnje mjesto.",
+      "subtitle": "Meč počinje čim četiri igrača budu spremna.",
       "eyebrow": "Tražim igrače",
       "elapsed": "proteklo",
       "seated": "{{found}} / 4 popunjeno",
@@ -695,19 +677,18 @@
         "nameRequired": "Naziv sobe je obavezan",
         "nameTaken": "Naziv je već u upotrebi",
         "unexpected": "Stvaranje sobe nije uspjelo. Pokušaj ponovno.",
-        "nameTooShort": "Naziv mora imati barem {{min}} znakova",
+        "nameTooShort": "Naziv mora imati najmanje {{min}} znakova",
         "buyInTooHigh": "Ulog premašuje tvoje stanje od {{balance}}",
-        "alreadyInRoom": "Već si u sobi, napusti je prije nego što napraviš novu",
+        "alreadyInRoom": "Već si u sobi. Napusti je prije nego što napraviš novu.",
         "passwordRequired": "Postavi lozinku za privatnu sobu",
-        "passwordTooShort": "Lozinka mora imati barem {{min}} znakova",
+        "passwordTooShort": "Lozinka mora imati najmanje {{min}} znakova",
         "passwordTooLong": "Lozinka može imati najviše {{max}} znakova",
         "invalidMinHonor": "Minimalna čast mora biti između {{min}} i {{max}}.",
         "ownHonorTooLow": "Tvoja čast je {{honor}}, pa ne možeš sjesti u sobu s minimumom {{minHonor}}. Spusti minimum da nastaviš.",
         "ownNewPlayerNotAllowed": "Još si novi igrač i ne možeš sjesti u vlastitu sobu. Dozvoli nove igrače da nastaviš."
       },
-      "eyebrow": "Nova soba",
       "headline": "Stvori sobu",
-      "roomNameInfo": "{{min}}–{{max}} znakova. Već ti je generiran nasumičan naziv, pritisni ↻ za drugi ili upiši svoj.",
+      "roomNameInfo": "{{min}}–{{max}} znakova. Pritisni ↻ za drugi nasumičan naziv ili upiši svoj.",
       "roomNameShuffleAria": "Novi nasumičan naziv",
       "randomName": {
         "adjectives": [
@@ -745,14 +726,13 @@
       "submit": "Stvori sobu",
       "submitting": "Stvaram…",
       "preview": {
-        "title": "Pregled uživo · ovako soba izgleda u lobiju",
+        "title": "Pregled u lobiju",
         "joinLabel": "Pridruži se",
-        "justNow": "upravo sad",
         "codeLabel": "KOD",
         "seated": "{{current}}/4"
       },
       "variantHint": "Bitolska dijeli pet karata i okreće adutsku kartu, hrvatska dijeli šest i adut se zove slobodno",
-      "matchModeHint": "501 za kratak meč, 701 za srednji, 1001 za punu utrku",
+      "matchModeHint": "501 je kratak, 701 srednji, 1001 puna utrka",
       "timerHintRelaxed": "Bez tajmera",
       "timerDurationHint": "10–120s · zadano 30s",
       "coinBuyIn": "Ulog",
@@ -763,27 +743,24 @@
       "privateRoomHint": "Privatne sobe ostaju na popisu, ali traže lozinku za ulazak",
       "privacyPublic": "Javna",
       "privacyPrivate": "Privatna",
-      "roomPassword": "Lozinka sobe",
-      "roomPasswordPlaceholder": "Unesi lozinku",
+      "roomPassword": "Lozinka",
       "minHonor": "Tko može sjesti",
-      "minHonorHint": "Igrači s ovolikom ili višom ocjenom časti",
       "minHonorAnyone": "Svatko",
-      "minHonorYou": "ti {{honor}}",
       "minHonorInfoBands": "Svaki prag je granica tijera časti: {{bands}}.",
       "minHonorInfoYou": "Tvoja čast je {{honor}} · {{tier}}.",
       "allowNewPlayers": "Novi igrači",
       "allowNewPlayersYes": "Dozvoli",
       "allowNewPlayersNo": "Samo iskusni",
-      "allowNewPlayersHint": "Novi igrači nemaju dovoljno odigranih mečeva za ocjenu časti. „Samo iskusni“ ih isključuje.",
+      "allowNewPlayersHint": "Novi igrači još nemaju ocjenu časti. „Samo iskusni“ ih isključuje.",
       "roomPasswordHint": "Najmanje {{min}} znakova",
       "declarations": "Zvanja",
       "declarationsOn": "Uključena",
       "declarationsOff": "Isključena",
-      "declarationsHint": "Bez zvanja nema ni Bele, a dijeljenja se broje samo na bodove iz karata",
+      "declarationsHint": "Isključeno: bez zvanja i Bele, samo bodovi iz karata",
       "declarationsTransfer": "Zvanja pri padu",
       "declarationsTransferOn": "Pobjednicima",
       "declarationsTransferOff": "Poništavaju se",
-      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njezina zvanja i Bela obično idu drugoj ekipi. „Poništavaju se“ znači da ih nitko ne dobiva",
+      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njezina zvanja i Bela idu drugoj ekipi; kad se poništavaju, nitko ih ne dobiva",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši dijeljenje",
       "matchEndStop": "Dosta",
@@ -791,7 +768,7 @@
       "direction": "Smjer igre",
       "directionCounterClockwise": "Udesno",
       "directionClockwise": "Ulijevo",
-      "directionHint": "Udesno je uobičajeni smjer, suprotno od kazaljke na satu; ulijevo igra ide u smjeru kazaljke",
+      "directionHint": "Uobičajeno igra ide udesno; u smjeru kazaljke ide ulijevo",
       "advanced": {
         "title": "Napredne postavke",
         "changedCount": "{{count}} promijenjeno",
@@ -839,7 +816,7 @@
     },
     "empty": {
       "title": "Nema otvorenih soba za tvoje filtre",
-      "description": "Obriši filtre, pritisni Brza igra ili stvori sobu i pozovi prijatelje.",
+      "description": "Obriši filtre, probaj Brzu igru ili stvori sobu.",
       "clear": "Obriši pretragu"
     },
     "card": {
@@ -1170,9 +1147,9 @@
       "label": "Ulog"
     },
     "rules": {
-      "stopAtTargetNote": "Za ovim stolom igra se s dosta: meč završava u trenutku kad jedna ekipa dosegne cilj, bez dovršavanja ruke. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje se ruka prvo odigra do kraja.",
-      "noDeclarationsTransferNote": "Za ovim stolom zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi. Poglavlje o bodovanju niže opisuje uobičajeno pravilo, gdje ta zvanja idu drugoj ekipi.",
-      "clockwiseNote": "Za ovim stolom igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo. Poglavlja niže opisuju uobičajenu igru udesno."
+      "stopAtTargetNote": "Za ovim stolom igra se s dosta: meč završava čim jedna ekipa dosegne cilj, bez dovršavanja ruke.",
+      "noDeclarationsTransferNote": "Za ovim stolom zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi.",
+      "clockwiseNote": "Za ovim stolom igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo."
     }
   },
   "auth": {
@@ -1248,15 +1225,15 @@
       },
       "linkDialog": {
         "title": "Poveži svoj račun",
-        "description": "Račun za {{email}} već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Idući put ulaziš jednim klikom.",
-        "descriptionNoEmail": "Račun s ovom email adresom već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Idući put ulaziš jednim klikom.",
-        "passwordPlaceholder": "Lozinka računa",
+        "description": "Unesi lozinku za {{email}} da povežeš Google prijavu.",
+        "descriptionNoEmail": "Unesi lozinku da povežeš Google prijavu.",
+        "passwordPlaceholder": "Lozinka",
         "cancel": "Odustani",
         "submit": "Poveži i prijavi se",
         "submitting": "Povezivanje…",
         "errors": {
-          "wrongPassword": "Pogrešna lozinka. Pokušaj ponovno.",
-          "linkFailed": "Povezivanje nije uspjelo. Pokušaj ponovno."
+          "wrongPassword": "Pogrešna lozinka.",
+          "linkFailed": "Povezivanje računa nije uspjelo. Pokušaj ponovno."
         }
       },
       "errors": {
@@ -1271,20 +1248,20 @@
     "forgotPassword": {
       "eyebrow": "Zaboravljena lozinka",
       "title": "Resetiraj lozinku",
-      "subtitle": "Unesi svoj email i poslat ćemo ti link za postavljanje nove lozinke.",
+      "subtitle": "Poslat ćemo ti link za novu lozinku.",
       "emailLabel": "Email",
       "emailPlaceholder": "ime@primjer.com",
       "submitButton": "Pošalji link",
       "submitting": "Slanje…",
       "successTitle": "Provjeri svoj sandučić",
       "successBody": "Ako račun za tu adresu postoji, poslali smo link za resetiranje lozinke.",
-      "successHint": "Link istječe za 1 sat. Ne zaboravi provjeriti i spam mapu.",
+      "successHint": "Link istječe za 1 sat. Provjeri i spam mapu.",
       "altPrompt": "Sjetio si se?",
       "altCta": "Natrag na prijavu",
       "errors": {
         "emailRequired": "Email je obavezan",
         "emailInvalid": "Unesi valjanu email adresu",
-        "requestFailed": "Nešto je pošlo po zlu. Pokušaj ponovno."
+        "requestFailed": "Slanje poveznice nije uspjelo. Pokušaj ponovno."
       }
     },
     "resetPassword": {
@@ -1299,7 +1276,7 @@
       "submitting": "Resetiranje…",
       "success": "Lozinka je ažurirana. Prijavi se.",
       "invalidTitle": "Link je istekao",
-      "invalidBody": "Ovaj link za resetiranje nevažeći je ili je istekao. Zatraži novi za nastavak.",
+      "invalidBody": "Link je nevažeći ili je istekao. Zatraži novi.",
       "requestNewLink": "Zatraži novi link",
       "altPrompt": "Sjetio si se?",
       "altCta": "Natrag na prijavu",
@@ -1308,7 +1285,7 @@
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
         "passwordsMismatch": "Lozinke se ne podudaraju",
-        "resetFailed": "Nešto je pošlo po zlu. Pokušaj ponovno."
+        "resetFailed": "Promjena lozinke nije uspjela. Pokušaj ponovno."
       }
     }
   },
@@ -1330,22 +1307,22 @@
       "eyebrow": "Tri koraka do prvog štiha",
       "title": "U igri si prije nego što se kava ohladi.",
       "s1t": "Otvori besplatan račun",
-      "s1b": "Odaberi ime, bez preuzimanja. U predvorju si za manje od minute.",
+      "s1b": "Odaberi ime, bez preuzimanja. Za minutu si u lobiju.",
       "s2t": "Zauzmi mjesto",
-      "s2b": "Pritisni Brza igra i naći ćemo tvoju četvorku, ili otvori vlastitu sobu i podijeli kod s prijateljima.",
+      "s2b": "Pritisni Brza igra i naći ćemo ti partnere, ili otvori sobu i podijeli kod.",
       "s3t": "Zovi aduta i igraj",
-      "s3b": "Zovi aduta, osvajaj štihove uz svog partnera i vodi ekipu do 1001 boda."
+      "s3b": "Zovi aduta, osvajaj štihove s partnerom, utrka do 1001."
     },
     "feat": {
       "f1tag": "Predvorje · uživo",
       "f1title": "Gledaj kako se sobe pune uživo",
-      "f1body": "Svaka otvorena soba, svako mjesto, ažurira se u trenu. Filtriraj po tajmeru ili bodovima, traži po kodu ili samo pritisni Brza igra i smjestit ćemo te.",
+      "f1body": "Svaka otvorena soba i mjesto, uživo. Filtriraj po tajmeru ili bodovima, traži po kodu ili pritisni Brza igra.",
       "f2tag": "Ekipe · zlato protiv srebra",
       "f2title": "To je partnerstvo, ne svatko za sebe",
-      "f2body": "Dvoje protiv dvoje, onako kako je Bela zamišljena. Sjedni nasuprot partneru, čitaj zvanja i igraj dugu igru do 1001. Ugrađeni chat i emotikoni drže stol u razgovoru.",
+      "f2body": "Dvoje protiv dvoje, partneri jedan nasuprot drugome, utrka do 1001. Chat i emotikoni drže stol u razgovoru.",
       "f3tag": "Profil · povijest mečeva",
       "f3title": "Svaka ruka se broji u tvoj učinak",
-      "f3body": "Prati odigrane mečeve, postotak pobjeda i poraza, uz potpunu povijest mečeva ruku po ruku. Vidi s kim pobjeđuješ i kako je prošla večeras."
+      "f3body": "Odigrani mečevi, postotak pobjeda i povijest ruku po ruku. Vidi s kim pobjeđuješ."
     },
     "room": {
       "join": "Uđi",
@@ -1387,9 +1364,9 @@
     },
     "contact": {
       "title": "Kontakt",
-      "lead": "Beljot je izradio Emilijan Koteski. Pitanja, prijave grešaka i povratne informacije su dobrodošli.",
+      "lead": "Pitanja, prijave grešaka i prijedlozi su dobrodošli.",
       "linkedin": "LinkedIn",
-      "disclaimer": "Ovo je beta verzija za testiranje, nije gotov proizvod."
+      "disclaimer": "Beta verzija, još u testiranju."
     }
   },
   "bots": {
@@ -1401,9 +1378,7 @@
     "dailyReward": {
       "title": "Dnevna nagrada",
       "streakMaxed": "Maksimalan niz",
-      "coinsAdded": "novčića dodano u tvoj novčanik",
       "streak": "Dan {{streak}}",
-      "newBalance": "Novo stanje",
       "continue": "Nastavi"
     }
   },
@@ -1418,7 +1393,7 @@
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Razina {{level}}, {{current}} / {{next}} XP",
     "levelUpDialog": {
-      "title": "Nova razina!",
+      "title": "Nova razina",
       "earned": "+{{amount}} XP",
       "continue": "Nastavi"
     }
@@ -1459,13 +1434,13 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Novi rang!"
+      "title": "Novi rang"
     },
     "rankDownDialog": {
       "title": "Pad ranga"
     },
     "rankDialog": {
-      "sp": "{{change}} SP u ovom meču",
+      "sp": "{{change}} SP",
       "continue": "Nastavi"
     },
     "result": {
@@ -1479,7 +1454,7 @@
       "sub": "Tko se najbrže penje ove sezone, po sezonskim poenima.",
       "subPast": "Konačan poredak za sezonu {{season}}, po sezonskim poenima.",
       "loading": "Učitavanje…",
-      "error": "Učitavanje rang liste nije uspjelo. Pokušaj ponovno",
+      "error": "Učitavanje rang liste nije uspjelo. Pokušaj ponovno.",
       "empty": "Još nitko nije osvojio sezonske poene ove sezone.",
       "emptyPast": "Nitko nije osvojio sezonske poene u ovoj sezoni.",
       "loadMore": "Učitaj više",
@@ -1503,9 +1478,8 @@
     "label": "Podrži Beljot.online",
     "note": "Hobi projekt. Uvijek mi možeš <action>kupiti kavu</action>.",
     "dialog": {
-      "eyebrow": "Hobi projekt",
       "title": "Beljot.online radim u slobodno vrijeme",
-      "body": "Server i domenu plaćam iz svog džepa. Jedna kava pokriva dio toga, a igranje i pozivanje prijatelja pomažu jednako.",
+      "body": "Server i domenu plaćam iz svog džepa. Kava pomaže, kao i igranje i dovođenje prijatelja.",
       "cta": "Kupi mi kavu",
       "qrToggle": "Skeniraj mobitelom",
       "qrAlt": "QR kod koji vodi na Buy Me a Coffee stranicu Emilijana Koteskog"

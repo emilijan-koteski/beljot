@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { RelativeTime } from "@/shared/components/RelativeTime";
+import { Button } from "@/shared/components/ui/button";
 import { Chip } from "@/shared/components/ui/chips";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useVisualViewport } from "@/shared/hooks/useVisualViewport";
@@ -363,14 +364,16 @@ export function ChatDock(props: ChatDockProps) {
       <div className="flex items-center gap-2 border-b border-border px-3.5 py-3">
         <MessageSquare className="text-accent size-3.5" />
         <span className="text-ink text-sm font-semibold">{t(keys.title)}</span>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={() => setOpen(false)}
           aria-label={t(keys.closeLabel)}
-          className="text-ink-dim ml-auto p-1"
+          className="text-ink-dim ml-auto"
           data-testid={`${testIdRoot}-close`}
         >
           <X className="size-3.5" />
-        </button>
+        </Button>
       </div>
 
       {threadKeys.length > 0 && (
@@ -445,15 +448,15 @@ export function ChatDock(props: ChatDockProps) {
           data-testid={`${testIdRoot}-input`}
           className="bg-surface-elevated text-ink flex-1 rounded-lg border border-border px-2.5 py-2 text-xs outline-none transition-[border-color,box-shadow] placeholder:text-ink-mute focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70 disabled:cursor-not-allowed disabled:opacity-50"
         />
-        <button
+        <Button
+          size="icon"
           onClick={send}
           disabled={!draft.trim() || !isConnected}
           aria-label={t(keys.sendLabel)}
           data-testid={`${testIdRoot}-send`}
-          className="bg-accent text-accent-ink inline-flex size-8 items-center justify-center rounded-lg disabled:opacity-50"
         >
           <Send className="size-3.5" strokeWidth={2} />
-        </button>
+        </Button>
       </div>
     </aside>
   );

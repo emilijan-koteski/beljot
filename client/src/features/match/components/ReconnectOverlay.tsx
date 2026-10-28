@@ -48,7 +48,7 @@ const RING_SIZE = 132;
 const RING_STROKE_INSET = 4;
 const RING_RADIUS = (RING_SIZE - RING_STROKE_INSET) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
-const FELT_DARK = "#0e2818";
+const FELT_DARK = "var(--felt-shadow)";
 
 /**
  * Returns the viewer's win or loss for an abandoned match, based on whether they share the abandoner's team.
@@ -282,7 +282,7 @@ export function ReconnectOverlay({
                   cy={ringSize / 2}
                   r={ringRadius}
                   fill={FELT_DARK}
-                  stroke="rgba(255,255,255,0.08)"
+                  stroke="var(--sheen-10)"
                   strokeWidth={2}
                 />
                 <circle
@@ -365,7 +365,7 @@ function DisconnectedPlayerRow({
     <div
       className="flex items-center gap-3 px-3 py-2 rounded-xl"
       style={{
-        background: "rgba(0,0,0,0.22)",
+        background: "var(--shade-20)",
         border: "1px solid var(--brass-40)",
         boxShadow: "inset 0 1px 0 var(--brass-10)",
       }}
@@ -381,7 +381,7 @@ function DisconnectedPlayerRow({
             position: "absolute",
             inset: 0,
             background:
-              "conic-gradient(from 0deg, var(--brass-85), rgba(156,125,78,0.85), var(--brass-85))",
+              "conic-gradient(from 0deg, var(--brass-85), color-mix(in srgb, var(--brass-deep) 85%, transparent), var(--brass-85))",
             padding: 2,
             boxShadow: "var(--shadow-felt-sm)",
           }}

@@ -9,7 +9,7 @@ const EDGE_COLOR: Record<FloatingPanelEdge, string> = {
   danger: "color-mix(in srgb, var(--danger-light) 40%, transparent)",
 };
 
-const PANEL_FILL = "var(--panel-dark, rgba(20, 45, 30, 0.85))";
+const PANEL_FILL = "var(--panel-dark)";
 const PANEL_BLUR = "blur(8px)";
 
 interface FloatingPanelOptions {
