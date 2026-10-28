@@ -17,7 +17,7 @@ interface ToneStyle {
 const TONE_STYLE: Record<ExplainerTone, ToneStyle> = {
   brass: {
     edge: "var(--brass-40)",
-    fill: "var(--felt-strip-fill)",
+    fill: "linear-gradient(90deg, var(--felt-strip-start), var(--felt-strip-end))",
     ink: "var(--felt-cream)",
     dot: "var(--brass)",
     dotGlow: "var(--brass-55)",
@@ -25,7 +25,7 @@ const TONE_STYLE: Record<ExplainerTone, ToneStyle> = {
   },
   danger: {
     edge: "color-mix(in srgb, var(--danger-light) 35%, transparent)",
-    fill: "var(--felt-strip-fill-danger)",
+    fill: "linear-gradient(90deg, var(--felt-strip-danger-start), var(--felt-strip-danger-end))",
     ink: "color-mix(in srgb, var(--danger-light) 25%, var(--ink-light))",
     dot: "var(--danger-light)",
     dotGlow: "color-mix(in srgb, var(--danger-light) 60%, transparent)",

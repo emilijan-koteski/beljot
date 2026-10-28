@@ -274,11 +274,14 @@
   --shade-25: rgb(0 0 0 / 0.25);
   --shade-60: rgb(0 0 0 / 0.6);
 
-  /* ── Felt fills — the translucent grounds of felt controls and strips. */
-  --felt-ghost-fill: linear-gradient(180deg, rgb(60 90 70 / 0.6), rgb(30 50 35 / 0.6));
-  --felt-ghost-fill-soft: linear-gradient(180deg, rgb(60 90 70 / 0.35), rgb(30 50 35 / 0.35));
-  --felt-strip-fill: linear-gradient(90deg, rgb(20 46 28 / 0.55), rgb(14 40 24 / 0.35));
-  --felt-strip-fill-danger: linear-gradient(90deg, rgb(80 28 28 / 0.55), rgb(50 18 18 / 0.35));
+  /* ── Felt fills — gradient stops for the translucent grounds of the ghost
+     ClassicButton and the ExplainerStrip, like the dialog-felt pair above. */
+  --felt-ghost-top: rgb(60 90 70 / 0.6);
+  --felt-ghost-bottom: rgb(30 50 35 / 0.6);
+  --felt-strip-start: rgb(20 46 28 / 0.55);
+  --felt-strip-end: rgb(14 40 24 / 0.35);
+  --felt-strip-danger-start: rgb(80 28 28 / 0.55);
+  --felt-strip-danger-end: rgb(50 18 18 / 0.35);
   --panel-dark: rgba(20, 45, 30, 0.85);
   --panel-deeper: rgba(18, 32, 22, 0.94);
 

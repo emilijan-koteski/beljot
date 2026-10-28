@@ -20,7 +20,7 @@ const VARIANT_STYLE: Record<ClassicButtonVariant, CSSProperties> = {
   },
   ghost: {
     border: "1px solid var(--brass-40)",
-    background: "var(--felt-ghost-fill)",
+    background: "linear-gradient(180deg, var(--felt-ghost-top), var(--felt-ghost-bottom))",
     color: "var(--ink-light)",
     boxShadow: "var(--shadow-felt-sm)",
   },
