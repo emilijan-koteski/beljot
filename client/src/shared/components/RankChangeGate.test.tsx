@@ -63,7 +63,7 @@ describe("RankChangeGate", () => {
     useRankChangeStore.getState().setPending(promotedToGold2);
 
     renderGate();
-    expect(screen.getByTestId("rank-change-dialog")).toHaveAttribute("data-direction", "promoted");
+    expect(screen.getByTestId("rank-change-rank")).toHaveAttribute("data-direction", "promoted");
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
 
     await user.click(screen.getByTestId("rank-change-continue"));
@@ -84,9 +84,8 @@ describe("RankChangeGate", () => {
     });
 
     renderGate();
-    expect(screen.getByTestId("rank-change-dialog")).toHaveAttribute("data-direction", "demoted");
+    expect(screen.getByTestId("rank-change-rank")).toHaveAttribute("data-direction", "demoted");
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Silver 3");
-    expect(screen.queryByTestId("rank-change-halo")).not.toBeInTheDocument();
   });
 
   it("waits for a pending level-up to be dismissed first", async () => {

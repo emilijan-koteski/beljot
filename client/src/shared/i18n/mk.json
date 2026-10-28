@@ -1395,7 +1395,7 @@
     "progress": "{{current}} / {{next}} поени",
     "progressLabel": "Ниво {{level}}, {{current}} / {{next}} поени",
     "levelUpDialog": {
-      "title": "Ново ниво!",
+      "title": "Ново ниво",
       "earned": "+{{amount}} поени",
       "continue": "Продолжи"
     }
@@ -1436,13 +1436,13 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Нов ранг!"
+      "title": "Нов ранг"
     },
     "rankDownDialog": {
       "title": "Пад на рангот"
     },
     "rankDialog": {
-      "sp": "{{change}} СП во овој меч",
+      "sp": "{{change}} СП",
       "continue": "Продолжи"
     },
     "result": {

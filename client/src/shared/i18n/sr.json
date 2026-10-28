@@ -1395,7 +1395,7 @@
     "progress": "{{current}} / {{next}} XP",
     "progressLabel": "Nivo {{level}}, {{current}} / {{next}} XP",
     "levelUpDialog": {
-      "title": "Novi nivo!",
+      "title": "Novi nivo",
       "earned": "+{{amount}} XP",
       "continue": "Nastavi"
     }
@@ -1436,13 +1436,13 @@
     },
     "rank": "{{tier}} {{division}}",
     "rankUpDialog": {
-      "title": "Novi rang!"
+      "title": "Novi rang"
     },
     "rankDownDialog": {
       "title": "Pad ranga"
     },
     "rankDialog": {
-      "sp": "{{change}} SP u ovom meču",
+      "sp": "{{change}} SP",
       "continue": "Nastavi"
     },
     "result": {

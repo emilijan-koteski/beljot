@@ -1,6 +1,7 @@
 import { Check, Flame, Sparkle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { CoinMedallion } from "@/shared/components/CoinMedallion";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
@@ -13,18 +14,6 @@ interface DailyRewardDialogProps {
 }
 
 const STREAK_MAX = 14;
-
-/** The Beljot coin: a brass disc with the "B" monogram, drawn from tokens. */
-function Coin() {
-  return (
-    <span
-      aria-hidden="true"
-      className="from-brass to-brass-deep text-brass-ink ring-brass-soft flex size-18 items-center justify-center rounded-full bg-linear-to-b text-3xl font-bold shadow-md ring-4"
-    >
-      B
-    </span>
-  );
-}
 
 /** The 14-day login streak: cleared days filled with a check, today ringed, day 14 marked with a sparkle. */
 function StreakTrack({ day }: { day: number }) {
@@ -67,7 +56,7 @@ export function DailyRewardDialog({ open, amount, streakDay, onClose }: DailyRew
       open={open}
       onClose={onClose}
       tone="celebration"
-      art={<Coin />}
+      art={<CoinMedallion>B</CoinMedallion>}
       title={t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
       primary={{
         label: t("rewards.dailyReward.continue"),
