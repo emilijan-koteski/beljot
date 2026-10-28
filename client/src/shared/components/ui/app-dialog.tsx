@@ -131,7 +131,9 @@ export function AppDialog({
       <div
         className={cn(
           "px-6 pt-6",
-          celebration ? "flex flex-col items-center text-center" : "flex items-start gap-4",
+          celebration
+            ? "flex flex-col items-center text-center"
+            : cn("flex gap-4", description === undefined ? "items-center" : "items-start"),
         )}
       >
         {celebration
