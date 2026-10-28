@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/shared/lib/utils";
 
-const buttonVariants = cva(
+const buttonVariantClasses = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,color] outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/70 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-danger aria-invalid:ring-3 aria-invalid:ring-danger/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
@@ -38,17 +38,27 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonVariantProps = VariantProps<typeof buttonVariantClasses>;
+
+/**
+ * Button classes for any element (a router Link, an anchor), merged so a variant's border or fill
+ * always wins over the base classes, exactly as on Button itself.
+ */
+function buttonVariants(props?: Parameters<typeof buttonVariantClasses>[0]): string {
+  return cn(buttonVariantClasses(props));
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & ButtonVariantProps) {
   return (
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariantClasses({ variant, size, className }))}
       {...props}
     />
   );
