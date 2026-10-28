@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent, PointerEventHandler, ReactNode } from "react";
 
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -32,6 +32,7 @@ interface AppDialogProps {
   primary: AppDialogAction;
   secondary?: AppDialogAction;
   onSubmit?: () => void;
+  onPointerDownCapture?: PointerEventHandler<HTMLDivElement>;
   testId?: string;
   children?: ReactNode;
 }
@@ -59,6 +60,7 @@ export function AppDialog({
   primary,
   secondary,
   onSubmit,
+  onPointerDownCapture,
   testId,
   children,
 }: AppDialogProps) {
@@ -154,6 +156,7 @@ export function AppDialog({
     <Dialog open={open} onOpenChange={(next) => !next && !pending && onClose()}>
       <DialogContent
         showCloseButton={false}
+        onPointerDownCapture={onPointerDownCapture}
         data-testid={testId}
         data-tone={tone}
         className="bg-surface ring-brass-soft block gap-0 overflow-hidden rounded-xl p-0 shadow-xl sm:max-w-[480px]"

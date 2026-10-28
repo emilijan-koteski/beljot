@@ -138,19 +138,17 @@
       "explainer": {
         "open": "Kako funkcionira",
         "title": "Kako funkcionira čast",
-        "lede": "Ocjena pokazuje završavaš li mečeve koje započneš.",
-        "finishLabel": "Završi meč",
-        "finishBody": "i ocjena raste, bez obzira na pobjedu ili poraz.",
-        "dropLabel": "Ako napustiš i ne vratiš se,",
-        "dropBody": "ocjena pada. Jedino to je snižava.",
-        "surrenderLabel": "Predaja se ne računa.",
-        "surrenderBody": "Završen meč je završen meč.",
-        "decayLabel": "Stara napuštanja blijede.",
-        "decayBody": "Noviji mečevi vrijede mnogo više.",
+        "lede": "Čast pokazuje završavaš li mečeve koje započneš.",
         "standing": "Trenutno si na {{score}}, <tierWord>{{tier}}</tierWord>.",
-        "standingNew": "Odigraj 5 mečeva i tvoja ocjena pojavit će se ovdje.",
+        "standingNew": "Odigraj 5 mečeva da vidiš svoju ocjenu.",
         "fullRules": "Sva pravila",
-        "close": "Razumijem"
+        "close": "Razumijem",
+        "facts": {
+          "finish": "Završen meč je podiže, bez obzira na ishod.",
+          "drop": "Snižava je samo napuštanje meča bez povratka.",
+          "surrender": "Predaja se računa kao završen meč.",
+          "decay": "Stara napuštanja blijede, najviše vrijede noviji mečevi."
+        }
       },
       "tier": {
         "exemplary": "Uzoran",
@@ -448,7 +446,7 @@
       "description": "Unesi lozinku za {{name}}.",
       "placeholder": "Lozinka",
       "submit": "Uđi",
-      "submitting": "Pridruživanje…",
+      "submitting": "Ulazak…",
       "cancel": "Odustani"
     },
     "privacy": {
@@ -563,12 +561,12 @@
     "someone": "Netko",
     "popup": {
       "title": "Poziv u sobu",
-      "body": "{{inviter}} te zove u sobu „{{roomName}}“.",
+      "body": "{{inviter}} te zove u {{roomName}}.",
       "buyIn": "Ulog {{buyIn}}",
-      "privateHostInvite": "Privatna soba, poziv te pušta unutra",
-      "privatePasswordNeeded": "Privatna soba, potrebna je lozinka",
-      "accept": "Uđi u sobu",
-      "accepting": "Pridruživanje…",
+      "privateHostInvite": "Bez lozinke",
+      "privatePasswordNeeded": "Potrebna lozinka",
+      "accept": "Uđi",
+      "accepting": "Ulazak…",
       "decline": "Ne sada"
     },
     "panel": {
@@ -638,16 +636,13 @@
       "online": "online"
     },
     "roomEjection": {
-      "eyebrow": "Pažnja",
       "insolventTitle": "Nemaš dovoljno novčića",
-      "insolventBody": "Nemaš dovoljno novčića za ulog ove sobe. Stanje: {{balance}}. Ulog: {{buyIn}}.",
-      "honorTitle": "Čast ispod granice sobe",
-      "honorBody": "Tvoja čast je pala ispod minimuma ove sobe ({{minHonor}}), sada je {{honor}}. Odigraj sljedeće mečeve i vratit će se.",
+      "insolventBody": "Ova soba traži {{buyIn}}. Imaš {{balance}}.",
+      "honorTitle": "Nemaš dovoljno časti",
+      "honorBody": "Ova soba traži {{minHonor}} časti. Imaš {{honor}}.",
       "roomClosedTitle": "Soba je zatvorena",
-      "roomClosedBody": "Ova soba je zatvorena jer nijedan preostali igrač nije mogao biti domaćin.",
+      "roomClosedBody": "Nijedan preostali igrač nije mogao biti domaćin.",
       "action": "U redu",
-      "youLabel": "Ti",
-      "tableLabel": "Stol",
       "browseQualifying": "Sobe za mene"
     },
     "matchmaking": {

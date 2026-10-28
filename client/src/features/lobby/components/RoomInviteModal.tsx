@@ -7,16 +7,8 @@ import { toast } from "sonner";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { FetchError } from "@/shared/api/axiosClient";
 import { playAlertSfx } from "@/shared/audio/audioEngine";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Badge } from "@/shared/components/ui/badge";
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
 import {
   useDeclineRoomInviteMutation,
   useJoinRoomMutation,
@@ -149,39 +141,37 @@ export function RoomInviteModal() {
     void join(invite.roomId);
   }
 
+  const inviter =
+    invite.inviterUsername.length > 0 ? invite.inviterUsername : t("roomInvite.someone");
+  const showBadges = invite.coinBuyIn > 0 || invite.isPrivate === true;
+
   return (
     <>
-      <Dialog
+      <AppDialog
         open={!showPasswordPrompt}
-        onOpenChange={(next) => {
-          if (!next) decline();
+        onClose={decline}
+        onPointerDownCapture={silenceWhistle}
+        icon={<MailOpen />}
+        title={<span data-testid="room-invite-title">{t("roomInvite.popup.title")}</span>}
+        description={
+          <span data-testid="room-invite-body">
+            {t("roomInvite.popup.body", { inviter, roomName: invite.roomName })}
+          </span>
+        }
+        pending={isJoining}
+        primary={{
+          label: isJoining ? t("roomInvite.popup.accepting") : t("roomInvite.popup.accept"),
+          onClick: handleAccept,
+          testId: "room-invite-accept",
         }}
+        secondary={{
+          label: t("roomInvite.popup.decline"),
+          onClick: decline,
+          testId: "room-invite-decline",
+        }}
+        testId="room-invite-modal"
       >
-        <DialogContent
-          showCloseButton={false}
-          data-testid="room-invite-modal"
-          onPointerDownCapture={silenceWhistle}
-        >
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">
-                <MailOpen className="size-5" />
-              </div>
-              <DialogTitle data-testid="room-invite-title">
-                {t("roomInvite.popup.title")}
-              </DialogTitle>
-            </div>
-            <DialogDescription data-testid="room-invite-body">
-              {t("roomInvite.popup.body", {
-                inviter:
-                  invite.inviterUsername.length > 0
-                    ? invite.inviterUsername
-                    : t("roomInvite.someone"),
-                roomName: invite.roomName,
-              })}
-            </DialogDescription>
-          </DialogHeader>
-
+        {showBadges ? (
           <div className="flex flex-wrap items-center gap-2">
             {invite.coinBuyIn > 0 && (
               <Badge
@@ -199,28 +189,8 @@ export function RoomInviteModal() {
               </Badge>
             )}
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              onClick={handleAccept}
-              data-testid="room-invite-accept"
-              disabled={isJoining}
-            >
-              {isJoining ? t("roomInvite.popup.accepting") : t("roomInvite.popup.accept")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={decline}
-              data-testid="room-invite-decline"
-              disabled={isJoining}
-            >
-              {t("roomInvite.popup.decline")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        ) : undefined}
+      </AppDialog>
 
       <PasswordPromptDialog
         open={showPasswordPrompt}

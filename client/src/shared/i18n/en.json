@@ -138,19 +138,17 @@
       "explainer": {
         "open": "How it works",
         "title": "How honor works",
-        "lede": "The score shows one thing — whether you finish the matches you start.",
-        "finishLabel": "Finish a match",
-        "finishBody": "— win or lose, it lifts your score.",
-        "dropLabel": "If you drop out and don't come back,",
-        "dropBody": "your score falls. Nothing else lowers it.",
-        "surrenderLabel": "Surrender doesn't count.",
-        "surrenderBody": "A finished match is a finished match.",
-        "decayLabel": "Old abandonments fade.",
-        "decayBody": "Recent matches count for far more.",
-        "standing": "You're at {{score}} — <tierWord>{{tier}}</tierWord>.",
-        "standingNew": "Finish 5 matches and your score appears here.",
+        "lede": "Honor shows whether you finish the matches you start.",
+        "standing": "You're at {{score}}, <tierWord>{{tier}}</tierWord>.",
+        "standingNew": "Finish 5 matches to see your score.",
         "fullRules": "Full rules",
-        "close": "Got it"
+        "close": "Got it",
+        "facts": {
+          "finish": "Finishing a match raises it, win or lose.",
+          "drop": "Only leaving a match for good lowers it.",
+          "surrender": "Surrendering counts as finishing.",
+          "decay": "Old abandonments fade; recent matches count most."
+        }
       },
       "tier": {
         "exemplary": "Exemplary",
@@ -563,11 +561,11 @@
     "someone": "Someone",
     "popup": {
       "title": "Room invite",
-      "body": "{{inviter}} invited you to join \"{{roomName}}\".",
+      "body": "{{inviter}} invited you to {{roomName}}.",
       "buyIn": "Buy-in {{buyIn}}",
-      "privateHostInvite": "Private room — your invite gets you in",
-      "privatePasswordNeeded": "Private room — password required",
-      "accept": "Join room",
+      "privateHostInvite": "No password needed",
+      "privatePasswordNeeded": "Password needed",
+      "accept": "Join",
       "accepting": "Joining…",
       "decline": "Not now"
     },
@@ -638,16 +636,13 @@
       "online": "online"
     },
     "roomEjection": {
-      "eyebrow": "Heads up",
       "insolventTitle": "Not enough coins",
-      "insolventBody": "You don't have enough coins to cover this room's buy-in. Balance: {{balance}}. Buy-in: {{buyIn}}.",
-      "honorTitle": "Honor below the room's bar",
-      "honorBody": "Your honor dropped below this room's minimum of {{minHonor}} — it's now {{honor}}. Finish your next matches and it climbs back.",
+      "insolventBody": "This room needs {{buyIn}}. You have {{balance}}.",
+      "honorTitle": "Not enough honor",
+      "honorBody": "This room needs {{minHonor}} honor. You have {{honor}}.",
       "roomClosedTitle": "Room closed",
-      "roomClosedBody": "This room closed — no remaining player could be its host.",
+      "roomClosedBody": "No player left could host it.",
       "action": "Got it",
-      "youLabel": "You",
-      "tableLabel": "Table",
       "browseQualifying": "Rooms I qualify for"
     },
     "matchmaking": {
