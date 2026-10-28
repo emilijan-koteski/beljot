@@ -1,7 +1,7 @@
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 
-import { Button } from "@/shared/components/ui/button";
+import { CrashScreen } from "@/shared/components/CrashScreen";
 
 interface Props {
   children: ReactNode;
@@ -34,14 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-background">
-          <div className="text-center">
-            <h1 className="mb-4 text-2xl text-ink tracking-tight">Something went wrong</h1>
-            <Button onClick={() => window.location.reload()}>Try again</Button>
-          </div>
-        </div>
-      );
+      return <CrashScreen />;
     }
 
     return this.props.children;

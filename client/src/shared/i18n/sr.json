@@ -3,7 +3,12 @@
     "appName": "Beljot",
     "close": "Zatvori",
     "showPassword": "Prikaži lozinku",
-    "hidePassword": "Sakrij lozinku"
+    "hidePassword": "Sakrij lozinku",
+    "crash": {
+      "title": "Nešto je pošlo po zlu",
+      "retry": "Pokušaj ponovo",
+      "backToLobby": "Nazad u lobi"
+    }
   },
   "team": {
     "us": "Mi",

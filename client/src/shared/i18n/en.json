@@ -3,7 +3,12 @@
     "appName": "Beljot",
     "close": "Close",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "crash": {
+      "title": "Something went wrong",
+      "retry": "Try again",
+      "backToLobby": "Back to lobby"
+    }
   },
   "team": {
     "us": "Us",
