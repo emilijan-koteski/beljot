@@ -941,7 +941,6 @@
       "resolved": "Најави",
       "headlineUs": "Ние ги освоивме најавите",
       "headlineThem": "Тие ги освоија најавите",
-      "tiebreaker": "Највисока најава: {{label}} · {{player}}",
       "byPlayer": "од {{name}}",
       "dismiss": "Затвори",
       "declaredBanner": "{{username}} има најава"

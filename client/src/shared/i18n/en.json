@@ -941,7 +941,6 @@
       "resolved": "Declarations",
       "headlineUs": "We won the declarations",
       "headlineThem": "They won the declarations",
-      "tiebreaker": "{{player}}'s {{label}} is highest",
       "byPlayer": "by {{name}}",
       "dismiss": "Dismiss",
       "declaredBanner": "{{username}} has a declaration"

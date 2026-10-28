@@ -12,8 +12,6 @@ vi.mock("react-i18next", () => ({
       };
       if (key === "match.declaration.headlineUs") return "We won the declarations";
       if (key === "match.declaration.headlineThem") return "They won the declarations";
-      if (key === "match.declaration.tiebreaker" && opts)
-        return `${opts.player}'s ${opts.label} is highest`;
       if (key === "match.declaration.byPlayer" && opts) return `by ${opts.name}`;
       if (key === "match.declaration.tierce") return "Tierce";
       if (key === "match.declaration.quarte") return "Quarte";
@@ -222,8 +220,8 @@ describe("DeclarationReveal", () => {
 
     const values = screen.getAllByTestId("declaration-reveal-meld-value");
     expect(values).toHaveLength(2);
-    expect(values[0]).toHaveTextContent("+50");
-    expect(values[1]).toHaveTextContent("+200");
+    expect(values[0]).toHaveTextContent("+200");
+    expect(values[1]).toHaveTextContent("+50");
 
     expect(screen.getAllByTestId("playing-card-JS")).toHaveLength(2);
     for (const id of ["9S", "TS", "QS", "JH", "JD", "JC"]) {
@@ -259,34 +257,13 @@ describe("DeclarationReveal", () => {
     );
     const declarers = screen.getAllByTestId("declaration-reveal-declarer");
     expect(declarers).toHaveLength(2);
-    expect(declarers[0]).toHaveAttribute("data-seat", "0");
-    expect(declarers[0]).toHaveTextContent("by alice");
-    expect(declarers[1]).toHaveAttribute("data-seat", "2");
-    expect(declarers[1]).toHaveTextContent("by carol");
+    expect(declarers[0]).toHaveAttribute("data-seat", "2");
+    expect(declarers[0]).toHaveTextContent("by carol");
+    expect(declarers[1]).toHaveAttribute("data-seat", "0");
+    expect(declarers[1]).toHaveTextContent("by alice");
   });
 
-  it("hides the tiebreaker line when the opposing team declared nothing", () => {
-    const uncontestedOverlap: DeclarationsResolvedPayload = {
-      winnerTeam: 1,
-      contested: false,
-      declarations: [
-        { playerSeat: 1, type: "sequence", value: 20, cards: ["8H", "9H", "TH"] },
-        { playerSeat: 1, type: "four_of_a_kind", value: 200, cards: ["JC", "JH", "JD", "JS"] },
-      ],
-    };
-    render(
-      <DeclarationReveal
-        payload={uncontestedOverlap}
-        players={mockPlayers}
-        viewerTeam="teamA"
-        onComplete={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId("declaration-reveal-tiebreaker")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId("declaration-reveal-meld-label")).toHaveLength(2);
-  });
-
-  it("names the deciding meld when both teams declared", () => {
+  it("lists the melds highest first with no tiebreaker line, whoever won", () => {
     const contested: DeclarationsResolvedPayload = {
       winnerTeam: 1,
       contested: true,
@@ -303,28 +280,10 @@ describe("DeclarationReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("declaration-reveal-tiebreaker")).toHaveTextContent(
-      "dave's Carré is highest",
-    );
-  });
-
-  it("names the deciding meld even when the winning team has only one", () => {
-    const contestedSingle: DeclarationsResolvedPayload = {
-      winnerTeam: 1,
-      contested: true,
-      declarations: [
-        { playerSeat: 1, type: "sequence", value: 50, cards: ["JD", "QD", "KD", "AD"] },
-      ],
-    };
-    render(
-      <DeclarationReveal
-        payload={contestedSingle}
-        players={mockPlayers}
-        viewerTeam="teamA"
-        onComplete={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("declaration-reveal-tiebreaker")).toBeInTheDocument();
+    const values = screen.getAllByTestId("declaration-reveal-meld-value");
+    expect(values[0]).toHaveTextContent("+200");
+    expect(values[1]).toHaveTextContent("+20");
+    expect(screen.queryByText(/is highest/)).not.toBeInTheDocument();
   });
 
   it("renders the total in the brass strip without a caption", () => {
