@@ -1,5 +1,7 @@
 import { RuleBlock } from "@/features/rules/components/RuleBlock";
 import type { RuleSection } from "@/features/rules/content/types";
+import { useRulesDense } from "@/features/rules/RulesContext";
+import { cn } from "@/shared/lib/utils";
 
 type Props = {
   idx: number;
@@ -9,59 +11,40 @@ type Props = {
 
 /** One numbered chapter (§01…§06): header + content blocks. */
 export function Chapter({ idx, section, registerRef }: Props) {
+  const dense = useRulesDense();
   return (
     <section
       ref={(el) => registerRef(section.id, el)}
       id={section.id}
-      style={{
-        scrollMarginTop: 84,
-        display: "flex",
-        flexDirection: "column",
-        gap: 18,
-        padding: "36px 0 32px",
-        borderTop: idx === 0 ? "none" : "1px solid var(--border)",
-      }}
+      className={cn(
+        "flex flex-col",
+        dense ? "scroll-mt-2 gap-3.5 pt-5.5 pb-5" : "scroll-mt-21 gap-4.5 pt-9 pb-8",
+        idx > 0 && "border-border border-t",
+      )}
     >
-      <header style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div
-          className="font-mono"
-          style={{
-            fontSize: 10,
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "var(--brass-deep)",
-            fontWeight: 600,
-          }}
-        >
+      <header className={cn("flex flex-col", dense ? "gap-1" : "gap-1.5")}>
+        <div className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
           {String(idx + 1).padStart(2, "0")} &nbsp; {section.label}
         </div>
         <h2
-          className=""
-          style={{
-            margin: 0,
-            fontSize: 28,
-            fontWeight: 700,
-            letterSpacing: "-0.025em",
-            lineHeight: 1.2,
-            color: "var(--ink)",
-          }}
+          className={cn(
+            "text-ink m-0 leading-tight tracking-tight",
+            dense ? "text-2xl font-semibold" : "text-3xl font-bold",
+          )}
         >
           {section.title}
         </h2>
         <p
-          style={{
-            margin: "4px 0 0",
-            fontSize: 16,
-            lineHeight: 1.6,
-            color: "var(--ink-dim)",
-            maxWidth: 640,
-          }}
+          className={cn(
+            "text-ink-dim mt-1 mb-0 max-w-160 leading-relaxed",
+            dense ? "text-sm" : "text-base",
+          )}
         >
           {section.lede}
         </p>
       </header>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className={cn("flex flex-col", dense ? "gap-3" : "gap-3.5")}>
         {section.blocks.map((b, i) => (
           <RuleBlock key={i} block={b} />
         ))}

@@ -44,7 +44,7 @@ describe("RulesDialog (in-game)", () => {
     expect(
       screen.getByRole("heading", { name: "Trump plays by its own rules" }),
     ).toBeInTheDocument();
-    const carreJ = screen.getByTestId("rules-meld-carreJ");
+    const carreJ = screen.getByTestId("meld-carreJ");
     expect(within(carreJ).getByText("Carré of Jacks")).toBeInTheDocument();
     expect(within(carreJ).getByText("+200")).toBeInTheDocument();
   });

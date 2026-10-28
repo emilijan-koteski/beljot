@@ -1,100 +1,63 @@
 import type { Declaration } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
+import { cn } from "@/shared/lib/utils";
 
-const TIER_STYLES: Record<
-  0 | 1 | 2 | 3,
-  { eyebrow: string; border: string; tint: string; pts: string; text: string }
-> = {
+const TIER: Record<0 | 1 | 2 | 3, { eyebrow: string; card: string; pts: string; text: string }> = {
   0: {
-    eyebrow: "var(--brass-deep)",
-    border: "var(--border)",
-    tint: "var(--surface)",
-    pts: "var(--ink)",
-    text: "var(--ink)",
+    eyebrow: "text-brass-deep",
+    card: "border-border bg-surface",
+    pts: "text-ink",
+    text: "text-ink",
   },
   1: {
-    eyebrow: "var(--brass-deep)",
-    border: "var(--brass)",
-    tint: "var(--surface)",
-    pts: "var(--ink)",
-    text: "var(--ink)",
+    eyebrow: "text-brass-deep",
+    card: "border-brass bg-surface",
+    pts: "text-ink",
+    text: "text-ink",
   },
   2: {
-    eyebrow: "var(--accent)",
-    border: "var(--accent)",
-    tint: "rgba(25,101,54,0.05)",
-    pts: "var(--accent)",
-    text: "var(--ink)",
+    eyebrow: "text-accent",
+    card: "border-accent bg-accent/5",
+    pts: "text-accent",
+    text: "text-ink",
   },
   3: {
-    eyebrow: "var(--danger)",
-    border: "var(--danger)",
-    tint: "color-mix(in srgb, var(--danger) 5%, transparent)",
-    pts: "var(--danger)",
-    text: "var(--danger)",
+    eyebrow: "text-danger",
+    card: "border-danger bg-danger/5",
+    pts: "text-danger",
+    text: "text-danger",
   },
 };
 
 function MeldCard({ meld }: { meld: Declaration }) {
   const { ui } = useRules();
-  const tier = TIER_STYLES[meld.tier];
+  const tier = TIER[meld.tier];
   return (
     <div
       data-testid={`meld-${meld.id}`}
-      style={{
-        background: tier.tint,
-        border: `1px solid ${tier.border}`,
-        borderRadius: 14,
-        padding: "14px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
+      className={cn("flex flex-col gap-2 rounded-lg border px-4 py-3.5", tier.card)}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="flex items-center gap-2.5">
         <span
-          className=""
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: tier.text,
-            letterSpacing: "-0.025em",
-            flex: "1 1 auto",
-            minWidth: 0,
-            lineHeight: 1.2,
-          }}
+          className={cn(
+            "min-w-0 flex-auto text-base leading-tight font-semibold tracking-tight",
+            tier.text,
+          )}
         >
           {meld.name}
         </span>
-        <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "baseline", gap: 4 }}>
-          <span
-            className="tabular-nums"
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: tier.pts,
-              letterSpacing: "-0.025em",
-            }}
-          >
+        <span className="inline-flex shrink-0 items-baseline gap-1">
+          <span className={cn("text-2xl font-bold tracking-tight tabular-nums", tier.pts)}>
             +{meld.pts}
           </span>
-          <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{ui.pts}</span>
+          <span className="text-ink-mute text-xs">{ui.pts}</span>
         </span>
       </div>
-      <div
-        className="font-mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: tier.eyebrow,
-          fontWeight: 600,
-        }}
-      >
+      <div className={cn("font-mono text-2xs font-semibold tracking-caps uppercase", tier.eyebrow)}>
         {ui.meldKinds[meld.kind]}
       </div>
-      <div style={{ fontSize: 14, lineHeight: 1.5, color: tier.text }}>{meld.summary}</div>
-      <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--ink-dim)" }}>{meld.detail}</div>
+      <div className={cn("text-sm leading-normal", tier.text)}>{meld.summary}</div>
+      <div className="text-ink-dim text-xs leading-normal">{meld.detail}</div>
     </div>
   );
 }
