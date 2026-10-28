@@ -8,7 +8,7 @@ vi.mock("@/shared/hooks/useReducedMotion", () => ({
   useReducedMotion: () => mockReducedMotion,
 }));
 
-const RING_CIRC = 2 * Math.PI * 9;
+const RING_CIRC = 2 * Math.PI * 14;
 
 describe("AutoCloseRing", () => {
   beforeEach(() => {

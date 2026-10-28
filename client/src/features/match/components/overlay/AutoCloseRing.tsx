@@ -18,14 +18,14 @@ interface AutoCloseRingProps {
   ariaLabel?: string;
 }
 
-const RING_RADIUS = 9;
+const BUTTON_PX = 32;
+const BUTTON_BORDER_PX = 1;
+const RING_RADIUS = BUTTON_PX / 2 - BUTTON_BORDER_PX - TIMER_RING_STROKE / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
-const RING_VIEWBOX = 24;
-const RING_BOX_PX = 36;
-const RING_STROKE_IN_VIEWBOX = (TIMER_RING_STROKE * RING_VIEWBOX) / RING_BOX_PX;
+const CENTER = BUTTON_PX / 2;
 
 /**
- * Circular X button whose progress ring drains over `duration` seconds, in step with the close timer.
+ * Circular X button whose progress ring, flush inside its border, drains over `duration` seconds.
  * `onClose` fires exactly once, on timeout or click, and never while `paused`.
  */
 export function AutoCloseRing({
@@ -83,11 +83,11 @@ export function AutoCloseRing({
       data-testid={testId}
       style={{
         position: "relative",
-        width: 32,
-        height: 32,
+        width: BUTTON_PX,
+        height: BUTTON_PX,
         borderRadius: "50%",
         background: "var(--shade-25)",
-        border: "1px solid var(--brass-40)",
+        border: `${BUTTON_BORDER_PX}px solid var(--brass-40)`,
         color: "var(--ink-light)",
         cursor: "pointer",
         display: "inline-flex",
@@ -100,31 +100,34 @@ export function AutoCloseRing({
       <TouchTargetPad />
       <IconX size={14} />
       <svg
-        viewBox="0 0 24 24"
+        width={BUTTON_PX}
+        height={BUTTON_PX}
+        viewBox={`0 0 ${BUTTON_PX} ${BUTTON_PX}`}
         aria-hidden
         style={{
           position: "absolute",
-          inset: -2,
+          top: -BUTTON_BORDER_PX,
+          left: -BUTTON_BORDER_PX,
           transform: "rotate(-90deg)",
           pointerEvents: "none",
         }}
       >
         <circle
-          cx="12"
-          cy="12"
+          cx={CENTER}
+          cy={CENTER}
           r={RING_RADIUS}
           fill="none"
           stroke={TIMER_RING_TRACK}
-          strokeWidth={RING_STROKE_IN_VIEWBOX}
+          strokeWidth={TIMER_RING_STROKE}
         />
         <circle
           data-testid={`${testId}-arc`}
-          cx="12"
-          cy="12"
+          cx={CENTER}
+          cy={CENTER}
           r={RING_RADIUS}
           fill="none"
           stroke={TIMER_RING_INK}
-          strokeWidth={RING_STROKE_IN_VIEWBOX}
+          strokeWidth={TIMER_RING_STROKE}
           strokeLinecap="round"
           strokeDasharray={RING_CIRC}
           style={{
