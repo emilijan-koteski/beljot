@@ -240,7 +240,7 @@ function ScoreRow({ label, teamAValue, teamBValue, bold, topBorder, testId }: Sc
       style={{
         gridTemplateColumns: "1fr 80px 80px",
         gap: 8,
-        borderTop: topBorder ? "1px solid rgba(255,255,255,0.06)" : undefined,
+        borderTop: topBorder ? "1px solid var(--sheen-6)" : undefined,
       }}
       data-testid={testId}
     >

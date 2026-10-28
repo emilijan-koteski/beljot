@@ -147,8 +147,8 @@ export function TrumpReveal({
                   "radial-gradient(circle at 38% 30%, var(--card-face), var(--card-face-shade) 68%, var(--card-face-edge))",
                 border: `3px solid ${sealRing}`,
                 boxShadow: card
-                  ? "var(--shadow-felt-md), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
-                  : `var(--shadow-felt-md), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)`,
+                  ? "var(--shadow-felt-md), inset 0 2px 3px var(--sheen-70), inset 0 -3px 6px var(--shade-20)"
+                  : `var(--shadow-felt-md), 0 0 32px ${glowColor}66, 0 0 0 6px ${glowColor}22, inset 0 2px 3px var(--sheen-70), inset 0 -3px 6px var(--shade-20)`,
               }}
               data-testid="trump-reveal-seal"
               data-suit={trumpSuit}
@@ -158,7 +158,7 @@ export function TrumpReveal({
                 suit={trumpSuit}
                 deck={deck}
                 size={30}
-                shadow="0 1px 1px rgba(0,0,0,0.25)"
+                shadow="0 1px 1px var(--shade-25)"
                 style={{ fontFamily: "var(--font-suit)" }}
               />
             </div>

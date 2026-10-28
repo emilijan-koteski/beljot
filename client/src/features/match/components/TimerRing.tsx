@@ -72,7 +72,7 @@ export function TimerRing({
           cy={px / 2}
           r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.15)"
+          stroke="var(--sheen-15)"
           strokeWidth={strokeWidth}
         />
         <circle

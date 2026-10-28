@@ -76,8 +76,8 @@ function StatusChip({
         color: textColor,
         border: `2px solid ${borderColor}`,
         boxShadow: glowColor
-          ? `var(--shadow-felt-sm), 0 0 12px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.6)`
-          : "var(--shadow-felt-sm), inset 0 1px 0 rgba(255,255,255,0.6)",
+          ? `var(--shadow-felt-sm), 0 0 12px ${glowColor}, inset 0 1px 0 var(--sheen-70)`
+          : "var(--shadow-felt-sm), inset 0 1px 0 var(--sheen-70)",
         fontFamily: "var(--font-suit)",
         fontWeight: 700,
         lineHeight: 1,
@@ -198,8 +198,8 @@ export function PlayerSeat({
           style={{
             width: framePx,
             height: framePx,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px dashed rgba(255,255,255,0.18)",
+            background: "var(--sheen-6)",
+            border: "1px dashed var(--sheen-15)",
           }}
         >
           <span className="text-ink-dim text-xs">?</span>
@@ -351,11 +351,9 @@ export function PlayerSeat({
         className={`rounded-lg flex flex-col items-center ${compact ? "px-2 py-0.5" : "gap-0.5 px-3 py-1.5"}`}
         style={{
           minWidth: compact ? undefined : 88,
-          background: "var(--panel-dark, rgba(20,45,30,0.85))",
+          background: "var(--panel-dark)",
           border:
-            isActive && !isDisconnected
-              ? `1px solid ${TURN_LIME}`
-              : "1px solid rgba(255,255,255,0.08)",
+            isActive && !isDisconnected ? `1px solid ${TURN_LIME}` : "1px solid var(--sheen-10)",
           boxShadow:
             isActive && !isDisconnected
               ? "0 0 12px color-mix(in srgb, var(--accent) 33%, transparent)"

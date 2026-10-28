@@ -31,9 +31,10 @@ export const CARD_SIZES: Record<CardSize, CardDimensions> = {
 
 export const SEAT_STACK_CARD_WIDTH = { desktop: 30, compact: 20 } as const;
 
-export const CARD_FACE_BACKGROUND = "linear-gradient(180deg, var(--card-face) 0%, #f4ecd8 100%)";
+export const CARD_FACE_BACKGROUND =
+  "linear-gradient(180deg, var(--card-face) 0%, var(--card-face-bottom) 100%)";
 
-export const CARD_FACE_BORDER = "1px solid rgba(0,0,0,0.15)";
+export const CARD_FACE_BORDER = "1px solid var(--shade-15)";
 
 export const CARD_BACK_BACKGROUND =
   "linear-gradient(135deg, #2a1a10 0%, #4a2818 50%, #2a1a10 100%)";

@@ -59,10 +59,8 @@ export function PauseOverlay({
                   key={player.seat}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg"
                   style={{
-                    background: isPaused ? "var(--brass-10)" : "rgba(0,0,0,0.18)",
-                    border: isPaused
-                      ? "1px solid var(--brass-40)"
-                      : "1px solid rgba(255,255,255,0.05)",
+                    background: isPaused ? "var(--brass-10)" : "var(--shade-20)",
+                    border: isPaused ? "1px solid var(--brass-40)" : "1px solid var(--sheen-6)",
                   }}
                   data-testid={isPaused ? `pause-player-${player.seat}` : undefined}
                 >

@@ -259,6 +259,29 @@
   --brass-55: color-mix(in srgb, var(--brass) 55%, transparent);
   --brass-85: color-mix(in srgb, var(--brass) 85%, transparent);
 
+  /* ── Felt light and shade ladders — the only translucent white and black.
+     `sheen` lights a felt surface (hairlines, tracks, bevels, empty slots);
+     `shade` sinks it (row wells, vignettes, text shadows). Scope-stable. */
+  --sheen-2: rgb(255 255 255 / 0.02);
+  --sheen-6: rgb(255 255 255 / 0.06);
+  --sheen-10: rgb(255 255 255 / 0.1);
+  --sheen-15: rgb(255 255 255 / 0.15);
+  --sheen-25: rgb(255 255 255 / 0.25);
+  --sheen-70: rgb(255 255 255 / 0.7);
+  --shade-5: rgb(0 0 0 / 0.05);
+  --shade-15: rgb(0 0 0 / 0.15);
+  --shade-20: rgb(0 0 0 / 0.2);
+  --shade-25: rgb(0 0 0 / 0.25);
+  --shade-60: rgb(0 0 0 / 0.6);
+
+  /* ── Felt fills — the translucent grounds of felt controls and strips. */
+  --felt-ghost-fill: linear-gradient(180deg, rgb(60 90 70 / 0.6), rgb(30 50 35 / 0.6));
+  --felt-ghost-fill-soft: linear-gradient(180deg, rgb(60 90 70 / 0.35), rgb(30 50 35 / 0.35));
+  --felt-strip-fill: linear-gradient(90deg, rgb(20 46 28 / 0.55), rgb(14 40 24 / 0.35));
+  --felt-strip-fill-danger: linear-gradient(90deg, rgb(80 28 28 / 0.55), rgb(50 18 18 / 0.35));
+  --panel-dark: rgba(20, 45, 30, 0.85);
+  --panel-deeper: rgba(18, 32, 22, 0.94);
+
   /* ── Felt dialog ground — the two stops of ClassicPanel's vertical
      gradient. Scope-stable: in-match dialogs portal out of `.game-table`. */
   --dialog-felt-top: rgba(30, 60, 40, 0.98);
@@ -287,6 +310,7 @@
        same cream on parchment and on felt, so these are NOT re-rooted by
        `.felt-surface`/`.game-table`). Shared by the table and marketing cards. */
   --card-face: #fdfaf0;
+  --card-face-bottom: #f4ecd8;
   --card-face-shade: #f0e8d0;
   --card-face-edge: #ddcca2;
   --ink-on-card: #0e3a24;
@@ -455,7 +479,7 @@
 
   --ink: #f5f2e8;
   --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
+  --ink-mute: color-mix(in srgb, var(--ink-light) 65%, transparent);
 
   --accent: var(--accent-light);
   --accent-deep: #00b07c;
@@ -484,10 +508,6 @@
   --wood-light: #7a4e29;
   --wood-base: #5b3a1e;
   --wood-dark: #4a2d17;
-
-  /* Surface panels */
-  --panel-dark: rgba(20, 45, 30, 0.85);
-  --panel-deeper: rgba(18, 32, 22, 0.94);
 
   /* Avatar inner disc */
   --avatar-inner: #1f2e23;
@@ -600,13 +620,12 @@
    In-game chat dock — reuses the lobby `ChatDock` chrome but swaps the
    parchment palette for frosted felt + a brass action accent. The table's
    own `--accent` is the lime turn-signal, which must NOT bleed into chat,
-   so we re-point the accent family to brass here. Only rendered inside
-   `.game-table`, so `--panel-deeper` / `--brass*` resolve from that scope.
+   so we re-point the accent family to brass here.
    ────────────────────────────────────────────────────────────────────── */
 .chat-dock-match {
   --surface: var(--panel-deeper); /* frosted dark panel */
-  --surface-2: rgba(255, 255, 255, 0.04); /* bubble / input fill */
-  --border: rgba(180, 220, 200, 0.12); /* felt-tinted hairline */
+  --surface-2: var(--sheen-6); /* bubble / input fill */
+  --border: var(--sheen-10); /* felt hairline */
   --accent: var(--brass);
   --accent-deep: var(--brass-deep);
   --accent-soft: var(--brass-soft);
@@ -626,11 +645,11 @@
   --bg: var(--brass-soft);
   --surface: #1d3a26;
   --surface-2: var(--brass-soft);
-  --surface-3: rgba(0, 0, 0, 0.28);
+  --surface-3: var(--shade-25);
   --border: var(--brass-40);
   --ink: var(--ink-light);
   --ink-dim: #c8d5cd;
-  --ink-mute: rgba(245, 242, 232, 0.65);
+  --ink-mute: color-mix(in srgb, var(--ink-light) 65%, transparent);
   --accent: var(--brass);
   --accent-deep: var(--brass);
   --accent-soft: var(--brass-soft);
@@ -642,15 +661,14 @@
    `.felt-toasts` (useFeltToasts), and every sonner toast swaps the
    parchment card for the floating-panel recipe the table HUD uses:
    panel-dark, an 8px blur, a brass hairline and cream ink. Errors take
-   the danger edge and ink. The Toaster sits outside `.game-table`, so
-   panel-dark falls back to its literal value here.
+   the danger edge and ink.
    ────────────────────────────────────────────────────────────────────── */
 body.felt-toasts [data-sonner-toast] {
-  --surface-2: var(--panel-dark, rgba(20, 45, 30, 0.85));
+  --surface-2: var(--panel-dark);
   --ink: var(--ink-light);
   --border: var(--brass-40);
-  --normal-bg: var(--panel-dark, rgba(20, 45, 30, 0.85));
-  --normal-bg-hover: rgba(30, 60, 40, 0.92);
+  --normal-bg: var(--panel-dark);
+  --normal-bg-hover: var(--dialog-felt-top);
   --normal-text: var(--ink-light);
   --normal-border: var(--brass-40);
   backdrop-filter: blur(8px);

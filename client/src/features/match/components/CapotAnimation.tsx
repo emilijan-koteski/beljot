@@ -93,7 +93,7 @@ export function CapotAnimation({
               color: bright,
               margin: 0,
               lineHeight: 1,
-              textShadow: `0 0 30px ${bright}80, 0 4px 18px rgba(0,0,0,0.6)`,
+              textShadow: `0 0 30px ${bright}80, 0 4px 18px var(--shade-60)`,
               "--cap-glow": `${bright}80`,
             } as CSSProperties
           }

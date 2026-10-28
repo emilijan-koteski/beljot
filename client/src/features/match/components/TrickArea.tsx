@@ -92,8 +92,8 @@ export function TrickArea({
               height: phH,
               transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
               borderRadius: CARD_SIZES.md.radius,
-              border: occupied ? "2px solid transparent" : "2px dashed rgba(255,255,255,0.14)",
-              background: occupied ? "transparent" : "rgba(255,255,255,0.02)",
+              border: occupied ? "2px solid transparent" : "2px dashed var(--sheen-15)",
+              background: occupied ? "transparent" : "var(--sheen-2)",
               visibility: "visible",
               zIndex: 0,
             }}

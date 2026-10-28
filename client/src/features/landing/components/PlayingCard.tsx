@@ -118,8 +118,8 @@ export function PlayingCard({
       style={{
         ...base,
         background: "var(--card-face)",
-        border: "1px solid rgba(0,0,0,0.14)",
-        boxShadow: "var(--shadow-felt-lg), inset 0 1px 0 rgba(255,255,255,0.6)",
+        border: "1px solid var(--shade-15)",
+        boxShadow: "var(--shadow-felt-lg), inset 0 1px 0 var(--sheen-70)",
       }}
     >
       <span style={corner(false)}>
