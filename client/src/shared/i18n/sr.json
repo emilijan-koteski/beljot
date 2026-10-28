@@ -271,10 +271,10 @@
       "linkedToast": "Google nalog povezan.",
       "unlinkedToast": "Google nalog uklonjen.",
       "unlinkDialog": {
-        "title": "Ukloniti {{provider}}?",
-        "description": "Uklonite {{provider}} ({{email}}) sa svog naloga. Možete ga ponovo povezati bilo kada.",
-        "descriptionNoEmail": "Uklonite {{provider}} sa svog naloga. Možete ga ponovo povezati bilo kada.",
-        "cancel": "Odustani",
+        "title": "Ukloni {{provider}}",
+        "description": "Nalog {{email}} možeš ponovo da povežeš bilo kada.",
+        "descriptionNoEmail": "Možeš ponovo da ga povežeš bilo kada.",
+        "cancel": "Otkaži",
         "confirm": "Ukloni",
         "submitting": "Uklanjanje…"
       },
@@ -334,9 +334,9 @@
       "heading": "Zahtevi za prijateljstvo"
     },
     "removeDialog": {
-      "title": "Ukloniti prijatelja?",
-      "description": "Uklonite {{username}} sa liste prijatelja. Kasnije možete ponovo poslati zahtev za prijateljstvo.",
-      "cancel": "Odustani",
+      "title": "Ukloni {{username}}",
+      "description": "Kasnije možeš ponovo da pošalješ zahtev za prijateljstvo.",
+      "cancel": "Otkaži",
       "confirm": "Ukloni",
       "submitting": "Uklanjanje…"
     },
@@ -518,34 +518,18 @@
     "addBot": "Dodaj bota",
     "removeBotIconLabel": "Ukloni {{name}}",
     "removeBotConfirm": {
-      "title": "Ukloniti <name>{{name}}</name> sa stola?",
-      "lede": "Mesto se odmah oslobađa. Možeš da postaviš drugog bota ili da ga ostaviš za igrača.",
+      "title": "Ukloni {{name}}",
+      "description": "Mesto se odmah oslobađa.",
       "confirm": "Ukloni",
       "cancel": "Otkaži"
     },
     "kickedToast": "Izbačeni ste iz sobe {{name}}",
     "promoteIconLabel": "Postavi {{username}} za domaćina",
     "transferConfirm": {
-      "title": "Preneti vlasništvo nad sobom drugom igraču?",
-      "lede": "Ostajete u sobi, ali <strong>{{toName}}</strong> postaje domaćin. Samo domaćin može da vrati vlasništvo, ne možeš ga uzeti sam.",
+      "title": "Postavi {{name}} za domaćina",
+      "description": "Ulogu može da ti vrati samo novi domaćin.",
       "confirm": "Postavi domaćina",
       "cancel": "Otkaži"
-    },
-    "ownerConfirm": {
-      "eyebrow": "Akcija domaćina",
-      "close": "Zatvori",
-      "seatLabel": "Mesto {{n}}",
-      "standing": "Stoji",
-      "youHost": "Ti · trenutni domaćin",
-      "newHost": "{{name}} · novi domaćin",
-      "handOver": "Predaješ",
-      "capabilities": {
-        "start": "Pokretanje meča",
-        "seats": "Zamenu i raspored mesta",
-        "players": "Izbacivanje i postavljanje igrača",
-        "bots": "Dodavanje i uklanjanje botova",
-        "privacy": "Privatnost sobe"
-      }
     },
     "legendNeutral": "Slobodna mesta · timovi se otkrivaju kad sedneš",
     "legendOpen": "slobodno",
@@ -1248,14 +1232,14 @@
       },
       "linkDialog": {
         "title": "Poveži svoj nalog",
-        "description": "Nalog za {{email}} već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Sledeći put ulaziš jednim klikom.",
-        "descriptionNoEmail": "Nalog sa ovom email adresom već postoji. Unesi njegovu lozinku da povežeš Google prijavu. Sledeći put ulaziš jednim klikom.",
-        "passwordPlaceholder": "Lozinka naloga",
+        "description": "Unesi lozinku za {{email}} da povežeš Google prijavu.",
+        "descriptionNoEmail": "Unesi lozinku da povežeš Google prijavu.",
+        "passwordPlaceholder": "Lozinka",
         "cancel": "Otkaži",
         "submit": "Poveži i prijavi se",
         "submitting": "Povezivanje…",
         "errors": {
-          "wrongPassword": "Pogrešna lozinka. Pokušaj ponovo.",
+          "wrongPassword": "Pogrešna lozinka.",
           "linkFailed": "Povezivanje nije uspelo. Pokušaj ponovo."
         }
       },

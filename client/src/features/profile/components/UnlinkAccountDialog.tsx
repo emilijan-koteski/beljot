@@ -1,15 +1,7 @@
 import { Unlink } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 
 interface UnlinkAccountDialogProps {
   open: boolean;
@@ -35,57 +27,33 @@ export function UnlinkAccountDialog({
   const { t } = useTranslation();
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next && !pending) onClose();
+      onClose={onClose}
+      tone="danger"
+      icon={<Unlink />}
+      title={t("profile.linkedAccounts.unlinkDialog.title", { provider: providerLabel })}
+      description={
+        <span data-testid="unlink-account-email">
+          {email === ""
+            ? t("profile.linkedAccounts.unlinkDialog.descriptionNoEmail")
+            : t("profile.linkedAccounts.unlinkDialog.description", { email })}
+        </span>
+      }
+      pending={pending}
+      primary={{
+        label: pending
+          ? t("profile.linkedAccounts.unlinkDialog.submitting")
+          : t("profile.linkedAccounts.unlinkDialog.confirm"),
+        onClick: onConfirm,
+        testId: "unlink-account-confirm",
       }}
-    >
-      <DialogContent showCloseButton={false} data-testid="unlink-account-dialog">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">
-              <Unlink className="size-5" />
-            </div>
-            <DialogTitle>
-              {t("profile.linkedAccounts.unlinkDialog.title", { provider: providerLabel })}
-            </DialogTitle>
-          </div>
-          <DialogDescription data-testid="unlink-account-email">
-            {email === ""
-              ? t("profile.linkedAccounts.unlinkDialog.descriptionNoEmail", {
-                  provider: providerLabel,
-                })
-              : t("profile.linkedAccounts.unlinkDialog.description", {
-                  provider: providerLabel,
-                  email,
-                })}
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending}
-            onClick={onConfirm}
-            data-testid="unlink-account-confirm"
-          >
-            {pending
-              ? t("profile.linkedAccounts.unlinkDialog.submitting")
-              : t("profile.linkedAccounts.unlinkDialog.confirm")}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={pending}
-            onClick={onClose}
-            data-testid="unlink-account-cancel"
-          >
-            {t("profile.linkedAccounts.unlinkDialog.cancel")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      secondary={{
+        label: t("profile.linkedAccounts.unlinkDialog.cancel"),
+        onClick: onClose,
+        testId: "unlink-account-cancel",
+      }}
+      testId="unlink-account-dialog"
+    />
   );
 }

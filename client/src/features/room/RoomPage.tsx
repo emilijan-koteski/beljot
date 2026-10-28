@@ -732,13 +732,6 @@ export function RoomPage() {
     return resolveSeatMode(p.seat) === "us" ? "A" : "B";
   };
 
-  const kickTarget = kickConfirm
-    ? (players.find((p) => p.userId === kickConfirm.userId) ?? null)
-    : null;
-  const transferTarget = transferConfirm
-    ? (players.find((p) => p.userId === transferConfirm.userId) ?? null)
-    : null;
-
   const inSwapMode = swapSourceSeat !== null;
   let ctaLabel: string;
   let ctaDisabled = true;
@@ -1362,14 +1355,7 @@ export function RoomPage() {
         }}
         onConfirm={handleTransferConfirm}
         pending={transferOwnershipMutation.isPending}
-        fromName={currentUser?.username ?? ownerUsername}
-        fromAvatarUrl={currentUser?.avatarUrl ?? null}
-        target={{
-          name: transferConfirm?.username ?? "",
-          seat: transferTarget?.seat ?? null,
-          team: transferTarget ? rosterTeam(transferTarget) : null,
-          avatarUrl: transferTarget?.avatarUrl ?? null,
-        }}
+        name={transferConfirm?.username ?? ""}
       />
 
       <KickPlayerDialog
@@ -1379,12 +1365,7 @@ export function RoomPage() {
         }}
         onConfirm={handleKickConfirm}
         pending={kickPlayerMutation.isPending}
-        target={{
-          name: kickConfirm?.username ?? "",
-          seat: kickTarget?.seat ?? kickConfirm?.seat ?? null,
-          team: kickTarget ? rosterTeam(kickTarget) : null,
-          avatarUrl: kickTarget?.avatarUrl ?? null,
-        }}
+        name={kickConfirm?.username ?? ""}
       />
 
       <RemoveBotDialog
@@ -1394,16 +1375,7 @@ export function RoomPage() {
         }}
         onConfirm={handleRemoveBotConfirm}
         pending={removeBotMutation.isPending}
-        target={{
-          name: removeBotConfirm !== null ? botDisplayName(t, removeBotConfirm.seat) : "",
-          seat: removeBotConfirm?.seat ?? null,
-          team:
-            removeBotConfirm !== null && viewerSeat !== null
-              ? resolveSeatMode(removeBotConfirm.seat) === "us"
-                ? "A"
-                : "B"
-              : null,
-        }}
+        name={removeBotConfirm !== null ? botDisplayName(t, removeBotConfirm.seat) : ""}
       />
 
       <InviteFriendsDialog

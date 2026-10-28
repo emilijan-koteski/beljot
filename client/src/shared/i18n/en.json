@@ -271,9 +271,9 @@
       "linkedToast": "Google account linked.",
       "unlinkedToast": "Google account unlinked.",
       "unlinkDialog": {
-        "title": "Unlink {{provider}}?",
-        "description": "Remove {{provider}} ({{email}}) from your account. You can link it again anytime.",
-        "descriptionNoEmail": "Remove {{provider}} from your account. You can link it again anytime.",
+        "title": "Unlink {{provider}}",
+        "description": "You can link {{email}} again any time.",
+        "descriptionNoEmail": "You can link it again any time.",
         "cancel": "Cancel",
         "confirm": "Unlink",
         "submitting": "Unlinking…"
@@ -334,8 +334,8 @@
       "heading": "Friend requests"
     },
     "removeDialog": {
-      "title": "Remove friend?",
-      "description": "Remove {{username}} from your friends. You can send a new friend request later.",
+      "title": "Remove {{username}}",
+      "description": "You can send a friend request again later.",
       "cancel": "Cancel",
       "confirm": "Remove",
       "submitting": "Removing…"
@@ -518,34 +518,18 @@
     "addBot": "Add a bot",
     "removeBotIconLabel": "Remove {{name}}",
     "removeBotConfirm": {
-      "title": "Remove <name>{{name}}</name> from the table?",
-      "lede": "The seat opens up right away — seat another bot or leave it for a player.",
+      "title": "Remove {{name}}",
+      "description": "The seat opens right away.",
       "confirm": "Remove",
       "cancel": "Cancel"
     },
     "kickedToast": "You were removed from room {{name}}",
     "promoteIconLabel": "Make {{username}} the host",
     "transferConfirm": {
-      "title": "Transfer room ownership to another player?",
-      "lede": "You stay in the room, but <strong>{{toName}}</strong> becomes the host. Only a host can hand the ownership back — you can't take it yourself.",
+      "title": "Make {{name}} host",
+      "description": "Only the new host can hand it back.",
       "confirm": "Make host",
       "cancel": "Cancel"
-    },
-    "ownerConfirm": {
-      "eyebrow": "Host action",
-      "close": "Close",
-      "seatLabel": "Seat {{n}}",
-      "standing": "Standing",
-      "youHost": "You · current host",
-      "newHost": "{{name}} · New host",
-      "handOver": "You'll hand over",
-      "capabilities": {
-        "start": "Starting the match",
-        "seats": "Swapping & arranging seats",
-        "players": "Kicking & promoting players",
-        "bots": "Adding & removing bots",
-        "privacy": "Room privacy"
-      }
     },
     "legendNeutral": "Open seats · teams reveal once you sit down",
     "legendOpen": "open",
@@ -1248,14 +1232,14 @@
       },
       "linkDialog": {
         "title": "Link your account",
-        "description": "An account for {{email}} already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
-        "descriptionNoEmail": "An account with this email already exists. Enter its password to link Google sign-in — next time you're in with one tap.",
-        "passwordPlaceholder": "Account password",
+        "description": "Enter the password for {{email}} to link Google sign-in.",
+        "descriptionNoEmail": "Enter your password to link Google sign-in.",
+        "passwordPlaceholder": "Password",
         "cancel": "Cancel",
         "submit": "Link and log in",
         "submitting": "Linking…",
         "errors": {
-          "wrongPassword": "Incorrect password. Try again.",
+          "wrongPassword": "Wrong password.",
           "linkFailed": "Couldn't link your account. Please try again."
         }
       },

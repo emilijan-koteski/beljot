@@ -3,15 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Input } from "@/shared/components/ui/input";
 
 /** Props for LinkAccountDialog; errorKey is the i18n key of an inline error shown while the player retries. */
@@ -55,83 +47,56 @@ export function LinkAccountDialog({
 
   const showError = errorKey !== null && !errorDismissed;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (pending || password.length === 0) return;
-    onSubmit(password);
-  }
-
   return (
-    <Dialog
+    <AppDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next && !pending) onClose();
+      onClose={onClose}
+      icon={<Link2 />}
+      title={t("auth.sso.linkDialog.title")}
+      description={
+        <span data-testid="link-account-email">
+          {email === ""
+            ? t("auth.sso.linkDialog.descriptionNoEmail")
+            : t("auth.sso.linkDialog.description", { email })}
+        </span>
+      }
+      error={showError ? t(errorKey) : null}
+      errorTestId="link-account-error"
+      pending={pending}
+      onSubmit={() => onSubmit(password)}
+      primary={{
+        label: pending ? t("auth.sso.linkDialog.submitting") : t("auth.sso.linkDialog.submit"),
+        disabled: pending || password.length === 0,
+        testId: "link-account-submit",
       }}
+      secondary={{
+        label: t("auth.sso.linkDialog.cancel"),
+        onClick: onClose,
+        testId: "link-account-cancel",
+      }}
+      testId="link-account-dialog"
     >
-      <DialogContent showCloseButton={false} data-testid="link-account-dialog">
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">
-                <Link2 className="size-5" />
-              </div>
-              <DialogTitle>{t("auth.sso.linkDialog.title")}</DialogTitle>
-            </div>
-            <DialogDescription data-testid="link-account-email">
-              {email === ""
-                ? t("auth.sso.linkDialog.descriptionNoEmail")
-                : t("auth.sso.linkDialog.description", { email })}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="relative">
-            <Input
-              type={showPassword ? "text" : "password"}
-              autoFocus
-              autoComplete="current-password"
-              placeholder={t("auth.sso.linkDialog.passwordPlaceholder")}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setErrorDismissed(true);
-              }}
-              aria-invalid={showError}
-              data-testid="link-account-password-input"
-              className="h-11 pr-10"
-            />
-            <PasswordToggle
-              shown={showPassword}
-              onToggle={() => setShowPassword(!showPassword)}
-              testId="link-account-password-toggle"
-            />
-          </div>
-
-          {showError && (
-            <p role="alert" data-testid="link-account-error" className="text-danger text-sm">
-              {t(errorKey)}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={pending || password.length === 0}
-              data-testid="link-account-submit"
-            >
-              {pending ? t("auth.sso.linkDialog.submitting") : t("auth.sso.linkDialog.submit")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={pending}
-              onClick={onClose}
-              data-testid="link-account-cancel"
-            >
-              {t("auth.sso.linkDialog.cancel")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div className="relative">
+        <Input
+          type={showPassword ? "text" : "password"}
+          autoFocus
+          autoComplete="current-password"
+          placeholder={t("auth.sso.linkDialog.passwordPlaceholder")}
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setErrorDismissed(true);
+          }}
+          aria-invalid={showError}
+          data-testid="link-account-password-input"
+          className="h-11 pr-10"
+        />
+        <PasswordToggle
+          shown={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          testId="link-account-password-toggle"
+        />
+      </div>
+    </AppDialog>
   );
 }
