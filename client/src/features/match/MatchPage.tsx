@@ -1192,7 +1192,7 @@ export function MatchPage() {
       data-testid="match-page"
     >
       <TableBackdrop compact={isCompactTable} />
-      <TableAmbience intensity={0.9} tint="#ffe9b0" />
+      <TableAmbience intensity={0.9} />
       <Wordmark />
 
       <ScorePanel

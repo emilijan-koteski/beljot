@@ -621,7 +621,7 @@ export function RoomPage() {
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-surface border-border h-32 animate-pulse rounded-2xl border"
+              className="bg-surface border-border h-32 animate-pulse rounded-xl border"
             />
           ))}
         </div>
@@ -1324,7 +1324,7 @@ export function RoomPage() {
                 style={{
                   transform: "rotate(45deg)",
                   background:
-                    "radial-gradient(circle at 30% 30%, #1d6c3b 0%, var(--accent-deep) 70%), var(--accent-deep)",
+                    "radial-gradient(circle at 30% 30%, var(--felt-green) 0%, var(--accent-deep) 70%), var(--accent-deep)",
                   borderColor: "var(--brass)",
                   boxShadow: "var(--shadow-sm), inset 0 0 0 4px var(--brass-10)",
                 }}

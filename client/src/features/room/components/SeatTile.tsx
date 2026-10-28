@@ -106,7 +106,7 @@ export function SeatTile({
         disabled={!isClickable || isPending}
         data-testid={`player-seat-${seatIndex}`}
         className={cn(
-          "flex min-h-22 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2.5 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
+          "flex min-h-22 w-full flex-col items-center justify-center gap-1 rounded-xl p-2.5 transition-all sm:min-h-32.5 sm:gap-2 sm:p-3.5",
           isClickable && !isPending ? "cursor-pointer" : "cursor-default",
           isPending && "pointer-events-none opacity-60",
         )}

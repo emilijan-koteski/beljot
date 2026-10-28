@@ -26,8 +26,8 @@ const VARIANT_STYLE: Record<ClassicButtonVariant, CSSProperties> = {
   },
   danger: {
     border: "1px solid color-mix(in srgb, var(--danger-light) 70%, transparent)",
-    background: "linear-gradient(180deg, #d96a5a 0%, #8a3024 100%)",
-    color: "#fff8f3",
+    background: "linear-gradient(180deg, var(--danger-light) 0%, var(--danger) 100%)",
+    color: "var(--ink-light)",
     boxShadow:
       "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 rgba(255,255,255,0.25)",
   },

@@ -59,20 +59,12 @@ export function RulesPage() {
           <RulesHero />
 
           <div
-            className="flex flex-col gap-2 pb-2"
+            className="border-border flex flex-col gap-2 border-t pt-5 pb-2"
             data-testid="rules-variant-tabs"
-            style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}
           >
             <span
               id={VARIANT_LABEL_ID}
-              className="font-mono"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "var(--brass-deep)",
-                fontWeight: 600,
-              }}
+              className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase"
             >
               {content.ui.variantLabel}
             </span>

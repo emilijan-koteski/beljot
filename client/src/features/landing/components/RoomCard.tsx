@@ -83,7 +83,7 @@ export function RoomCard({
 }: RoomCardProps) {
   return (
     <div
-      className="bg-surface border-border w-full overflow-hidden rounded-2xl border"
+      className="bg-surface border-border w-full overflow-hidden rounded-lg border"
       style={{ maxWidth: width, ...style }}
     >
       <div className="px-4 pt-4 pb-3">

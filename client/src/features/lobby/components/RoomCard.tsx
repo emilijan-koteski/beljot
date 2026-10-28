@@ -256,7 +256,7 @@ export function RoomCard({ room, onJoin, index = 0 }: Props) {
         <SeatChip {...seatOf(t, room.players, 3)} team="B" testId={`room-${room.id}-seat-3`} />
       </div>
 
-      <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-[rgba(14,58,36,0.03)] px-5 py-3">
+      <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-ink/3 px-5 py-3">
         <span className="text-ink-dim flex items-center gap-1.5 text-xs">
           <Avatar
             name={room.ownerUsername ?? ""}

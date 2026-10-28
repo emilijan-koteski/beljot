@@ -75,7 +75,7 @@ export function TopBar({
 
   return (
     <nav
-      className="sticky top-0 z-50 flex h-15 items-center border-b border-border bg-[rgba(245,242,232,0.85)] px-4 backdrop-blur-md lg:px-7"
+      className="sticky top-0 z-50 flex h-15 items-center border-b border-border bg-background/85 px-4 backdrop-blur-md lg:px-7"
       data-testid="app-nav"
     >
       <Link

@@ -6,15 +6,15 @@ import { Button } from "@/shared/components/ui/button";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-/** "Ready for your first hand?" closer with a Play CTA back to the lobby. */
+/**
+ * "Ready for your first hand?" closer with a Play CTA back to the lobby. Signed-in players return to the
+ * lobby root; guests push `/lobby` so the back button still returns them to the rules.
+ */
 export function RulesFooter() {
   const { ui } = useRules();
   const returnToLobby = useLobbyReturn();
   const navigate = useNavigate();
   const isAuthed = useAuthStore((s) => s.token !== null);
-  // Authed users pop/replace back to the lobby root. Guests keep the plain
-  // push: ProtectedRoute bounces them to the landing page, and the push
-  // preserves the rules page in history so back returns them to their reading.
   const handlePlay = () => {
     if (isAuthed) {
       returnToLobby();
@@ -23,24 +23,10 @@ export function RulesFooter() {
     }
   };
   return (
-    <footer
-      style={{
-        marginTop: 36,
-        padding: "24px 26px",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        alignItems: "center",
-        gap: 18,
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 240 }}>
-        <span className="" style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>
-          {ui.footerTitle}
-        </span>
-        <span style={{ fontSize: 14, color: "var(--ink-dim)" }}>{ui.footerBody}</span>
+    <footer className="bg-surface border-border mt-9 flex flex-wrap items-center gap-4.5 rounded-lg border px-6.5 py-6">
+      <div className="flex min-w-60 flex-1 flex-col gap-1">
+        <span className="text-ink text-lg font-semibold">{ui.footerTitle}</span>
+        <span className="text-ink-dim text-sm">{ui.footerBody}</span>
       </div>
       <Button size="cta" onClick={handlePlay} data-testid="rules-play-cta">
         {ui.footerCta}

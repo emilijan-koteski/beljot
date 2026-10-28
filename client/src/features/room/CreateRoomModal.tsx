@@ -889,7 +889,7 @@ function PreviewCard({
   return (
     <article
       data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-2xl border shadow-lg"
+      className="bg-surface text-ink border-border overflow-hidden rounded-lg border shadow-lg"
     >
       <div className="px-4.5 pt-4.5 pb-3.5">
         <div className="flex items-center gap-2.5">
@@ -1039,7 +1039,7 @@ function PreviewCard({
         <SeatChip username={null} team="B" testId="preview-seat-3" />
       </div>
 
-      <div className="border-border bg-[rgba(14,58,36,0.03)] flex items-center gap-2.5 border-t px-4.5 py-3">
+      <div className="border-border bg-ink/3 flex items-center gap-2.5 border-t px-4.5 py-3">
         <span className="text-ink-dim inline-flex items-center gap-1.5 text-xs">
           <Avatar name={hostUsername} size={20} />
           {hostUsername}

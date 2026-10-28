@@ -70,12 +70,12 @@ export function Avatar({
   let textColor: string;
   if (team === "A") {
     background = "var(--team-a-fill)";
-    textColor = "#3b2c08";
+    textColor = "var(--brass-ink)";
   } else if (team === "B") {
     background = "var(--team-b-fill)";
-    textColor = "#2c2f35";
+    textColor = "var(--suit-black)";
   } else {
-    background = "linear-gradient(135deg, #1c7a45 0%, var(--accent-deep) 100%)";
+    background = "linear-gradient(135deg, var(--felt-green) 0%, var(--accent-deep) 100%)";
     textColor = "var(--accent-ink)";
   }
 

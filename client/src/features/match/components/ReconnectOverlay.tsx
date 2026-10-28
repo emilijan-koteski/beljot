@@ -48,7 +48,7 @@ const RING_SIZE = 132;
 const RING_STROKE_INSET = 4;
 const RING_RADIUS = (RING_SIZE - RING_STROKE_INSET) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
-const FELT_DARK = "#0e2818";
+const FELT_DARK = "var(--felt-shadow)";
 
 /**
  * Returns the viewer's win or loss for an abandoned match, based on whether they share the abandoner's team.

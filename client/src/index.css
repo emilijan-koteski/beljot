@@ -287,6 +287,13 @@
        same cream on parchment and on felt, so these are NOT re-rooted by
        `.felt-surface`/`.game-table`). Shared by the table and marketing cards. */
   --card-face: #fdfaf0;
+  --card-face-shade: #f0e8d0;
+  --card-face-edge: #ddcca2;
+  --ink-on-card: #0e3a24;
+  --felt-cream: #e8dfc8;
+  --felt-green: #1c7a45;
+  --felt-shadow: #0e2818;
+  --lamp-warm: #ffe9b0;
   --suit-red: #c62828;
   --suit-black: #1a1a1a;
 

@@ -72,7 +72,7 @@ function StatusChip({
       style={{
         width: 30,
         height: 30,
-        background: "linear-gradient(180deg, #fdfaf0, #f0e8d0)",
+        background: "linear-gradient(180deg, var(--card-face), var(--card-face-shade))",
         color: textColor,
         border: `2px solid ${borderColor}`,
         boxShadow: glowColor
@@ -250,7 +250,7 @@ export function PlayerSeat({
   const dealerChipNode = isDealer ? (
     <StatusChip
       borderColor="var(--avatar-inner)"
-      textColor="#0e3a24"
+      textColor="var(--ink-on-card)"
       title="Dealer this hand"
       testId="player-seat-dealer-chip"
     >

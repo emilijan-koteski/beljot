@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
 import { formatClockTime, formatLocalizedDate } from "@/shared/lib/formatDate";
 import { variantLabel } from "@/shared/lib/roomLabels";
+import { cn } from "@/shared/lib/utils";
 
 import { SeatChip } from "./SeatChip";
 
@@ -92,12 +93,7 @@ function HandNotes({
     <>
       {h.capot && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
-          style={{
-            background: "var(--accent-soft)",
-            color: "var(--accent)",
-            border: "1px solid rgba(25,101,54,0.33)",
-          }}
+          className="bg-accent-soft text-accent border-accent/33 rounded-md border px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
           data-testid="match-history-hand-capot"
         >
           {t("profile.matchHistory.hand.note.capot", { points: h.capotBonus })} ·{" "}
@@ -106,12 +102,8 @@ function HandNotes({
       )}
       {!h.capot && h.lastTrickBonus > 0 && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
-          style={{
-            background: "var(--surface-3)",
-            color: lastTrickIsUs ? usColor : themColor,
-            border: "1px solid var(--border)",
-          }}
+          className="bg-surface-3 border-border rounded-md border px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
+          style={{ color: lastTrickIsUs ? usColor : themColor }}
           data-testid="match-history-hand-last-trick"
         >
           {t("profile.matchHistory.hand.note.lastTrick", { points: h.lastTrickBonus })} ·{" "}
@@ -120,12 +112,7 @@ function HandNotes({
       )}
       {h.failedContract && (
         <span
-          className="rounded-md px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
-          style={{
-            background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-            color: "var(--danger)",
-            border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
-          }}
+          className="bg-danger/10 text-danger border-danger/30 rounded-md border px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
           data-testid="match-history-hand-failed"
         >
           {contractingIsUs
@@ -339,11 +326,11 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
           return (
             <div
               key={h.handNumber}
-              className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
-              style={{
-                gridTemplateColumns: cols,
-                background: idx % 2 ? "transparent" : "var(--surface-2)",
-              }}
+              className={cn(
+                "grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm",
+                idx % 2 === 0 && "bg-surface-2",
+              )}
+              style={{ gridTemplateColumns: cols }}
               data-testid="match-history-hand-row"
               data-hand-number={h.handNumber}
             >
@@ -385,7 +372,7 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
         {hasUnscoredHand && (
           <div
             className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
-            style={{ gridTemplateColumns: cols, background: "transparent" }}
+            style={{ gridTemplateColumns: cols }}
             data-testid="match-history-unscored-hand"
           >
             <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
@@ -642,8 +629,7 @@ export function MatchStatsCard({
           id={detailId}
           data-testid="match-history-detail"
           data-match-id={match.id}
-          className="border-border border-t px-4 pt-3 pb-4.5"
-          style={{ background: "rgba(14,58,36,0.025)" }}
+          className="border-border bg-ink/2.5 border-t px-4 pt-3 pb-4.5"
         >
           <HandsGrid
             hands={match.hands}

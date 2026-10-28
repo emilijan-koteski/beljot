@@ -143,7 +143,8 @@ export function TrumpReveal({
                 width: 60,
                 height: 60,
                 borderRadius: "50%",
-                background: "radial-gradient(circle at 38% 30%, #fffdf6, #efe4c8 68%, #ddcca2)",
+                background:
+                  "radial-gradient(circle at 38% 30%, var(--card-face), var(--card-face-shade) 68%, var(--card-face-edge))",
                 border: `3px solid ${sealRing}`,
                 boxShadow: card
                   ? "var(--shadow-felt-md), inset 0 2px 3px rgba(255,255,255,0.75), inset 0 -3px 6px rgba(0,0,0,0.2)"
@@ -186,8 +187,7 @@ export function TrumpReveal({
           </div>
 
           <div
-            className="mt-1 leading-snug"
-            style={{ fontSize: 14, color: "#e8dfc8" }}
+            className="mt-1 text-sm leading-snug text-(--felt-cream)"
             data-testid="trump-reveal-copy"
           >
             <Trans

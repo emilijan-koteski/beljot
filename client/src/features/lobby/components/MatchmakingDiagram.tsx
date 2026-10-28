@@ -62,7 +62,7 @@ export function MatchmakingDiagram({
       className="relative flex max-w-full flex-col items-center"
       style={{
         background: `
-          radial-gradient(ellipse 70% 50% at 50% 35%, rgba(25,101,54,0.07), transparent 70%),
+          radial-gradient(ellipse 70% 50% at 50% 35%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
           radial-gradient(ellipse 60% 40% at 50% 115%, var(--brass-10), transparent 70%)`,
       }}
     >
@@ -114,7 +114,8 @@ export function MatchmakingDiagram({
           className="absolute rounded-full"
           style={{
             inset: "15.79%",
-            background: "radial-gradient(circle, rgba(25,101,54,0.10) 0%, transparent 70%)",
+            background:
+              "radial-gradient(circle, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 70%)",
           }}
         />
         <div
@@ -122,7 +123,7 @@ export function MatchmakingDiagram({
           style={{
             inset: "10.53%",
             background:
-              "conic-gradient(from 0deg, transparent 0%, transparent 70%, rgba(25,101,54,0.25) 90%, transparent 100%)",
+              "conic-gradient(from 0deg, transparent 0%, transparent 70%, color-mix(in srgb, var(--accent) 25%, transparent) 90%, transparent 100%)",
             maskImage: "radial-gradient(circle, transparent 65%, #000 66%, #000 100%)",
             WebkitMaskImage: "radial-gradient(circle, transparent 65%, #000 66%, #000 100%)",
           }}

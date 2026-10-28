@@ -18,7 +18,7 @@ export function QuickPlayTile({ onClick, disabled }: Props) {
       onClick={onClick}
       disabled={disabled}
       data-testid="quick-play-card"
-      className="group/qp relative flex items-center gap-4 overflow-hidden rounded-lg border border-accent/40 bg-[linear-gradient(135deg,var(--accent-soft)_0%,rgba(25,101,54,0.04)_60%,var(--surface)_100%)] px-5.5 py-4.5 text-left text-ink shadow-glow inset-ring inset-ring-accent/10 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+      className="group/qp relative flex items-center gap-4 overflow-hidden rounded-lg border border-accent/40 bg-[linear-gradient(135deg,var(--accent-soft)_0%,color-mix(in_srgb,var(--accent)_4%,transparent)_60%,var(--surface)_100%)] px-5.5 py-4.5 text-left text-ink shadow-glow inset-ring inset-ring-accent/10 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
     >
       <span className="bg-accent text-accent-ink inline-flex size-11 items-center justify-center rounded-xl shadow-glow">
         <Zap className="size-6" strokeWidth={2} />
