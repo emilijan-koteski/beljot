@@ -28,7 +28,7 @@ function parseCardId(id: string) {
   return { rank: id[0] as Rank, suit: id[1] as Suit };
 }
 
-/** Reveal panel showing the winning team's melds, glowing in that team's viewer-relative color. */
+/** Reveal panel showing the winning team's melds, highest first, glowing in that team's viewer-relative color. */
 export function DeclarationReveal({
   payload,
   players,
@@ -65,19 +65,7 @@ export function DeclarationReveal({
 
   const totalAwarded = payload.declarations.reduce((acc, d) => acc + d.value, 0);
 
-  const showTiebreaker = payload.contested && payload.declarations.length > 0;
-  const highestMeld = showTiebreaker
-    ? payload.declarations.reduce((best, d) => (d.value > best.value ? d : best))
-    : null;
-  const highestDeclarer =
-    highestMeld !== null
-      ? (playerDisplayName(t, players.find((p) => p.seat === highestMeld.playerSeat) ?? null) ??
-        `#${highestMeld.playerSeat}`)
-      : null;
-  const highestLabel =
-    highestMeld !== null
-      ? t(`match.declaration.${declarationLabelKey(highestMeld.type, highestMeld.cards.length)}`)
-      : null;
+  const meldsHighestFirst = [...payload.declarations].sort((a, b) => b.value - a.value);
 
   return (
     <div
@@ -115,43 +103,19 @@ export function DeclarationReveal({
               {t("match.declaration.resolved")}
             </div>
             <div
-              className="flex items-center justify-center gap-2.5 font-semibold leading-tight"
+              className="font-semibold leading-tight"
               style={{
                 fontSize: 24,
               }}
               data-testid="declaration-reveal-team"
               data-team={winnerTeamString}
             >
-              <span
-                aria-hidden
-                className="rounded-full inline-block"
-                style={{
-                  width: 9,
-                  height: 9,
-                  background: glowColor,
-                  boxShadow: `0 0 12px ${glowColor}`,
-                }}
-              />
-              <span>
-                {isUs ? t("match.declaration.headlineUs") : t("match.declaration.headlineThem")}
-              </span>
+              {isUs ? t("match.declaration.headlineUs") : t("match.declaration.headlineThem")}
             </div>
-            {showTiebreaker && highestDeclarer && highestLabel && (
-              <div
-                className="text-xs mt-1.5"
-                style={{ color: "var(--ink-light)", opacity: 0.7 }}
-                data-testid="declaration-reveal-tiebreaker"
-              >
-                {t("match.declaration.tiebreaker", {
-                  player: highestDeclarer,
-                  label: highestLabel,
-                })}
-              </div>
-            )}
           </div>
 
           <div className="flex flex-col gap-3 mb-4">
-            {payload.declarations.map((decl, i) => {
+            {meldsHighestFirst.map((decl, i) => {
               const declarer = players.find((p) => p.seat === decl.playerSeat);
               const username = playerDisplayName(t, declarer) ?? `#${decl.playerSeat}`;
               return (

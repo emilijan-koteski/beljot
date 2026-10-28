@@ -5,7 +5,6 @@ import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
-import { seatTeam, teamColors } from "../lib/tableTheme";
 import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -50,8 +49,6 @@ export function PauseOverlay({
         <ClassicPanel size="dialog" title={t("match.pause.title")}>
           <div className="flex flex-col gap-2 mb-4">
             {players.map((player) => {
-              const team = seatTeam(player.seat, myPlayerSeat);
-              const dotColor = teamColors(team)[0];
               const isPaused = pausedPlayers[player.seat];
               const usedPause = pauseUsed[player.seat];
               return (
@@ -64,16 +61,6 @@ export function PauseOverlay({
                   }}
                   data-testid={isPaused ? `pause-player-${player.seat}` : undefined}
                 >
-                  <span
-                    aria-hidden
-                    className="rounded-full"
-                    style={{
-                      width: 6,
-                      height: 6,
-                      background: dotColor,
-                      boxShadow: `0 0 6px ${dotColor}`,
-                    }}
-                  />
                   <span className="text-sm flex-1" style={{ color: "var(--ink-light)" }}>
                     {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                   </span>

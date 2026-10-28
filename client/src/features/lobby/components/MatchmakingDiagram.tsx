@@ -139,8 +139,8 @@ export function MatchmakingDiagram({
           <div className="relative">
             <Avatar name={currentUsername} avatarUrl={currentAvatarUrl} size={youSize} />
             <span
-              className="border-accent absolute rounded-full border-2 opacity-40 animate-[pulse-dot_1.6s_ease-in-out_infinite]"
-              style={{ inset: -6 }}
+              className="border-accent/70 pointer-events-none absolute -inset-0.5 rounded-full border-2 motion-safe:animate-pulse"
+              data-testid="matchmaking-you-ring"
             />
           </div>
           <span className="text-accent-deep font-mono text-2xs font-semibold tracking-caps uppercase">

@@ -1,7 +1,9 @@
+import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSfxOnce } from "@/shared/audio/useSfxOnce";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { playerDisplayName } from "@/shared/lib/botName";
@@ -66,7 +68,9 @@ export function BelotReveal({
   const teamLabel = t(team === "gold" ? "team.us" : "team.them");
 
   const labelKey = isRebelote ? "match.belot.reveal.rebelot" : "match.belot.reveal.belot";
-  const announcer = playerDisplayName(t, players?.find((p) => p.seat === playerSeat) ?? null);
+  const announcerPlayer = players?.find((p) => p.seat === playerSeat) ?? null;
+  const announcer = playerDisplayName(t, announcerPlayer);
+  const avatarTeam = team === "gold" ? "A" : "B";
 
   return (
     <div
@@ -97,14 +101,14 @@ export function BelotReveal({
             style={{
               color: "var(--brass)",
               padding: "0 18px",
-              marginBottom: 14,
+              marginBottom: 16,
             }}
             data-testid="belot-reveal-label"
           >
             {t(labelKey)}
           </div>
 
-          <div className="relative mb-4 inline-block">
+          <div className="relative mb-4.5 inline-block">
             <div
               aria-hidden
               className="absolute rounded-lg"
@@ -121,15 +125,35 @@ export function BelotReveal({
           </div>
 
           <div
-            className="font-semibold leading-snug"
-            style={{ fontSize: 18 }}
+            className="flex items-center justify-center gap-2"
+            style={{ fontSize: 20, fontWeight: 600 }}
             data-testid="belot-reveal-title"
             data-seat={playerSeat}
           >
-            {announcer ?? teamLabel}
+            {announcer !== null && announcerPlayer ? (
+              <>
+                <Avatar
+                  name={announcer}
+                  avatarUrl={announcerPlayer.isBot === true ? null : announcerPlayer.avatarUrl}
+                  team={avatarTeam}
+                  size={24}
+                  icon={announcerPlayer.isBot === true ? <Bot aria-hidden="true" /> : undefined}
+                />
+                <span>{announcer}</span>
+              </>
+            ) : (
+              <span>{teamLabel}</span>
+            )}
           </div>
 
-          <div className="mt-3 flex justify-center">
+          <div
+            className="mt-1 text-sm leading-snug font-semibold tabular-nums text-(--felt-cream)"
+            data-testid="belot-reveal-bonus"
+          >
+            +{BELOT_BONUS}
+          </div>
+
+          <div className="mt-3.5 flex justify-center">
             <Badge
               size="sm"
               tint={glowColor}
@@ -137,10 +161,6 @@ export function BelotReveal({
             >
               {teamLabel}
             </Badge>
-          </div>
-
-          <div className="mt-1.5" style={{ fontSize: 12, opacity: 0.7 }}>
-            +{BELOT_BONUS}
           </div>
         </ClassicPanel>
       </div>

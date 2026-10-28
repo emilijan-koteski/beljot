@@ -941,7 +941,6 @@
       "resolved": "Zvanja",
       "headlineUs": "Mi smo osvojili zvanja",
       "headlineThem": "Oni su osvojili zvanja",
-      "tiebreaker": "Najviše zvanje: {{label}} · {{player}}",
       "byPlayer": "od {{name}}",
       "dismiss": "Zatvori",
       "declaredBanner": "{{username}} ima zvanje"

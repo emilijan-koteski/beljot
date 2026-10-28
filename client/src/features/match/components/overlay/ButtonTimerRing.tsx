@@ -26,8 +26,8 @@ interface ButtonTimerRingProps {
 }
 
 /**
- * Wraps a button with a rounded-rect countdown outline that drains to a server deadline or a client-side timer.
- * Fires `onExpire` once when the countdown reaches 0.
+ * Wraps a button with a rounded-rect countdown outline, sized to the button's fractional layout box so the
+ * outline stays centred. Drains to a server deadline or a client-side timer and fires `onExpire` once at 0.
  */
 export function ButtonTimerRing({
   turnExpiresAt,
@@ -77,14 +77,16 @@ export function ButtonTimerRing({
   }, [secondsLeft, onExpire, turnExpiresAt, clientCountdown]);
 
   useLayoutEffect(() => {
-    const measure = () => {
-      const el = wrapRef.current;
-      if (!el) return;
-      setSize({ w: el.offsetWidth, h: el.offsetHeight });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (wrapRef.current) ro.observe(wrapRef.current);
+    const el = wrapRef.current;
+    if (!el) return;
+    setSize({ w: el.offsetWidth, h: el.offsetHeight });
+    const ro = new ResizeObserver(([entry]) => {
+      const box = entry?.borderBoxSize?.[0];
+      setSize(
+        box ? { w: box.inlineSize, h: box.blockSize } : { w: el.offsetWidth, h: el.offsetHeight },
+      );
+    });
+    ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
@@ -112,7 +114,7 @@ export function ButtonTimerRing({
   return (
     <div
       ref={wrapRef}
-      className="relative inline-block"
+      className="relative inline-flex"
       data-testid="button-timer-ring"
       data-urgent={isUrgent ? "true" : "false"}
     >
