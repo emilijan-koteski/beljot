@@ -437,7 +437,7 @@
       "insufficientCoins": "Potrebno je {{buyIn}} novčića za ulazak u sobu. Tvoje stanje: {{balance}}.",
       "insufficientCoinsGeneric": "Nemaš dovoljno novčića za ulazak u sobu.",
       "insufficientCoinsStart": "Igrač ne može da uloži toliko. Meč nije počeo.",
-      "wrongPassword": "Pogrešna lozinka sobe.",
+      "wrongPassword": "Pogrešna lozinka.",
       "honorTooLow": "Ova soba traži čast {{minHonor}} ili više. Tvoja je {{honor}}. Odigraj još nekoliko mečeva da je podigneš.",
       "honorTooLowGeneric": "Tvoj skor časti je ispod minimuma ove sobe.",
       "newPlayerNotAllowed": "Ova soba je za iskusne igrače. Odigraj 5 mečeva da otvoriš takve sobe.",
@@ -445,8 +445,8 @@
     },
     "passwordPrompt": {
       "title": "Privatna soba",
-      "description": "Unesi lozinku da uđeš u \"{{name}}\".",
-      "placeholder": "Lozinka sobe",
+      "description": "Unesi lozinku za {{name}}.",
+      "placeholder": "Lozinka",
       "submit": "Uđi",
       "submitting": "Pridruživanje…",
       "cancel": "Otkaži"
@@ -510,8 +510,8 @@
     "autoStarting": "Pokretanje meča…",
     "kickIconLabel": "Izbaci {{username}}",
     "kickConfirm": {
-      "title": "Izbaciti <name>{{name}}</name> iz sobe?",
-      "lede": "Ovo je izbacivanje, ne trajna zabrana. <strong>{{name}}</strong> može da se vrati bilo kada.",
+      "title": "Izbaci {{name}}",
+      "description": "Može da se vrati bilo kada.",
       "confirm": "Izbaci",
       "cancel": "Otkaži"
     },
@@ -1401,9 +1401,7 @@
     "dailyReward": {
       "title": "Dnevna nagrada",
       "streakMaxed": "Maksimalan niz",
-      "coinsAdded": "novčića dodato u tvoj novčanik",
       "streak": "Dan {{streak}}",
-      "newBalance": "Novo stanje",
       "continue": "Nastavi"
     }
   },

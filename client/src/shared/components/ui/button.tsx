@@ -16,6 +16,8 @@ const buttonVariants = cva(
           "text-ink hover:bg-surface-sunken hover:text-ink aria-expanded:bg-surface-sunken aria-expanded:text-ink",
         destructive:
           "bg-danger/10 text-danger hover:bg-danger/20 focus-visible:border-danger/40 focus-visible:ring-danger/20",
+        danger:
+          "bg-danger text-accent-ink hover:bg-danger/90 focus-visible:border-danger/40 focus-visible:ring-danger/30 disabled:bg-surface-sunken disabled:text-ink-mute",
       },
       size: {
         default:
@@ -41,6 +43,7 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-variant={variant}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

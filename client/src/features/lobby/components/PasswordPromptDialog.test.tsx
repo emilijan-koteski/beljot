@@ -49,9 +49,7 @@ describe("PasswordPromptDialog", () => {
 
   it("shows the error message when errorKey is set", () => {
     renderDialog({ errorKey: "room.errors.wrongPassword" });
-    expect(screen.getByTestId("password-prompt-error")).toHaveTextContent(
-      "Incorrect room password.",
-    );
+    expect(screen.getByTestId("password-prompt-error")).toHaveTextContent("Wrong password.");
   });
 
   it("hides the error as soon as the player edits the password", async () => {
@@ -80,7 +78,7 @@ describe("PasswordPromptDialog footer order", () => {
 
   it("stacks the shared footer in DOM order on narrow screens", () => {
     renderDialog();
-    const footer = document.querySelector('[data-slot="dialog-footer"]');
+    const footer = document.querySelector('[data-slot="app-dialog-footer"]');
     expect(footer?.className).toContain("flex-col");
     expect(footer?.className).not.toContain("flex-col-reverse");
   });

@@ -437,7 +437,7 @@
       "insufficientCoins": "Потребни се {{buyIn}} парички за влез во собата. Твоето салдо: {{balance}}.",
       "insufficientCoinsGeneric": "Немаш доволно парички за влез во собата.",
       "insufficientCoinsStart": "Играч не може да вложи толку. Мечот не започна.",
-      "wrongPassword": "Погрешна лозинка за собата.",
+      "wrongPassword": "Погрешна лозинка.",
       "honorTooLow": "Оваа соба бара чест {{minHonor}} или повеќе. Твојата е {{honor}}. Одиграј уште неколку мечеви за да ја подигнеш.",
       "honorTooLowGeneric": "Твојата оценка на чест е под минимумот на оваа соба.",
       "newPlayerNotAllowed": "Оваа соба е за искусни играчи. Одиграј 5 мечеви за да отвориш такви соби.",
@@ -445,8 +445,8 @@
     },
     "passwordPrompt": {
       "title": "Приватна соба",
-      "description": "Внеси ја лозинката за да влезеш во \"{{name}}\".",
-      "placeholder": "Лозинка на собата",
+      "description": "Внеси ја лозинката за {{name}}.",
+      "placeholder": "Лозинка",
       "submit": "Влези",
       "submitting": "Се приклучуваш…",
       "cancel": "Откажи"
@@ -510,8 +510,8 @@
     "autoStarting": "Мечот започнува…",
     "kickIconLabel": "Исфрли {{username}}",
     "kickConfirm": {
-      "title": "Да го/ја исфрлам <name>{{name}}</name> од собата?",
-      "lede": "Ова е исфрлање, не трајна забрана. <strong>{{name}}</strong> може да се врати во секое време.",
+      "title": "Исфрли {{name}}",
+      "description": "Може да се врати во секое време.",
       "confirm": "Исфрли",
       "cancel": "Откажи"
     },
@@ -1401,9 +1401,7 @@
     "dailyReward": {
       "title": "Дневна награда",
       "streakMaxed": "Максимална низа",
-      "coinsAdded": "парички додадени во твојот паричник",
       "streak": "Ден {{streak}}",
-      "newBalance": "Нов биланс",
       "continue": "Продолжи"
     }
   },

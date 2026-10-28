@@ -437,7 +437,7 @@
       "insufficientCoins": "You need {{buyIn}} coins to join this room — your balance: {{balance}}.",
       "insufficientCoinsGeneric": "You don't have enough coins to join this room.",
       "insufficientCoinsStart": "A player can't stake that much — the match didn't start.",
-      "wrongPassword": "Incorrect room password.",
+      "wrongPassword": "Wrong password.",
       "honorTooLow": "This room asks for honor {{minHonor}} or higher. Yours is {{honor}} — finish a few matches to bring it up.",
       "honorTooLowGeneric": "Your honor score is below this room's minimum.",
       "newPlayerNotAllowed": "This room is for experienced players. Finish 5 matches to unlock rooms like it.",
@@ -445,8 +445,8 @@
     },
     "passwordPrompt": {
       "title": "Private room",
-      "description": "Enter the password to join \"{{name}}\".",
-      "placeholder": "Room password",
+      "description": "Enter the password for {{name}}.",
+      "placeholder": "Password",
       "submit": "Join",
       "submitting": "Joining…",
       "cancel": "Cancel"
@@ -510,8 +510,8 @@
     "autoStarting": "Starting match…",
     "kickIconLabel": "Kick {{username}}",
     "kickConfirm": {
-      "title": "Kick <name>{{name}}</name> from the room?",
-      "lede": "This is a kick, not a permanent ban — <strong>{{name}}</strong> can rejoin any time.",
+      "title": "Kick {{name}}",
+      "description": "They can rejoin any time.",
       "confirm": "Kick",
       "cancel": "Cancel"
     },
@@ -1401,9 +1401,7 @@
     "dailyReward": {
       "title": "Daily reward",
       "streakMaxed": "Streak maxed",
-      "coinsAdded": "coins added to your wallet",
       "streak": "Day {{streak}}",
-      "newBalance": "New balance",
       "continue": "Continue"
     }
   },

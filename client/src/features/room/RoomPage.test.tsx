@@ -1706,7 +1706,7 @@ describe("RoomPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("kick-confirm")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("kick-dialog-title")).toHaveTextContent("Kick bob from the room?");
+    expect(screen.getByTestId("kick-dialog-title")).toHaveTextContent("Kick bob");
 
     await user.click(screen.getByTestId("kick-confirm"));
 

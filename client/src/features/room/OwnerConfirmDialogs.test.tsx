@@ -10,7 +10,7 @@ import { KickPlayerDialog, TransferOwnershipDialog } from "./OwnerConfirmDialogs
 describe("KickPlayerDialog", () => {
   const seatedOpponent = { name: "ena_h", seat: 1, team: "B" as const };
 
-  it("titles the kick with the target name and shows seat + Opponent relation", async () => {
+  it("titles the kick by name and says they can rejoin", async () => {
     render(
       <KickPlayerDialog
         open
@@ -20,42 +20,27 @@ describe("KickPlayerDialog", () => {
         target={seatedOpponent}
       />,
     );
-    expect(await screen.findByTestId("kick-dialog-title")).toHaveTextContent(
-      "Kick ena_h from the room?",
+    expect(await screen.findByRole("dialog", { name: "Kick ena_h" })).toHaveAccessibleDescription(
+      "They can rejoin any time.",
     );
-    expect(screen.getByText("Seat 2")).toBeInTheDocument();
-    expect(screen.getByText("Opponent")).toBeInTheDocument();
+    expect(screen.getByTestId("kick-confirm")).toHaveAttribute("data-variant", "danger");
   });
 
-  it("shows the target's picture, as the roster does", async () => {
-    const url = "https://assets.test/avatars/ena/128.webp";
+  it("drops the host-action eyebrow and the player card the title already covers", async () => {
     render(
       <KickPlayerDialog
         open
         onOpenChange={vi.fn()}
         onConfirm={vi.fn()}
         pending={false}
-        target={{ ...seatedOpponent, avatarUrl: url }}
+        target={{ ...seatedOpponent, avatarUrl: "https://assets.test/avatars/ena/128.webp" }}
       />,
     );
-    const title = await screen.findByTestId("kick-dialog-title");
-    const dialog = title.closest("[role='dialog']") ?? document.body;
-    expect(dialog.querySelector(`img[src="${url}"]`)).not.toBeNull();
-  });
-
-  it("shows 'Standing' and no relation badge for an unseated target", async () => {
-    render(
-      <KickPlayerDialog
-        open
-        onOpenChange={vi.fn()}
-        onConfirm={vi.fn()}
-        pending={false}
-        target={{ name: "wanderer", seat: null, team: null }}
-      />,
-    );
-    expect(await screen.findByText("Standing")).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog");
+    expect(screen.queryByText("Host action")).toBeNull();
+    expect(screen.queryByText("Seat 2")).toBeNull();
     expect(screen.queryByText("Opponent")).toBeNull();
-    expect(screen.queryByText("Partner")).toBeNull();
+    expect(dialog.querySelector("img")).toBeNull();
   });
 
   it("fires onConfirm on confirm and onOpenChange(false) on cancel", async () => {
@@ -146,13 +131,7 @@ describe("owner confirm dialog footer order", () => {
     );
     await screen.findByTestId("kick-dialog-title");
     expectActionBeforeStatusQuo("kick-confirm", "kick-cancel");
-
-    const close = screen.getByLabelText("Close");
-    expect(close.style.position).toBe("absolute");
-    expect(
-      close.compareDocumentPosition(screen.getByTestId("kick-confirm")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(screen.queryByLabelText("Close")).toBeNull();
   });
 
   it("places the transfer confirm before its cancel", async () => {

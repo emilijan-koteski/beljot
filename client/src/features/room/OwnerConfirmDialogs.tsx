@@ -2,6 +2,7 @@ import { Bot, Crown, Lock, Shuffle, UserX, X, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Dialog, DialogClose, DialogContent } from "@/shared/components/ui/dialog";
@@ -329,42 +330,25 @@ export function KickPlayerDialog({
 }: ActionDialogProps) {
   const { t } = useTranslation();
   return (
-    <OwnerConfirmDialog
+    <AppDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onClose={() => onOpenChange(false)}
       tone="danger"
-      eyebrow={t("room.ownerConfirm.eyebrow")}
-      icon={<UserX size={24} color="var(--danger)" />}
-      titleTestId="kick-dialog-title"
+      icon={<UserX />}
       title={
-        <Trans
-          i18nKey="room.kickConfirm.title"
-          values={{ name: target.name }}
-          components={{ name: <span style={{ color: "var(--danger)" }} /> }}
-        />
+        <span data-testid="kick-dialog-title">
+          {t("room.kickConfirm.title", { name: target.name })}
+        </span>
       }
-      lede={
-        <Trans
-          i18nKey="room.kickConfirm.lede"
-          values={{ name: target.name }}
-          components={{ strong: <strong style={{ color: "var(--ink)" }} /> }}
-        />
-      }
-      confirmLabel={t("room.kickConfirm.confirm")}
-      confirmIcon={<UserX size={16} color="#fbeae6" />}
-      onConfirm={onConfirm}
-      confirmPending={pending}
-      confirmTestId="kick-confirm"
-      cancelLabel={t("room.kickConfirm.cancel")}
-      cancelTestId="kick-cancel"
-    >
-      <PlayerRow
-        name={target.name}
-        seat={target.seat}
-        team={target.team}
-        avatarUrl={target.avatarUrl}
-      />
-    </OwnerConfirmDialog>
+      description={t("room.kickConfirm.description")}
+      pending={pending}
+      primary={{ label: t("room.kickConfirm.confirm"), onClick: onConfirm, testId: "kick-confirm" }}
+      secondary={{
+        label: t("room.kickConfirm.cancel"),
+        onClick: () => onOpenChange(false),
+        testId: "kick-cancel",
+      }}
+    />
   );
 }
 

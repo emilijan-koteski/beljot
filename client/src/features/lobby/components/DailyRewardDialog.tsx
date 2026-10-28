@@ -1,13 +1,7 @@
 import { Check, Flame, Sparkle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import { cn } from "@/shared/lib/utils";
 
@@ -15,131 +9,47 @@ interface DailyRewardDialogProps {
   open: boolean;
   amount: number;
   streakDay: number;
-  newBalance: number;
   onClose: () => void;
 }
 
 const STREAK_MAX = 14;
 
-/** Struck-brass coin token with the embossed Beljot monogram, in brass or gold `tone`. */
-function CoinMedallion({
-  size = 96,
-  tone = "brass",
-  glyph = "B",
-}: {
-  size?: number;
-  tone?: "brass" | "gold";
-  glyph?: string;
-}) {
-  const gold = tone === "gold";
-  const face = gold
-    ? "radial-gradient(circle at 38% 30%, #fbeec0 0%, #e8c25a 50%, #a07d1a 100%)"
-    : "radial-gradient(circle at 38% 30%, #f4e3b8 0%, #c9a876 52%, #8a6a3c 100%)";
-  const rim = gold ? "#a07d1a" : "#8a6a3c";
-  const halo = gold ? "rgba(232,194,90,0.45)" : "var(--brass-40)";
-  const ink = gold ? "#6e520f" : "#5a4322";
+/** The Beljot coin: a brass disc with the "B" monogram, drawn from tokens. */
+function Coin() {
   return (
     <span
       aria-hidden="true"
-      style={{
-        position: "relative",
-        width: size,
-        height: size,
-        display: "inline-flex",
-        flexShrink: 0,
-      }}
+      className="from-brass to-brass-deep text-brass-ink ring-brass-soft flex size-18 items-center justify-center rounded-full bg-linear-to-b text-3xl font-bold shadow-md ring-4"
     >
-      <span
-        style={{
-          position: "absolute",
-          inset: -size * 0.28,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${halo} 0%, transparent 68%)`,
-        }}
-      />
-      <span
-        style={{
-          position: "relative",
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          background: face,
-          border: `${Math.max(2, size * 0.025)}px solid ${rim}`,
-          boxShadow: `inset 0 ${size * 0.03}px ${size * 0.05}px rgba(255,255,255,0.6), inset 0 -${size * 0.04}px ${size * 0.07}px rgba(0,0,0,0.28), 0 ${size * 0.08}px ${size * 0.18}px -${size * 0.06}px rgba(90,67,34,0.7)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            inset: size * 0.1,
-            borderRadius: "50%",
-            border: `1px solid ${rim}88`,
-            boxShadow: "inset 0 1px 2px rgba(0,0,0,0.18)",
-          }}
-        />
-        <span
-          className=""
-          style={{
-            fontSize: size * 0.46,
-            fontWeight: 700,
-            color: ink,
-            letterSpacing: "-0.025em",
-            textShadow: "0 1px 0 rgba(255,255,255,0.55), 0 -1px 1px rgba(0,0,0,0.25)",
-          }}
-        >
-          {glyph}
-        </span>
-      </span>
+      B
     </span>
   );
 }
 
-/**
- * 14-day login-streak track. Cleared days fill brass with a check, today rings
- * in gold, future days are dashed wells; day 14 always carries the sparkle as
- * the max-reward milestone.
- */
-function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number }) {
+/** The 14-day login streak: cleared days filled with a check, today ringed, day 14 marked with a sparkle. */
+function StreakTrack({ day }: { day: number }) {
   return (
-    <div className="flex items-center justify-center gap-[5px]" aria-hidden="true">
-      {Array.from({ length: total }, (_, i) => {
+    <div className="flex items-center justify-center gap-1.5" aria-hidden="true">
+      {Array.from({ length: STREAK_MAX }, (_, i) => {
         const n = i + 1;
         const done = n < day;
         const today = n === day;
-        const milestone = n === total;
         return (
           <span
             key={n}
-            style={{
-              width: today ? 18 : 13,
-              height: today ? 18 : 13,
-              borderRadius: "50%",
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: today
-                ? "radial-gradient(circle at 38% 30%, #fbeec0, #e8c25a 60%, #a07d1a)"
-                : done
-                  ? "radial-gradient(circle at 38% 30%, #ead9b0, #c9a876 60%, #9c7d4e)"
-                  : "var(--surface-3)",
-              border: today
-                ? "2px solid #a07d1a"
-                : done
-                  ? "1px solid #9c7d4e"
-                  : "1px dashed var(--brass)",
-              boxShadow: today ? "0 0 0 3px rgba(232,194,90,0.28), var(--shadow-sm)" : "none",
-              color: today ? "#6e520f" : done ? "#5a4322" : "var(--faint)",
-            }}
+            data-state={done ? "done" : today ? "today" : "upcoming"}
+            className={cn(
+              "flex items-center justify-center rounded-full",
+              today ? "bg-brass text-brass-ink ring-brass-soft size-4 ring-3" : "size-3",
+              done && "bg-brass text-brass-ink",
+              !done && !today && "border-brass/50 text-brass border border-dashed",
+            )}
           >
-            {milestone ? (
-              <Sparkle size={today ? 11 : 8} />
-            ) : done ? (
-              <Check size={8} strokeWidth={3.4} />
-            ) : null}
+            {n === STREAK_MAX ? (
+              <Sparkle className="size-2" />
+            ) : (
+              done && <Check className="size-2" strokeWidth={4} />
+            )}
           </span>
         );
       })}
@@ -147,97 +57,41 @@ function StreakTrack({ day, total = STREAK_MAX }: { day: number; total?: number 
   );
 }
 
-/**
- * Persistent, fully controlled daily-login reward modal opened by the gate.
- * Every library-initiated close is swallowed, so only the Continue button dismisses it.
- */
-export function DailyRewardDialog({
-  open,
-  amount,
-  streakDay,
-  newBalance,
-  onClose,
-}: DailyRewardDialogProps) {
+/** The once-a-day coin reward on the celebration shell: the amount, the streak and one Continue. */
+export function DailyRewardDialog({ open, amount, streakDay, onClose }: DailyRewardDialogProps) {
   const { t } = useTranslation();
-
   const milestone = streakDay >= STREAK_MAX;
-  const tone = milestone ? "gold" : "brass";
 
   return (
-    <Dialog open={open} disablePointerDismissal onOpenChange={() => {}}>
-      <DialogContent
-        showCloseButton={false}
-        data-testid="daily-reward-dialog"
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      tone="celebration"
+      art={<Coin />}
+      title={t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
+      primary={{
+        label: t("rewards.dailyReward.continue"),
+        onClick: onClose,
+        testId: "daily-reward-continue",
+      }}
+      testId="daily-reward-dialog"
+    >
+      <p
+        data-testid="daily-reward-amount"
         className={cn(
-          "block overflow-hidden rounded-lg border border-border bg-surface p-0 ring-0 sm:max-w-[380px]",
-          milestone
-            ? "shadow-xl inset-ring inset-ring-brass/18"
-            : "shadow-xl inset-ring inset-ring-brass/18",
+          "m-0 text-5xl leading-none font-bold tracking-tight tabular-nums",
+          milestone ? "text-team-a" : "text-ink",
         )}
       >
-        <div className="h-[3px] bg-[linear-gradient(90deg,transparent,var(--brass)_28%,var(--team-a-fill)_50%,var(--brass)_72%,transparent)]" />
-        <div
-          aria-hidden="true"
-          className={cn(
-            "pointer-events-none absolute inset-x-0 top-0 h-[180px]",
-            milestone
-              ? "bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(232,194,90,0.18),transparent_70%)]"
-              : "bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,var(--brass-soft),transparent_70%)]",
-          )}
-        />
-
-        <div className="relative flex flex-col items-center gap-4 px-[26px] pt-[26px] pb-6 text-center">
-          <DialogTitle className="text-brass-deep text-2xs font-bold tracking-caps uppercase">
-            {t(milestone ? "rewards.dailyReward.streakMaxed" : "rewards.dailyReward.title")}
-          </DialogTitle>
-
-          <CoinMedallion size={96} tone={tone} />
-
-          <div>
-            <div
-              data-testid="daily-reward-amount"
-              className={cn(
-                "tabular-nums text-5xl leading-none font-bold tracking-tight",
-                milestone ? "text-team-a" : "text-ink",
-              )}
-            >
-              +{formatCoins(amount)}
-            </div>
-            <DialogDescription className="text-ink-dim mt-1 text-sm">
-              {t("rewards.dailyReward.coinsAdded")}
-            </DialogDescription>
-          </div>
-
-          <div className="w-full">
-            <StreakTrack day={Math.min(streakDay, STREAK_MAX)} />
-            <div className="text-ink-dim mt-3 inline-flex items-center gap-1.5 text-xs">
-              <Flame className="text-brass-deep size-3.5" aria-hidden="true" />
-              {t("rewards.dailyReward.streak", { streak: streakDay })}
-            </div>
-          </div>
-
-          <div className="bg-border h-px w-full" />
-
-          <div className="flex w-full items-center justify-between">
-            <span className="text-ink-mute inline-flex items-center gap-2 text-sm">
-              <CoinMedallion size={24} tone={tone} />
-              {t("rewards.dailyReward.newBalance")}
-            </span>
-            <span className="tabular-nums text-ink text-lg font-bold">
-              {formatCoins(newBalance)}
-            </span>
-          </div>
-
-          <Button
-            onClick={onClose}
-            size="cta"
-            className="w-full"
-            data-testid="daily-reward-continue"
-          >
-            {t("rewards.dailyReward.continue")}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        +{formatCoins(amount)}
+      </p>
+      <div className="mt-5">
+        <StreakTrack day={Math.min(streakDay, STREAK_MAX)} />
+      </div>
+      <p className="text-ink-dim mt-2 mb-0 inline-flex items-center gap-1 text-xs">
+        <Flame className="text-brass-deep size-3.5" aria-hidden="true" />
+        {t("rewards.dailyReward.streak", { streak: streakDay })}
+      </p>
+    </AppDialog>
   );
 }

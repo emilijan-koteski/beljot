@@ -3,15 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
-import { Button } from "@/shared/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Input } from "@/shared/components/ui/input";
 
 interface PasswordPromptDialogProps {
@@ -54,75 +46,50 @@ export function PasswordPromptDialog({
 
   const showError = errorKey !== null && !errorDismissed;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (pending || password.length === 0) return;
-    onSubmit(password);
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent showCloseButton={false} data-testid="password-prompt-dialog">
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="bg-brass-soft border-brass/40 text-brass-deep flex size-11 shrink-0 items-center justify-center rounded-xl border">
-                <Lock className="size-5" />
-              </div>
-              <DialogTitle>{t("room.passwordPrompt.title")}</DialogTitle>
-            </div>
-            <DialogDescription>
-              {t("room.passwordPrompt.description", { name: roomName })}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="relative">
-            <Input
-              type={showPassword ? "text" : "password"}
-              autoFocus
-              autoComplete="current-password"
-              placeholder={t("room.passwordPrompt.placeholder")}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setErrorDismissed(true);
-              }}
-              aria-invalid={showError}
-              data-testid="password-prompt-input"
-              className="h-11 pr-10"
-            />
-            <PasswordToggle
-              shown={showPassword}
-              onToggle={() => setShowPassword(!showPassword)}
-              testId="password-prompt-toggle"
-            />
-          </div>
-
-          {showError && (
-            <p role="alert" data-testid="password-prompt-error" className="text-danger text-sm">
-              {t(errorKey)}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={pending || password.length === 0}
-              data-testid="password-prompt-submit"
-            >
-              {pending ? t("room.passwordPrompt.submitting") : t("room.passwordPrompt.submit")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              data-testid="password-prompt-cancel"
-            >
-              {t("room.passwordPrompt.cancel")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={<Lock />}
+      title={t("room.passwordPrompt.title")}
+      description={t("room.passwordPrompt.description", { name: roomName })}
+      error={showError ? t(errorKey) : null}
+      errorTestId="password-prompt-error"
+      pending={pending}
+      onSubmit={() => onSubmit(password)}
+      primary={{
+        label: pending ? t("room.passwordPrompt.submitting") : t("room.passwordPrompt.submit"),
+        disabled: pending || password.length === 0,
+        testId: "password-prompt-submit",
+      }}
+      secondary={{
+        label: t("room.passwordPrompt.cancel"),
+        onClick: onClose,
+        testId: "password-prompt-cancel",
+      }}
+      testId="password-prompt-dialog"
+    >
+      <div className="relative">
+        <Input
+          type={showPassword ? "text" : "password"}
+          autoFocus
+          autoComplete="current-password"
+          placeholder={t("room.passwordPrompt.placeholder")}
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setErrorDismissed(true);
+          }}
+          aria-invalid={showError}
+          data-testid="password-prompt-input"
+          className="h-11 pr-10"
+        />
+        <PasswordToggle
+          shown={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          testId="password-prompt-toggle"
+        />
+      </div>
+    </AppDialog>
   );
 }
