@@ -993,10 +993,11 @@
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
-      "autoPassed": "{{player}} ran out of time — auto-passed",
-      "autoPickedTrump": "{{player}} ran out of time — trump was named for them",
-      "autoSkippedDeclare": "{{player}} ran out of time — auto-skipped declarations",
-      "autoSkippedBelot": "{{player}} ran out of time — auto-declined Belote"
+      "autoPassed": "{{player}} timed out · passed",
+      "autoPickedTrump": "{{player}} timed out · trump chosen",
+      "autoSkippedDeclare": "You timed out · declarations skipped",
+      "autoSkippedBelot": "You timed out · Belote skipped",
+      "timedOut": "{{player}} timed out"
     },
     "score": {
       "heading": "Scoreboard",

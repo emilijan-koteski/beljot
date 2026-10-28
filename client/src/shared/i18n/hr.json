@@ -993,10 +993,11 @@
     },
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",
-      "autoPassed": "{{player}} · vrijeme isteklo, automatski pas",
-      "autoPickedTrump": "{{player}} · vrijeme isteklo, adut izabran automatski",
-      "autoSkippedDeclare": "{{player}} · vrijeme isteklo, zvanje preskočeno",
-      "autoSkippedBelot": "{{player}} · vrijeme isteklo, Bela odbijena"
+      "autoPassed": "{{player}} · vrijeme isteklo, pas",
+      "autoPickedTrump": "{{player}} · vrijeme isteklo, adut odabran",
+      "autoSkippedDeclare": "Isteklo ti je vrijeme · zvanja preskočena",
+      "autoSkippedBelot": "Isteklo ti je vrijeme · Bela preskočena",
+      "timedOut": "{{player}} · vrijeme isteklo"
     },
     "score": {
       "heading": "Rezultat",

@@ -993,10 +993,11 @@
     },
     "timer": {
       "autoPlayed": "Автоматски одиграно: {{card}}",
-      "autoPassed": "{{player}}, времето истече, автоматски пас",
-      "autoPickedTrump": "{{player}}, времето истече, адутот е избран автоматски",
-      "autoSkippedDeclare": "{{player}}, времето истече, прескокната најава",
-      "autoSkippedBelot": "{{player}}, времето истече, Бељот одбиен"
+      "autoPassed": "{{player}} · времето истече, пас",
+      "autoPickedTrump": "{{player}} · времето истече, адутот е избран",
+      "autoSkippedDeclare": "Ти истече времето · најавите се прескокнати",
+      "autoSkippedBelot": "Ти истече времето · Бељот прескокнат",
+      "timedOut": "{{player}} · времето истече"
     },
     "score": {
       "heading": "Резултат",

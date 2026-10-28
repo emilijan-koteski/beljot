@@ -1449,10 +1449,7 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	session.mu.Unlock()
 
 	if autoType, ok := autoActionTypeFor(action.Type); ok {
-		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventAutoAction, ws.AutoActionPayload{
-			PlayerSeat: expectedSeat,
-			Type:       autoType,
-		}))
+		m.sendAutoAction(playerIDs, expectedSeat, autoType)
 	}
 
 	for _, step := range steps {
@@ -1488,6 +1485,34 @@ func autoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 		return ws.AutoActionPickTrump, true
 	}
 	return "", false
+}
+
+// sendAutoAction tells every human player about a timeout auto-action. A private skip reaches only the timed-out
+// player by name; the others see a plain timeout, because the skip would reveal what that seat holds.
+func (m *Manager) sendAutoAction(playerIDs [4]uint, seat int, autoType ws.AutoActionType) {
+	exact := buildMessage(ws.EventAutoAction, ws.AutoActionPayload{PlayerSeat: seat, Type: autoType})
+	if !isPrivateAutoAction(autoType) {
+		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), exact)
+		return
+	}
+	masked := buildMessage(ws.EventAutoAction, ws.AutoActionPayload{PlayerSeat: seat, Type: ws.AutoActionTimeout})
+	frames := make([]ws.UserFrame, 0, len(playerIDs))
+	for s, id := range playerIDs {
+		if id == 0 {
+			continue
+		}
+		msg := masked
+		if s == seat {
+			msg = exact
+		}
+		frames = append(frames, ws.UserFrame{UserID: id, Msg: msg})
+	}
+	m.hub.SendFrames(frames)
+}
+
+// isPrivateAutoAction reports whether an auto-action would expose the timed-out seat's hand to the other players.
+func isPrivateAutoAction(autoType ws.AutoActionType) bool {
+	return autoType == ws.AutoActionSkipDeclare || autoType == ws.AutoActionSkipBelot
 }
 
 func safeDerefInt(p *int) int {

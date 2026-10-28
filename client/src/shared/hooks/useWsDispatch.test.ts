@@ -1580,6 +1580,16 @@ describe("useWsDispatch", () => {
     expect(tSpy).not.toHaveBeenCalledWith("match.timer.autoPassed", expect.anything());
   });
 
+  it("toasts only the timeout for another seat's private skip", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:auto_action",
+      payload: { playerSeat: 0, type: "timeout" },
+    });
+    expect(toast.info).toHaveBeenCalledWith("Alice timed out", expect.anything());
+  });
+
   it("ignores event:auto_action when matchState is null", () => {
     const { result } = renderHook(() => useWsDispatch());
     result.current({
@@ -1600,6 +1610,10 @@ describe("useWsDispatch", () => {
     result.current({
       type: "event:auto_action",
       payload: { playerSeat: 1, type: "bogus" as unknown as "pass_trump" },
+    });
+    result.current({
+      type: "event:auto_action",
+      payload: { playerSeat: 1, type: "toString" as unknown as "pass_trump" },
     });
     result.current({
       type: "event:auto_action",

@@ -19,6 +19,7 @@ import type { Room } from "@/shared/types/apiTypes";
 import type { MatchState } from "@/shared/types/matchTypes";
 import type {
   AutoActionPayload,
+  AutoActionType,
   BelotAnnouncedPayload,
   BotAddedPayload,
   BotRemovedPayload,
@@ -118,6 +119,14 @@ import {
   SYSTEM_SEAT_UPDATED,
   SYSTEM_WHISPER,
 } from "@/shared/types/wsEvents";
+
+const AUTO_ACTION_TOAST_KEYS: Record<AutoActionType, string> = {
+  pass_trump: "match.timer.autoPassed",
+  pick_trump: "match.timer.autoPickedTrump",
+  skip_declare: "match.timer.autoSkippedDeclare",
+  skip_belot: "match.timer.autoSkippedBelot",
+  timeout: "match.timer.timedOut",
+};
 
 export function useWsDispatch() {
   const dispatch = useCallback((message: WsMessage) => {
@@ -412,25 +421,16 @@ function dispatchGameEvent(message: WsMessage): void {
       !Number.isInteger(payload.playerSeat) ||
       payload.playerSeat < 0 ||
       payload.playerSeat > 3 ||
-      (payload?.type !== "pass_trump" &&
-        payload?.type !== "skip_declare" &&
-        payload?.type !== "skip_belot" &&
-        payload?.type !== "pick_trump")
+      !Object.hasOwn(AUTO_ACTION_TOAST_KEYS, payload?.type)
     ) {
       console.warn("WS: ignoring malformed event:auto_action payload", payload);
       return;
     }
     const playerName =
       store.matchState.players[payload.playerSeat]?.username ?? `Player ${payload.playerSeat + 1}`;
-    const i18nKey =
-      payload.type === "pass_trump"
-        ? "match.timer.autoPassed"
-        : payload.type === "skip_declare"
-          ? "match.timer.autoSkippedDeclare"
-          : payload.type === "skip_belot"
-            ? "match.timer.autoSkippedBelot"
-            : "match.timer.autoPickedTrump";
-    toast.info(i18n.t(i18nKey, { player: playerName }), { duration: 3000 });
+    toast.info(i18n.t(AUTO_ACTION_TOAST_KEYS[payload.type], { player: playerName }), {
+      duration: 3000,
+    });
     return;
   }
 
