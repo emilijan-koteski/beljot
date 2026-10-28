@@ -1,8 +1,9 @@
-import { ArrowDownWideNarrow, Search, X } from "lucide-react";
+import { ArrowDownWideNarrow } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/shared/components/ui/button";
 import { Chip } from "@/shared/components/ui/chips";
+import { SearchInput } from "@/shared/components/ui/search-input";
 
 export type LobbyFilter = "all" | "qualify" | "open" | "relaxed" | "timed";
 export type LobbySort = "newest" | "filling";
@@ -25,26 +26,16 @@ export function FilterRail({ search, setSearch, filter, setFilter, sort, setSort
   const { t } = useTranslation();
   return (
     <div className="bg-surface mb-3.5 flex flex-wrap items-center gap-3.5 rounded-lg border border-border p-3.5">
-      <div className="bg-surface-elevated flex min-w-50 flex-1 items-center gap-2 rounded-md border border-border px-2.5 py-1.5 transition-[border-color,box-shadow] has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/70">
-        <Search className="text-ink-mute size-3.5" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("lobby.search.placeholder")}
-          data-testid="room-list-search"
-          className="text-ink min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-ink-mute"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch("")}
-            data-testid="room-list-clear-search"
-            aria-label="Clear search"
-            className="text-ink-mute flex p-0.5"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
-      </div>
+      <SearchInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder={t("lobby.search.placeholder")}
+        aria-label={t("lobby.search.placeholder")}
+        data-testid="room-list-search"
+        clearLabel={t("lobby.empty.clear")}
+        clearTestId="room-list-clear-search"
+        wrapperClassName="min-w-50 flex-1"
+      />
 
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {

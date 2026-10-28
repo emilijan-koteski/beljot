@@ -836,11 +836,7 @@ export function RoomPage() {
                   <span>{t("room.inRoomCount", { count: players.length })}</span>
                   <ChevronDown className="text-ink-mute size-3" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="bg-surface-elevated min-w-64"
-                  data-testid="in-room-list"
-                >
+                <DropdownMenuContent align="start" className="min-w-64" data-testid="in-room-list">
                   <div className="text-brass-deep px-2 pt-1.5 pb-1 font-mono text-2xs font-semibold tracking-caps uppercase">
                     {t("room.inRoomList.title")}
                   </div>

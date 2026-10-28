@@ -193,10 +193,7 @@ export function TopBar({
               </span>
               <ChevronDown className="text-ink-dim size-3 shrink-0 opacity-70" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="bg-surface-elevated w-max min-w-44 max-w-(--available-width) border border-border p-1 shadow-lg"
-            >
+            <DropdownMenuContent align="end" className="w-max min-w-44 max-w-(--available-width)">
               <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-xs">
                 {t("nav.signedInAs", { defaultValue: "Signed in as" })}{" "}
                 <span className="text-ink font-semibold">{user.username}</span>
@@ -232,10 +229,7 @@ export function TopBar({
             >
               <Menu className="size-5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="bg-surface-elevated w-max min-w-48 max-w-(--available-width) border border-border p-1 shadow-lg"
-            >
+            <DropdownMenuContent align="end" className="w-max min-w-48 max-w-(--available-width)">
               {showUserMenu && user && (
                 <>
                   <div className="text-ink-mute px-2.5 pt-2 pb-1.5 text-xs">
