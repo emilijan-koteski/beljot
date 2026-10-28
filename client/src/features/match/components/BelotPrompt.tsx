@@ -5,6 +5,7 @@ import { Z } from "@/shared/lib/zLayers";
 import type { Suit } from "@/shared/types/matchTypes";
 
 import { ButtonTimerRing } from "./overlay/ButtonTimerRing";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -67,14 +68,13 @@ export function BelotPrompt({
               />
             </div>
 
-            <div className="flex justify-end items-center gap-3.5">
-              <ClassicButton
-                variant="primary"
-                onClick={onAnnounce}
-                data-testid="belot-prompt-announce"
-              >
-                {t("match.belot.announce")}
-              </ClassicButton>
+            <ClassicActions
+              primary={{
+                label: t("match.belot.announce"),
+                onClick: onAnnounce,
+                testId: "belot-prompt-announce",
+              }}
+            >
               {showRing ? (
                 <ButtonTimerRing
                   turnExpiresAt={turnExpiresAt}
@@ -89,7 +89,7 @@ export function BelotPrompt({
                   {t("match.belot.decline")}
                 </ClassicButton>
               )}
-            </div>
+            </ClassicActions>
           </ClassicPanel>
         </div>
       </OverlayBackdrop>

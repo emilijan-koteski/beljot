@@ -6,6 +6,7 @@ import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
 import { seatTeam, teamColors } from "../lib/tableTheme";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -94,10 +95,7 @@ export function PauseOverlay({
             })}
           </div>
 
-          <div
-            className="mt-4 flex flex-wrap items-center justify-end gap-3.5"
-            data-testid="pause-actions"
-          >
+          <ClassicActions className="mt-4" testId="pause-actions">
             {hasActivePause ? (
               <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
                 {t("match.pause.resume")}
@@ -128,7 +126,7 @@ export function PauseOverlay({
                 </span>
               </ClassicButton>
             )}
-          </div>
+          </ClassicActions>
         </ClassicPanel>
       </OverlayBackdrop>
     </div>

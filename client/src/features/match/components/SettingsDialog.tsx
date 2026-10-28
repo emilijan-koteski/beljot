@@ -20,7 +20,7 @@ import { useAuthStore } from "@/shared/stores/authStore";
 
 import type { CardDeck } from "../lib/cardFace";
 import { resolveCardDeck } from "../lib/cardFace";
-import { ClassicButton } from "./overlay/ClassicButton";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
@@ -242,15 +242,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </SettingSection>
             </div>
 
-            <div className="flex justify-end items-center mt-5">
-              <ClassicButton
-                variant="primary"
-                onClick={() => onOpenChange(false)}
-                data-testid="settings-dialog-close"
-              >
-                {t("match.settings.close")}
-              </ClassicButton>
-            </div>
+            <ClassicActions
+              className="mt-5"
+              primary={{
+                label: t("match.settings.close"),
+                onClick: () => onOpenChange(false),
+                testId: "settings-dialog-close",
+              }}
+            />
           </ClassicPanel>
         </div>
       </OverlayBackdrop>

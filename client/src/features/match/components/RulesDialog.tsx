@@ -13,7 +13,7 @@ import { variantLabel } from "@/shared/lib/roomLabels";
 import { Z } from "@/shared/lib/zLayers";
 import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
 
-import { ClassicButton } from "./overlay/ClassicButton";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
@@ -184,13 +184,13 @@ export function RulesDialog({
                 </div>
 
                 <div className="border-brass-25 flex shrink-0 items-center justify-end border-t bg-black/30 px-5 py-3">
-                  <ClassicButton
-                    variant="primary"
-                    onClick={() => onOpenChange(false)}
-                    data-testid="rules-dialog-close"
-                  >
-                    {ui.ovClose}
-                  </ClassicButton>
+                  <ClassicActions
+                    primary={{
+                      label: ui.ovClose,
+                      onClick: () => onOpenChange(false),
+                      testId: "rules-dialog-close",
+                    }}
+                  />
                 </div>
               </div>
             </ClassicPanel>

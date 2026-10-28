@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { Z } from "@/shared/lib/zLayers";
 
-import { ClassicButton } from "./overlay/ClassicButton";
+import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicPanel } from "./overlay/ClassicPanel";
 import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
@@ -75,14 +75,11 @@ export function SurrenderDialog({
             <ExplainerStrip tone="danger" className="mb-4">
               {cost}
             </ExplainerStrip>
-            <div className="flex items-center justify-end gap-3.5">
-              <ClassicButton variant="danger" onClick={onConfirm} data-testid={testIds.confirm}>
-                {confirmLabel}
-              </ClassicButton>
-              <ClassicButton onClick={onCancel} data-testid={testIds.cancel}>
-                {cancelLabel}
-              </ClassicButton>
-            </div>
+            <ClassicActions
+              tone="danger"
+              primary={{ label: confirmLabel, onClick: onConfirm, testId: testIds.confirm }}
+              secondary={{ label: cancelLabel, onClick: onCancel, testId: testIds.cancel }}
+            />
           </ClassicPanel>
         </div>
       </OverlayBackdrop>
