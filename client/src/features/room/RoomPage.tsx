@@ -892,9 +892,10 @@ export function RoomPage() {
                               {seatLabel}
                             </Badge>
                             {ownerCanPromoteRow && (
-                              <button
-                                type="button"
-                                className="text-ink-mute hover:bg-surface-sunken hover:text-brass-deep rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className="text-ink-mute hover:text-brass-deep"
                                 aria-label={t("room.promoteIconLabel", {
                                   username: p.username,
                                 })}
@@ -912,12 +913,13 @@ export function RoomPage() {
                                 }}
                               >
                                 <Crown className="size-3.5" />
-                              </button>
+                              </Button>
                             )}
                             {ownerCanKickRow && (
-                              <button
-                                type="button"
-                                className="text-ink-mute hover:bg-surface-sunken hover:text-danger rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                className="text-ink-mute hover:text-danger"
                                 aria-label={t("room.kickIconLabel", {
                                   username: p.username,
                                 })}
@@ -937,7 +939,7 @@ export function RoomPage() {
                                 }}
                               >
                                 <UserX className="size-3.5" />
-                              </button>
+                              </Button>
                             )}
                           </li>
                         );

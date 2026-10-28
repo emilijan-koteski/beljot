@@ -7,6 +7,7 @@ import { FriendRequests } from "@/features/friends/FriendRequests";
 import { PlayerSearch } from "@/features/lobby/components/PlayerSearch";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { Avatar } from "@/shared/components/ui/avatar";
+import { Button } from "@/shared/components/ui/button";
 import { useFriends } from "@/shared/hooks/queries/useFriends";
 import { useChatStore } from "@/shared/stores/chatStore";
 
@@ -28,21 +29,22 @@ export function FriendList() {
     >
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink-dim text-xs font-semibold">{t("friends.list.heading")}</h2>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={() => setSearchOpen((open) => !open)}
           aria-expanded={searchOpen}
           aria-label={searchOpen ? t("lobby.playerSearch.close") : t("lobby.playerSearch.label")}
           title={searchOpen ? t("lobby.playerSearch.close") : t("lobby.playerSearch.label")}
           data-testid="player-search-toggle"
-          className="text-ink-mute hover:text-ink hover:bg-surface-sunken focus-visible:ring-ring/70 ml-auto flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
+          className="text-ink-mute ml-auto"
         >
           {searchOpen ? (
             <X className="size-3.5" aria-hidden="true" />
           ) : (
             <Search className="size-3.5" aria-hidden="true" />
           )}
-        </button>
+        </Button>
       </div>
 
       {searchOpen && <PlayerSearch onClose={() => setSearchOpen(false)} />}
@@ -97,16 +99,17 @@ export function FriendList() {
               </span>
 
               {friend.online === true && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   data-testid="friend-whisper"
                   onClick={() => openWhisper(friend.username)}
                   aria-label={t("friends.whisperAria", { username: friend.username })}
                   title={t("friends.whisperAria", { username: friend.username })}
-                  className="focus-visible:ring-ring/70 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-(--whisper-ink) transition-colors hover:bg-(--whisper-fill) focus-visible:ring-3 focus-visible:outline-none"
+                  className="text-(--whisper-ink) hover:bg-(--whisper-fill) hover:text-(--whisper-ink)"
                 >
-                  <MessageCircle className="size-4" aria-hidden="true" />
-                </button>
+                  <MessageCircle aria-hidden="true" />
+                </Button>
               )}
             </li>
           ))}

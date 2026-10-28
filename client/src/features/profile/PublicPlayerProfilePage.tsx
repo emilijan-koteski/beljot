@@ -5,6 +5,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import type { MatchFilter } from "@/shared/api/matches";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { FriendButton } from "@/shared/components/friends/FriendButton";
+import { buttonVariants } from "@/shared/components/ui/button";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { usePublicProfileQuery } from "@/shared/hooks/queries/usePublicProfile";
 
@@ -53,7 +54,7 @@ export function PublicPlayerProfilePage() {
           action={
             <Link
               to="/lobby"
-              className="text-accent inline-flex items-center text-sm underline-offset-2 hover:underline"
+              className={buttonVariants({ variant: "link", size: "inline" })}
               data-testid="public-profile-not-found-cta"
             >
               {t("publicProfile.notFound.cta")}

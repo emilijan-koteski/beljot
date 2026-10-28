@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { RoomCard } from "@/features/lobby/components/RoomCard";
 import { EmptyState } from "@/shared/components/EmptyState";
+import { Button } from "@/shared/components/ui/button";
 import type { Room } from "@/shared/types/apiTypes";
 
 type Props = {
@@ -28,13 +29,14 @@ export function RoomGrid({ rooms, onJoin, hasSearch, onClearSearch }: Props) {
         action={
           hasSearch &&
           onClearSearch && (
-            <button
+            <Button
+              variant="link"
+              size="inline"
               onClick={onClearSearch}
               data-testid="room-list-clear-search-empty"
-              className="text-accent text-sm font-semibold hover:underline"
             >
               {t("lobby.empty.clear")}
-            </button>
+            </Button>
           )
         }
       >

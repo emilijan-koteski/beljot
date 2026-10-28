@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import type { MatchFilter, MatchListItem, MatchSort } from "@/shared/api/matches";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
+import { Button, buttonVariants } from "@/shared/components/ui/button";
 import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 
 import { HistoryFilters } from "./components/HistoryFilters";
@@ -57,7 +58,7 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
             subjectIsSelf && (
               <Link
                 to="/lobby"
-                className="text-accent inline-flex items-center text-sm underline-offset-2 hover:underline"
+                className={buttonVariants({ variant: "link", size: "inline" })}
                 data-testid="match-history-empty-cta"
               >
                 {t("profile.matchHistory.emptyCta")}
@@ -119,17 +120,17 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
           ))}
         </ul>
         {showLoadMore && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => query.fetchNextPage()}
             disabled={query.isFetchingNextPage}
-            className="bg-surface border-border text-ink hover:bg-surface-elevated mt-2.5 w-full rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 h-9 w-full"
             data-testid="match-history-load-more"
           >
             {query.isFetchingNextPage
               ? t("profile.matchHistory.loading")
               : t("profile.matchHistory.loadMore")}
-          </button>
+          </Button>
         )}
         <p className="text-ink-mute mt-4 text-center text-xs" data-testid="match-history-count">
           {t("profile.matchHistory.showing", { shown: items.length, total })}
