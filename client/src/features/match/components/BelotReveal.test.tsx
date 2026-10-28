@@ -155,7 +155,29 @@ describe("BelotReveal", () => {
         onComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("belot-reveal-title")).toHaveTextContent(/^Stefan$/);
+    const title = screen.getByTestId("belot-reveal-title");
+    expect(title).toHaveTextContent("Stefan");
+    expect(title).not.toHaveTextContent(/Belote|Us|Them/);
+  });
+
+  it("shows the +20 bonus between the announcer and the team tag", () => {
+    render(
+      <BelotReveal
+        playerSeat={0}
+        myPlayerSeat={0}
+        cardId="QC"
+        isRebelote={false}
+        onComplete={vi.fn()}
+      />,
+    );
+    const title = screen.getByTestId("belot-reveal-title");
+    const bonus = screen.getByTestId("belot-reveal-bonus");
+    expect(bonus).toHaveTextContent("+20");
+    expect(title.compareDocumentPosition(bonus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      bonus.compareDocumentPosition(screen.getAllByText("Us").at(-1) as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("falls back to the team label when players is not provided", () => {
