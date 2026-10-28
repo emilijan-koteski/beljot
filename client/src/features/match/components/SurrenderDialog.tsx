@@ -9,7 +9,8 @@ import { ClassicPanel } from "./overlay/ClassicPanel";
 import { ExplainerStrip } from "./overlay/ExplainerStrip";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
-const DANGER = "var(--danger-light)";
+const DANGER_INK = "var(--danger-light)";
+const DANGER_RING = "var(--suit-red)";
 
 interface SurrenderDialogTestIds {
   overlay: string;
@@ -58,10 +59,10 @@ export function SurrenderDialog({
         >
           <ClassicPanel
             size="dialog"
-            glowColor={DANGER}
+            glowColor={DANGER_RING}
             title={
               <span id={titleId} className="inline-flex items-center gap-2.5">
-                <Flag size={20} style={{ color: DANGER }} aria-hidden="true" />
+                <Flag size={20} style={{ color: DANGER_INK }} aria-hidden="true" />
                 {title}
               </span>
             }

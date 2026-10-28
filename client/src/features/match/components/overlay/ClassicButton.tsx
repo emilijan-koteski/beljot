@@ -25,11 +25,11 @@ const VARIANT_STYLE: Record<ClassicButtonVariant, CSSProperties> = {
     boxShadow: "var(--shadow-felt-sm)",
   },
   danger: {
-    border: "1px solid color-mix(in srgb, var(--danger-light) 70%, transparent)",
-    background: "linear-gradient(180deg, var(--danger-light) 0%, var(--danger) 100%)",
+    border: "1px solid var(--danger-deep)",
+    background: "linear-gradient(180deg, var(--suit-red) 0%, var(--danger-deep) 100%)",
     color: "var(--ink-light)",
     boxShadow:
-      "0 8px 24px -12px color-mix(in srgb, var(--danger-light) 70%, transparent), inset 0 1px 0 var(--sheen-25)",
+      "0 8px 24px -12px color-mix(in srgb, var(--suit-red) 70%, transparent), inset 0 1px 0 var(--sheen-15)",
   },
 };
 

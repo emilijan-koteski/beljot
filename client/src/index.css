@@ -245,6 +245,7 @@
   /* Scope-stable felt colours, for overlays that portal out of `.game-table`. */
   --ink-light: #f5f2e8;
   --danger-light: #ff8585;
+  --danger-deep: #8b2a1f;
   --accent-light: #00e5a0;
 
   /* ── Brass (chrome accent) ────────────────────────────────────────── */
