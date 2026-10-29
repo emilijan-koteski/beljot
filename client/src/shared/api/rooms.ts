@@ -17,6 +17,18 @@ export function getRooms(status: string = "waiting"): Promise<Room[]> {
   return axiosClient.get("/rooms", { params: { status } });
 }
 
+/** The room the signed-in user is in, as the server sees it. */
+export interface MyRoom {
+  roomId: number;
+  status: string;
+  isQuickPlay: boolean;
+}
+
+/** The caller's waiting or playing room, or null; the server first drops a membership left behind by a broken start. */
+export function getMyRoom(): Promise<MyRoom | null> {
+  return axiosClient.get("/rooms/mine");
+}
+
 export function getRoom(id: number): Promise<RoomDetail> {
   return axiosClient.get(`/rooms/${id}`);
 }

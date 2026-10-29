@@ -226,13 +226,14 @@ func (r *GormRepository) FindQuickPlayRoom(buyIn int) (*Room, error) {
 	return r.FindQuickPlayRoomExcluding(nil, buyIn)
 }
 
-// FindQuickPlayRoomExcluding locks the oldest open quick-play room in the caller's buy-in bracket.
+// FindQuickPlayRoomExcluding locks the oldest quick-play room in the caller's buy-in bracket with a seat free of humans and bots.
 // The croatia filter is defence in depth, since quick-play rooms are only ever created with that variant.
 func (r *GormRepository) FindQuickPlayRoomExcluding(excludedRoomIDs map[uint]bool, buyIn int) (*Room, error) {
 	var room Room
 	q := r.db.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("is_quick_play = ? AND status = ? AND player_count < 4 AND coin_buy_in = ? AND variant = ?",
-			true, "waiting", buyIn, "croatia")
+		Where("is_quick_play = ? AND status = ? AND coin_buy_in = ? AND variant = ?",
+			true, "waiting", buyIn, "croatia").
+		Where("player_count + (SELECT COUNT(*) FROM room_bots WHERE room_bots.room_id = rooms.id) < 4")
 	if len(excludedRoomIDs) > 0 {
 		ids := make([]uint, 0, len(excludedRoomIDs))
 		for id := range excludedRoomIDs {

@@ -138,7 +138,7 @@ export function MatchmakingDiagram({
             top: `calc(50% + ${YOU_OFFSET.y}%)`,
           }}
         >
-          <div className="relative">
+          <div className="relative flex rounded-full">
             <Avatar name={currentUsername} avatarUrl={currentAvatarUrl} size={youSize} />
             <span
               className="border-accent/70 pointer-events-none absolute -inset-0.5 rounded-full border-2 motion-safe:animate-pulse"

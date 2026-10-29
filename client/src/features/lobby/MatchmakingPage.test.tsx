@@ -80,6 +80,20 @@ const viewer = makeUser({
   createdAt: "",
 });
 
+function aliceSeated() {
+  return {
+    id: 1,
+    roomId: 1,
+    userId: 10,
+    username: "alice",
+    avatarUrl: null,
+    seat: 0,
+    team: "teamA",
+    isBot: false,
+    createdAt: "",
+  };
+}
+
 function renderPage() {
   render(
     <QueryWrapper>
@@ -254,6 +268,51 @@ describe("MatchmakingPage", () => {
     await waitFor(() => expect(mockLeaveRoom).toHaveBeenCalledWith(1));
     expect(toast.error).toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("stays on cancel when the leave request fails, so the player is never left seated unseen", async () => {
+    const user = userEvent.setup();
+    mockLeaveRoom.mockRejectedValue(new FetchError(0, "NETWORK_ERROR", "network down"));
+    mockGetRoom.mockResolvedValue(makeRoomDetail({ room: qpRoom, players: [aliceSeated()] }));
+
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("matchmaking-cancel")).toBeInTheDocument());
+
+    await user.click(screen.getByTestId("matchmaking-cancel"));
+
+    await waitFor(() => expect(mockLeaveRoom).toHaveBeenCalledWith(1));
+    expect(toast.error).toHaveBeenCalledWith("Couldn't cancel the search. Try again.");
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("returns to the lobby on cancel when the server says the player already left", async () => {
+    const user = userEvent.setup();
+    mockLeaveRoom.mockRejectedValue(new FetchError(404, "NOT_IN_ROOM", "not in room"));
+    mockGetRoom.mockResolvedValue(makeRoomDetail({ room: qpRoom, players: [aliceSeated()] }));
+
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("matchmaking-cancel")).toBeInTheDocument());
+
+    await user.click(screen.getByTestId("matchmaking-cancel"));
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("goes to the match when the room it waits in is already playing", async () => {
+    mockGetRoom.mockResolvedValue(
+      makeRoomDetail({ room: { ...qpRoom, status: "playing" }, players: [aliceSeated()] }),
+    );
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/match/1", {
+        replace: true,
+        state: { fromRoom: true },
+      }),
+    );
+    expect(mockLeaveRoom).not.toHaveBeenCalled();
   });
 
   it("does not bounce to lobby when the cached snapshot is stale (member added by refetch)", async () => {

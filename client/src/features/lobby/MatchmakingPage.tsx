@@ -112,6 +112,12 @@ export function MatchmakingPage() {
   const status = storeRoom?.status ?? roomQuery.data?.room.status ?? null;
   const isClosed = status === "completed" || status === "cancelled" || status === "finished";
   useEffect(() => {
+    if (status === "playing" && id && hasJoinedRef.current) {
+      hasLeftRef.current = true;
+      navigate(`/match/${id}`, { replace: true, state: { fromRoom: true } });
+    }
+  }, [status, id, navigate]);
+  useEffect(() => {
     if (isClosed && !matchStarted) {
       hasLeftRef.current = true;
       navigate("/lobby", { replace: true });
@@ -146,9 +152,15 @@ export function MatchmakingPage() {
     try {
       await leaveRoomMutation.mutateAsync(Number(id));
     } catch (err) {
-      if (err instanceof FetchError && err.code === "MATCH_ALREADY_STARTED") {
+      const code = err instanceof FetchError ? err.code : null;
+      if (code === "MATCH_ALREADY_STARTED") {
         hasLeftRef.current = false;
         toast.error(t("room.errors.alreadyStarted"));
+        return;
+      }
+      if (code !== "NOT_IN_ROOM" && code !== "ROOM_NOT_FOUND") {
+        hasLeftRef.current = false;
+        toast.error(t("lobby.matchmaking.errors.cancelFailed"));
         return;
       }
     }

@@ -140,7 +140,7 @@ func (m *mockRoomRepo) FindPlayersByRoomID(roomID uint) ([]room.RoomPlayer, erro
 func (m *mockRoomRepo) FindPlayerRoom(userID uint) (*room.RoomPlayer, error) {
 	for _, p := range m.players {
 		for _, r := range m.rooms {
-			if r.ID == p.RoomID && r.Status == "waiting" && p.UserID == userID {
+			if r.ID == p.RoomID && (r.Status == "waiting" || r.Status == "playing") && p.UserID == userID {
 				return p, nil
 			}
 		}
@@ -208,7 +208,8 @@ func (m *mockRoomRepo) FindQuickPlayRoomExcluding(excluded map[uint]bool, buyIn 
 		if excluded[r.ID] {
 			continue
 		}
-		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount < 4 &&
+		bots, _ := m.FindBotsByRoomID(r.ID)
+		if r.IsQuickPlay && r.Status == "waiting" && r.PlayerCount+len(bots) < 4 &&
 			r.CoinBuyIn == buyIn && r.Variant == "croatia" {
 			return r, nil
 		}
@@ -2347,6 +2348,11 @@ type fakeMatchStarter struct {
 	lastDeclarationsTransfer bool
 	lastClockwise            bool
 	err                      error
+	inMatch                  map[uint]bool
+}
+
+func (g *fakeMatchStarter) IsUserInMatch(userID uint) bool {
+	return g.inMatch[userID]
 }
 
 func (g *fakeMatchStarter) StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, _ uint, _ int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error {
@@ -2375,6 +2381,7 @@ func setupTestWithStarter(starter room.MatchStarter, broadcaster room.Broadcaste
 	api := e.Group("/api/v1", auth.AuthMiddleware("test-jwt-secret"))
 	api.POST("/rooms", handler.CreateRoom)
 	api.POST("/rooms/quick-play", handler.QuickPlay)
+	api.GET("/rooms/mine", handler.MyRoom)
 	api.POST("/rooms/:id/join", handler.JoinRoom)
 	api.POST("/rooms/:id/quick-join", handler.QuickJoin)
 	api.POST("/rooms/:id/leave", handler.LeaveRoom)

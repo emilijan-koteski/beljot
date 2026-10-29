@@ -663,7 +663,8 @@
       "you": "Ti",
       "searching": "tražim",
       "errors": {
-        "alreadyInRoom": "Već si u sobi"
+        "alreadyInRoom": "Već si u sobi",
+        "cancelFailed": "Otkazivanje traženja nije uspelo. Pokušaj ponovo."
       }
     },
     "createRoomModal": {
@@ -875,7 +876,10 @@
       "alreadyInRoom": "Već si u sobi",
       "joinFailed": "Pridruživanje nije uspelo. Probaj drugu sobu.",
       "matchmakingFailed": "Traženje meča nije uspelo. Pokušaj ponovo.",
-      "quickPlayBracketMismatch": "Ova soba je za drugačiji iznos novčića. Klikni Brza igra da nađeš odgovarajuću."
+      "quickPlayBracketMismatch": "Ova soba je za drugačiji iznos novčića. Klikni Brza igra da nađeš odgovarajuću.",
+      "backToMatch": "Nazad u meč",
+      "backToRoom": "Nazad u sobu",
+      "alreadyInRoomCleared": "Tvoja prethodna soba je zatvorena. Pokušaj ponovo."
     },
     "tabs": {
       "label": "Sobe",

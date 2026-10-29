@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { FetchError } from "@/shared/api/axiosClient";
 import { i18n } from "@/shared/i18n/i18n";
 import { makeRoom, makeRoomPlayer, makeUser, mockViewportWidth, QueryWrapper } from "@/test-utils";
 
@@ -14,6 +15,7 @@ const mockGetRooms = vi.fn();
 const mockQuickPlay = vi.fn();
 const mockQuickJoin = vi.fn();
 const mockJoinRoom = vi.fn();
+const mockGetMyRoom = vi.fn();
 const mockGetLobbyStats = vi.fn();
 
 const mockNavigate = vi.fn();
@@ -33,6 +35,7 @@ vi.mock("@/shared/api/rooms", () => ({
   joinRoom: (...args: unknown[]) => mockJoinRoom(...args),
   quickJoin: (...args: unknown[]) => mockQuickJoin(...args),
   quickPlay: (...args: unknown[]) => mockQuickPlay(...args),
+  getMyRoom: (...args: unknown[]) => mockGetMyRoom(...args),
   getRoomByCode: vi.fn(),
 }));
 
@@ -242,6 +245,44 @@ describe("LobbyPage", () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/match/77", { state: { fromRoom: true } });
     });
+  });
+
+  it("offers a way back to the match when Quick Play says the player is already in one", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    mockQuickPlay.mockRejectedValueOnce(
+      new FetchError(409, "ALREADY_IN_ROOM", "already in a room"),
+    );
+    mockGetMyRoom.mockResolvedValueOnce({ roomId: 77, status: "playing", isQuickPlay: true });
+    renderLobbyPage();
+
+    await user.click(screen.getByTestId("quick-play-card"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const [message, options] = vi.mocked(toast.error).mock.calls[0] as [
+      string,
+      { action: { label: string; onClick: () => void } },
+    ];
+    expect(message).toBe(i18n.t("lobby.matchmaking.errors.alreadyInRoom"));
+    expect(options.action.label).toBe("Back to your match");
+    options.action.onClick();
+    expect(mockNavigate).toHaveBeenCalledWith("/match/77", { state: { fromRoom: true } });
+  });
+
+  it("asks to try again when the room that blocked Quick Play is gone", async () => {
+    const user = userEvent.setup();
+    const { toast } = await import("sonner");
+    mockQuickPlay.mockRejectedValueOnce(
+      new FetchError(409, "ALREADY_IN_ROOM", "already in a room"),
+    );
+    mockGetMyRoom.mockResolvedValueOnce(null);
+    renderLobbyPage();
+
+    await user.click(screen.getByTestId("quick-play-card"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Your last room has closed. Try again."),
+    );
   });
 
   it("ports a quick-play room join to the matchmaking screen (quick-join)", async () => {

@@ -120,7 +120,7 @@ export function IdentityHero({
       data-testid="profile-identity-hero"
     >
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-4">
-        <div className="relative shrink-0">
+        <div className="relative flex shrink-0">
           <Avatar name={username} avatarUrl={avatarUrl} eager size={96} halo="profile" />
           {userId !== undefined && (
             <>

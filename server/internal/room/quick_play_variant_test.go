@@ -59,3 +59,47 @@ func TestFindQuickPlayRoomExcluding_SkipsNonCroatianRooms(t *testing.T) {
 	assert.Equal(t, croatian.ID, got.ID,
 		"with only these two rows in scope the query must pick the Croatian one, never the Bitola one")
 }
+
+// TestFindQuickPlayRoomExcluding_SkipsRoomsBotsFill runs the real bot-count clause against a database,
+// skipping when none is reachable.
+func TestFindQuickPlayRoomExcluding_SkipsRoomsBotsFill(t *testing.T) {
+	db := getRoomTestDB(t)
+	repo := room.NewGormRepository(db)
+
+	owner := &user.User{Email: "qpbots@room.test", Username: "qpbotowner", PasswordHash: "x"}
+	require.NoError(t, db.Create(owner).Error)
+
+	const buyIn = 750
+
+	full := &room.Room{
+		Name: "QP Bots Full", Code: "QPBTF1", OwnerID: owner.ID,
+		Variant: "croatia", MatchMode: "501", TimerStyle: "per-move",
+		Status: "waiting", PlayerCount: 1, IsQuickPlay: true, CoinBuyIn: buyIn,
+	}
+	require.NoError(t, repo.Create(full))
+	for _, seat := range []int{1, 2, 3} {
+		require.NoError(t, repo.AddBot(full.ID, seat))
+	}
+
+	open := &room.Room{
+		Name: "QP Bots Open", Code: "QPBTO1", OwnerID: owner.ID,
+		Variant: "croatia", MatchMode: "501", TimerStyle: "per-move",
+		Status: "waiting", PlayerCount: 1, IsQuickPlay: true, CoinBuyIn: buyIn,
+	}
+	require.NoError(t, repo.Create(open))
+	require.NoError(t, repo.AddBot(open.ID, 1))
+
+	var otherIDs []uint
+	require.NoError(t, db.Model(&room.Room{}).
+		Where("is_quick_play = ? AND id NOT IN ?", true, []uint{full.ID, open.ID}).
+		Pluck("id", &otherIDs).Error)
+	excluded := make(map[uint]bool, len(otherIDs))
+	for _, id := range otherIDs {
+		excluded[id] = true
+	}
+
+	got, err := repo.FindQuickPlayRoomExcluding(excluded, buyIn)
+	require.NoError(t, err)
+	require.NotNil(t, got, "the room with one bot still has a free seat")
+	assert.Equal(t, open.ID, got.ID, "a room whose other three seats hold bots has no seat left")
+}

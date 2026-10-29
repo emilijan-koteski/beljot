@@ -104,9 +104,10 @@ type CreateRoomRequest struct {
 	Clockwise            bool   `json:"clockwise"`
 }
 
-// MatchStarter is the interface the room handler uses to start a live match.
+// MatchStarter is the interface the room handler uses to start a live match and to ask whether a user is in one.
 type MatchStarter interface {
 	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error
+	IsUserInMatch(userID uint) bool
 }
 
 // WalletService is the subset of *wallet.Service the room handler needs. A nil
@@ -330,7 +331,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		return apperr.ErrUnauthorized
 	}
 
-	existingRoom, err := h.repo.FindPlayerRoom(userID)
+	existingRoom, err := h.activeMembership(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
 	}
@@ -729,7 +730,7 @@ func (h *RoomHandler) JoinRoom(c echo.Context) error {
 		return apperr.ErrRoomFull
 	}
 
-	existingRoom, err := h.repo.FindPlayerRoom(userID)
+	existingRoom, err := h.activeMembership(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
 	}
@@ -1490,7 +1491,7 @@ func (h *RoomHandler) LeaveRoom(c echo.Context) error {
 		if freshRoom == nil {
 			return apperr.ErrRoomNotFound
 		}
-		if freshRoom.Status == "playing" {
+		if freshRoom.Status == "playing" && !h.isStaleMembership(freshRoom, userID) {
 			return apperr.ErrMatchAlreadyStarted
 		}
 		if err := tx.RemovePlayer(uint(roomID), userID); err != nil {
@@ -1878,6 +1879,9 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 	if h.matchStarter == nil {
 		return nil
 	}
+	if !seatsFilledOnce(players, bots) {
+		return fmt.Errorf("room %d: seats are not filled exactly once each", autoStartRoom.ID)
+	}
 	var seatInfo [4]match.PlayerSeatInfo
 	for _, p := range players {
 		if p.Seat != nil {
@@ -2056,13 +2060,7 @@ func (h *RoomHandler) autoStartIfFull(roomID uint) (bool, error) {
 		if err != nil {
 			return fmt.Errorf("fetching bots for auto-start check: %w", err)
 		}
-		seatedCount := 0
-		for _, p := range freshPlayers {
-			if p.Seat != nil {
-				seatedCount++
-			}
-		}
-		if seatedCount+len(bots) < 4 {
+		if !seatsFilledOnce(freshPlayers, bots) {
 			return nil
 		}
 		r.Status = "playing"
@@ -2989,7 +2987,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 		return apperr.ErrUnauthorized
 	}
 
-	existingRoom, err := h.repo.FindPlayerRoom(userID)
+	existingRoom, err := h.activeMembership(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
 	}
@@ -3143,7 +3141,7 @@ func (h *RoomHandler) QuickJoin(c echo.Context) error {
 		return apperr.ErrRoomNotFound
 	}
 
-	existing, err := h.repo.FindPlayerRoom(userID)
+	existing, err := h.activeMembership(userID)
 	if err != nil {
 		return fmt.Errorf("checking existing room: %w", err)
 	}
@@ -3266,7 +3264,20 @@ func (h *RoomHandler) broadcastQuickPlayerSeated(r *Room, userID uint, seat int,
 // pickFirstEmptySeat returns the lowest seat index 0..3 currently unoccupied
 // in the room, or an error if every seat is taken.
 func pickFirstEmptySeat(tx RoomRepository, roomID uint) (int, error) {
+	bots, err := tx.FindBotsByRoomID(roomID)
+	if err != nil {
+		return 0, fmt.Errorf("checking bot seats: %w", err)
+	}
+	botSeat := [4]bool{}
+	for _, b := range bots {
+		if b.Seat >= 0 && b.Seat < 4 {
+			botSeat[b.Seat] = true
+		}
+	}
 	for seat := 0; seat < 4; seat++ {
+		if botSeat[seat] {
+			continue
+		}
 		existing, err := tx.FindPlayerBySeat(roomID, seat)
 		if err != nil {
 			return 0, fmt.Errorf("checking seat %d occupancy: %w", seat, err)
@@ -3276,6 +3287,87 @@ func pickFirstEmptySeat(tx RoomRepository, roomID uint) (int, error) {
 		}
 	}
 	return 0, apperr.ErrRoomFull
+}
+
+const staleMembershipGrace = 30 * time.Second
+
+// isStaleMembership reports whether a playing room has no live match for this user, so the membership only blocks them.
+func (h *RoomHandler) isStaleMembership(r *Room, userID uint) bool {
+	if h.matchStarter == nil || r.Status != "playing" {
+		return false
+	}
+	return !h.matchStarter.IsUserInMatch(userID) && time.Since(r.UpdatedAt) > staleMembershipGrace
+}
+
+// activeMembership returns the user's waiting or playing room membership, first dropping one left behind in a
+// playing room with no live match, so a broken start can never lock the user out of every room.
+func (h *RoomHandler) activeMembership(userID uint) (*RoomPlayer, error) {
+	rp, err := h.repo.FindPlayerRoom(userID)
+	if err != nil || rp == nil {
+		return rp, err
+	}
+	r, err := h.repo.FindByID(rp.RoomID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching room %d for membership check: %w", rp.RoomID, err)
+	}
+	if r == nil || !h.isStaleMembership(r, userID) {
+		return rp, nil
+	}
+	slog.Warn("dropping stale membership in a playing room with no live match", "roomID", r.ID, "userID", userID)
+	if err := h.repo.RunInTransaction(func(tx RoomRepository) error {
+		if err := tx.RemovePlayer(r.ID, userID); err != nil {
+			return err
+		}
+		return tx.DecrementPlayerCount(r.ID)
+	}); err != nil && !errors.Is(err, apperr.ErrNotInRoom) {
+		return nil, fmt.Errorf("dropping stale membership: %w", err)
+	}
+	return nil, nil
+}
+
+// MyRoom returns the room the caller is in (waiting or playing) as { roomId, status, isQuickPlay }, or null.
+func (h *RoomHandler) MyRoom(c echo.Context) error {
+	userID, err := auth.GetUserID(c)
+	if err != nil {
+		return apperr.ErrUnauthorized
+	}
+	rp, err := h.activeMembership(userID)
+	if err != nil {
+		return err
+	}
+	if rp == nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{"data": nil})
+	}
+	r, err := h.repo.FindByID(rp.RoomID)
+	if err != nil {
+		return fmt.Errorf("fetching room %d: %w", rp.RoomID, err)
+	}
+	if r == nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{"data": nil})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": map[string]interface{}{
+			"roomId":      r.ID,
+			"status":      r.Status,
+			"isQuickPlay": r.IsQuickPlay,
+		},
+	})
+}
+
+// seatsFilledOnce reports whether each of the four seats holds exactly one seated human or bot.
+func seatsFilledOnce(players []RoomPlayer, bots []RoomBot) bool {
+	var filled [4]int
+	for _, p := range players {
+		if p.Seat != nil && *p.Seat >= 0 && *p.Seat < 4 {
+			filled[*p.Seat]++
+		}
+	}
+	for _, b := range bots {
+		if b.Seat >= 0 && b.Seat < 4 {
+			filled[b.Seat]++
+		}
+	}
+	return filled == [4]int{1, 1, 1, 1}
 }
 
 // resolveReconnectWindow returns the reconnect window in seconds,

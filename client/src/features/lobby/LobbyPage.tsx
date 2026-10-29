@@ -34,6 +34,7 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { useAlreadyInRoomToast } from "@/shared/hooks/useAlreadyInRoomToast";
 import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
 import { joinFailureMessage } from "@/shared/lib/joinFailure";
@@ -88,6 +89,8 @@ export function LobbyPage() {
     [rooms, search, filter, sort, honorViewer],
   );
 
+  const showAlreadyInRoom = useAlreadyInRoomToast();
+
   function goToMatchmaking(result: { room: Room; matchStarted: boolean }) {
     if (result.matchStarted) {
       navigate(`/match/${result.room.id}`, { state: { fromRoom: true } });
@@ -102,11 +105,9 @@ export function LobbyPage() {
       goToMatchmaking(await quickPlayMutation.mutateAsync(undefined));
     } catch (err) {
       const code = err instanceof FetchError ? err.code : null;
-      toast.error(
-        code === "ALREADY_IN_ROOM"
-          ? t("lobby.matchmaking.errors.alreadyInRoom")
-          : t("lobby.errors.matchmakingFailed"),
-      );
+      if (code === "ALREADY_IN_ROOM")
+        void showAlreadyInRoom(t("lobby.matchmaking.errors.alreadyInRoom"));
+      else toast.error(t("lobby.errors.matchmakingFailed"));
     }
   }
 
@@ -122,7 +123,8 @@ export function LobbyPage() {
           toast.error(t("lobby.errors.quickPlayBracketMismatch"));
         else if (code === "INSUFFICIENT_COINS")
           toast.error(t("room.errors.insufficientCoinsGeneric"));
-        else if (code === "ALREADY_IN_ROOM") toast.error(t("lobby.errors.alreadyInRoom"));
+        else if (code === "ALREADY_IN_ROOM")
+          void showAlreadyInRoom(t("lobby.errors.alreadyInRoom"));
         else toast.error(t("lobby.errors.joinFailed"));
       }
       return;
@@ -154,7 +156,8 @@ export function LobbyPage() {
         return;
       }
       setPendingPrivateRoom(null);
-      toast.error(joinFailureMessage(code, room));
+      if (code === "ALREADY_IN_ROOM") void showAlreadyInRoom(joinFailureMessage(code, room));
+      else toast.error(joinFailureMessage(code, room));
     }
   }
 
