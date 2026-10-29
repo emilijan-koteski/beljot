@@ -244,7 +244,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     : "grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-4 gap-y-3.5";
 
   const fields = (
-    <div className={cn("flex flex-col", phone ? "gap-7" : "gap-5")}>
+    <div className={cn("flex flex-col", phone ? "gap-4" : "gap-3.5")}>
       <div className="flex flex-col gap-4">
         <CompactField
           label={t("lobby.createRoomModal.roomName")}
