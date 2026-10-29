@@ -28,6 +28,7 @@ export function RoomGrid({ rooms, onJoin, live = false, hasSearch, onClearSearch
     if (live) {
       return (
         <EmptyState
+          size="sm"
           testId="room-list-empty-live"
           icon={<Radio />}
           title={t("lobby.empty.liveTitle")}
@@ -38,6 +39,7 @@ export function RoomGrid({ rooms, onJoin, live = false, hasSearch, onClearSearch
     }
     return (
       <EmptyState
+        size="sm"
         testId={hasSearch ? "room-list-empty-search" : "room-list-empty"}
         icon={<DoorOpen />}
         title={t("lobby.empty.title")}
@@ -47,6 +49,7 @@ export function RoomGrid({ rooms, onJoin, live = false, hasSearch, onClearSearch
             <Button
               variant="link"
               size="inline"
+              className="text-xs"
               onClick={onClearSearch}
               data-testid="room-list-clear-search-empty"
             >

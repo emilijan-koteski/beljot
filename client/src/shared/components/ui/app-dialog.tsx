@@ -130,7 +130,7 @@ export function AppDialog({
     <>
       <div
         className={cn(
-          "px-6 pt-6",
+          "shrink-0 px-6 pt-6",
           celebration
             ? "flex flex-col items-center text-center"
             : cn("flex gap-4", description === undefined ? "items-center" : "items-start"),
@@ -153,21 +153,27 @@ export function AppDialog({
         </div>
       </div>
       {children !== undefined && (
-        <div className={cn("px-6 pt-5", celebration && "flex flex-col items-center")}>
+        <div
+          data-slot="app-dialog-body"
+          className={cn(
+            "-mb-1 min-h-0 overflow-y-auto px-6 pt-5 pb-1",
+            celebration && "flex flex-col items-center",
+          )}
+        >
           {children}
         </div>
       )}
       {error !== undefined && error !== null && error !== false && (
-        <FormError testId={errorTestId} className="px-6 pt-3">
+        <FormError testId={errorTestId} className="shrink-0 px-6 pt-3">
           {error}
         </FormError>
       )}
       {celebration ? (
-        <div className="p-6">{primaryButton}</div>
+        <div className="shrink-0 p-6">{primaryButton}</div>
       ) : (
         <div
           data-slot="app-dialog-footer"
-          className="border-border bg-surface-sunken/50 mt-6 flex flex-col gap-2 border-t px-6 py-4 sm:flex-row sm:justify-end"
+          className="border-border bg-surface-sunken/50 mt-6 flex shrink-0 flex-col gap-2 border-t px-6 py-4 sm:flex-row sm:justify-end"
         >
           {primaryButton}
           {secondary && (
@@ -195,11 +201,17 @@ export function AppDialog({
         data-testid={testId}
         data-tone={tone}
         className={cn(
-          "bg-surface ring-brass-soft block gap-0 overflow-hidden rounded-xl p-0 shadow-xl",
+          "bg-surface ring-brass-soft flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-xl",
           size === "lg" ? "sm:max-w-3xl" : "sm:max-w-[480px]",
         )}
       >
-        {onSubmit ? <form onSubmit={submit}>{content}</form> : content}
+        {onSubmit ? (
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            {content}
+          </form>
+        ) : (
+          content
+        )}
       </DialogContent>
     </Dialog>
   );

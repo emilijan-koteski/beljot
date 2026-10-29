@@ -8,13 +8,14 @@ interface EmptyStateProps {
   children?: ReactNode;
   action?: ReactNode;
   compact?: boolean;
+  size?: "md" | "sm";
   testId?: string;
   className?: string;
 }
 
 /**
- * The one "nothing here yet" state: a dashed card with an optional icon, title and action for page
- * sections, or a single muted line (`compact`) inside lists, menus and dialogs.
+ * The one "nothing here yet" state: a dashed card with an optional icon, title and action for page sections
+ * (`sm` on the compact mobile type scale), or a single muted line (`compact`) inside lists, menus and dialogs.
  */
 export function EmptyState({
   icon,
@@ -22,6 +23,7 @@ export function EmptyState({
   children,
   action,
   compact = false,
+  size = "md",
   testId,
   className,
 }: EmptyStateProps) {
@@ -33,21 +35,32 @@ export function EmptyState({
     );
   }
 
+  const sm = size === "sm";
   return (
     <div
       className={cn(
-        "bg-surface border-border flex flex-col items-center gap-3 rounded-lg border border-dashed px-5 py-10 text-center",
+        "bg-surface border-border flex flex-col items-center rounded-lg border border-dashed text-center",
+        sm ? "gap-2 px-4 py-8" : "gap-3 px-5 py-10",
         className,
       )}
       data-testid={testId}
     >
       {icon && (
-        <span className="bg-accent-soft text-accent flex size-14 items-center justify-center rounded-full [&_svg]:size-6">
+        <span
+          className={cn(
+            "bg-accent-soft text-accent flex items-center justify-center rounded-full",
+            sm ? "size-10 [&_svg]:size-5" : "size-14 [&_svg]:size-6",
+          )}
+        >
           {icon}
         </span>
       )}
-      {title && <p className="text-ink m-0 text-lg font-semibold">{title}</p>}
-      {children && <p className="text-ink-dim m-0 max-w-90 text-sm">{children}</p>}
+      {title && (
+        <p className={cn("text-ink m-0 font-semibold", sm ? "text-sm" : "text-lg")}>{title}</p>
+      )}
+      {children && (
+        <p className={cn("text-ink-dim m-0 max-w-90", sm ? "text-xs" : "text-sm")}>{children}</p>
+      )}
       {action}
     </div>
   );

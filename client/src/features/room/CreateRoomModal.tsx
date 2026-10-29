@@ -364,7 +364,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           noValidate
         >
           <div className="bg-surface flex min-h-0 flex-col">
-            <header className="flex shrink-0 items-center gap-4 px-8 pt-6 pb-1.5">
+            <header className="flex shrink-0 items-center gap-4 px-4 pt-6 pb-1.5 md:px-8">
               <AppDialogTile>
                 <Plus />
               </AppDialogTile>
@@ -373,7 +373,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               </DialogTitle>
             </header>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-8 py-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 md:px-8">
               <Field
                 label={t("lobby.createRoomModal.roomName")}
                 htmlFor="room-name"
@@ -720,12 +720,12 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
             </div>
 
             {formError && (
-              <FormError testId="create-room-form-error" className="shrink-0 px-8 pt-3">
+              <FormError testId="create-room-form-error" className="shrink-0 px-4 pt-3 md:px-8">
                 {formError}
               </FormError>
             )}
 
-            <footer className="border-border bg-surface-sunken/50 flex shrink-0 flex-col gap-2 border-t px-8 py-4 sm:flex-row sm:justify-end">
+            <footer className="border-border bg-surface-sunken/50 flex shrink-0 flex-col gap-2 border-t px-4 py-4 sm:flex-row sm:justify-end md:px-8">
               <Button
                 type="submit"
                 size="cta"
@@ -834,7 +834,7 @@ function AdvancedSettings({
       {open && (
         <div
           data-testid="advanced-settings-panel"
-          className="flex flex-col gap-3.5 px-3.5 pt-1 pb-3.5"
+          className="flex flex-col gap-3.5 px-3 pt-1 pb-3.5 sm:px-3.5"
         >
           {children}
         </div>

@@ -20,8 +20,8 @@ type SegmentedProps<T extends string> = {
 };
 
 /**
- * Segmented radio-group toggle used for the parchment option controls.
- * The active option is raised out of a sunken well; disabled options are dimmed and inert.
+ * Segmented radio-group toggle used for the parchment option controls, its options sharing the width equally.
+ * The active option is raised out of a sunken well; long labels wrap by word, and disabled options are dimmed and inert.
  */
 export function Segmented<T extends string>({
   value,
@@ -53,8 +53,10 @@ export function Segmented<T extends string>({
             data-state={active ? "on" : "off"}
             data-testid={`${testId ?? "segmented"}-${o.value}`}
             className={cn(
-              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm font-medium transition-[background-color,box-shadow,color] outline-none",
-              dense ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
+              "inline-flex min-w-0 flex-1 items-center justify-center rounded-sm font-medium transition-[background-color,box-shadow,color] outline-none [&>svg]:shrink-0",
+              dense
+                ? "gap-1.5 px-2.5 py-1.5 text-xs"
+                : "gap-1 px-2 py-2 text-sm sm:gap-1.5 sm:px-3.5",
               active
                 ? "bg-surface-elevated text-ink shadow-xs ring-1 ring-border"
                 : o.disabled
@@ -64,7 +66,9 @@ export function Segmented<T extends string>({
             )}
           >
             {o.icon}
-            {o.label}
+            <span className="min-w-0 text-center text-balance [overflow-wrap:anywhere]">
+              {o.label}
+            </span>
           </button>
         );
       })}

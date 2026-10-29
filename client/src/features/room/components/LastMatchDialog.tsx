@@ -55,7 +55,7 @@ export function LastMatchDialog({
           {t("room.lastMatch.unavailable")}
         </EmptyState>
       ) : (
-        <ul className="m-0 max-h-[70vh] list-none overflow-y-auto p-0">
+        <ul className="m-0 list-none p-0">
           <MatchStatsCard
             match={query.data}
             isOpen={expanded}
