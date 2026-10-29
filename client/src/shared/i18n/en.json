@@ -663,7 +663,8 @@
       "you": "You",
       "searching": "searching",
       "errors": {
-        "alreadyInRoom": "You are already in a room"
+        "alreadyInRoom": "You are already in a room",
+        "cancelFailed": "Couldn't cancel the search. Try again."
       }
     },
     "createRoomModal": {
@@ -875,7 +876,10 @@
       "alreadyInRoom": "You are already in a room",
       "joinFailed": "Couldn't join. Try another room.",
       "matchmakingFailed": "Couldn't start matchmaking. Try again.",
-      "quickPlayBracketMismatch": "This room is for a different coin bracket. Tap Quick Play to find yours."
+      "quickPlayBracketMismatch": "This room is for a different coin bracket. Tap Quick Play to find yours.",
+      "backToMatch": "Back to your match",
+      "backToRoom": "Back to your room",
+      "alreadyInRoomCleared": "Your last room has closed. Try again."
     },
     "tabs": {
       "label": "Rooms",

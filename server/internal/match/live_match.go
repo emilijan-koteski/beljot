@@ -232,6 +232,9 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 // StartMatch creates a new game session from room data and broadcasts the initial state.
 // coinBuyIn is the per-human stake for settlement, 0 for no-economy matches.
 func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error {
+	if err := validateSeats(players); err != nil {
+		return fmt.Errorf("room %d: %w", roomID, err)
+	}
 	m.mu.Lock()
 	if _, exists := m.sessions[roomID]; exists {
 		m.mu.Unlock()
@@ -1558,4 +1561,17 @@ func cardsToIDs(cards []game.Card) []string {
 		ids[i] = c.String()
 	}
 	return ids
+}
+
+// validateSeats rejects a line-up whose seats are not 0-3 in order, or that holds an empty seat with no user and no bot.
+func validateSeats(players [4]PlayerSeatInfo) error {
+	for i, p := range players {
+		if p.Seat != i {
+			return fmt.Errorf("seat %d carries seat number %d", i, p.Seat)
+		}
+		if !p.IsBot && p.UserID == 0 {
+			return fmt.Errorf("seat %d has neither a player nor a bot", i)
+		}
+	}
+	return nil
 }

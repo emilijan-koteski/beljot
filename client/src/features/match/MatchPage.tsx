@@ -659,7 +659,7 @@ export function MatchPage() {
           setSplashIssue("notMember");
           return;
         }
-        if (detail.room.status !== "waiting" && detail.room.status !== "in_progress") {
+        if (detail.room.status !== "waiting" && detail.room.status !== "playing") {
           setSplashIssue("noActiveSession");
         }
       })

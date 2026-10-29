@@ -3,6 +3,7 @@ export const queryKeys = {
     all: ["rooms"] as const,
     list: (status: string) => ["rooms", "list", status] as const,
     detail: (id: number) => ["rooms", "detail", id] as const,
+    mine: ["rooms", "mine"] as const,
     byCode: (code: string) => ["rooms", "byCode", code] as const,
     invitableFriends: (roomId: number) => ["rooms", "invitableFriends", roomId] as const,
     invitablePlayers: (roomId: number, search: string) =>
