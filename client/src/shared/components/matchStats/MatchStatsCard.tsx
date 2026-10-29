@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MatchHandView, MatchListItem, MatchOutcome } from "@/shared/api/matches";
+import { MatchRulesPopover } from "@/shared/components/roomRules/RoomRules";
 import { Badge } from "@/shared/components/ui/badge";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { botDisplayName } from "@/shared/lib/botName";
@@ -401,6 +402,7 @@ interface MatchStatsCardProps {
   handsLayout?: HandsLayout;
   linkPlayers?: boolean;
   footer?: ReactNode;
+  rulesZIndex?: number;
 }
 
 /**
@@ -415,6 +417,7 @@ export function MatchStatsCard({
   handsLayout = "auto",
   linkPlayers = true,
   footer,
+  rulesZIndex,
 }: MatchStatsCardProps) {
   const { t } = useTranslation();
 
@@ -476,46 +479,11 @@ export function MatchStatsCard({
           >
             {variantLabel(t, match.variant)}
           </span>
-          {match.declarationsEnabled === false && (
-            <span
-              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
-              data-testid="match-history-no-declarations"
-              role="img"
-              aria-label={t("lobby.card.noDeclarationsAriaLabel")}
-            >
-              {t("lobby.card.noDeclarations")}
-            </span>
-          )}
-          {match.stopAtTarget === true && (
-            <span
-              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
-              data-testid="match-history-stop-at-target"
-              role="img"
-              aria-label={t("lobby.card.stopAtTargetAriaLabel")}
-            >
-              {t("lobby.card.stopAtTarget")}
-            </span>
-          )}
-          {match.declarationsTransfer === false && (
-            <span
-              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
-              data-testid="match-history-no-declarations-transfer"
-              role="img"
-              aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
-            >
-              {t("lobby.card.noDeclarationsTransfer")}
-            </span>
-          )}
-          {match.clockwise === true && (
-            <span
-              className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
-              data-testid="match-history-clockwise"
-              role="img"
-              aria-label={t("lobby.card.clockwiseAriaLabel")}
-            >
-              {t("lobby.card.clockwise")}
-            </span>
-          )}
+          <MatchRulesPopover
+            rules={match}
+            zIndex={rulesZIndex}
+            className="mt-1 mr-0 -ml-1 self-start"
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5">

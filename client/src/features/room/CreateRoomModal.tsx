@@ -1,16 +1,4 @@
-import {
-  ChevronDown,
-  Clock,
-  Coins,
-  Lock,
-  LockOpen,
-  Plus,
-  RotateCcw,
-  RotateCw,
-  Settings,
-  Shuffle,
-  Zap,
-} from "lucide-react";
+import { ChevronDown, Coins, Plus, Settings, Shuffle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -19,6 +7,7 @@ import { CreateRoomPreview } from "@/features/room/components/CreateRoomPreview"
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
+import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
 import { AppDialogTile } from "@/shared/components/ui/app-dialog";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -253,43 +242,55 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     label: modeOptionLabel(t, value),
   }));
 
-  const declarationsOptions = (["on", "off"] as const).map((value) => ({
-    value,
-    label: t(
-      value === "on"
-        ? "lobby.createRoomModal.declarationsOn"
-        : "lobby.createRoomModal.declarationsOff",
-    ),
-  }));
+  const declarationsOptions = [
+    {
+      value: "on" as const,
+      label: t("lobby.createRoomModal.declarationsOn"),
+      icon: <RULE_ICONS.declarationsOn className="size-3.5" />,
+    },
+    {
+      value: "off" as const,
+      label: t("lobby.createRoomModal.declarationsOff"),
+      icon: <RULE_ICONS.declarationsOff className="size-3.5" />,
+    },
+  ];
 
-  const matchEndOptions = (["finish", "stop"] as const).map((value) => ({
-    value,
-    label: t(
-      value === "finish"
-        ? "lobby.createRoomModal.matchEndFinish"
-        : "lobby.createRoomModal.matchEndStop",
-    ),
-  }));
+  const matchEndOptions = [
+    {
+      value: "finish" as const,
+      label: t("lobby.createRoomModal.matchEndFinish"),
+      icon: <RULE_ICONS.finishHand className="size-3.5" />,
+    },
+    {
+      value: "stop" as const,
+      label: t("lobby.createRoomModal.matchEndStop"),
+      icon: <RULE_ICONS.stopAtTarget className="size-3.5" />,
+    },
+  ];
 
-  const declarationsTransferOptions = (["transfer", "void"] as const).map((value) => ({
-    value,
-    label: t(
-      value === "transfer"
-        ? "lobby.createRoomModal.declarationsTransferOn"
-        : "lobby.createRoomModal.declarationsTransferOff",
-    ),
-  }));
+  const declarationsTransferOptions = [
+    {
+      value: "transfer" as const,
+      label: t("lobby.createRoomModal.declarationsTransferOn"),
+      icon: <RULE_ICONS.fallTransfer className="size-3.5" />,
+    },
+    {
+      value: "void" as const,
+      label: t("lobby.createRoomModal.declarationsTransferOff"),
+      icon: <RULE_ICONS.fallVoided className="size-3.5" />,
+    },
+  ];
 
   const directionOptions = [
     {
       value: "counterClockwise" as const,
       label: t("lobby.createRoomModal.directionCounterClockwise"),
-      icon: <RotateCcw className="size-3.5" />,
+      icon: <RULE_ICONS.counterClockwise className="size-3.5" />,
     },
     {
       value: "clockwise" as const,
       label: t("lobby.createRoomModal.directionClockwise"),
-      icon: <RotateCw className="size-3.5" />,
+      icon: <RULE_ICONS.clockwise className="size-3.5" />,
     },
   ];
 
@@ -297,12 +298,12 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
     {
       value: "relaxed" as const,
       label: t("lobby.createRoomModal.timerRelaxed"),
-      icon: <Clock className="size-3.5" />,
+      icon: <RULE_ICONS.relaxedTimer className="size-3.5" />,
     },
     {
       value: "per-move" as const,
       label: t("lobby.createRoomModal.timerPerMove"),
-      icon: <Zap className="size-3.5" />,
+      icon: <RULE_ICONS.moveTimer className="size-3.5" />,
     },
   ];
 
@@ -617,12 +618,12 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                         {
                           value: "public",
                           label: t("lobby.createRoomModal.privacyPublic"),
-                          icon: <LockOpen className="size-3.5" />,
+                          icon: <RULE_ICONS.public className="size-3.5" />,
                         },
                         {
                           value: "private",
                           label: t("lobby.createRoomModal.privacyPrivate"),
-                          icon: <Lock className="size-3.5" />,
+                          icon: <RULE_ICONS.private className="size-3.5" />,
                         },
                       ]}
                       testId="private-room-toggle"
@@ -677,10 +678,15 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                     value={allowNewPlayers ? "allow" : "veterans"}
                     onValueChange={(v) => setAllowNewPlayers(v === "allow")}
                     options={[
-                      { value: "allow", label: t("lobby.createRoomModal.allowNewPlayersYes") },
+                      {
+                        value: "allow",
+                        label: t("lobby.createRoomModal.allowNewPlayersYes"),
+                        icon: <RULE_ICONS.newPlayers className="size-3.5" />,
+                      },
                       {
                         value: "veterans",
                         label: t("lobby.createRoomModal.allowNewPlayersNo"),
+                        icon: <RULE_ICONS.veteransOnly className="size-3.5" />,
                       },
                     ]}
                     testId="allow-new-players-toggle"

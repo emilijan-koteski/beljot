@@ -212,69 +212,47 @@ describe("MatchStatsCard", () => {
     });
   });
 
-  describe("rule chips", () => {
-    it("names the rules when they are not the defaults", () => {
+  describe("rules", () => {
+    it("names the four match rules on the rule icons, brass where they changed", () => {
       renderCard({
-        match: makeMatch({ declarationsEnabled: false, stopAtTarget: true }),
+        match: makeMatch({
+          declarationsEnabled: false,
+          stopAtTarget: true,
+          declarationsTransfer: true,
+          clockwise: true,
+        }),
       });
 
-      const decl = screen.getByTestId("match-history-no-declarations");
-      const stop = screen.getByTestId("match-history-stop-at-target");
-      expect(decl).toHaveAccessibleName(/without declarations and without Belote/i);
-      expect(stop).toHaveAccessibleName(/without finishing the hand/i);
+      expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
+        "Rules: Direction of play: Clockwise, Declarations: Off, Declarations on a fall: Not used, Match end: Stop at target",
+      );
     });
 
-    it("stays unchipped on a default match, and on one from a server without the columns", () => {
-      renderCard({ match: makeMatch({ declarationsEnabled: true, stopAtTarget: false }) });
-      expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
-
+    it("reads a match from an older server without the rule columns as standard", () => {
       const legacy = makeMatch();
       delete (legacy as { declarationsEnabled?: boolean }).declarationsEnabled;
       delete (legacy as { stopAtTarget?: boolean }).stopAtTarget;
-      renderCard({ match: legacy });
-      expect(screen.queryByTestId("match-history-no-declarations")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("match-history-stop-at-target")).not.toBeInTheDocument();
-    });
-
-    it("names a match whose declarations did not transfer", () => {
-      renderCard({ match: makeMatch({ declarationsTransfer: false }) });
-
-      const chip = screen.getByTestId("match-history-no-declarations-transfer");
-      expect(chip).toHaveTextContent("No declaration transfer");
-      expect(chip).toHaveAccessibleName(/voided instead of going to the other team/i);
-    });
-
-    it("leaves the transfer unchipped when it is on or absent from an older server", () => {
-      renderCard({ match: makeMatch({ declarationsTransfer: true }) });
-      expect(
-        screen.queryByTestId("match-history-no-declarations-transfer"),
-      ).not.toBeInTheDocument();
-
-      const legacy = makeMatch();
       delete (legacy as { declarationsTransfer?: boolean }).declarationsTransfer;
-      renderCard({ match: legacy });
-      expect(
-        screen.queryByTestId("match-history-no-declarations-transfer"),
-      ).not.toBeInTheDocument();
-    });
-
-    it("names a match that was played clockwise", () => {
-      renderCard({ match: makeMatch({ clockwise: true }) });
-
-      const chip = screen.getByTestId("match-history-clockwise");
-      expect(chip).toHaveTextContent("Clockwise");
-      expect(chip).toHaveAccessibleName(/play moves to the left/i);
-    });
-
-    it("leaves the direction unchipped when it is counter-clockwise or absent from an older server", () => {
-      renderCard({ match: makeMatch({ clockwise: false }) });
-      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
-
-      const legacy = makeMatch();
       delete (legacy as { clockwise?: boolean }).clockwise;
       renderCard({ match: legacy });
-      expect(screen.queryByTestId("match-history-clockwise")).not.toBeInTheDocument();
+
+      expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
+        "Rules: Direction of play: Counter-clockwise, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
+      );
+    });
+
+    it("opens the match rules in words without toggling the card", async () => {
+      const user = userEvent.setup();
+      const { onToggle } = renderCard({ match: makeMatch({ declarationsTransfer: false }) });
+
+      await user.click(screen.getByTestId("room-rules-trigger"));
+
+      const popup = await screen.findByTestId("room-rules-popup");
+      expect(within(popup).getByTestId("rule-fall")).toHaveTextContent("Voided");
+      expect(within(popup).getByTestId("rule-fall")).toHaveAttribute("data-changed", "true");
+      expect(within(popup).queryByTestId("rules-room")).not.toBeInTheDocument();
+      await user.click(within(popup).getByTestId("rule-fall"));
+      expect(onToggle).not.toHaveBeenCalled();
     });
   });
 });

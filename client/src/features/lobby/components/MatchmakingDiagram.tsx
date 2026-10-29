@@ -1,6 +1,7 @@
-import { Bot, Clock, Coins, Trophy, X } from "lucide-react";
+import { Bot, Coins, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -53,6 +54,7 @@ export function MatchmakingDiagram({
   const orbitSize = isCompact ? 40 : 52;
   const orbitBox = isCompact ? "min(240px, calc(100vw - 72px))" : "min(380px, calc(100vw - 72px))";
 
+  const TimerIcon = room.timerStyle === "relaxed" ? RULE_ICONS.relaxedTimer : RULE_ICONS.moveTimer;
   const orbitSeats = [0, 1, 2, 3].filter((s) => s !== viewerSeat);
   const remaining = Math.max(0, 4 - found);
 
@@ -83,7 +85,7 @@ export function MatchmakingDiagram({
           {variantLabel(t, room.variant)}
         </Badge>
         <Badge tone="neutral">{modeLabel(t, room.matchMode)}</Badge>
-        <Badge tone="accent" icon={<Clock className="size-3 text-(--accent)" />}>
+        <Badge tone="accent" icon={<TimerIcon className="size-3 text-(--accent)" />}>
           {room.timerStyle === "relaxed"
             ? t("lobby.card.relaxed")
             : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds })}

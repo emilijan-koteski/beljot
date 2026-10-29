@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { Chapter } from "@/features/rules/components/Chapter";
 import { ChapterIndex } from "@/features/rules/components/ChapterIndex";
 import { getRulesContent } from "@/features/rules/content/rulesContent";
 import { RulesProvider } from "@/features/rules/RulesContext";
+import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { variantLabel } from "@/shared/lib/roomLabels";
@@ -149,17 +150,26 @@ export function RulesDialog({
                         </TabsList>
                       </div>
                       {stopAtTarget === true && (
-                        <TableRuleNote testId="rules-dialog-stop-at-target-note">
+                        <TableRuleNote
+                          testId="rules-dialog-stop-at-target-note"
+                          icon={RULE_ICONS.stopAtTarget}
+                        >
                           {t("match.rules.stopAtTargetNote")}
                         </TableRuleNote>
                       )}
                       {declarationsTransfer === false && (
-                        <TableRuleNote testId="rules-dialog-no-declarations-transfer-note">
+                        <TableRuleNote
+                          testId="rules-dialog-no-declarations-transfer-note"
+                          icon={RULE_ICONS.fallVoided}
+                        >
                           {t("match.rules.noDeclarationsTransferNote")}
                         </TableRuleNote>
                       )}
                       {clockwise === true && (
-                        <TableRuleNote testId="rules-dialog-clockwise-note">
+                        <TableRuleNote
+                          testId="rules-dialog-clockwise-note"
+                          icon={RULE_ICONS.clockwise}
+                        >
                           {t("match.rules.clockwiseNote")}
                         </TableRuleNote>
                       )}
@@ -203,14 +213,21 @@ export function RulesDialog({
   return createPortal(dialog, document.body);
 }
 
-/** A callout naming a room rule this table plays differently from the chapters below. */
-function TableRuleNote({ testId, children }: { testId: string; children: React.ReactNode }) {
+interface TableRuleNoteProps {
+  testId: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}
+
+/** A callout naming a room rule this table plays differently from the chapters below, with that rule's icon. */
+function TableRuleNote({ testId, icon: Icon, children }: TableRuleNoteProps) {
   return (
     <div
-      className="bg-brass/10 border-brass-40 text-ink-light mt-3 rounded-lg border px-3 py-2.5 text-xs leading-normal"
+      className="bg-brass/10 border-brass-40 text-ink-light mt-3 flex gap-2.5 rounded-lg border px-3 py-2.5 text-xs leading-normal"
       data-testid={testId}
     >
-      {children}
+      <Icon className="text-brass mt-px size-4 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
     </div>
   );
 }

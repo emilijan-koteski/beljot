@@ -3,6 +3,8 @@ import {
   ArrowRightLeft,
   Bot,
   CircleSlash2,
+  Clock,
+  Coffee,
   Flag,
   Lock,
   LockOpen,
@@ -20,18 +22,32 @@ import {
 import { roomBotCount } from "@/shared/lib/roomOccupancy";
 import type { Room } from "@/shared/types/apiTypes";
 
-export type RoomRuleSource = Pick<
+export type MatchRuleSource = Pick<
   Room,
-  | "clockwise"
-  | "declarationsEnabled"
-  | "declarationsTransfer"
-  | "stopAtTarget"
-  | "isPrivate"
-  | "allowNewPlayers"
-  | "isQuickPlay"
-  | "coinBuyIn"
-  | "players"
+  "clockwise" | "declarationsEnabled" | "declarationsTransfer" | "stopAtTarget"
 >;
+
+export type RoomRuleSource = MatchRuleSource &
+  Pick<Room, "isPrivate" | "allowNewPlayers" | "isQuickPlay" | "coinBuyIn" | "players">;
+
+export const RULE_ICONS = {
+  counterClockwise: RotateCcw,
+  clockwise: RotateCw,
+  declarationsOn: Megaphone,
+  declarationsOff: MegaphoneOff,
+  fallTransfer: ArrowRightLeft,
+  fallVoided: CircleSlash2,
+  finishHand: Flag,
+  stopAtTarget: Target,
+  public: LockOpen,
+  private: Lock,
+  newPlayers: Sprout,
+  veteransOnly: Medal,
+  bots: Bot,
+  quickPlay: Zap,
+  moveTimer: Clock,
+  relaxedTimer: Coffee,
+} satisfies Record<string, LucideIcon>;
 
 export interface RuleLine {
   key: string;
@@ -45,7 +61,7 @@ export interface RuleLine {
 const FORM = "lobby.createRoomModal";
 
 /** The four match rules in a fixed order, worded as the create-room form words them. */
-export function matchRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
+export function matchRuleLines(t: TFunction, room: MatchRuleSource): RuleLine[] {
   const clockwise = room.clockwise === true;
   const declarationsOff = room.declarationsEnabled === false;
   const voided = room.declarationsTransfer === false && !declarationsOff;
@@ -55,14 +71,14 @@ export function matchRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       key: "direction",
       label: t(`${FORM}.direction`),
       value: t(clockwise ? `${FORM}.directionClockwise` : `${FORM}.directionCounterClockwise`),
-      icon: clockwise ? RotateCw : RotateCcw,
+      icon: clockwise ? RULE_ICONS.clockwise : RULE_ICONS.counterClockwise,
       changed: clockwise,
     },
     {
       key: "declarations",
       label: t(`${FORM}.declarations`),
       value: t(declarationsOff ? `${FORM}.declarationsOff` : `${FORM}.declarationsOn`),
-      icon: declarationsOff ? MegaphoneOff : Megaphone,
+      icon: declarationsOff ? RULE_ICONS.declarationsOff : RULE_ICONS.declarationsOn,
       changed: declarationsOff,
     },
     {
@@ -71,7 +87,7 @@ export function matchRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       value: declarationsOff
         ? t("roomRules.notUsed")
         : t(voided ? `${FORM}.declarationsTransferOff` : `${FORM}.declarationsTransferOn`),
-      icon: voided ? CircleSlash2 : ArrowRightLeft,
+      icon: voided ? RULE_ICONS.fallVoided : RULE_ICONS.fallTransfer,
       changed: voided,
       unused: declarationsOff,
     },
@@ -79,7 +95,7 @@ export function matchRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       key: "end",
       label: t(`${FORM}.matchEnd`),
       value: t(stop ? `${FORM}.matchEndStop` : `${FORM}.matchEndFinish`),
-      icon: stop ? Target : Flag,
+      icon: stop ? RULE_ICONS.stopAtTarget : RULE_ICONS.finishHand,
       changed: stop,
     },
   ];
@@ -93,14 +109,14 @@ export function roomRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       key: "access",
       label: t("roomRules.access"),
       value: t(room.isPrivate ? "roomRules.accessPrivate" : "roomRules.accessPublic"),
-      icon: room.isPrivate ? Lock : LockOpen,
+      icon: room.isPrivate ? RULE_ICONS.private : RULE_ICONS.public,
       changed: room.isPrivate,
     },
     {
       key: "newPlayers",
       label: t(`${FORM}.allowNewPlayers`),
       value: t(veteransOnly ? `${FORM}.allowNewPlayersNo` : `${FORM}.allowNewPlayersYes`),
-      icon: veteransOnly ? Medal : Sprout,
+      icon: veteransOnly ? RULE_ICONS.veteransOnly : RULE_ICONS.newPlayers,
       changed: veteransOnly,
     },
   ];
@@ -110,7 +126,7 @@ export function roomRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       key: "bots",
       label: t("roomRules.bots"),
       value: String(bots),
-      icon: Bot,
+      icon: RULE_ICONS.bots,
       changed: true,
     });
   }
@@ -119,7 +135,7 @@ export function roomRuleLines(t: TFunction, room: RoomRuleSource): RuleLine[] {
       key: "seating",
       label: t("roomRules.seating"),
       value: t("roomRules.seatingQuickPlay"),
-      icon: Zap,
+      icon: RULE_ICONS.quickPlay,
       changed: false,
     });
   }

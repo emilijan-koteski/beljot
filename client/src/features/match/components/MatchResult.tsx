@@ -226,6 +226,7 @@ export function MatchResult({
                         onToggle={() => setStatsOpen(false)}
                         handsLayout="stacked"
                         linkPlayers={false}
+                        rulesZIndex={Z.UTIL_POPOVER}
                         footer={<MatchPlayerActions match={stats} allowRemoveFriend={false} />}
                       />
                     </ul>

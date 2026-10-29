@@ -2157,21 +2157,7 @@ describe("RoomPage honour", () => {
     expect(screen.getByTestId("badge-veterans-only")).toBeInTheDocument();
   });
 
-  it("badges a room that plays without declarations", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1, declarationsEnabled: false },
-        players: [seat(10, "alice", 0)],
-      }),
-    );
-
-    renderRoomPage();
-
-    await waitFor(() => expect(screen.getByTestId("badge-no-declarations")).toBeInTheDocument());
-  });
-
-  it("says nothing about declarations on an ordinary room, absent field included", async () => {
+  it("names every standard match rule on the Rules badge, absent fields included", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
@@ -2182,98 +2168,50 @@ describe("RoomPage honour", () => {
 
     renderRoomPage();
 
-    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
-    expect(screen.queryByTestId("badge-no-declarations")).not.toBeInTheDocument();
+    const trigger = await screen.findByTestId("room-rules-trigger");
+    expect(trigger).toHaveTextContent("Rules");
+    expect(trigger).toHaveAccessibleName(
+      "Rules: Direction of play: Counter-clockwise, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
+    );
   });
 
-  it("badges a room that stops at the target", async () => {
+  it.each([
+    [{ declarationsEnabled: false }, "Declarations: Off"],
+    [{ stopAtTarget: true }, "Match end: Stop at target"],
+    [{ declarationsTransfer: false }, "Declarations on a fall: Voided"],
+    [{ clockwise: true }, "Direction of play: Clockwise"],
+  ])("names a changed rule on the Rules badge (%o)", async (rule, named) => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1, stopAtTarget: true },
+        room: { ...defaultRoom, playerCount: 1, ...rule },
         players: [seat(10, "alice", 0)],
       }),
     );
 
     renderRoomPage();
 
-    await waitFor(() => expect(screen.getByTestId("badge-stop-at-target")).toBeInTheDocument());
+    const trigger = await screen.findByTestId("room-rules-trigger");
+    expect(trigger).toHaveAccessibleName(new RegExp(named));
   });
 
-  it("says nothing about dosta on an ordinary room, absent field included", async () => {
+  it("opens the match and room rules from the Rules badge", async () => {
+    const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1 },
+        room: { ...defaultRoom, playerCount: 1, clockwise: true, allowNewPlayers: false },
         players: [seat(10, "alice", 0)],
       }),
     );
 
     renderRoomPage();
 
-    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
-    expect(screen.queryByTestId("badge-stop-at-target")).not.toBeInTheDocument();
-  });
+    await user.click(await screen.findByTestId("room-rules-trigger"));
 
-  it("badges a room whose declarations do not transfer", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1, declarationsTransfer: false },
-        players: [seat(10, "alice", 0)],
-      }),
-    );
-
-    renderRoomPage();
-
-    const badge = await screen.findByTestId("badge-no-declarations-transfer");
-    expect(badge).toHaveTextContent("No declaration transfer");
-  });
-
-  it("badges a room that plays clockwise", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1, clockwise: true },
-        players: [seat(10, "alice", 0)],
-      }),
-    );
-
-    renderRoomPage();
-
-    const badge = await screen.findByTestId("badge-clockwise");
-    expect(badge).toHaveTextContent("Clockwise");
-    expect(badge).toHaveAccessibleName(/play moves to the left/i);
-  });
-
-  it("says nothing about the direction on an ordinary room, absent field included", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1 },
-        players: [seat(10, "alice", 0)],
-      }),
-    );
-
-    renderRoomPage();
-
-    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
-    expect(screen.queryByTestId("badge-clockwise")).not.toBeInTheDocument();
-  });
-
-  it("says nothing about the transfer on an ordinary room, absent field included", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1 },
-        players: [seat(10, "alice", 0)],
-      }),
-    );
-
-    renderRoomPage();
-
-    await waitFor(() => expect(screen.getByTestId("badge-variant")).toBeInTheDocument());
-    expect(screen.queryByTestId("badge-no-declarations-transfer")).not.toBeInTheDocument();
+    const popup = await screen.findByTestId("room-rules-popup");
+    expect(within(popup).getByTestId("rule-direction")).toHaveAttribute("data-changed", "true");
+    expect(within(popup).getByTestId("rule-newPlayers")).toHaveTextContent("Veterans only");
   });
 
   it("renders no honour badges on an ungated room", async () => {

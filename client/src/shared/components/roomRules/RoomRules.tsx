@@ -1,5 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { Bot } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Eyebrow } from "@/shared/components/ui/eyebrow";
@@ -7,7 +8,13 @@ import { POPUP_SURFACE } from "@/shared/lib/popupSurface";
 import { roomBotCount } from "@/shared/lib/roomOccupancy";
 import { cn } from "@/shared/lib/utils";
 
-import { matchRuleLines, roomRuleLines, type RoomRuleSource, type RuleLine } from "./roomRuleLines";
+import {
+  matchRuleLines,
+  type MatchRuleSource,
+  roomRuleLines,
+  type RoomRuleSource,
+  type RuleLine,
+} from "./roomRuleLines";
 
 export const RULES_PANEL = "flex w-70 flex-col gap-2.5 p-3 text-xs";
 
@@ -93,25 +100,48 @@ export function RoomRulesContent({ room, live = false }: { room: RoomRuleSource;
   );
 }
 
-interface RoomRulesPopoverProps {
-  room: RoomRuleSource;
-  live?: boolean;
+/** The match rules alone in words, for a finished match that no longer has a room behind it. */
+export function MatchRulesContent({ rules }: { rules: MatchRuleSource }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="text-ink text-sm font-semibold">{t("roomRules.title")}</div>
+      <RuleSection
+        title={t("roomRules.matchSection")}
+        lines={matchRuleLines(t, rules)}
+        testId="rules-match"
+      />
+      <p className="text-ink-mute m-0 text-2xs">{t("roomRules.legend")}</p>
+    </>
+  );
+}
+
+function stopPropagation(event: MouseEvent) {
+  event.stopPropagation();
+}
+
+interface RulesPopoverProps {
+  rules: MatchRuleSource;
+  labelled?: boolean;
   className?: string;
+  zIndex?: number;
+  children: ReactNode;
 }
 
 /**
- * The four match rules as fixed icon slots (brass where changed), opening every rule in words on hover or tap.
- * The slots never change in number, so every room card keeps the same height.
+ * The four match rules as fixed icon slots (brass where changed), opening the rules in words on hover or tap.
+ * Clicks stay inside, so the trigger can sit in a clickable row.
  */
-export function RoomRulesPopover({ room, live = false, className }: RoomRulesPopoverProps) {
+function RulesPopover({ rules, labelled = false, className, zIndex, children }: RulesPopoverProps) {
   const { t } = useTranslation();
-  const lines = matchRuleLines(t, room);
+  const lines = matchRuleLines(t, rules);
   return (
     <Popover.Root>
       <Popover.Trigger
         openOnHover
         delay={0}
         closeDelay={0}
+        onClick={stopPropagation}
         aria-label={t("roomRules.triggerAria", {
           summary: lines.map((l) => `${l.label}: ${l.value}`).join(", "),
         })}
@@ -121,6 +151,7 @@ export function RoomRulesPopover({ room, live = false, className }: RoomRulesPop
           className,
         )}
       >
+        {labelled && <span className="mr-0.5">{t("roomRules.title")}</span>}
         {lines.map((line) => (
           <line.icon key={line.key} className={cn("size-3.5", iconTone(line))} aria-hidden="true" />
         ))}
@@ -132,12 +163,53 @@ export function RoomRulesPopover({ room, live = false, className }: RoomRulesPop
           sideOffset={6}
           collisionPadding={12}
           className="z-50"
+          style={zIndex === undefined ? undefined : { zIndex }}
         >
-          <Popover.Popup className={cn(POPUP_SURFACE, RULES_PANEL)} data-testid="room-rules-popup">
-            <RoomRulesContent room={room} live={live} />
+          <Popover.Popup
+            className={cn(POPUP_SURFACE, RULES_PANEL)}
+            data-testid="room-rules-popup"
+            onClick={stopPropagation}
+          >
+            {children}
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+interface RoomRulesPopoverProps {
+  room: RoomRuleSource;
+  live?: boolean;
+  labelled?: boolean;
+  className?: string;
+}
+
+/** A room's rule icons opening its match and room rules. The slots never change in number, so cards keep one height. */
+export function RoomRulesPopover({
+  room,
+  live = false,
+  labelled,
+  className,
+}: RoomRulesPopoverProps) {
+  return (
+    <RulesPopover rules={room} labelled={labelled} className={className}>
+      <RoomRulesContent room={room} live={live} />
+    </RulesPopover>
+  );
+}
+
+interface MatchRulesPopoverProps {
+  rules: MatchRuleSource;
+  className?: string;
+  zIndex?: number;
+}
+
+/** A finished match's rule icons opening its match rules in words; `zIndex` lifts the popup over an overlay. */
+export function MatchRulesPopover({ rules, className, zIndex }: MatchRulesPopoverProps) {
+  return (
+    <RulesPopover rules={rules} className={className} zIndex={zIndex}>
+      <MatchRulesContent rules={rules} />
+    </RulesPopover>
   );
 }
