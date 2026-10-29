@@ -34,6 +34,8 @@ const (
 	codeChars                     = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	codeLength                    = 6
 	maxRetries                    = 3
+	maxDefaultNameAttempts        = 5
+	defaultMoveSeconds            = 20
 	quickPlayStandardBuyIn        = 500
 	quickPlayTimerDurationSeconds = 30
 	roomPasswordMinLength         = 4
@@ -345,16 +347,25 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 	}
 
 	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		return apperr.ErrRoomNameRequired
-	}
 	if len(name) > 100 {
 		return apperr.ErrRoomNameTooLong
+	}
+	var hostName, hostLanguage string
+	defaultName := name == ""
+	if defaultName {
+		hostName, hostLanguage, err = h.repo.FindUserNameAndLanguage(userID)
+		if err != nil {
+			return err
+		}
+		if hostName == "" {
+			return apperr.ErrRoomNameRequired
+		}
+		name = defaultRoomName(hostName, hostLanguage, 1)
 	}
 
 	variant := req.Variant
 	if variant == "" {
-		variant = "bitola"
+		variant = "croatia"
 	}
 	if !validVariants[variant] {
 		return apperr.ErrInvalidVariant
@@ -370,7 +381,11 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 
 	timerStyle := req.TimerStyle
 	if timerStyle == "" {
-		timerStyle = "relaxed"
+		timerStyle = "per-move"
+		if req.TimerDurationSeconds == nil {
+			defaultDuration := defaultMoveSeconds
+			req.TimerDurationSeconds = &defaultDuration
+		}
 	}
 	if !validTimerStyles[timerStyle] {
 		return apperr.ErrInvalidTimerStyle
@@ -497,7 +512,8 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 	}
 
 	var createErr error
-	for i := 0; i < maxRetries; i++ {
+	nameAttempt := 1
+	for i := 0; i < maxRetries+maxDefaultNameAttempts; i++ {
 		createErr = h.repo.RunInTransaction(func(tx RoomRepository) error {
 			if err := tx.Create(room); err != nil {
 				return err
@@ -521,6 +537,11 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 				return fmt.Errorf("generating room code: %w", codeErr)
 			}
 			room.Code = newCode
+			continue
+		}
+		if defaultName && errors.Is(createErr, apperr.ErrRoomNameTaken) && nameAttempt < maxDefaultNameAttempts {
+			nameAttempt++
+			room.Name = defaultRoomName(hostName, hostLanguage, nameAttempt)
 			continue
 		}
 		return createErr

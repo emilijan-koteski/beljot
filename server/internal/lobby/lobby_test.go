@@ -77,6 +77,7 @@ func (r *fakeRoomRepo) FindQuickPlayRoomExcluding(map[uint]bool, int) (*room.Roo
 func (r *fakeRoomRepo) UpdateStatus(uint, string) error                        { panic("unused") }
 func (r *fakeRoomRepo) RunInTransaction(func(room.RoomRepository) error) error { panic("unused") }
 func (r *fakeRoomRepo) LoadOwnerUsernames([]*room.Room) error                  { return nil }
+func (r *fakeRoomRepo) FindUserNameAndLanguage(uint) (string, string, error)   { return "", "", nil }
 func (r *fakeRoomRepo) FindPlayersByRoomIDs([]uint) (map[uint][]room.RoomPlayer, error) {
 	return map[uint][]room.RoomPlayer{}, nil
 }

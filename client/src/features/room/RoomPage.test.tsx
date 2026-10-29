@@ -2171,7 +2171,7 @@ describe("RoomPage honour", () => {
     const trigger = await screen.findByTestId("room-rules-trigger");
     expect(trigger).toHaveTextContent("Rules");
     expect(trigger).toHaveAccessibleName(
-      "Rules: Direction of play: Counter-clockwise, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
+      "Rules: Direction: To the right, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
     );
   });
 
@@ -2179,7 +2179,7 @@ describe("RoomPage honour", () => {
     [{ declarationsEnabled: false }, "Declarations: Off"],
     [{ stopAtTarget: true }, "Match end: Stop at target"],
     [{ declarationsTransfer: false }, "Declarations on a fall: Voided"],
-    [{ clockwise: true }, "Direction of play: Clockwise"],
+    [{ clockwise: true }, "Direction: To the left"],
   ])("names a changed rule on the Rules badge (%o)", async (rule, named) => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(

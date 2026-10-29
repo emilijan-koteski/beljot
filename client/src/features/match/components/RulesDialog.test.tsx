@@ -249,7 +249,7 @@ describe("RulesDialog (in-game)", () => {
   it("notes that play moves to the left on a clockwise table", () => {
     render(<RulesDialog open onOpenChange={() => {}} clockwise />);
     expect(screen.getByTestId("rules-dialog-clockwise-note")).toHaveTextContent(
-      /play moves to the left \(clockwise\)/i,
+      /play moves to the left:/i,
     );
   });
 
