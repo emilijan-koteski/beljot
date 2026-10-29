@@ -17,11 +17,12 @@ type SegmentedProps<T extends string> = {
   className?: string;
   ariaLabel?: string;
   testId?: string;
+  trailing?: React.ReactNode;
 };
 
 /**
- * Segmented radio-group toggle used for the parchment option controls, its options sharing the width equally.
- * The active option is raised out of a sunken well; long labels wrap by word, and disabled options are dimmed and inert.
+ * Segmented radio-group toggle for the parchment option controls: equal-width options in a sunken well, the active one
+ * raised, long labels wrapped by word. `trailing` adds a last cell, such as a field for a value the options lack.
  */
 export function Segmented<T extends string>({
   value,
@@ -31,6 +32,7 @@ export function Segmented<T extends string>({
   className,
   ariaLabel,
   testId,
+  trailing,
 }: SegmentedProps<T>) {
   return (
     <div
@@ -72,6 +74,7 @@ export function Segmented<T extends string>({
           </button>
         );
       })}
+      {trailing}
     </div>
   );
 }

@@ -21,7 +21,7 @@ describe("matchRuleLines", () => {
     const lines = matchRuleLines(t, makeRoom());
     expect(lines.map((l) => l.key)).toEqual(["direction", "declarations", "fall", "end"]);
     expect(lines.map((l) => l.value)).toEqual([
-      "Counter-clockwise",
+      "To the right",
       "On",
       "To the winners",
       "Finish the hand",
@@ -34,7 +34,7 @@ describe("matchRuleLines", () => {
       t,
       makeRoom({ clockwise: true, declarationsTransfer: false, stopAtTarget: true }),
     );
-    expect(lines.map((l) => l.value)).toEqual(["Clockwise", "On", "Voided", "Stop at target"]);
+    expect(lines.map((l) => l.value)).toEqual(["To the left", "On", "Voided", "Stop at target"]);
     expect(lines.map((l) => l.changed)).toEqual([true, false, true, true]);
   });
 

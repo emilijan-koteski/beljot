@@ -3,6 +3,7 @@ package room_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +33,7 @@ type mockRoomRepo struct {
 	nextBID         uint
 	ownerUsernames  map[uint]string
 	ownerAvatarURLs map[uint]*string
+	userLanguages   map[uint]string
 	addPlayerHook   func(*room.RoomPlayer)
 }
 
@@ -241,6 +243,14 @@ func (m *mockRoomRepo) UpdateStatus(roomID uint, status string) error {
 		}
 	}
 	return nil
+}
+
+func (m *mockRoomRepo) FindUserNameAndLanguage(userID uint) (string, string, error) {
+	lang := m.userLanguages[userID]
+	if lang == "" {
+		lang = "en"
+	}
+	return fmt.Sprintf("player%d", userID), lang, nil
 }
 
 func (m *mockRoomRepo) LoadOwnerUsernames(rooms []*room.Room) error {
@@ -624,38 +634,55 @@ func TestCreateRoom_WithDefaults(t *testing.T) {
 	var data room.Room
 	require.NoError(t, json.Unmarshal(resp["data"], &data))
 
-	assert.Equal(t, "bitola", data.Variant)
+	assert.Equal(t, "croatia", data.Variant)
 	assert.Equal(t, "1001", data.MatchMode)
-	assert.Equal(t, "relaxed", data.TimerStyle)
-	assert.Nil(t, data.TimerDurationSeconds)
+	assert.Equal(t, "per-move", data.TimerStyle)
+	require.NotNil(t, data.TimerDurationSeconds)
+	assert.Equal(t, 20, *data.TimerDurationSeconds)
 }
 
-func TestCreateRoom_EmptyName(t *testing.T) {
-	e, _ := setupTest()
-	token := validToken(1)
+func TestCreateRoom_BlankNameUsesTheHostsDefaultName(t *testing.T) {
+	cases := []struct {
+		name     string
+		body     string
+		language string
+		want     string
+	}{
+		{"empty, English host", `{"name":""}`, "en", "Room - player1"},
+		{"whitespace, Croatian host", `{"name":"   "}`, "hr", "Soba - player1"},
+		{"empty, Macedonian host", `{"name":""}`, "mk", "Соба - player1"},
+		{"unknown language falls back to English", `{"name":""}`, "de", "Room - player1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e, repo := setupTest()
+			repo.userLanguages = map[uint]string{1: tc.language}
 
-	body := `{"name":""}`
-	rec := doCreateRoom(e, body, token)
+			rec := doCreateRoom(e, tc.body, validToken(1))
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-
-	var errResp map[string]map[string]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
-	assert.Equal(t, "ROOM_NAME_REQUIRED", errResp["error"]["code"])
+			require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+			var resp struct {
+				Data room.Room `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+			assert.Equal(t, tc.want, resp.Data.Name)
+		})
+	}
 }
 
-func TestCreateRoom_WhitespaceOnlyName(t *testing.T) {
-	e, _ := setupTest()
-	token := validToken(1)
+func TestCreateRoom_DefaultNameNumbersItselfWhenTaken(t *testing.T) {
+	e, repo := setupTest()
+	repo.userLanguages = map[uint]string{1: "hr"}
+	require.NoError(t, repo.Create(&room.Room{Name: "Soba - player1", Code: "TAKEN1", OwnerID: 99, Status: "waiting"}))
 
-	body := `{"name":"   "}`
-	rec := doCreateRoom(e, body, token)
+	rec := doCreateRoom(e, `{"name":""}`, validToken(1))
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-
-	var errResp map[string]map[string]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
-	assert.Equal(t, "ROOM_NAME_REQUIRED", errResp["error"]["code"])
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var resp struct {
+		Data room.Room `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, "Soba - player1 2", resp.Data.Name)
 }
 
 func TestCreateRoom_DuplicateName(t *testing.T) {

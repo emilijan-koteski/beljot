@@ -466,7 +466,7 @@
       "dialogTitle": "Room privacy",
       "dialogDescription": "Seated players stay either way.",
       "modeLabel": "Access",
-      "public": "Public",
+      "public": "Open",
       "private": "Private",
       "passwordLabel": "Password",
       "passwordHint": "At least {{min}} characters",
@@ -474,11 +474,11 @@
       "save": "Save",
       "saving": "Saving…",
       "toastPrivate": "Room is now private.",
-      "toastPublic": "Room is now public.",
+      "toastPublic": "Room is now open.",
       "privateBadge": "Private",
-      "publicBadge": "Public",
+      "publicBadge": "Open",
       "manageButtonPrivate": "Privacy: Private",
-      "manageButtonPublic": "Privacy: Public",
+      "manageButtonPublic": "Privacy: Open",
       "errors": {
         "passwordRequired": "Set a password for the private room",
         "passwordTooShort": "Password must be at least 4 characters",
@@ -669,14 +669,10 @@
     },
     "createRoomModal": {
       "roomName": "Room name",
-      "roomNamePlaceholder": "Sunday Service…",
       "variant": "Variant",
-      "matchMode": "Match mode",
+      "matchMode": "Play to",
       "matchMode1001": "1001 points",
-      "timerStyle": "Timer style",
-      "timerRelaxed": "Relaxed",
-      "timerPerMove": "Per move",
-      "timerDuration": "Move duration",
+      "timerDuration": "Move time (s)",
       "cancel": "Cancel",
       "errors": {
         "nameRequired": "Room name is required",
@@ -692,42 +688,10 @@
         "ownHonorTooLow": "Your honor is {{honor}}, so you can't sit in a room with a minimum of {{minHonor}}. Lower the minimum to continue.",
         "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
-      "headline": "Create a room",
-      "roomNameInfo": "{{min}}–{{max}} characters. Press ↻ for another random name, or type your own.",
-      "roomNameShuffleAria": "New random name",
-      "randomName": {
-        "adjectives": [
-          "Evening",
-          "Quiet",
-          "Golden",
-          "Sunday",
-          "Old",
-          "Quick",
-          "Nightly",
-          "Sunny",
-          "Little",
-          "Long",
-          "Warm",
-          "Merry"
-        ],
-        "nouns": [
-          "Party",
-          "Table",
-          "Crew",
-          "Night",
-          "Terrace",
-          "Tavern",
-          "Shift",
-          "Round",
-          "Squad",
-          "Hall",
-          "Circle",
-          "Session"
-        ]
-      },
+      "headline": "New room",
+      "roomNameInfo": "{{min}}–{{max}} characters. Left as it is, the room carries your name.",
       "matchMode501": "501 points",
       "matchMode701": "701 points",
-      "timerDurationSuffix": "seconds / move",
       "submit": "Create room",
       "submitting": "Creating…",
       "preview": {
@@ -736,17 +700,16 @@
       "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
       "matchModeHint": "501 is quick, 701 medium, 1001 the full race",
       "timerHintRelaxed": "No timer",
-      "timerDurationHint": "10–120s · default 30s",
       "coinBuyIn": "Buy-in",
       "coinBuyInHint": "Each player stakes this to play · default 500",
       "coinBuyInBalance": "balance {{balance}}",
-      "coinBuyInCustom": "Custom",
-      "privateRoom": "Private room",
+      "coinBuyInCustom": "Other",
+      "privateRoom": "Room type",
       "privateRoomHint": "Private rooms stay listed but need a password to join",
-      "privacyPublic": "Public",
+      "privacyPublic": "Open",
       "privacyPrivate": "Private",
       "roomPassword": "Password",
-      "minHonor": "Who can sit down",
+      "minHonor": "Minimum honor",
       "minHonorAnyone": "Anyone",
       "minHonorInfoBands": "Each threshold is an honor-tier boundary: {{bands}}.",
       "minHonorInfoYou": "Your honor is {{honor}} · {{tier}}.",
@@ -767,15 +730,11 @@
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
       "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus",
-      "direction": "Direction of play",
-      "directionCounterClockwise": "Counter-clockwise",
-      "directionClockwise": "Clockwise",
-      "directionHint": "Counter-clockwise passes the turn right, as usual; clockwise passes it left",
-      "advanced": {
-        "title": "Advanced settings",
-        "changedCount": "{{count}} changed",
-        "summary": "Declarations, declarations on a fall, match end, direction of play, privacy, who can sit down"
-      }
+      "direction": "Direction",
+      "directionCounterClockwise": "To the right",
+      "directionClockwise": "To the left",
+      "directionHint": "The turn passes to the right, as usual, or to the left: the deal, the bidding, the tricks and the next dealer all follow it",
+      "defaultName": "Room - {{username}}"
     },
     "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
     "actions": {
@@ -1164,7 +1123,7 @@
     "rules": {
       "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand.",
       "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team.",
-      "clockwiseNote": "On this table, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left."
+      "clockwiseNote": "On this table, play moves to the left: the deal, the bidding, the tricks and the next dealer all go left."
     }
   },
   "auth": {
@@ -1508,7 +1467,7 @@
     "legend": "Brass marks a rule changed from the standard.",
     "notUsed": "Not used",
     "access": "Access",
-    "accessPublic": "Public",
+    "accessPublic": "Open",
     "accessPrivate": "Private · password",
     "bots": "Bot seats",
     "seating": "Seating",

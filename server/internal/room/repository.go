@@ -21,6 +21,7 @@ type RoomRepository interface {
 	UpdateStatus(roomID uint, status string) error
 	FindUserIDsByRoomStatus(status string) ([]uint, error)
 	LoadOwnerUsernames(rooms []*Room) error
+	FindUserNameAndLanguage(userID uint) (username string, language string, err error)
 	FindPlayersByRoomIDs(roomIDs []uint) (map[uint][]RoomPlayer, error)
 	AddBot(roomID uint, seat int) error
 	RemoveBot(roomID uint, seat int) error

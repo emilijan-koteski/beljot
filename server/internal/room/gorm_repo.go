@@ -264,6 +264,22 @@ func (r *GormRepository) FindUserIDsByRoomStatus(status string) ([]uint, error) 
 	return ids, nil
 }
 
+// FindUserNameAndLanguage returns a user's username and language preference, or empty strings when the user is gone.
+func (r *GormRepository) FindUserNameAndLanguage(userID uint) (string, string, error) {
+	var row struct {
+		Username           string
+		LanguagePreference string
+	}
+	err := r.db.Table("users").
+		Select("username, language_preference").
+		Where("id = ? AND deleted_at IS NULL", userID).
+		Scan(&row).Error
+	if err != nil {
+		return "", "", fmt.Errorf("finding username and language for user %d: %w", userID, err)
+	}
+	return row.Username, row.LanguagePreference, nil
+}
+
 // LoadOwnerUsernames fills OwnerUsername and OwnerAvatarURL on each room with one users query.
 // Rooms that already have a username are skipped, since the two fields are always set together.
 func (r *GormRepository) LoadOwnerUsernames(rooms []*Room) error {

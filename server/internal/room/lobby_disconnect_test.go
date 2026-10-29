@@ -84,6 +84,9 @@ func (r *mockRepoForLobby) RunInTransaction(fn func(room.RoomRepository) error) 
 }
 
 func (r *mockRepoForLobby) LoadOwnerUsernames(_ []*room.Room) error { return nil }
+func (r *mockRepoForLobby) FindUserNameAndLanguage(_ uint) (string, string, error) {
+	return "", "", nil
+}
 func (r *mockRepoForLobby) FindPlayersByRoomIDs(_ []uint) (map[uint][]room.RoomPlayer, error) {
 	return map[uint][]room.RoomPlayer{}, nil
 }

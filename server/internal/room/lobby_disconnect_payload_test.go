@@ -32,9 +32,10 @@ type payloadRepo struct {
 	bots    []RoomBot
 }
 
-func (r payloadRepo) LoadOwnerUsernames(_ []*Room) error               { return nil }
-func (r payloadRepo) FindPlayersByRoomID(_ uint) ([]RoomPlayer, error) { return r.players, nil }
-func (r payloadRepo) FindBotsByRoomID(_ uint) ([]RoomBot, error)       { return r.bots, nil }
+func (r payloadRepo) LoadOwnerUsernames(_ []*Room) error                     { return nil }
+func (r payloadRepo) FindUserNameAndLanguage(_ uint) (string, string, error) { return "", "", nil }
+func (r payloadRepo) FindPlayersByRoomID(_ uint) ([]RoomPlayer, error)       { return r.players, nil }
+func (r payloadRepo) FindBotsByRoomID(_ uint) ([]RoomBot, error)             { return r.bots, nil }
 
 // TestBroadcastRoomUpdated_CarriesEveryRuleFlag checks that the disconnect room_updated
 // payload carries every per-room rule flag. It is internal because broadcastRoomUpdated

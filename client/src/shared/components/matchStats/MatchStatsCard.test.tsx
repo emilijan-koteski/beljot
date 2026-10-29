@@ -224,7 +224,7 @@ describe("MatchStatsCard", () => {
       });
 
       expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
-        "Rules: Direction of play: Clockwise, Declarations: Off, Declarations on a fall: Not used, Match end: Stop at target",
+        "Rules: Direction: To the left, Declarations: Off, Declarations on a fall: Not used, Match end: Stop at target",
       );
     });
 
@@ -237,7 +237,7 @@ describe("MatchStatsCard", () => {
       renderCard({ match: legacy });
 
       expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
-        "Rules: Direction of play: Counter-clockwise, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
+        "Rules: Direction: To the right, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
       );
     });
 
