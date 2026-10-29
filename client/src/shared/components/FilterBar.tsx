@@ -16,7 +16,8 @@ interface FilterBarProps {
   searchTestId?: string;
 }
 
-const SCROLLING_FILTERS = "min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]";
+const SCROLLING_FILTERS =
+  "min-w-0 flex-1 overflow-x-auto pr-4 [mask-image:linear-gradient(to_right,black_calc(100%-1rem),transparent)] [scrollbar-width:none]";
 
 /**
  * Search, a row of filter chips and a trailing control (usually a SortMenu), 32px tall.
