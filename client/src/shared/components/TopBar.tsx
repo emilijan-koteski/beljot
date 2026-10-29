@@ -179,8 +179,9 @@ export function TopBar({
         {showUserMenu && user && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 transition-colors md:flex"
+              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-2 pl-1 transition-colors md:flex lg:pr-3"
               data-testid="nav-user"
+              aria-label={t("nav.accountMenu", { username: user.username })}
             >
               <Avatar
                 name={user.username}
@@ -188,7 +189,7 @@ export function TopBar({
                 size={26}
                 testId="nav-user-avatar"
               />
-              <span className="text-ink max-w-24 truncate text-sm font-medium lg:max-w-40">
+              <span className="text-ink hidden max-w-40 truncate text-sm font-medium lg:inline">
                 {user.username}
               </span>
               <ChevronDown className="text-ink-dim size-3 shrink-0 opacity-70" />

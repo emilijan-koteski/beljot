@@ -1,19 +1,32 @@
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import { FriendList } from "@/features/friends/FriendList";
-import type { FilterCounts, LobbyFilter, LobbySort } from "@/features/lobby/components/FilterRail";
-import { FilterRail } from "@/features/lobby/components/FilterRail";
-import { HeroBlock } from "@/features/lobby/components/HeroBlock";
+import { FriendsDialog } from "@/features/friends/FriendsDialog";
+import { FriendsSidebar } from "@/features/friends/FriendsSidebar";
+import { JoinByCodeDialog } from "@/features/lobby/components/JoinByCodeDialog";
+import { LobbyActions } from "@/features/lobby/components/LobbyActions";
 import { LobbyChatDock } from "@/features/lobby/components/LobbyChatDock";
+import { LobbyFilters } from "@/features/lobby/components/LobbyFilters";
+import { LobbyCounts, PresenceLine } from "@/features/lobby/components/LobbyPresence";
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
 import { RoomEjectionModal } from "@/features/lobby/components/RoomEjectionModal";
 import { RoomGrid } from "@/features/lobby/components/RoomGrid";
+import {
+  filterAndSort,
+  filterCounts,
+  type LobbyFilter,
+  type LobbySort,
+  type LobbyTab,
+} from "@/features/lobby/lib/lobbyRooms";
 import { CreateRoomModal } from "@/features/room/CreateRoomModal";
 import { FetchError } from "@/shared/api/axiosClient";
+import { PageShell } from "@/shared/components/layout/PageShell";
 import { SupportNote } from "@/shared/components/support/SupportNote";
+import { Button } from "@/shared/components/ui/button";
+import { Segmented } from "@/shared/components/ui/segmented";
 import {
   useJoinRoomMutation,
   useQuickJoinMutation,
@@ -21,66 +34,34 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useLobbyStatsQuery } from "@/shared/hooks/queries/useLobbyStats";
 import { useRoomsQuery } from "@/shared/hooks/queries/useRooms";
+import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
 import { useMarkLobbyRoot } from "@/shared/hooks/useLobbyReturn";
-import { type HonorGateViewer, honorQualifies } from "@/shared/lib/honor";
 import { joinFailureMessage } from "@/shared/lib/joinFailure";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { Room } from "@/shared/types/apiTypes";
 
 const JOINING_TOAST_ID = "lobby-joining";
 
-function filterAndSort(
-  rooms: Room[],
-  search: string,
-  filter: LobbyFilter,
-  sort: LobbySort,
-  viewer: HonorGateViewer,
-): Room[] {
-  const q = search.trim().toLowerCase();
-  const filtered = rooms.filter((r) => {
-    if (q && !r.name.toLowerCase().includes(q) && !r.code.toLowerCase().includes(q)) return false;
-    if (filter === "open" && r.playerCount >= 4) return false;
-    if (filter === "relaxed" && r.timerStyle !== "relaxed") return false;
-    if (filter === "timed" && r.timerStyle === "relaxed") return false;
-    if (filter === "qualify" && !honorQualifies(r, viewer)) return false;
-    return true;
-  });
-  const sorted = [...filtered];
-  if (sort === "newest") {
-    sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else {
-    sorted.sort(
-      (a, b) =>
-        b.playerCount - a.playerCount ||
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  }
-  return sorted;
-}
-
-function deriveCounts(rooms: Room[], viewer: HonorGateViewer): FilterCounts {
-  return {
-    all: rooms.length,
-    qualify: rooms.filter((r) => honorQualifies(r, viewer)).length,
-    open: rooms.filter((r) => r.playerCount < 4).length,
-    relaxed: rooms.filter((r) => r.timerStyle === "relaxed").length,
-    timed: rooms.filter((r) => r.timerStyle !== "relaxed").length,
-  };
-}
-
+/**
+ * The lobby for every width: action tiles, open rooms and live matches, with filters, search and sort.
+ * Friends sit in a sidebar on a desktop and in a sheet elsewhere; a phone pins New room to the bottom.
+ */
 export function LobbyPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const band = useLayoutBand();
   useMarkLobbyRoot();
 
   const roomsQuery = useRoomsQuery("waiting", true);
+  const liveQuery = useRoomsQuery("playing", true);
   const statsQuery = useLobbyStatsQuery();
   const quickPlayMutation = useQuickPlayMutation();
   const quickJoinMutation = useQuickJoinMutation();
   const joinRoomMutation = useJoinRoomMutation();
 
-  const [search, setSearch] = useState("");
   const location = useLocation();
+  const [tab, setTab] = useState<LobbyTab>("open");
+  const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<LobbyFilter>(() =>
     (location.state as { lobbyFilter?: LobbyFilter } | null)?.lobbyFilter === "qualify"
       ? "qualify"
@@ -88,17 +69,20 @@ export function LobbyPage() {
   );
   const [sort, setSort] = useState<LobbySort>("filling");
   const [showCreate, setShowCreate] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   const [pendingPrivateRoom, setPendingPrivateRoom] = useState<Room | null>(null);
   const [passwordErrorKey, setPasswordErrorKey] = useState<string | null>(null);
 
   const rooms = useMemo(() => roomsQuery.data ?? [], [roomsQuery.data]);
+  const liveRooms = useMemo(() => liveQuery.data ?? [], [liveQuery.data]);
   const viewerHonorScore = useAuthStore((s) => s.user?.honorScore);
   const viewerIsNewPlayer = useAuthStore((s) => s.user?.isNewPlayer);
   const honorViewer = useMemo(
     () => ({ honorScore: viewerHonorScore, isNewPlayer: viewerIsNewPlayer }),
     [viewerHonorScore, viewerIsNewPlayer],
   );
-  const counts = useMemo(() => deriveCounts(rooms, honorViewer), [rooms, honorViewer]);
+  const counts = useMemo(() => filterCounts(rooms, honorViewer), [rooms, honorViewer]);
   const filtered = useMemo(
     () => filterAndSort(rooms, search, filter, sort, honorViewer),
     [rooms, search, filter, sort, honorViewer],
@@ -174,42 +158,80 @@ export function LobbyPage() {
     }
   }
 
+  const desktop = band === "desktop";
+  const newRoomBar =
+    band === "phone" ? (
+      <Button
+        size="cta"
+        className="w-full text-base"
+        onClick={() => setShowCreate(true)}
+        data-testid="create-room-card"
+      >
+        <Plus className="size-5" aria-hidden="true" />
+        {t("lobby.actions.createRoom.title")}
+      </Button>
+    ) : undefined;
+
   return (
-    <div className="mx-auto max-w-330 px-7 py-8 pb-32">
-      <HeroBlock
-        openCount={rooms.length}
-        stats={statsQuery.data}
+    <PageShell
+      sidebar={desktop ? <FriendsSidebar /> : undefined}
+      bottomBar={newRoomBar}
+      testId="lobby-page"
+    >
+      <LobbyActions
+        band={band}
         onQuickPlay={handleQuickPlay}
-        onCreateRoom={() => setShowCreate(true)}
         quickPlayDisabled={quickPlayMutation.isPending}
+        onOpenCode={() => setShowCode(true)}
+        onNewRoom={() => setShowCreate(true)}
       />
-
-      <FriendList />
-
-      <FilterRail
-        search={search}
-        setSearch={setSearch}
-        filter={filter}
-        setFilter={setFilter}
-        sort={sort}
-        setSort={setSort}
-        counts={counts}
-      />
-
-      <RoomGrid
-        rooms={filtered}
-        onJoin={handleJoinRoom}
-        hasSearch={search.trim().length > 0}
-        onClearSearch={() => setSearch("")}
-      />
-
-      <p className="text-ink-mute mt-8 text-center text-xs">
-        {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
-      </p>
-
-      <SupportNote variant="lobby" />
+      {!desktop && (
+        <PresenceLine stats={statsQuery.data} onOpenFriends={() => setShowFriends(true)} />
+      )}
+      <div className="flex items-center justify-between gap-4">
+        <Segmented<LobbyTab>
+          value={tab}
+          onValueChange={setTab}
+          ariaLabel={t("lobby.tabs.label")}
+          testId="lobby-tabs"
+          className={desktop ? "w-90" : "flex-1"}
+          options={[
+            { value: "open", label: t("lobby.tabs.open", { count: rooms.length }) },
+            { value: "playing", label: t("lobby.tabs.playing", { count: liveRooms.length }) },
+          ]}
+        />
+        {desktop && <LobbyCounts stats={statsQuery.data} />}
+      </div>
+      {tab === "open" ? (
+        <>
+          <LobbyFilters
+            search={search}
+            setSearch={setSearch}
+            filter={filter}
+            setFilter={setFilter}
+            sort={sort}
+            setSort={setSort}
+            counts={counts}
+            collapsed={!desktop}
+          />
+          <RoomGrid
+            rooms={filtered}
+            onJoin={handleJoinRoom}
+            hasSearch={search.trim().length > 0}
+            onClearSearch={() => setSearch("")}
+          />
+          <p className="text-ink-mute m-0 mt-2 text-center text-xs">
+            {t("lobby.footnote", { shown: filtered.length, total: rooms.length })}
+          </p>
+        </>
+      ) : (
+        <RoomGrid rooms={liveRooms} live />
+      )}
+      <SupportNote variant="lobby" className="mt-0" />
 
       <CreateRoomModal open={showCreate} onOpenChange={setShowCreate} />
+      <JoinByCodeDialog open={showCode} onClose={() => setShowCode(false)} />
+      {!desktop && <FriendsDialog open={showFriends} onClose={() => setShowFriends(false)} />}
       <PasswordPromptDialog
         open={pendingPrivateRoom !== null}
         roomName={pendingPrivateRoom?.name ?? ""}
@@ -227,7 +249,7 @@ export function LobbyPage() {
         }}
       />
       <RoomEjectionModal />
-      <LobbyChatDock />
-    </div>
+      <LobbyChatDock aboveBottomBar={band === "phone"} />
+    </PageShell>
   );
 }

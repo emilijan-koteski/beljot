@@ -1,12 +1,12 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/shared/i18n/i18n";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeRoom, makeRoomPlayer, makeUser, mockViewportWidth, QueryWrapper } from "@/test-utils";
 
 import { LobbyPage } from "./LobbyPage";
 
@@ -56,8 +56,12 @@ vi.mock("sonner", () => ({
   },
 }));
 
+let restoreViewport = () => {};
+
 afterEach(() => {
   vi.clearAllMocks();
+  restoreViewport();
+  restoreViewport = () => {};
 });
 
 function renderLobbyPage() {
@@ -79,12 +83,62 @@ function renderLobbyPage() {
 }
 
 describe("LobbyPage", () => {
-  it("renders hero action tiles", () => {
+  it("shows two action tiles on a phone and pins New room to the bottom bar", () => {
     renderLobbyPage();
 
-    expect(screen.getByTestId("quick-play-card")).toBeInTheDocument();
-    expect(screen.getByTestId("create-room-card")).toBeInTheDocument();
-    expect(screen.getByTestId("join-by-code")).toBeInTheDocument();
+    const tiles = screen.getByTestId("lobby-actions");
+    expect(within(tiles).getByTestId("quick-play-card")).toBeInTheDocument();
+    expect(within(tiles).getByTestId("join-by-code-card")).toBeInTheDocument();
+    expect(within(tiles).queryByTestId("create-room-card")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("page-bottom-bar")).getByTestId("create-room-card"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("open-friends")).toBeInTheDocument();
+    expect(screen.queryByTestId("friends-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("moves New room into a third tile on a tablet and keeps Friends in a sheet", () => {
+    restoreViewport = mockViewportWidth(820);
+    renderLobbyPage();
+
+    const tiles = screen.getByTestId("lobby-actions");
+    expect(within(tiles).getByTestId("create-room-card")).toBeInTheDocument();
+    expect(within(tiles).getByTestId("join-by-code-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("page-bottom-bar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("open-friends")).toBeInTheDocument();
+    expect(screen.queryByTestId("friends-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("types the room code in place and shows the Friends sidebar on a desktop", () => {
+    restoreViewport = mockViewportWidth(1280);
+    renderLobbyPage();
+
+    const tiles = screen.getByTestId("lobby-actions");
+    expect(within(tiles).getByTestId("join-by-code-input")).toBeInTheDocument();
+    expect(within(tiles).getByTestId("create-room-card")).toBeInTheDocument();
+    expect(screen.getByTestId("friends-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("lobby-counts")).toBeInTheDocument();
+    expect(screen.queryByTestId("open-friends")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("page-bottom-bar")).not.toBeInTheDocument();
+  });
+
+  it("opens the Friends sheet from the presence line", async () => {
+    const user = userEvent.setup();
+    renderLobbyPage();
+
+    await user.click(screen.getByTestId("open-friends"));
+
+    expect(await screen.findByTestId("friends-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("friends-panel")).toBeInTheDocument();
+  });
+
+  it("opens the Join by code sheet from its tile on a phone", async () => {
+    const user = userEvent.setup();
+    renderLobbyPage();
+
+    await user.click(screen.getByTestId("join-by-code-card"));
+
+    expect(await screen.findByTestId("join-by-code-dialog")).toBeInTheDocument();
   });
 
   it("renders the chat dock FAB", () => {
@@ -92,23 +146,39 @@ describe("LobbyPage", () => {
     expect(screen.getByTestId("lobby-chat-fab")).toBeInTheDocument();
   });
 
-  it("renders the filter rail with search + chips + sort", () => {
+  it("folds room search behind a button on a phone", async () => {
+    const user = userEvent.setup();
+    renderLobbyPage();
+
+    expect(screen.queryByTestId("room-list-search")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("room-list-search-open"));
+    expect(screen.getByTestId("room-list-search")).toBeInTheDocument();
+  });
+
+  it("renders the filter row with search, chips and sort on a desktop", () => {
+    restoreViewport = mockViewportWidth(1280);
     renderLobbyPage();
     expect(screen.getByTestId("room-list-search")).toBeInTheDocument();
     expect(screen.getByTestId("filter-chip-all")).toBeInTheDocument();
     expect(screen.getByTestId("filter-chip-open")).toBeInTheDocument();
     expect(screen.getByTestId("filter-chip-relaxed")).toBeInTheDocument();
     expect(screen.getByTestId("filter-chip-timed")).toBeInTheDocument();
-    expect(screen.getByTestId("sort-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("sort-toggle")).toHaveTextContent("Filling up first");
   });
 
-  it("renders the lobby stats panel with all four pills", () => {
+  it("shows the live head-counts beside the presence line", async () => {
+    mockGetLobbyStats.mockResolvedValueOnce({
+      inLobby: 3,
+      inRoom: 4,
+      inMatch: 46,
+      online: 128,
+      registered: 900,
+    });
     renderLobbyPage();
-    expect(screen.getByTestId("lobby-stats-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("stats-in-lobby")).toBeInTheDocument();
-    expect(screen.getByTestId("stats-in-room")).toBeInTheDocument();
-    expect(screen.getByTestId("stats-in-game")).toBeInTheDocument();
-    expect(screen.getByTestId("stats-active-ratio")).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("lobby-counts")).toHaveTextContent("128 online · 46 playing"),
+    );
   });
 
   it("mounts no seasonal surface — no rank banner, no leaderboard aside", () => {
@@ -363,13 +433,12 @@ describe("LobbyPage", () => {
     ],
   };
 
-  it("labels a gated room's card with both honor chips", async () => {
+  it("shows a gated room's honor floor on its card", async () => {
     mockGetRooms.mockResolvedValueOnce([gatedRoom]);
     renderLobbyPage();
 
     await waitFor(() => expect(screen.getByTestId("room-card")).toBeInTheDocument());
-    expect(screen.getByTestId("room-card-min-honor")).toHaveAttribute("data-min-honor", "85");
-    expect(screen.getByTestId("room-card-veterans-only")).toBeInTheDocument();
+    expect(screen.getByTestId("room-card-honor")).toHaveTextContent("85+");
     expect(screen.getByTestId("room-card-join")).toBeInTheDocument();
   });
 
@@ -385,7 +454,7 @@ describe("LobbyPage", () => {
 
     await waitFor(() => expect(screen.getByTestId("room-card-join")).toBeInTheDocument());
     const join = screen.getByTestId("room-card-join");
-    expect(join).toHaveAttribute("data-locked", "true");
+    expect(screen.getByTestId("room-card")).toHaveAttribute("data-state", "disabled");
     expect(join).toBeDisabled();
     expect(join).toHaveAttribute("title", expect.stringContaining("85"));
     expect(join).toHaveAttribute("title", expect.stringContaining("42"));
@@ -547,6 +616,109 @@ describe("LobbyPage", () => {
     await waitFor(() => expect(screen.getByTestId("password-prompt-error")).toBeInTheDocument());
     expect(screen.getByTestId("password-prompt-dialog")).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalledWith("/rooms/9");
+  });
+
+  it("counts bots as seated, so a room filled with bots is full and can't be joined", async () => {
+    const humans = [0, 2].map((seat) =>
+      makeRoomPlayer({ id: seat + 1, userId: seat + 1, username: `p${seat}`, seat }),
+    );
+    const bots = [1, 3].map((seat) =>
+      makeRoomPlayer({ id: 0, userId: 0, username: "", seat, isBot: true }),
+    );
+    mockGetRooms.mockResolvedValueOnce([
+      makeRoom({
+        id: 9,
+        name: "Bot Table",
+        code: "BOT123",
+        playerCount: 2,
+        players: [...humans, ...bots],
+      }),
+    ]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getByTestId("room-card")).toBeInTheDocument());
+    expect(screen.getByTestId("room-card")).toHaveAttribute("data-state", "disabled");
+    expect(screen.getByTestId("room-card-join")).toBeDisabled();
+    expect(screen.getByTestId("filter-chip-open")).toHaveTextContent("0");
+  });
+
+  it("lists rooms nearest to starting first and full rooms last", async () => {
+    const seatedPlayers = (count: number, roomId: number) =>
+      Array.from({ length: count }, (_, seat) =>
+        makeRoomPlayer({
+          id: roomId * 10 + seat,
+          roomId,
+          userId: roomId * 10 + seat,
+          username: `u${roomId}${seat}`,
+          seat,
+        }),
+      );
+    mockGetRooms.mockResolvedValueOnce([
+      makeRoom({
+        id: 1,
+        name: "Full",
+        code: "FUL123",
+        playerCount: 4,
+        players: seatedPlayers(4, 1),
+      }),
+      makeRoom({
+        id: 2,
+        name: "One",
+        code: "ONE123",
+        playerCount: 1,
+        players: seatedPlayers(1, 2),
+      }),
+      makeRoom({
+        id: 3,
+        name: "Three",
+        code: "THR123",
+        playerCount: 3,
+        players: seatedPlayers(3, 3),
+      }),
+    ]);
+    renderLobbyPage();
+
+    await waitFor(() => expect(screen.getAllByTestId("room-card")).toHaveLength(3));
+    const names = screen
+      .getAllByTestId("room-card")
+      .map((card) => within(card).getByRole("heading").textContent);
+    expect(names).toEqual(["Three", "One", "Full"]);
+  });
+
+  it("lists live matches read-only on the Playing tab", async () => {
+    const user = userEvent.setup();
+    mockGetRooms.mockImplementation((status: string) =>
+      Promise.resolve(
+        status === "playing"
+          ? [
+              makeRoom({
+                id: 40,
+                name: "Live Table",
+                code: "LIV123",
+                status: "playing",
+                playerCount: 4,
+              }),
+            ]
+          : [],
+      ),
+    );
+    render(
+      <QueryWrapper>
+        <BrowserRouter>
+          <LobbyPage />
+        </BrowserRouter>
+      </QueryWrapper>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("lobby-tabs-playing")).toHaveTextContent("Playing (1)"),
+    );
+    await user.click(screen.getByTestId("lobby-tabs-playing"));
+
+    expect(await screen.findByText("Live Table")).toBeInTheDocument();
+    expect(screen.getByTestId("room-card")).toHaveAttribute("data-state", "live");
+    expect(screen.queryByTestId("room-card-join")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("filter-chip-all")).not.toBeInTheDocument();
   });
 });
 

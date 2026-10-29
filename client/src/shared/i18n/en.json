@@ -24,7 +24,8 @@
     "appName": "Beljot",
     "logout": "Log out",
     "signedInAs": "Signed in as",
-    "menu": "Menu"
+    "menu": "Menu",
+    "accountMenu": "Account menu for {{username}}"
   },
   "profile": {
     "title": "Profile",
@@ -331,10 +332,12 @@
     "list": {
       "heading": "Friends",
       "loading": "Loading friends…",
-      "empty": "No friends yet. Find players and send a friend request."
+      "empty": "No friends yet. Find players and send a friend request.",
+      "groupLabel": "Friends · {{count}} online"
     },
     "requests": {
-      "heading": "Friend requests"
+      "groupLabel": "Requests · {{count}}",
+      "subtitle": "Wants to be friends"
     },
     "removeDialog": {
       "title": "Remove {{username}}",
@@ -348,6 +351,11 @@
       "acceptFailed": "Couldn't accept the request. It may no longer be available.",
       "declineFailed": "Couldn't decline the request. It may no longer be available.",
       "removeFailed": "Couldn't remove this friend. You may no longer be friends."
+    },
+    "onlineCount": "{{count}} online",
+    "dialog": {
+      "description": "{{online}} of {{total}} online",
+      "done": "Done"
     }
   },
   "language": {
@@ -630,13 +638,9 @@
     }
   },
   "lobby": {
-    "title": "Open rooms",
     "quickPlay": "Quick Play",
     "stats": {
-      "inLobby": "in lobby",
-      "inRoom": "in a room",
-      "inMatch": "playing",
-      "online": "online"
+      "line": "{{online}} online · {{playing}} playing"
     },
     "roomEjection": {
       "insolventTitle": "Not enough coins",
@@ -726,10 +730,7 @@
       "submit": "Create room",
       "submitting": "Creating…",
       "preview": {
-        "title": "Lobby preview",
-        "joinLabel": "Join",
-        "codeLabel": "CODE",
-        "seated": "{{current}}/4"
+        "title": "Lobby preview"
       },
       "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
       "matchModeHint": "501 is quick, 701 medium, 1001 the full race",
@@ -779,16 +780,22 @@
     "actions": {
       "quickPlay": {
         "title": "Quick Play",
-        "subtitle": "Drop into the next opening",
-        "cta": "Play"
+        "subtitle": "Seated in seconds"
       },
       "createRoom": {
-        "title": "Create room",
+        "title": "New room",
         "subtitle": "Set your own rules"
       },
       "joinByCode": {
-        "placeholder": "Have a code?",
-        "cta": "Join"
+        "placeholder": "Type the room code",
+        "cta": "Join",
+        "title": "Have a code?",
+        "subtitle": "Join a private room",
+        "inputLabel": "Room code",
+        "codePlaceholder": "ABC123",
+        "dialogTitle": "Join by code",
+        "dialogDescription": "Ask the host for the room's 6-character code.",
+        "cancel": "Cancel"
       }
     },
     "filters": {
@@ -796,19 +803,22 @@
       "qualify": "I qualify",
       "open": "Has seats",
       "relaxed": "Relaxed",
-      "timed": "Timed"
+      "timed": "Timed",
+      "label": "Filter rooms"
     },
     "sort": {
-      "label": "Sort",
       "newest": "Newest first",
-      "filling": "Filling up first"
+      "filling": "Filling up first",
+      "ariaLabel": "Sort: {{order}}"
     },
     "search": {
-      "placeholder": "Search by room name or code…"
+      "placeholder": "Room name or code",
+      "open": "Search rooms",
+      "close": "Close search"
     },
     "playerSearch": {
       "label": "Find players",
-      "placeholder": "Search players by username…",
+      "placeholder": "Find a player",
       "loading": "Searching…",
       "empty": "No players found matching \"{{query}}\"",
       "close": "Close search",
@@ -817,17 +827,14 @@
     "empty": {
       "title": "No open rooms match your filters",
       "description": "Clear the filters, try Quick Play, or create a room.",
-      "clear": "Clear search"
+      "clear": "Clear search",
+      "liveTitle": "No matches in play right now",
+      "liveDescription": "Matches show up here as soon as they start."
     },
     "card": {
-      "join": "Join",
-      "joinQueue": "Join queue",
       "quickPlay": "Quick Play",
-      "full": "Full",
       "relaxed": "Relaxed",
       "timerSeconds": "{{seconds}}s timer",
-      "occupancy": "{{seated}}/4",
-      "empty": "empty",
       "joining": "Joining \"{{name}}\"…",
       "variantBitola": "Bitola",
       "variantCroatia": "Croatian",
@@ -837,14 +844,8 @@
       "matchModeGeneric": "{{points}} pts",
       "buyInFree": "No stake",
       "private": "Private",
-      "privateLockAriaLabel": "Private room, password required to join",
-      "public": "Public",
-      "publicAriaLabel": "Public room, anyone can join",
       "minHonor": "{{minHonor}}",
-      "minHonorAriaLabel": "Minimum honor {{minHonor}}",
       "veteransOnly": "Veterans only",
-      "veteransOnlyAriaLabel": "This room does not admit new players",
-      "locked": "Locked",
       "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}.",
       "noDeclarations": "No declarations",
       "noDeclarationsAriaLabel": "This room plays without declarations and without Belote",
@@ -853,7 +854,22 @@
       "noDeclarationsTransfer": "No declaration transfer",
       "noDeclarationsTransferAriaLabel": "In this room, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team",
       "clockwise": "Clockwise",
-      "clockwiseAriaLabel": "In this room, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left"
+      "clockwiseAriaLabel": "In this room, play moves to the left (clockwise): the deal, the bidding, the tricks and the next dealer all go left",
+      "rows": {
+        "variant": "Variant",
+        "target": "Target",
+        "timer": "Timer",
+        "buyIn": "Buy-in",
+        "honor": "Honor",
+        "rules": "Rules"
+      },
+      "timerShort": "{{seconds}}s",
+      "free": "Free",
+      "honorAny": "Any",
+      "live": "Live",
+      "joinAria": "Join {{name}}",
+      "fullTitle": "This room is full",
+      "openSeat": "Open seat"
     },
     "chat": {
       "title": "Lobby chat",
@@ -869,6 +885,11 @@
       "joinFailed": "Couldn't join. Try another room.",
       "matchmakingFailed": "Couldn't start matchmaking. Try again.",
       "quickPlayBracketMismatch": "This room is for a different coin bracket. Tap Quick Play to find yours."
+    },
+    "tabs": {
+      "label": "Rooms",
+      "open": "Open rooms ({{count}})",
+      "playing": "Playing ({{count}})"
     }
   },
   "match": {
@@ -1483,5 +1504,23 @@
       "qrToggle": "Scan with your phone",
       "qrAlt": "QR code linking to Emilijan's Buy Me a Coffee page"
     }
+  },
+  "roomRules": {
+    "title": "Rules",
+    "triggerAria": "Rules: {{summary}}",
+    "matchSection": "Match rules",
+    "roomSection": "Room rules",
+    "legend": "Brass marks a rule changed from the standard.",
+    "notUsed": "Not used",
+    "access": "Access",
+    "accessPublic": "Public",
+    "accessPrivate": "Private · password",
+    "bots": "Bot seats",
+    "seating": "Seating",
+    "seatingQuickPlay": "Quick Play fills it",
+    "botsWaiting": "Bots hold these seats until the host removes them.",
+    "botsLive": "Bots play these seats.",
+    "botsStake": "They pay no buy-in, so the winners split the players' stakes.",
+    "previewCaption": "Players see this when they hover the rule icons:"
   }
 }

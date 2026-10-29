@@ -151,3 +151,30 @@ export function expectActionBeforeStatusQuo(actionTestId: string, statusQuoTestI
     `expected ${actionTestId} to be followed by a sibling ${statusQuoTestId}`,
   ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 }
+
+/**
+ * Makes `window.matchMedia` answer min- and max-width queries as a window `width` pixels wide,
+ * so a test renders a page's phone, tablet or desktop layout. Returns a function that restores it.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function mockViewportWidth(width: number): () => void {
+  const original = window.matchMedia;
+  window.matchMedia = (query: string) => {
+    const min = /min-width:\s*(\d+)px/.exec(query);
+    const max = /max-width:\s*(\d+)px/.exec(query);
+    const matches = (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]));
+    return {
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    } as MediaQueryList;
+  };
+  return () => {
+    window.matchMedia = original;
+  };
+}

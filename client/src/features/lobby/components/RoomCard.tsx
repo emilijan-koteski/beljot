@@ -1,337 +1,196 @@
 import type { TFunction } from "i18next";
-import {
-  ArrowRight,
-  Ban,
-  Bot,
-  Clock,
-  Coins,
-  Flag,
-  KeyRound,
-  Lock,
-  LockOpen,
-  RotateCw,
-  Unlink,
-  UserCheck,
-  Users,
-  Zap,
-} from "lucide-react";
+import { Bot, Coins, Lock, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { SeatChip } from "@/features/lobby/components/SeatChip";
 import { HonorShield } from "@/shared/components/HonorShield";
-import { RelativeTime } from "@/shared/components/RelativeTime";
+import { RoomRulesPopover } from "@/shared/components/roomRules/RoomRules";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
+import { DetailRow, DetailRows } from "@/shared/components/ui/detail-rows";
 import { botDisplayName } from "@/shared/lib/botName";
 import { COIN_GOLD } from "@/shared/lib/coinGold";
 import { formatCoins } from "@/shared/lib/formatCoins";
 import {
   honorFloorLabel,
+  type HonorGateViewer,
+  honorIsNewPlayer,
   honorQualifies,
   honorScoreOrPrior,
   honorTierForScore,
 } from "@/shared/lib/honor";
-import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
+import { variantLabel } from "@/shared/lib/roomLabels";
+import { isRoomFull } from "@/shared/lib/roomOccupancy";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
-import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
+import type { Room } from "@/shared/types/apiTypes";
+
+const CARD =
+  "bg-surface border-border relative flex min-w-0 flex-col gap-2.5 rounded-xl border p-3 text-left shadow-xs";
+const CARD_JOINABLE =
+  "transition-[border-color,box-shadow,translate] hover:-translate-y-0.5 hover:border-brass hover:shadow-md";
+const CARD_DISABLED = "opacity-60";
+const JOIN_OVERLAY =
+  "absolute inset-0 cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/70 disabled:cursor-default";
+const SEAT_AVATAR = 30;
+const TEAM_ORDER = [0, 2, 1, 3] as const;
 
 type Props = {
   room: Room;
-  onJoin: (room: Room) => void;
-  index?: number;
+  onJoin?: (room: Room) => void;
+  live?: boolean;
+  preview?: boolean;
 };
 
-function seatOf(
-  t: TFunction,
-  players: RoomPlayer[] | undefined,
-  seat: number,
-): { username: string | null; bot: boolean; avatarUrl?: string | null } {
-  const found = players?.find((p) => p.seat === seat);
-  if (!found) return { username: null, bot: false };
-  if (found.isBot === true) return { username: botDisplayName(t, seat), bot: true };
-  return { username: found.username || null, bot: false, avatarUrl: found.avatarUrl };
+function blockedReason(t: TFunction, room: Room, viewer: HonorGateViewer, full: boolean): string {
+  if (full) return t("lobby.card.fullTitle");
+  if (honorIsNewPlayer(viewer.isNewPlayer)) return t("room.errors.newPlayerNotAllowed");
+  return t("lobby.card.minHonorLockedTitle", {
+    minHonor: room.minHonor,
+    honor: honorScoreOrPrior(viewer.honorScore),
+  });
 }
 
 /**
- * Single lobby room tile. Title row + meta row (variant · mode · timer ·
- * relative age) + 2×2 seat preview + footer (host · occupancy · Join).
+ * The lobby's room card, one height for every room: the name, six label-value rows and the four seats.
+ * A room the viewer can't join (full, or above their honor) dims and ignores taps; `live` cards are read-only
+ * and `preview` renders the create-room dialog's copy of the card.
  */
-export function RoomCard({ room, onJoin, index = 0 }: Props) {
+export function RoomCard({ room, onJoin, live = false, preview = false }: Props) {
   const { t } = useTranslation();
-  const seated = room.playerCount;
-  const full = seated >= 4;
-  const hasBots = room.players?.some((p) => p.isBot === true) ?? false;
-  const delay = `${Math.min(index * 28, 320)}ms`;
-
-  const viewer = useAuthStore((s) => s.user);
-  const viewerHonor = honorScoreOrPrior(viewer?.honorScore);
-  const qualifies = honorQualifies(room, viewer ?? {});
-  const locked = !qualifies;
-  const requirementTier = honorTierForScore(room.minHonor);
+  const viewer = useAuthStore((s) => s.user) ?? {};
+  const listed = !live && !preview;
+  const full = isRoomFull(room);
+  const locked = listed && !honorQualifies(room, viewer);
+  const disabled = listed && (full || locked);
 
   return (
     <article
       data-testid="room-card"
-      style={{ animationDelay: delay }}
-      className={cn(
-        "bg-surface text-ink relative flex flex-col overflow-hidden rounded-lg border border-border transition-[transform,border-color,box-shadow]",
-        "animate-[card-in_.35s_ease_both] hover:-translate-y-0.5 hover:border-brass hover:shadow-lg",
-      )}
+      data-room-id={room.id}
+      data-state={live ? "live" : disabled ? "disabled" : "open"}
+      className={cn(CARD, listed && !disabled && CARD_JOINABLE, disabled && CARD_DISABLED)}
     >
-      <div className="px-5 pt-4.5 pb-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className={cn(
-              "size-2 rounded-full",
-              full ? "bg-warning" : "bg-accent",
-              "animate-[pulse-dot_1.8s_ease-in-out_infinite]",
-            )}
-          />
-          <h3 className="text-ink m-0 flex-1 min-w-0 truncate text-base font-semibold">
-            {room.name}
-          </h3>
-          {room.isQuickPlay && (
-            <Badge
-              tone="accent"
-              size="sm"
-              icon={<Zap strokeWidth={2.4} />}
-              data-testid="quick-play-badge"
-            >
-              {t("lobby.card.quickPlay")}
-            </Badge>
-          )}
-          {hasBots && (
-            <Badge
-              tone="bot"
-              size="sm"
-              icon={<Bot strokeWidth={2.4} />}
-              data-testid="room-card-bots"
-            >
-              {t("bots.tag")}
-            </Badge>
-          )}
-          <CodeChip code={room.code} />
-        </div>
-
-        <div className="text-ink-dim mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-          <span>
-            {variantLabel(t, room.variant)} · {modeLabel(t, room.matchMode)}
-          </span>
-          {room.declarationsEnabled === false && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-no-declarations"
-                role="img"
-                aria-label={t("lobby.card.noDeclarationsAriaLabel")}
-              >
-                <Ban className="size-3" />
-                {t("lobby.card.noDeclarations")}
-              </span>
-            </>
-          )}
-          {room.stopAtTarget === true && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-stop-at-target"
-                role="img"
-                aria-label={t("lobby.card.stopAtTargetAriaLabel")}
-              >
-                <Flag className="size-3" />
-                {t("lobby.card.stopAtTarget")}
-              </span>
-            </>
-          )}
-          {room.declarationsTransfer === false && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-no-declarations-transfer"
-                role="img"
-                aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
-              >
-                <Unlink className="size-3" />
-                {t("lobby.card.noDeclarationsTransfer")}
-              </span>
-            </>
-          )}
-          {room.clockwise === true && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-clockwise"
-                role="img"
-                aria-label={t("lobby.card.clockwiseAriaLabel")}
-              >
-                <RotateCw className="size-3" />
-                {t("lobby.card.clockwise")}
-              </span>
-            </>
-          )}
-          <Dot />
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-3" />
-            {room.timerStyle === "relaxed"
-              ? t("lobby.card.relaxed")
-              : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds })}
-          </span>
-          <Dot />
-          <span className="inline-flex items-center gap-1" data-testid="room-card-buy-in">
-            <Coins className="size-3" style={{ color: COIN_GOLD }} />
-            {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
-          </span>
-          <Dot />
-          {room.isPrivate ? (
-            <span
-              className="inline-flex items-center gap-1"
-              data-testid="room-card-lock"
-              aria-label={t("lobby.card.privateLockAriaLabel")}
-            >
-              <Lock className="size-3" />
-              {t("lobby.card.private")}
-            </span>
-          ) : (
-            <span
-              className="inline-flex items-center gap-1"
-              data-testid="room-card-public"
-              aria-label={t("lobby.card.publicAriaLabel")}
-            >
-              <LockOpen className="size-3" />
-              {t("lobby.card.public")}
-            </span>
-          )}
-          {room.minHonor > 0 && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-min-honor"
-                data-min-honor={room.minHonor}
-                aria-label={t("lobby.card.minHonorAriaLabel", { minHonor: room.minHonor })}
-                title={
-                  qualifies
-                    ? undefined
-                    : t("lobby.card.minHonorLockedTitle", {
-                        minHonor: room.minHonor,
-                        honor: viewerHonor,
-                      })
-                }
-              >
-                <HonorShield tier={requirementTier} size={12} />
-                {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
-              </span>
-            </>
-          )}
-          {room.allowNewPlayers === false && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="room-card-veterans-only"
-                aria-label={t("lobby.card.veteransOnlyAriaLabel")}
-              >
-                <UserCheck className="size-3" />
-                {t("lobby.card.veteransOnly")}
-              </span>
-            </>
-          )}
-          <Dot />
-          <RelativeTime iso={room.createdAt} variant="compact" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5 px-5 pb-3.5">
-        <TeamLabel team="A" />
-        <SeatChip {...seatOf(t, room.players, 0)} team="A" testId={`room-${room.id}-seat-0`} />
-        <SeatChip {...seatOf(t, room.players, 2)} team="A" testId={`room-${room.id}-seat-2`} />
-        <TeamLabel team="B" />
-        <SeatChip {...seatOf(t, room.players, 1)} team="B" testId={`room-${room.id}-seat-1`} />
-        <SeatChip {...seatOf(t, room.players, 3)} team="B" testId={`room-${room.id}-seat-3`} />
-      </div>
-
-      <div className="mt-auto flex items-center gap-2.5 border-t border-border bg-ink/3 px-5 py-3">
-        <span className="text-ink-dim flex items-center gap-1.5 text-xs">
-          <Avatar
-            name={room.ownerUsername ?? ""}
-            avatarUrl={room.ownerAvatarUrl}
-            size={18}
-            testId="room-card-owner-avatar"
-          />
-          {room.ownerUsername || "—"}
-        </span>
-        <span className="text-ink-mute inline-flex items-center gap-1 text-xs">
-          <Users className="size-3" />
-          {t("lobby.card.occupancy", { seated })}
-        </span>
+      {listed && (
         <button
-          onClick={() => !full && !locked && onJoin(room)}
-          disabled={full || locked}
+          type="button"
+          onClick={() => onJoin?.(room)}
+          disabled={disabled}
+          title={disabled ? blockedReason(t, room, viewer, full) : undefined}
+          aria-label={t("lobby.card.joinAria", { name: room.name })}
           data-testid="room-card-join"
-          data-locked={locked ? "true" : undefined}
-          title={
-            locked
-              ? t("lobby.card.minHonorLockedTitle", {
-                  minHonor: room.minHonor,
-                  honor: viewerHonor,
-                })
-              : undefined
-          }
-          className={cn(
-            "ml-auto inline-flex items-center gap-1.5 rounded-md border border-transparent px-3.5 py-2 text-xs font-semibold transition-transform active:scale-[0.97]",
-            full || locked
-              ? "bg-surface-sunken text-ink-dim cursor-default"
-              : "bg-accent text-accent-ink cursor-pointer",
-          )}
-        >
-          {full
-            ? t("lobby.card.full")
-            : locked
-              ? t("lobby.card.locked")
-              : room.isQuickPlay
-                ? t("lobby.card.joinQueue")
-                : t("lobby.card.join")}
-          {locked && <Lock className="size-3.5" strokeWidth={2.2} />}
-          {!full &&
-            !locked &&
-            (room.isQuickPlay ? (
-              <Zap className="size-3.5" strokeWidth={2.4} />
-            ) : (
-              <ArrowRight className="size-3.5" strokeWidth={2.2} />
-            ))}
-        </button>
+          className={JOIN_OVERLAY}
+        />
+      )}
+      <div className="flex min-w-0 items-center gap-1.5">
+        {room.isQuickPlay && (
+          <Zap
+            className="text-accent size-3.5 shrink-0"
+            role="img"
+            aria-label={t("lobby.card.quickPlay")}
+          />
+        )}
+        {room.isPrivate && (
+          <Lock
+            className="text-brass-deep size-3.5 shrink-0"
+            role="img"
+            aria-label={t("lobby.card.private")}
+          />
+        )}
+        <h3 className="text-ink m-0 min-w-0 truncate text-sm font-semibold">{room.name}</h3>
       </div>
+      <DetailRows>
+        <DetailRow label={t("lobby.card.rows.variant")}>{variantLabel(t, room.variant)}</DetailRow>
+        <DetailRow label={t("lobby.card.rows.target")}>{room.matchMode}</DetailRow>
+        <DetailRow label={t("lobby.card.rows.timer")}>
+          {room.timerStyle === "relaxed"
+            ? t("lobby.card.relaxed")
+            : t("lobby.card.timerShort", { seconds: room.timerDurationSeconds ?? 0 })}
+        </DetailRow>
+        <DetailRow label={t("lobby.card.rows.buyIn")} testId="room-card-buy-in">
+          {room.coinBuyIn > 0 ? (
+            <>
+              <Coins className="size-3" style={{ color: COIN_GOLD }} aria-hidden="true" />
+              {formatCoins(room.coinBuyIn)}
+            </>
+          ) : (
+            t("lobby.card.free")
+          )}
+        </DetailRow>
+        <DetailRow
+          label={t("lobby.card.rows.honor")}
+          tone={locked ? "danger" : undefined}
+          testId="room-card-honor"
+        >
+          {room.minHonor > 0 ? (
+            <>
+              <HonorShield tier={honorTierForScore(room.minHonor)} size={12} />
+              {honorFloorLabel(room.minHonor)}
+            </>
+          ) : (
+            t("lobby.card.honorAny")
+          )}
+        </DetailRow>
+        <DetailRow label={t("lobby.card.rows.rules")}>
+          <RoomRulesPopover room={room} live={live} className="relative z-10" />
+        </DetailRow>
+      </DetailRows>
+      <RoomSeats room={room} />
+      {live && (
+        <span className="flex text-2xs">
+          <Badge
+            size="sm"
+            tone="accent"
+            icon={<span className="size-1.25 rounded-full bg-current" />}
+          >
+            {t("lobby.card.live")}
+          </Badge>
+        </span>
+      )}
     </article>
   );
 }
 
-function TeamLabel({ team }: { team: "A" | "B" }) {
+/** The four seats in team order (0 and 2, a divider, 1 and 3): avatars, a blue bot face for bots, dashed rings when open. */
+function RoomSeats({ room }: { room: Room }) {
+  const { t } = useTranslation();
   return (
-    <span
-      className={cn(
-        "pr-1 text-2xs font-bold uppercase tracking-widest",
-        team === "A" ? "text-team-a" : "text-team-b",
-      )}
-    >
-      {team}
-    </span>
+    <div className="flex items-center justify-between" data-testid="room-card-seats">
+      {TEAM_ORDER.map((seat, i) => {
+        const team = seat % 2 === 0 ? "A" : "B";
+        const player = room.players?.find((p) => p.seat === seat);
+        const bot = player?.isBot === true;
+        const name = player
+          ? bot
+            ? botDisplayName(t, seat)
+            : player.username
+          : t("lobby.card.openSeat");
+        return (
+          <span
+            key={seat}
+            className={cn("flex", i === 2 && "border-border border-l pl-1.5")}
+            data-testid={`room-${room.id}-seat-${seat}`}
+            data-seat={player ? (bot ? "bot" : "player") : "open"}
+          >
+            {player ? (
+              <Avatar
+                name={name}
+                avatarUrl={bot ? null : player.avatarUrl}
+                size={SEAT_AVATAR}
+                team={team}
+                icon={bot ? <Bot className="text-bot" aria-hidden="true" /> : undefined}
+              />
+            ) : (
+              <span
+                className="bg-surface-sunken size-7.5 rounded-full border-2 border-dashed"
+                style={{
+                  borderColor: team === "A" ? "var(--team-a-edge-soft)" : "var(--team-b-edge-soft)",
+                }}
+              />
+            )}
+            <span className="sr-only">{name}</span>
+          </span>
+        );
+      })}
+    </div>
   );
-}
-
-function CodeChip({ code }: { code: string }) {
-  return (
-    <Badge icon={<KeyRound />} className="font-mono tracking-caps">
-      {code}
-    </Badge>
-  );
-}
-
-function Dot() {
-  return <span className="text-faint text-2xs">·</span>;
 }

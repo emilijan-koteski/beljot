@@ -1,11 +1,7 @@
 import {
-  ArrowRight,
-  Ban,
   ChevronDown,
   Clock,
   Coins,
-  Flag,
-  KeyRound,
   Lock,
   LockOpen,
   Plus,
@@ -13,21 +9,17 @@ import {
   RotateCw,
   Settings,
   Shuffle,
-  Unlink,
-  UserCheck,
-  Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
-import { SeatChip } from "@/features/lobby/components/SeatChip";
+import { CreateRoomPreview } from "@/features/room/components/CreateRoomPreview";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { AppDialogTile } from "@/shared/components/ui/app-dialog";
-import { Avatar } from "@/shared/components/ui/avatar";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
@@ -50,7 +42,7 @@ import {
   honorTierForScore,
 } from "@/shared/lib/honor";
 import { randomRoomName } from "@/shared/lib/randomRoomName";
-import { modeLabel, modeOptionLabel, variantLabel } from "@/shared/lib/roomLabels";
+import { modeOptionLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { MatchMode } from "@/shared/types/matchTypes";
@@ -81,6 +73,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const navigate = useNavigate();
   const createRoomMutation = useCreateRoomMutation();
   const meUsername = useAuthStore((s) => s.user?.username ?? "");
+  const meAvatarUrl = useAuthStore((s) => s.user?.avatarUrl ?? null);
   const meBalance = useAuthStore((s) => s.user?.walletBalance ?? 0);
   const meHonor = useAuthStore((s) => honorScoreOrPrior(s.user?.honorScore));
   const meIsNewPlayer = useAuthStore((s) => honorIsNewPlayer(s.user?.isNewPlayer));
@@ -760,7 +753,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
           >
             <Eyebrow>{t("lobby.createRoomModal.preview.title")}</Eyebrow>
 
-            <PreviewCard
+            <CreateRoomPreview
               name={trimmed || t("lobby.createRoomModal.roomNamePlaceholder")}
               variant={variant}
               matchMode={matchMode}
@@ -775,6 +768,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               declarationsTransfer={effectiveDeclarationsTransfer}
               clockwise={clockwise}
               hostUsername={meUsername || "host"}
+              hostAvatarUrl={meAvatarUrl}
             />
           </aside>
         </form>
@@ -841,233 +835,4 @@ function AdvancedSettings({
       )}
     </section>
   );
-}
-
-function PreviewCard({
-  name,
-  variant,
-  matchMode,
-  timerStyle,
-  timerDuration,
-  coinBuyIn,
-  isPrivate,
-  minHonor,
-  allowNewPlayers,
-  declarationsEnabled,
-  stopAtTarget,
-  declarationsTransfer,
-  clockwise,
-  hostUsername,
-}: {
-  name: string;
-  variant: "bitola" | "croatia";
-  matchMode: MatchMode;
-  timerStyle: "relaxed" | "per-move";
-  timerDuration: number;
-  coinBuyIn: number;
-  isPrivate: boolean;
-  minHonor: number;
-  allowNewPlayers: boolean;
-  declarationsEnabled: boolean;
-  stopAtTarget: boolean;
-  declarationsTransfer: boolean;
-  clockwise: boolean;
-  hostUsername: string;
-}) {
-  const { t } = useTranslation();
-  const variantText = variantLabel(t, variant);
-  const matchLabel = modeLabel(t, matchMode);
-  const timerLabel =
-    timerStyle === "relaxed"
-      ? t("lobby.card.relaxed")
-      : t("lobby.card.timerSeconds", { seconds: timerDuration });
-
-  return (
-    <article
-      data-testid="create-room-preview"
-      className="bg-surface text-ink border-border overflow-hidden rounded-lg border shadow-lg"
-    >
-      <div className="px-4.5 pt-4.5 pb-3.5">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className="bg-accent size-2 rounded-full"
-            style={{ boxShadow: "0 0 0 3px var(--accent-soft)" }}
-          />
-          <h3
-            className="text-ink m-0 min-w-0 flex-1 truncate text-lg font-semibold"
-            data-testid="preview-name"
-          >
-            {name}
-          </h3>
-          <span className="bg-surface-sunken text-ink-dim border-border inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-2xs font-semibold tracking-caps tabular-nums">
-            <KeyRound className="size-2.5" />
-            {t("lobby.createRoomModal.preview.codeLabel")}
-          </span>
-        </div>
-
-        <div className="text-ink-dim mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-          <span>
-            {variantText} · {matchLabel}
-          </span>
-          {!declarationsEnabled && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-no-declarations"
-                role="img"
-                aria-label={t("lobby.card.noDeclarationsAriaLabel")}
-              >
-                <Ban className="size-3" />
-                {t("lobby.card.noDeclarations")}
-              </span>
-            </>
-          )}
-          {stopAtTarget && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-stop-at-target"
-                role="img"
-                aria-label={t("lobby.card.stopAtTargetAriaLabel")}
-              >
-                <Flag className="size-3" />
-                {t("lobby.card.stopAtTarget")}
-              </span>
-            </>
-          )}
-          {!declarationsTransfer && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-no-declarations-transfer"
-                role="img"
-                aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
-              >
-                <Unlink className="size-3" />
-                {t("lobby.card.noDeclarationsTransfer")}
-              </span>
-            </>
-          )}
-          {clockwise && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-clockwise"
-                role="img"
-                aria-label={t("lobby.card.clockwiseAriaLabel")}
-              >
-                <RotateCw className="size-3" />
-                {t("lobby.card.clockwise")}
-              </span>
-            </>
-          )}
-          <Dot />
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-3" />
-            {timerLabel}
-          </span>
-          <Dot />
-          <span className="inline-flex items-center gap-1" data-testid="preview-buy-in">
-            <Coins className="size-3" style={{ color: COIN_GOLD }} />
-            {coinBuyIn > 0 ? formatCoins(coinBuyIn) : t("lobby.card.buyInFree")}
-          </span>
-          <Dot />
-          {isPrivate ? (
-            <span
-              className="inline-flex items-center gap-1"
-              data-testid="preview-lock"
-              aria-label={t("lobby.card.privateLockAriaLabel")}
-            >
-              <Lock className="size-3" />
-              {t("lobby.card.private")}
-            </span>
-          ) : (
-            <span
-              className="inline-flex items-center gap-1"
-              data-testid="preview-public"
-              aria-label={t("lobby.card.publicAriaLabel")}
-            >
-              <LockOpen className="size-3" />
-              {t("lobby.card.public")}
-            </span>
-          )}
-          {minHonor > 0 && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-min-honor"
-                data-min-honor={minHonor}
-                aria-label={t("lobby.card.minHonorAriaLabel", { minHonor })}
-              >
-                <HonorShield tier={honorTierForScore(minHonor)} size={12} />
-                {t("lobby.card.minHonor", { minHonor: honorFloorLabel(minHonor) })}
-              </span>
-            </>
-          )}
-          {allowNewPlayers === false && (
-            <>
-              <Dot />
-              <span
-                className="inline-flex items-center gap-1"
-                data-testid="preview-veterans-only"
-                aria-label={t("lobby.card.veteransOnlyAriaLabel")}
-              >
-                <UserCheck className="size-3" />
-                {t("lobby.card.veteransOnly")}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-1.5 px-4.5 pb-3.5">
-        <TeamLabel team="A" />
-        <SeatChip username={hostUsername} team="A" testId="preview-seat-0" />
-        <SeatChip username={null} team="A" testId="preview-seat-2" />
-        <TeamLabel team="B" />
-        <SeatChip username={null} team="B" testId="preview-seat-1" />
-        <SeatChip username={null} team="B" testId="preview-seat-3" />
-      </div>
-
-      <div className="border-border bg-ink/3 flex items-center gap-2.5 border-t px-4.5 py-3">
-        <span className="text-ink-dim inline-flex items-center gap-1.5 text-xs">
-          <Avatar name={hostUsername} size={20} />
-          {hostUsername}
-        </span>
-        <span className="text-ink-mute inline-flex items-center gap-1 text-xs">
-          <Users className="size-3" />
-          {t("lobby.createRoomModal.preview.seated", { current: 1 })}
-        </span>
-        <span className="ml-auto">
-          <span className="bg-accent text-accent-ink inline-flex items-center gap-1.5 rounded-md border border-accent-deep px-3.5 py-1.5 text-xs font-semibold opacity-70">
-            {t("lobby.createRoomModal.preview.joinLabel")}
-            <ArrowRight className="size-3.5" strokeWidth={2.2} />
-          </span>
-        </span>
-      </div>
-    </article>
-  );
-}
-
-function TeamLabel({ team }: { team: "A" | "B" }) {
-  return (
-    <span
-      className={cn(
-        "pr-1 text-2xs font-bold uppercase tracking-widest",
-        team === "A" ? "text-team-a" : "text-team-b",
-      )}
-    >
-      {team}
-    </span>
-  );
-}
-
-function Dot() {
-  return <span className="text-faint text-2xs">·</span>;
 }

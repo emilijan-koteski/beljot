@@ -12,7 +12,7 @@ import {
 import { useFriendRequests } from "@/shared/hooks/queries/useFriendRequests";
 
 /**
- * The pending friend-requests section inside the Friends card, with accept and decline actions.
+ * Pending friend requests, each on a brass card with accept and decline.
  * It renders nothing while loading or when there are no pending requests.
  */
 export function FriendRequests() {
@@ -21,29 +21,20 @@ export function FriendRequests() {
   const { data: requests, isPending } = useFriendRequests();
   const acceptMutation = useAcceptFriendRequestMutation();
   const declineMutation = useDeclineFriendRequestMutation();
-
   const busy = acceptMutation.isPending || declineMutation.isPending;
 
   if (isPending || !requests || requests.length === 0) return null;
 
   return (
-    <section
-      className="border-border mb-2.5 border-b pb-2.5"
-      data-testid="friend-requests"
-      data-count={requests.length}
-    >
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <Eyebrow>{t("friends.requests.heading")}</Eyebrow>
-        <span className="text-brass-deep font-mono text-2xs font-semibold tabular-nums">
-          {requests.length}
-        </span>
-      </div>
-
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] list-none gap-1.5 p-0">
+    <section data-testid="friend-requests" data-count={requests.length}>
+      <Eyebrow tone="mute" className="mb-1.5">
+        {t("friends.requests.groupLabel", { count: requests.length })}
+      </Eyebrow>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {requests.map((request) => (
           <li
             key={request.id}
-            className="bg-surface-elevated border-border flex items-center gap-2 rounded-md border px-2.5 py-1.5"
+            className="bg-brass-soft border-brass/30 flex items-center gap-2.5 rounded-lg border px-2.5 py-2"
             data-testid="friend-request-row"
             data-request-id={request.id}
           >
@@ -52,19 +43,19 @@ export function FriendRequests() {
               onClick={() => navigate(`/players/${request.fromUserId}`)}
               aria-label={t("friends.viewProfileAria", { username: request.fromUsername })}
               data-testid="friend-request-profile"
-              className="hover:bg-surface-sunken focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
+              className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md text-left outline-none focus-visible:ring-3"
             >
-              <Avatar
-                name={request.fromUsername}
-                avatarUrl={request.avatarUrl}
-                size={28}
-                className="shrink-0"
-              />
-              <span className="text-ink truncate text-sm font-medium">{request.fromUsername}</span>
+              <Avatar name={request.fromUsername} avatarUrl={request.avatarUrl} size={32} />
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="text-ink truncate text-sm font-semibold">
+                  {request.fromUsername}
+                </span>
+                <span className="text-ink-mute text-2xs">{t("friends.requests.subtitle")}</span>
+              </span>
             </button>
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="icon-sm"
               data-testid="friend-request-accept"
               disabled={busy}
               onClick={() =>
@@ -78,7 +69,7 @@ export function FriendRequests() {
             </Button>
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="icon-sm"
               data-testid="friend-request-decline"
               disabled={busy}
               onClick={() =>

@@ -34,6 +34,13 @@ npx tsc --noEmit && npx eslint . && npx prettier --check .   # what make lint-cl
 - Overlay stacking uses the `Z` layers in `shared/lib/zLayers.ts`. Animation timings live in `shared/lib/motion.ts`.
 - Imports are sorted by `simple-import-sort`. Run `npx eslint --fix` instead of ordering them by hand.
 
+## Page layout
+
+- Pages sit in `PageShell` (`shared/components/layout/`): a 1320px cap with 16, 24 and 28px gutters, an optional 300px desktop sidebar and an optional phone bottom bar.
+- Switch structure per width with `useLayoutBand()` (phone below 768px, tablet below 1024px, desktop above). Use Tailwind's `md:` and `lg:` for styling alone. Tests pick a width with `mockViewportWidth` from `src/test-utils.tsx`.
+- Build from the shared parts before writing new ones: `ActionTile`, `Panel`, `DetailRows`, `controlVariants` (32px round or labelled controls), `FilterBar`, `SortMenu` and `RoomRulesPopover`/`RoomRulesContent`.
+- Room seats count bots: use `roomOccupancy` and `isRoomFull` from `shared/lib/roomOccupancy.ts`, never `room.playerCount` alone.
+
 ## Testing
 
 - Tests sit next to their source as `*.test.ts(x)`, using Vitest and Testing Library.
