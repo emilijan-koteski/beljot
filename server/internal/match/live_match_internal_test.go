@@ -2,6 +2,8 @@ package match
 
 import (
 	"encoding/json"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,7 +18,10 @@ import (
 
 // recordingBroadcaster captures every broadcast so a white-box test can assert
 // which events broadcastActionResult emits, without a real WS hub/clients.
-type recordingBroadcaster struct{ msgs [][]byte }
+type recordingBroadcaster struct {
+	mu   sync.Mutex
+	msgs [][]byte
+}
 
 // rejectUnprojectedState panics when an event:match_state payload is sent
 // through an identical-bytes primitive instead of per-seat projected SendFrames.
@@ -33,15 +38,11 @@ func rejectUnprojectedState(primitive string, msg []byte) {
 
 func (r *recordingBroadcaster) BroadcastToUsers(_ []uint, msg []byte) {
 	rejectUnprojectedState("BroadcastToUsers", msg)
-	cp := make([]byte, len(msg))
-	copy(cp, msg)
-	r.msgs = append(r.msgs, cp)
+	r.record(msg)
 }
 func (r *recordingBroadcaster) SendToUser(_ uint, msg []byte) {
 	rejectUnprojectedState("SendToUser", msg)
-	cp := make([]byte, len(msg))
-	copy(cp, msg)
-	r.msgs = append(r.msgs, cp)
+	r.record(msg)
 }
 
 // SendFrames records one entry per frames batch (the first frame stands in for
@@ -51,15 +52,30 @@ func (r *recordingBroadcaster) SendFrames(frames []ws.UserFrame) {
 	if len(frames) == 0 {
 		return
 	}
-	cp := make([]byte, len(frames[0].Msg))
-	copy(cp, frames[0].Msg)
+	r.record(frames[0].Msg)
+}
+
+// record appends a copy of msg; sessions broadcast from their own goroutine.
+func (r *recordingBroadcaster) record(msg []byte) {
+	cp := make([]byte, len(msg))
+	copy(cp, msg)
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.msgs = append(r.msgs, cp)
+}
+
+// snapshot returns the recorded messages so far, safe to read while a session broadcasts.
+func (r *recordingBroadcaster) snapshot() [][]byte {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.msgs)
 }
 
 // eventTypes returns the "type" field of every recorded message, in order.
 func (r *recordingBroadcaster) eventTypes() []string {
-	out := make([]string, 0, len(r.msgs))
-	for _, raw := range r.msgs {
+	msgs := r.snapshot()
+	out := make([]string, 0, len(msgs))
+	for _, raw := range msgs {
 		var env struct {
 			Type string `json:"type"`
 		}
@@ -73,7 +89,7 @@ func (r *recordingBroadcaster) eventTypes() []string {
 // payloadOf returns the decoded payload of the first message of the given type.
 func (r *recordingBroadcaster) payloadOf(t *testing.T, eventType string) map[string]any {
 	t.Helper()
-	for _, raw := range r.msgs {
+	for _, raw := range r.snapshot() {
 		var env struct {
 			Type    string         `json:"type"`
 			Payload map[string]any `json:"payload"`
@@ -394,7 +410,8 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 	}
 	require.NotNil(t, resolvedSnap, "the expired forced-dealer turn must resolve bidding, not loop on a rejected pass")
 
-	assert.Contains(t, rec.eventTypes(), ws.EventAutoAction,
+	require.Eventually(t, func() bool { return slices.Contains(rec.eventTypes(), ws.EventAutoAction) },
+		2*time.Second, 5*time.Millisecond,
 		"the forced auto-pick must announce itself (got %v)", rec.eventTypes())
 	autoPayload := rec.payloadOf(t, ws.EventAutoAction)
 	require.NotNil(t, autoPayload, "event:auto_action carried no payload")
