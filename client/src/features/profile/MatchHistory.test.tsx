@@ -21,6 +21,7 @@ vi.mock("@/shared/api/matches", () => ({
 }));
 
 const NONZERO_COUNTS: Record<MatchFilter, number> = { all: 99, win: 50, loss: 40, abandoned: 9 };
+const EXPAND_ROW = "Show hand details";
 
 function renderMatchHistory(
   userId: number | undefined = 1,
@@ -305,7 +306,7 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    const toggle = within(row).getByRole("button");
+    const toggle = within(row).getByRole("button", { name: EXPAND_ROW });
 
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
@@ -444,14 +445,16 @@ describe("MatchHistory", () => {
     expect(screen.queryByTestId("match-history-detail")).not.toBeInTheDocument();
   });
 
-  it("keeps exactly one button per row — the chevron toggle with the aria state", async () => {
+  it("keeps two buttons per row: the rule icons and the chevron toggle with the aria state", async () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
     const buttons = within(row).getAllByRole("button");
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]).toHaveAttribute("aria-expanded", "false");
-    expect(buttons[0]).toHaveAttribute("aria-controls", "match-history-detail-1");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveAccessibleName(/^Rules: /);
+    expect(buttons[1]).toHaveAccessibleName(EXPAND_ROW);
+    expect(buttons[1]).toHaveAttribute("aria-expanded", "false");
+    expect(buttons[1]).toHaveAttribute("aria-controls", "match-history-detail-1");
   });
 
   it("localizes the chip link aria-label in the mk locale", async () => {
@@ -491,7 +494,7 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([match], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    fireEvent.click(within(row).getByRole("button"));
+    fireEvent.click(within(row).getByRole("button", { name: EXPAND_ROW }));
 
     expect(screen.getByTestId("match-history-hand-capot")).toBeInTheDocument();
     const failed = screen.getByTestId("match-history-hand-failed");
@@ -517,7 +520,7 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([match], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    fireEvent.click(within(row).getByRole("button"));
+    fireEvent.click(within(row).getByRole("button", { name: EXPAND_ROW }));
 
     const failed = screen.getByTestId("match-history-hand-failed");
     expect(failed).toHaveTextContent(/them/);

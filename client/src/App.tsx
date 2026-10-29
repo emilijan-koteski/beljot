@@ -30,6 +30,7 @@ import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { PublicContentLayout } from "@/shared/components/PublicContentLayout";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { useAuthInit } from "@/shared/hooks/useAuth";
+import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
 import { useTokenRefresh } from "@/shared/hooks/useTokenRefresh";
 import { useVersionCheck } from "@/shared/hooks/useVersionCheck";
 import { QueryProvider } from "@/shared/providers/QueryProvider";
@@ -95,12 +96,18 @@ function createAppRouter() {
   );
 }
 
+/** The app's toaster: at the top on a phone, where nothing pinned to the bottom can cover it, else bottom centre. */
+function AppToaster() {
+  const band = useLayoutBand();
+  return <Toaster position={band === "phone" ? "top-center" : "bottom-center"} />;
+}
+
 export function App() {
   const [router] = useState(createAppRouter);
   return (
     <QueryProvider>
       <RouterProvider router={router} />
-      <Toaster position="bottom-center" />
+      <AppToaster />
     </QueryProvider>
   );
 }

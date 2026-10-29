@@ -50,6 +50,31 @@ function renderTile() {
 afterEach(() => vi.clearAllMocks());
 
 describe("JoinByCodeTile", () => {
+  it("keeps Join asleep until six characters, typed in capitals", async () => {
+    const user = userEvent.setup();
+    renderTile();
+
+    await user.type(screen.getByTestId("join-by-code-input"), "ab-c1");
+    expect(screen.getByTestId("join-by-code-input")).toHaveValue("ABC1");
+    expect(screen.getByTestId("join-by-code-button")).toBeDisabled();
+
+    await user.type(screen.getByTestId("join-by-code-input"), "23x");
+    expect(screen.getByTestId("join-by-code-input")).toHaveValue("ABC123");
+    expect(screen.getByTestId("join-by-code-button")).toBeEnabled();
+  });
+
+  it("submits the code on Enter", async () => {
+    const user = userEvent.setup();
+    mockGetRoomByCode.mockResolvedValueOnce(room(false));
+    mockJoinRoom.mockResolvedValueOnce({ id: 9 });
+    renderTile();
+
+    await user.type(screen.getByTestId("join-by-code-input"), "ABC123{Enter}");
+
+    await waitFor(() => expect(mockGetRoomByCode).toHaveBeenCalledWith("ABC123"));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/rooms/9"));
+  });
+
   it("joins a public room directly without prompting for a password", async () => {
     const user = userEvent.setup();
     mockGetRoomByCode.mockResolvedValueOnce(room(false));

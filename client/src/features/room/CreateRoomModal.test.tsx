@@ -64,6 +64,14 @@ async function setRoomName(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.type(input, name);
 }
 
+function previewCard(testId: string) {
+  return within(screen.getByTestId("create-room-preview")).getByTestId(testId);
+}
+
+function previewRule(key: string) {
+  return within(screen.getByTestId("create-room-preview-rules")).getByTestId(`rule-${key}`);
+}
+
 describe("CreateRoomModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -240,7 +248,7 @@ describe("CreateRoomModal", () => {
     await user.click(screen.getByTestId("match-mode-segmented-701"));
 
     expect(screen.getByTestId("match-mode-segmented-701")).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByTestId("create-room-preview")).toHaveTextContent("701 pts");
+    expect(within(screen.getByTestId("create-room-preview")).getByText("701")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -347,7 +355,7 @@ describe("CreateRoomModal", () => {
 
     expect(screen.getByTestId("coin-buy-in-chips-500")).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByTestId("coin-buy-in-input")).not.toBeInTheDocument();
-    expect(screen.getByTestId("preview-buy-in")).toHaveTextContent("500");
+    expect(previewCard("room-card-buy-in")).toHaveTextContent("500");
   });
 
   it("submits a preset buy-in chosen from the chips", async () => {
@@ -357,7 +365,7 @@ describe("CreateRoomModal", () => {
 
     await setRoomName(user, "Free Table");
     await user.click(screen.getByTestId("coin-buy-in-chips-0"));
-    expect(screen.getByTestId("preview-buy-in")).toHaveTextContent("No stake");
+    expect(previewCard("room-card-buy-in")).toHaveTextContent("Free");
 
     await user.click(screen.getByTestId("create-room-button"));
 
@@ -559,8 +567,8 @@ describe("CreateRoomModal", () => {
 
     expect(screen.getByTestId("min-honor-chips-0")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("min-honor-chips-0")).toHaveTextContent("Anyone");
-    expect(screen.queryByTestId("preview-min-honor")).toBeNull();
-    expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
+    expect(previewCard("room-card-honor")).toHaveTextContent("Any");
+    expect(previewRule("newPlayers")).toHaveAttribute("data-changed", "false");
   });
 
   it("labels each threshold chip with the tier it falls in", async () => {
@@ -595,8 +603,8 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("min-honor-chips-85"));
 
-    expect(screen.getByTestId("preview-min-honor")).toHaveAttribute("data-min-honor", "85");
-    expect(screen.queryByTestId("preview-veterans-only")).toBeNull();
+    expect(previewCard("room-card-honor")).toHaveTextContent("85+");
+    expect(previewRule("newPlayers")).toHaveAttribute("data-changed", "false");
   });
 
   it("mirrors the veterans-only toggle into the live preview card", async () => {
@@ -606,8 +614,9 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("allow-new-players-toggle-veterans"));
 
-    expect(screen.getByTestId("preview-veterans-only")).toBeInTheDocument();
-    expect(screen.queryByTestId("preview-min-honor")).toBeNull();
+    expect(previewRule("newPlayers")).toHaveAttribute("data-changed", "true");
+    expect(previewRule("newPlayers")).toHaveTextContent("Veterans only");
+    expect(previewCard("room-card-honor")).toHaveTextContent("Any");
   });
 
   it("submits the configured honor gate", async () => {
@@ -772,7 +781,7 @@ describe("CreateRoomModal", () => {
 
     expect(screen.getByTestId("declarations-segmented")).toBeInTheDocument();
     expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
+    expect(previewRule("declarations")).toHaveAttribute("data-changed", "false");
   });
 
   it("mirrors a declarations-off choice into the live preview card", async () => {
@@ -782,7 +791,9 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
 
-    expect(await screen.findByTestId("preview-no-declarations")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(previewRule("declarations")).toHaveAttribute("data-changed", "true"),
+    );
   });
 
   it("submits declarationsEnabled false when the off segment is selected", async () => {
@@ -836,14 +847,16 @@ describe("CreateRoomModal", () => {
     await openAdvanced(user);
 
     await user.click(screen.getByTestId("declarations-segmented-off"));
-    expect(await screen.findByTestId("preview-no-declarations")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(previewRule("declarations")).toHaveAttribute("data-changed", "true"),
+    );
 
     await user.click(screen.getByTestId("cancel-button"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
 
     await openAdvanced(user);
     expect(screen.getByTestId("declarations-segmented-on")).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByTestId("preview-no-declarations")).not.toBeInTheDocument();
+    expect(previewRule("declarations")).toHaveAttribute("data-changed", "false");
   });
 
   it("defaults the match-end control to finishing the hand and shows no preview chip", async () => {
@@ -856,7 +869,7 @@ describe("CreateRoomModal", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
+    expect(previewRule("end")).toHaveAttribute("data-changed", "false");
   });
 
   it("mirrors a stop-at-target choice into the live preview card", async () => {
@@ -866,7 +879,7 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("match-end-segmented-stop"));
 
-    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+    await waitFor(() => expect(previewRule("end")).toHaveAttribute("data-changed", "true"));
   });
 
   it("submits stopAtTarget true when the stop segment is selected", async () => {
@@ -920,7 +933,7 @@ describe("CreateRoomModal", () => {
     await openAdvanced(user);
 
     await user.click(screen.getByTestId("match-end-segmented-stop"));
-    expect(await screen.findByTestId("preview-stop-at-target")).toBeInTheDocument();
+    await waitFor(() => expect(previewRule("end")).toHaveAttribute("data-changed", "true"));
 
     await user.click(screen.getByTestId("cancel-button"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -930,7 +943,7 @@ describe("CreateRoomModal", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.queryByTestId("preview-stop-at-target")).not.toBeInTheDocument();
+    expect(previewRule("end")).toHaveAttribute("data-changed", "false");
   });
 
   it("defaults declarations on a fall to the winners and shows no preview chip", async () => {
@@ -946,7 +959,7 @@ describe("CreateRoomModal", () => {
       "To the winners",
     );
     expect(screen.getByTestId("declarations-transfer-segmented-void")).toHaveTextContent("Voided");
-    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+    expect(previewRule("fall")).toHaveAttribute("data-changed", "false");
     expect(screen.queryByTestId("advanced-settings-badge")).not.toBeInTheDocument();
   });
 
@@ -957,9 +970,8 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
 
-    expect(await screen.findByTestId("preview-no-declarations-transfer")).toHaveTextContent(
-      "No declaration transfer",
-    );
+    await waitFor(() => expect(previewRule("fall")).toHaveAttribute("data-changed", "true"));
+    expect(previewRule("fall")).toHaveTextContent("Voided");
     expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
   });
 
@@ -1026,7 +1038,8 @@ describe("CreateRoomModal", () => {
     await user.click(screen.getByTestId("declarations-segmented-off"));
 
     expect(screen.queryByTestId("declarations-transfer-segmented")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+    expect(previewRule("fall")).toHaveAttribute("data-changed", "false");
+    expect(previewRule("fall")).toHaveTextContent("Not used");
     expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
 
     await user.click(screen.getByTestId("create-room-button"));
@@ -1048,7 +1061,7 @@ describe("CreateRoomModal", () => {
     await openAdvanced(user);
 
     await user.click(screen.getByTestId("declarations-transfer-segmented-void"));
-    expect(await screen.findByTestId("preview-no-declarations-transfer")).toBeInTheDocument();
+    await waitFor(() => expect(previewRule("fall")).toHaveAttribute("data-changed", "true"));
 
     await user.click(screen.getByTestId("cancel-button"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -1058,7 +1071,7 @@ describe("CreateRoomModal", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.queryByTestId("preview-no-declarations-transfer")).not.toBeInTheDocument();
+    expect(previewRule("fall")).toHaveAttribute("data-changed", "false");
   });
 
   it("defaults the direction of play to counter-clockwise and shows no preview chip", async () => {
@@ -1074,7 +1087,7 @@ describe("CreateRoomModal", () => {
       "Counter-clockwise",
     );
     expect(screen.getByTestId("direction-segmented-clockwise")).toHaveTextContent("Clockwise");
-    expect(screen.queryByTestId("preview-clockwise")).not.toBeInTheDocument();
+    expect(previewRule("direction")).toHaveAttribute("data-changed", "false");
     expect(screen.queryByTestId("advanced-settings-badge")).not.toBeInTheDocument();
   });
 
@@ -1085,9 +1098,8 @@ describe("CreateRoomModal", () => {
 
     await user.click(screen.getByTestId("direction-segmented-clockwise"));
 
-    const chip = await screen.findByTestId("preview-clockwise");
-    expect(chip).toHaveTextContent("Clockwise");
-    expect(chip).toHaveAccessibleName(/play moves to the left/i);
+    await waitFor(() => expect(previewRule("direction")).toHaveAttribute("data-changed", "true"));
+    expect(previewRule("direction")).toHaveTextContent("Clockwise");
     expect(screen.getByTestId("advanced-settings-badge")).toHaveTextContent("1 changed");
   });
 
@@ -1135,7 +1147,7 @@ describe("CreateRoomModal", () => {
     await openAdvanced(user);
 
     await user.click(screen.getByTestId("direction-segmented-clockwise"));
-    expect(await screen.findByTestId("preview-clockwise")).toBeInTheDocument();
+    await waitFor(() => expect(previewRule("direction")).toHaveAttribute("data-changed", "true"));
 
     await user.click(screen.getByTestId("cancel-button"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -1145,7 +1157,7 @@ describe("CreateRoomModal", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.queryByTestId("preview-clockwise")).not.toBeInTheDocument();
+    expect(previewRule("direction")).toHaveAttribute("data-changed", "false");
   });
 
   it("surfaces the server's INVALID_MIN_HONOR rejection in the form banner", async () => {

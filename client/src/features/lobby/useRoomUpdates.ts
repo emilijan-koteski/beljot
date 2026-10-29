@@ -18,9 +18,18 @@ import {
 } from "@/shared/types/wsEvents";
 
 const WAITING = queryKeys.rooms.list("waiting");
+const PLAYING = queryKeys.rooms.list("playing");
 
 function update(updater: (rooms: Room[]) => Room[]) {
   queryClient.setQueryData<Room[]>(WAITING, (old) => (old ? updater(old) : undefined));
+}
+
+/** Refetches the live-match list when a room starts, or when a room it lists changes. */
+function refreshLiveRooms(roomId: number, status: string) {
+  const live = queryClient.getQueryData<Room[]>(PLAYING);
+  if (status === "playing" || live?.some((r) => r.id === roomId)) {
+    void queryClient.invalidateQueries({ queryKey: PLAYING });
+  }
 }
 
 /** Applies a WS room event to the cached waiting-room list, ignoring frames that fail to parse. */
@@ -40,6 +49,7 @@ export function handleWsMessage(event: MessageEvent): void {
 
       case SYSTEM_ROOM_UPDATED: {
         const payload = message.payload as RoomUpdatedPayload;
+        refreshLiveRooms(payload.id, payload.status);
         if (payload.status !== "waiting") {
           update((rooms) => rooms.filter((r) => r.id !== payload.id));
           return;

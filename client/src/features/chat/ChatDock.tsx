@@ -52,6 +52,7 @@ type Variant = "lobby" | "room" | "match";
 
 interface ChatDockBaseProps {
   className?: string;
+  launcherClassName?: string;
   resolveNameColor?: (userId: number) => string | undefined;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -69,7 +70,7 @@ type ChatDockProps = ChatDockBaseProps &
  * Closed it is a FAB with unread chips and a peek bubble; open it is a panel with whisper tabs.
  */
 export function ChatDock(props: ChatDockProps) {
-  const { variant, resolveNameColor, className } = props;
+  const { variant, resolveNameColor, className, launcherClassName } = props;
   const { t } = useTranslation();
 
   const messages = useChatStore((s) =>
@@ -282,6 +283,7 @@ export function ChatDock(props: ChatDockProps) {
           "fixed right-4.5 bottom-4.5 z-40 flex flex-col items-end gap-2.5",
           skin,
           className,
+          launcherClassName,
         )}
       >
         {peek && peekVisible && (

@@ -1,22 +1,4 @@
-import {
-  Ban,
-  Bot,
-  Clock,
-  Coins,
-  Crown,
-  DoorOpen,
-  Flag,
-  History,
-  Lock,
-  LockOpen,
-  RotateCw,
-  Send,
-  Shuffle,
-  Trophy,
-  Unlink,
-  UserCheck,
-  Zap,
-} from "lucide-react";
+import { Coins, Crown, DoorOpen, History, Lock, Send, Shuffle, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
@@ -36,6 +18,8 @@ import {
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
+import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
+import { RoomRulesPopover } from "@/shared/components/roomRules/RoomRules";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { CodeChip } from "@/shared/components/ui/code-chip";
@@ -849,53 +833,9 @@ export function RoomPage() {
               <Badge tone="brass">
                 <span data-testid="badge-match-mode">{matchModeText}</span>
               </Badge>
-              {room.declarationsEnabled === false && (
-                <Badge tone="neutral" icon={<Ban className="size-3" />}>
-                  <span
-                    data-testid="badge-no-declarations"
-                    role="img"
-                    aria-label={t("lobby.card.noDeclarationsAriaLabel")}
-                  >
-                    {t("lobby.card.noDeclarations")}
-                  </span>
-                </Badge>
-              )}
-              {room.stopAtTarget === true && (
-                <Badge tone="neutral" icon={<Flag className="size-3" />}>
-                  <span
-                    data-testid="badge-stop-at-target"
-                    role="img"
-                    aria-label={t("lobby.card.stopAtTargetAriaLabel")}
-                  >
-                    {t("lobby.card.stopAtTarget")}
-                  </span>
-                </Badge>
-              )}
-              {room.declarationsTransfer === false && (
-                <Badge tone="neutral" icon={<Unlink className="size-3" />}>
-                  <span
-                    data-testid="badge-no-declarations-transfer"
-                    role="img"
-                    aria-label={t("lobby.card.noDeclarationsTransferAriaLabel")}
-                  >
-                    {t("lobby.card.noDeclarationsTransfer")}
-                  </span>
-                </Badge>
-              )}
-              {room.clockwise === true && (
-                <Badge tone="neutral" icon={<RotateCw className="size-3" />}>
-                  <span
-                    data-testid="badge-clockwise"
-                    role="img"
-                    aria-label={t("lobby.card.clockwiseAriaLabel")}
-                  >
-                    {t("lobby.card.clockwise")}
-                  </span>
-                </Badge>
-              )}
               <Badge
                 tone={isRelaxed ? "accent" : "neutral"}
-                icon={isRelaxed ? undefined : <Clock />}
+                icon={isRelaxed ? <RULE_ICONS.relaxedTimer /> : <RULE_ICONS.moveTimer />}
               >
                 <span data-testid="badge-timer">{timerLabel}</span>
               </Badge>
@@ -915,29 +855,37 @@ export function RoomPage() {
                 </Badge>
               )}
               {room.allowNewPlayers === false && (
-                <Badge tone="neutral" icon={<UserCheck className="size-3" />}>
-                  <span data-testid="badge-veterans-only">{t("lobby.card.veteransOnly")}</span>
+                <Badge tone="neutral" icon={<RULE_ICONS.veteransOnly className="size-3" />}>
+                  <span data-testid="badge-veterans-only">
+                    {t("lobby.createRoomModal.allowNewPlayersNo")}
+                  </span>
                 </Badge>
               )}
               {room.isQuickPlay && (
-                <Badge tone="accent" icon={<Zap className="size-3" />}>
+                <Badge tone="accent" icon={<RULE_ICONS.quickPlay className="size-3" />}>
                   <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
                 </Badge>
               )}
               {room.isPrivate ? (
-                <Badge tone="neutral" icon={<Lock className="size-3" />}>
+                <Badge tone="neutral" icon={<RULE_ICONS.private className="size-3" />}>
                   <span data-testid="badge-private">{t("room.privacy.privateBadge")}</span>
                 </Badge>
               ) : (
-                <Badge tone="neutral" icon={<LockOpen className="size-3" />}>
+                <Badge tone="neutral" icon={<RULE_ICONS.public className="size-3" />}>
                   <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
                 </Badge>
               )}
               {players.some((p) => p.isBot === true) && (
-                <Badge tone="bot" icon={<Bot className="size-3" />}>
+                <Badge tone="bot" icon={<RULE_ICONS.bots className="size-3" />}>
                   <span data-testid="badge-bots">{t("bots.tag")}</span>
                 </Badge>
               )}
+              <RoomRulesPopover
+                room={{ ...room, players }}
+                live={room.status !== "waiting"}
+                labelled
+                className="bg-surface-sunken text-ink-dim mr-0 h-6 gap-1 rounded px-2 text-xs leading-none font-semibold md:px-2.5"
+              />
             </div>
           </div>
         </div>

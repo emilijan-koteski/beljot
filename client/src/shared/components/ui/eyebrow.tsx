@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/shared/lib/utils";
 
 type EyebrowProps = {
-  tone?: "brass" | "accent";
+  tone?: "brass" | "accent" | "mute";
   size?: "sm" | "xl";
   className?: string;
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export function Eyebrow({ tone = "brass", size = "sm", className, children }: Ey
       className={cn(
         "inline-flex items-center gap-1.5 font-mono font-semibold uppercase",
         size === "xl" ? "text-xs tracking-caps" : "text-2xs tracking-caps",
-        tone === "accent" ? "text-accent" : "text-brass-deep",
+        tone === "accent" ? "text-accent" : tone === "mute" ? "text-ink-mute" : "text-brass-deep",
         className,
       )}
     >

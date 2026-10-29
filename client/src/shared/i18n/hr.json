@@ -24,7 +24,8 @@
     "appName": "Beljot",
     "logout": "Odjavi se",
     "signedInAs": "Prijavljen kao",
-    "menu": "Izbornik"
+    "menu": "Izbornik",
+    "accountMenu": "Izbornik računa za {{username}}"
   },
   "profile": {
     "title": "Profil",
@@ -331,10 +332,12 @@
     "list": {
       "heading": "Prijatelji",
       "loading": "Učitavanje prijatelja…",
-      "empty": "Još nemaš prijatelja. Pronađi igrače i pošalji zahtjev za prijateljstvo."
+      "empty": "Još nemaš prijatelja. Pronađi igrače i pošalji zahtjev za prijateljstvo.",
+      "groupLabel": "Prijatelji · {{count}} online"
     },
     "requests": {
-      "heading": "Zahtjevi za prijateljstvo"
+      "groupLabel": "Zahtjevi · {{count}}",
+      "subtitle": "Želi biti tvoj prijatelj"
     },
     "removeDialog": {
       "title": "Ukloni {{username}}",
@@ -348,6 +351,11 @@
       "acceptFailed": "Prihvaćanje zahtjeva nije uspjelo. Možda više nije dostupan.",
       "declineFailed": "Odbijanje zahtjeva nije uspjelo. Možda više nije dostupan.",
       "removeFailed": "Uklanjanje prijatelja nije uspjelo. Možda više niste prijatelji."
+    },
+    "onlineCount": "{{count}} online",
+    "dialog": {
+      "description": "{{online}} od {{total}} online",
+      "done": "Gotovo"
     }
   },
   "language": {
@@ -630,13 +638,9 @@
     }
   },
   "lobby": {
-    "title": "Otvorene sobe",
     "quickPlay": "Brza igra",
     "stats": {
-      "inLobby": "u lobiju",
-      "inRoom": "u sobi",
-      "inMatch": "igraju",
-      "online": "online"
+      "line": "{{online}} online · {{playing}} igraju"
     },
     "roomEjection": {
       "insolventTitle": "Nemaš dovoljno novčića",
@@ -726,10 +730,7 @@
       "submit": "Stvori sobu",
       "submitting": "Stvaram…",
       "preview": {
-        "title": "Pregled u lobiju",
-        "joinLabel": "Pridruži se",
-        "codeLabel": "KOD",
-        "seated": "{{current}}/4"
+        "title": "Pregled u lobiju"
       },
       "variantHint": "Bitolska dijeli pet karata i okreće adutsku kartu, hrvatska dijeli šest i adut se zove slobodno",
       "matchModeHint": "501 je kratak, 701 srednji, 1001 puna utrka",
@@ -779,16 +780,22 @@
     "actions": {
       "quickPlay": {
         "title": "Brza igra",
-        "subtitle": "Skoči na prvo slobodno mjesto",
-        "cta": "Igraj"
+        "subtitle": "Za stolom za par sekundi"
       },
       "createRoom": {
-        "title": "Stvori sobu",
+        "title": "Nova soba",
         "subtitle": "Postavi svoja pravila"
       },
       "joinByCode": {
-        "placeholder": "Imaš kod?",
-        "cta": "Pridruži se"
+        "placeholder": "Upiši kod sobe",
+        "cta": "Pridruži se",
+        "title": "Imaš kod?",
+        "subtitle": "Uđi u privatnu sobu",
+        "inputLabel": "Kod sobe",
+        "codePlaceholder": "ABC123",
+        "dialogTitle": "Pridruži se kodom",
+        "dialogDescription": "Zatraži od domaćina kod sobe od 6 znakova.",
+        "cancel": "Otkaži"
       }
     },
     "filters": {
@@ -796,19 +803,22 @@
       "qualify": "Ispunjavam uvjete",
       "open": "Ima mjesta",
       "relaxed": "Opušteno",
-      "timed": "S tajmerom"
+      "timed": "S tajmerom",
+      "label": "Filtriraj sobe"
     },
     "sort": {
-      "label": "Sortiraj",
       "newest": "Najnovije prvo",
-      "filling": "Najpunije prvo"
+      "filling": "Najpunije prvo",
+      "ariaLabel": "Sortiranje: {{order}}"
     },
     "search": {
-      "placeholder": "Pretraži po imenu sobe ili kodu…"
+      "placeholder": "Ime sobe ili kod",
+      "open": "Pretraži sobe",
+      "close": "Zatvori pretragu"
     },
     "playerSearch": {
       "label": "Pronađi igrače",
-      "placeholder": "Pretraži igrače po korisničkom imenu…",
+      "placeholder": "Pronađi igrača",
       "loading": "Pretraživanje…",
       "empty": "Nema igrača sa „{{query}}“",
       "close": "Zatvori pretragu",
@@ -817,17 +827,14 @@
     "empty": {
       "title": "Nema otvorenih soba za tvoje filtre",
       "description": "Obriši filtre, probaj Brzu igru ili stvori sobu.",
-      "clear": "Obriši pretragu"
+      "clear": "Obriši pretragu",
+      "liveTitle": "Trenutno nema mečeva u tijeku",
+      "liveDescription": "Mečevi se ovdje pojavljuju čim počnu."
     },
     "card": {
-      "join": "Pridruži se",
-      "joinQueue": "Uđi u red",
       "quickPlay": "Brza igra",
-      "full": "Puno",
       "relaxed": "Opušteno",
       "timerSeconds": "{{seconds}}s tajmer",
-      "occupancy": "{{seated}}/4",
-      "empty": "prazno",
       "joining": "Pridruživanje sobi \"{{name}}\"…",
       "variantBitola": "Bitola",
       "variantCroatia": "Hrvatska",
@@ -837,23 +844,23 @@
       "matchModeGeneric": "{{points}} bodova",
       "buyInFree": "Bez uloga",
       "private": "Privatna",
-      "privateLockAriaLabel": "Privatna soba, za ulazak je potrebna lozinka",
-      "public": "Javna",
-      "publicAriaLabel": "Javna soba, svatko može ući",
       "minHonor": "{{minHonor}}",
-      "minHonorAriaLabel": "Minimalna čast {{minHonor}}",
-      "veteransOnly": "Samo iskusni",
-      "veteransOnlyAriaLabel": "Ova soba ne prima nove igrače",
-      "locked": "Zaključano",
       "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}.",
-      "noDeclarations": "Bez zvanja",
-      "noDeclarationsAriaLabel": "Ova soba igra bez zvanja i bez Bele",
-      "stopAtTarget": "Dosta",
-      "stopAtTargetAriaLabel": "Ova soba završava meč u trenutku kad ekipa dosegne cilj, bez dovršavanja dijeljenja",
-      "noDeclarationsTransfer": "Bez prijenosa zvanja",
-      "noDeclarationsTransferAriaLabel": "U ovoj sobi zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju se umjesto da idu drugoj ekipi",
-      "clockwise": "Igra ulijevo",
-      "clockwiseAriaLabel": "U ovoj sobi igra se kreće ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj idu ulijevo"
+      "rows": {
+        "variant": "Varijanta",
+        "target": "Cilj",
+        "timer": "Tajmer",
+        "buyIn": "Ulog",
+        "honor": "Čast",
+        "rules": "Pravila"
+      },
+      "timerShort": "{{seconds}}s",
+      "free": "Besplatno",
+      "honorAny": "Bilo koja",
+      "live": "Uživo",
+      "joinAria": "Pridruži se sobi {{name}}",
+      "fullTitle": "Ova soba je puna",
+      "openSeat": "Slobodno mjesto"
     },
     "chat": {
       "title": "Lobi chat",
@@ -869,6 +876,11 @@
       "joinFailed": "Pridruživanje nije uspjelo. Probaj drugu sobu.",
       "matchmakingFailed": "Traženje meča nije uspjelo. Pokušaj ponovno.",
       "quickPlayBracketMismatch": "Ova soba je za drukčiji iznos novčića. Klikni Brza igra da nađeš odgovarajuću."
+    },
+    "tabs": {
+      "label": "Sobe",
+      "open": "Otvorene sobe ({{count}})",
+      "playing": "U igri ({{count}})"
     }
   },
   "match": {
@@ -1483,5 +1495,23 @@
       "qrToggle": "Skeniraj mobitelom",
       "qrAlt": "QR kod koji vodi na Buy Me a Coffee stranicu Emilijana Koteskog"
     }
+  },
+  "roomRules": {
+    "title": "Pravila",
+    "triggerAria": "Pravila: {{summary}}",
+    "matchSection": "Pravila meča",
+    "roomSection": "Pravila sobe",
+    "legend": "Zlatnom bojom označeno je pravilo promijenjeno u odnosu na standardno.",
+    "notUsed": "Ne koristi se",
+    "access": "Pristup",
+    "accessPublic": "Javna",
+    "accessPrivate": "Privatna · lozinka",
+    "bots": "Mjesta za botove",
+    "seating": "Raspored",
+    "seatingQuickPlay": "Popunjava Brza igra",
+    "botsWaiting": "Botovi drže ova mjesta dok ih domaćin ne ukloni.",
+    "botsLive": "Na ovim mjestima igraju botovi.",
+    "botsStake": "Ne plaćaju ulog, pa pobjednici dijele uloge igrača.",
+    "previewCaption": "Igrači ovo vide kad prijeđu preko ikona pravila:"
   }
 }
