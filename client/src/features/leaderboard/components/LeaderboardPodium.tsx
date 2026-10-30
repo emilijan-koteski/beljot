@@ -52,7 +52,7 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
             data-testid="leaderboard-podium-place"
             data-place={place}
           >
-            <span className="relative">
+            <span className="relative flex">
               {place === 1 && (
                 <Crown
                   className="absolute -top-5 left-1/2 size-5 -translate-x-1/2"
@@ -61,10 +61,11 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
                 />
               )}
               <span
-                className="block rounded-full p-0.5"
-                style={{ boxShadow: `0 0 0 3px ${medal}` }}
+                className="flex rounded-full p-0.5"
+                style={{ boxShadow: `0 0 0 2px ${medal}` }}
+                data-testid="leaderboard-podium-ring"
               >
-                <Avatar name={row.username} avatarUrl={row.avatarUrl} size={avatar} />
+                <Avatar name={row.username} avatarUrl={row.avatarUrl} size={avatar} ring={medal} />
               </span>
               <span
                 className="text-surface absolute -right-1 -bottom-1 flex size-5.5 items-center justify-center rounded-full text-2xs font-bold"

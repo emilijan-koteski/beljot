@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LeaderboardPodium } from "@/features/leaderboard/components/LeaderboardPodium";
+import { SEASON_TIER_COLOR } from "@/shared/lib/seasonTier";
 import type { LeaderboardRow } from "@/shared/types/apiTypes";
 
 function row(position: number): LeaderboardRow {
@@ -43,6 +44,15 @@ describe("LeaderboardPodium", () => {
     const [second, first] = screen.getAllByTestId("leaderboard-podium-place");
     expect(within(first!).getByRole("link", { name: "p1" })).toHaveAttribute("href", "/players/10");
     expect(within(second!).getByRole("link", { name: "p2" })).toHaveAttribute("href", "/profile");
+  });
+
+  it("rings each avatar in its medal colour alone", () => {
+    renderPodium([row(1), row(2), row(3)]);
+    const [second, first, third] = screen.getAllByTestId("leaderboard-podium-ring");
+    const edge = (ring: HTMLElement | undefined) => (ring!.firstChild as HTMLElement).style.border;
+    expect(edge(first)).toBe(`2px solid ${SEASON_TIER_COLOR.gold}`);
+    expect(edge(second)).toBe(`2px solid ${SEASON_TIER_COLOR.silver}`);
+    expect(edge(third)).toBe(`2px solid ${SEASON_TIER_COLOR.bronze}`);
   });
 
   it("keeps the steps in place when the season has fewer than three players", () => {

@@ -44,6 +44,7 @@ type AvatarProps = {
   size?: number;
   team?: AvatarTeam;
   halo?: "profile";
+  ring?: string;
   icon?: ReactNode;
   className?: string;
   testId?: string;
@@ -51,7 +52,7 @@ type AvatarProps = {
 
 /**
  * Circular player avatar showing the uploaded picture or the initial.
- * Fill and ring both follow the team: gold for Us, silver for Them, felt green edged in brass otherwise.
+ * Fill and ring follow the team: gold for Us, silver for Them, brass-edged felt otherwise; `ring` overrides the ring.
  */
 export function Avatar({
   name,
@@ -60,6 +61,7 @@ export function Avatar({
   size = 36,
   team = null,
   halo,
+  ring,
   icon,
   className,
   testId,
@@ -80,7 +82,8 @@ export function Avatar({
   }
 
   let ringColor: string;
-  if (team === "A") ringColor = "var(--team-a)";
+  if (ring !== undefined) ringColor = ring;
+  else if (team === "A") ringColor = "var(--team-a)";
   else if (team === "B") ringColor = "var(--team-b)";
   else ringColor = "var(--brass)";
 
