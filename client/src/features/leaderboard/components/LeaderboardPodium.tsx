@@ -60,13 +60,13 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
                   aria-hidden="true"
                 />
               )}
-              <span
-                className="flex rounded-full p-0.5"
-                style={{ boxShadow: `0 0 0 2px ${medal}` }}
-                data-testid="leaderboard-podium-ring"
-              >
-                <Avatar name={row.username} avatarUrl={row.avatarUrl} size={avatar} ring={medal} />
-              </span>
+              <Avatar
+                name={row.username}
+                avatarUrl={row.avatarUrl}
+                size={avatar}
+                ring={medal}
+                testId="leaderboard-podium-avatar"
+              />
               <span
                 className="text-surface absolute -right-1 -bottom-1 flex size-5.5 items-center justify-center rounded-full text-2xs font-bold"
                 style={{ background: medal }}

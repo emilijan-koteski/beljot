@@ -48,11 +48,11 @@ describe("LeaderboardPodium", () => {
 
   it("rings each avatar in its medal colour alone", () => {
     renderPodium([row(1), row(2), row(3)]);
-    const [second, first, third] = screen.getAllByTestId("leaderboard-podium-ring");
-    const edge = (ring: HTMLElement | undefined) => (ring!.firstChild as HTMLElement).style.border;
-    expect(edge(first)).toBe(`2px solid ${SEASON_TIER_COLOR.gold}`);
-    expect(edge(second)).toBe(`2px solid ${SEASON_TIER_COLOR.silver}`);
-    expect(edge(third)).toBe(`2px solid ${SEASON_TIER_COLOR.bronze}`);
+    const [second, first, third] = screen.getAllByTestId("leaderboard-podium-avatar");
+    expect(first!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.gold}`);
+    expect(second!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.silver}`);
+    expect(third!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.bronze}`);
+    expect(first!.style.boxShadow).toBe("none");
   });
 
   it("keeps the steps in place when the season has fewer than three players", () => {
