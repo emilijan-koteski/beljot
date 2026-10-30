@@ -1,4 +1,4 @@
-import { Armchair, Bot, Crown, Hourglass, MoreHorizontal, UserPlus } from "lucide-react";
+import { Armchair, Bot, Crown, Hourglass, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,16 +9,15 @@ import { normalizeHonorTier } from "@/shared/lib/honor";
 import { cn } from "@/shared/lib/utils";
 import type { RoomPlayer } from "@/shared/types/apiTypes";
 
+import { BOT_BUTTON_CLASS } from "../lib/botButton";
 import type { Cardinal, TableSeat } from "../lib/tableSeat";
 
 interface RoomTableProps {
   seats: TableSeat[];
   layout: "compact" | "wide";
   swapMode: boolean;
-  canInvite: boolean;
   center: ReactNode;
   onSeat: (seat: number) => void;
-  onInvite: () => void;
   onAddBot: (seat: number) => void;
 }
 
@@ -29,22 +28,11 @@ const AREA: Record<Cardinal, string> = {
   west: "[grid-area:west]",
 };
 
-const BOT_BUTTON = "border-bot-edge bg-bot-soft text-bot-deep hover:border-bot hover:bg-bot-soft";
-
 /**
  * The room's table: four seats around a parchment cross, the viewer at the bottom. A phone draws avatars
  * with the open seat's Invite and Bot under its chair; wider screens draw seat cards with the actions inside.
  */
-export function RoomTable({
-  seats,
-  layout,
-  swapMode,
-  canInvite,
-  center,
-  onSeat,
-  onInvite,
-  onAddBot,
-}: RoomTableProps) {
+export function RoomTable({ seats, layout, swapMode, center, onSeat, onAddBot }: RoomTableProps) {
   const wide = layout === "wide";
   return (
     <div
@@ -74,23 +62,9 @@ export function RoomTable({
           )}
         >
           {wide ? (
-            <SeatCard
-              seat={s}
-              swapMode={swapMode}
-              canInvite={canInvite}
-              onSeat={onSeat}
-              onInvite={onInvite}
-              onAddBot={onAddBot}
-            />
+            <SeatCard seat={s} swapMode={swapMode} onSeat={onSeat} onAddBot={onAddBot} />
           ) : (
-            <SeatBubble
-              seat={s}
-              swapMode={swapMode}
-              canInvite={canInvite}
-              onSeat={onSeat}
-              onInvite={onInvite}
-              onAddBot={onAddBot}
-            />
+            <SeatBubble seat={s} swapMode={swapMode} onSeat={onSeat} onAddBot={onAddBot} />
           )}
         </div>
       ))}
@@ -125,9 +99,7 @@ function TeamLines() {
 interface SeatViewProps {
   seat: TableSeat;
   swapMode: boolean;
-  canInvite: boolean;
   onSeat: (seat: number) => void;
-  onInvite: () => void;
   onAddBot: (seat: number) => void;
 }
 
@@ -137,32 +109,11 @@ function edgeFor(team: "A" | "B" | null): string {
   return "var(--brass)";
 }
 
-function OpenSeatActions({
-  seat,
-  swapMode,
-  canInvite,
-  onInvite,
-  onAddBot,
-  small,
-}: SeatViewProps & { small: boolean }) {
+function OpenSeatActions({ seat, swapMode, onAddBot }: SeatViewProps) {
   const { t } = useTranslation();
   if (swapMode) return null;
-  const size = small ? "h-7 gap-1 px-2 text-xs" : undefined;
   return (
     <>
-      {canInvite && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onInvite}
-          disabled={seat.pending}
-          data-testid={`invite-seat-${seat.seat}`}
-          className={size}
-        >
-          <UserPlus className="size-3.5" />
-          {t("roomInvite.panel.invite")}
-        </Button>
-      )}
       {seat.canAddBot && (
         <Button
           size="sm"
@@ -171,7 +122,7 @@ function OpenSeatActions({
           disabled={seat.pending}
           aria-label={t("room.addBot")}
           data-testid={`add-bot-seat-${seat.seat}`}
-          className={cn(BOT_BUTTON, size)}
+          className={BOT_BUTTON_CLASS}
         >
           <Bot className="size-3.5" />
           {t("bots.badge")}
@@ -282,7 +233,7 @@ function SeatBubble(props: SeatViewProps) {
   const { t } = useTranslation();
   if (seat.player === undefined) {
     return (
-      <div className="flex w-28 flex-col items-center gap-1">
+      <div className="flex w-28 flex-col items-center">
         <button
           type="button"
           onClick={() => onSeat(seat.seat)}
@@ -300,9 +251,20 @@ function SeatBubble(props: SeatViewProps) {
             {swapMode ? t("room.seat.moveHere") : t("room.seat.sit")}
           </span>
         </button>
-        <div className="flex items-center gap-1">
-          <OpenSeatActions {...props} small />
-        </div>
+        {seat.canAddBot && !swapMode && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => props.onAddBot(seat.seat)}
+            disabled={seat.pending}
+            aria-label={t("room.addBot")}
+            data-testid={`add-bot-seat-${seat.seat}`}
+            className={cn("mt-1 h-7 gap-1 px-2 text-xs", BOT_BUTTON_CLASS)}
+          >
+            <Bot className="size-3.5" />
+            {t("bots.badge")}
+          </Button>
+        )}
       </div>
     );
   }
@@ -363,7 +325,7 @@ function SeatCard(props: SeatViewProps) {
             <Armchair className="size-3.5" />
             {swapMode ? t("room.seat.moveHere") : t("room.seat.sit")}
           </Button>
-          <OpenSeatActions {...props} small={false} />
+          <OpenSeatActions {...props} />
         </div>
       </div>
     );

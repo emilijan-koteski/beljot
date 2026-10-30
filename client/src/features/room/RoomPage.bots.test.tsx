@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 import { useChatStore } from "@/shared/stores/chatStore";
-import { makeRoom, makeRoomDetail, makeUser, QueryWrapper } from "@/test-utils";
+import { makeRoom, makeRoomDetail, makeUser, mockViewportWidth, QueryWrapper } from "@/test-utils";
 
 import { RoomPage } from "./RoomPage";
 
@@ -172,18 +172,38 @@ describe("RoomPage bot seating", () => {
     ).toBeInTheDocument();
   });
 
-  it("owner sees the add-bot affordance on empty seats and it fires the mutation", async () => {
+  it("owner adds a bot on a phone from the seat's own Bot button", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
     mockGetRoom.mockResolvedValue(makeRoomDetail({ room, players: [human(10, "alice", 0)] }));
-    mockAddBot.mockResolvedValue({ players: [human(10, "alice", 0), bot(1)] });
+    mockAddBot.mockResolvedValue({ players: [human(10, "alice", 0), bot(2)] });
 
     renderRoomPage();
 
-    await waitFor(() => expect(screen.getByTestId("add-bot-seat-1")).toBeInTheDocument());
-    await userEvent.click(screen.getByTestId("add-bot-seat-1"));
+    await waitFor(() => expect(screen.getByTestId("add-bot-seat-2")).toBeInTheDocument());
+    expect(screen.getByTestId("add-bot-seat-1")).toBeInTheDocument();
+    expect(screen.getByTestId("add-bot-seat-3")).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("add-bot-seat-2"));
 
-    await waitFor(() => expect(mockAddBot).toHaveBeenCalledWith(1, 1));
-    expect(await screen.findByTestId("bot-name-1")).toHaveTextContent("Bot 2");
+    await waitFor(() => expect(mockAddBot).toHaveBeenCalledWith(1, 2));
+    expect(await screen.findByTestId("bot-name-2")).toHaveTextContent("Bot 3");
+  });
+
+  it("owner adds a bot to a chosen seat from its card on a wide screen", async () => {
+    const restore = mockViewportWidth(1280);
+    try {
+      useAuthStore.setState({ user: owner, token: "tok" });
+      mockGetRoom.mockResolvedValue(makeRoomDetail({ room, players: [human(10, "alice", 0)] }));
+      mockAddBot.mockResolvedValue({ players: [human(10, "alice", 0), bot(3)] });
+
+      renderRoomPage();
+
+      await waitFor(() => expect(screen.getByTestId("add-bot-seat-3")).toBeInTheDocument());
+      await userEvent.click(screen.getByTestId("add-bot-seat-3"));
+
+      await waitFor(() => expect(mockAddBot).toHaveBeenCalledWith(1, 3));
+    } finally {
+      restore();
+    }
   });
 
   it("non-owner sees no add-bot or remove-bot affordances", async () => {

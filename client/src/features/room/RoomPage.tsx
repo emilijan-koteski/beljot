@@ -763,7 +763,6 @@ export function RoomPage() {
     viewerId: currentUser?.id ?? null,
     ownerId: room.ownerId,
     canManage: isOwner && isWaiting,
-    canInvite,
     onPromote: (p) => setTransferConfirm({ userId: p.userId, username: p.username }),
     onKick: (p) => {
       setSwapSourceSeat(null);
@@ -772,10 +771,6 @@ export function RoomPage() {
     onRemoveBot: (seat) => {
       setSwapSourceSeat(null);
       setRemoveBotConfirm({ seat });
-    },
-    onInvite: () => {
-      setShowRoster(false);
-      setShowInviteFriends(true);
     },
   };
 
@@ -792,7 +787,7 @@ export function RoomPage() {
   const center: ReactNode = phone ? (
     <div
       className={cn(
-        "bg-surface-elevated flex size-18 flex-col items-center justify-center rounded-full border shadow-sm",
+        "bg-surface-elevated flex size-20 flex-col items-center justify-center rounded-full border shadow-sm",
         allSeated ? "border-accent" : "border-brass/50",
       )}
       data-testid="table-center"
@@ -805,7 +800,7 @@ export function RoomPage() {
           <span className="text-ink-mute text-sm">/4</span>
         </span>
       )}
-      <span className="text-ink-mute font-mono text-2xs tracking-caps uppercase">
+      <span className="text-ink-mute max-w-17 text-center text-2xs leading-tight">
         {allSeated ? t("room.table.ready") : t("room.table.seated")}
       </span>
     </div>
@@ -916,12 +911,21 @@ export function RoomPage() {
               seats={table}
               layout={phone ? "compact" : "wide"}
               swapMode={inSwapMode}
-              canInvite={canInvite}
               center={center}
               onSeat={handleSeat}
-              onInvite={() => setShowInviteFriends(true)}
               onAddBot={handleAddBot}
             />
+            {phone && canInvite && !inSwapMode && (
+              <Button
+                variant="outline"
+                onClick={() => setShowInviteFriends(true)}
+                data-testid="invite-open"
+                className="h-10"
+              >
+                <UserPlus className="size-4" />
+                {t("roomInvite.panel.title")}
+              </Button>
+            )}
             {phone && standing.length > 0 && (
               <button
                 type="button"
