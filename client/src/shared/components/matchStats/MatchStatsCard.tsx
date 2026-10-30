@@ -411,11 +411,10 @@ export function MatchStatsCard({
 
   return (
     <li
-      className={cn("relative transition-colors", isOpen && "bg-brass/5")}
+      className={cn("transition-colors", isOpen && "bg-brass/5")}
       data-testid="match-history-row"
       data-match-id={match.id}
     >
-      {isOpen && <span aria-hidden="true" className="bg-brass absolute inset-y-0 left-0 w-0.5" />}
       <div
         onClick={onToggle}
         className="hover:bg-brass/5 flex cursor-pointer flex-col gap-1.5 px-3.5 py-2.5 transition-colors"
