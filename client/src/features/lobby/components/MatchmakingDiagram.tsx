@@ -86,10 +86,10 @@ export function MatchmakingDiagram({
         <Badge tone="accent" icon={<TimerIcon className="size-3 text-(--accent)" />}>
           {room.timerStyle === "relaxed"
             ? t("lobby.card.relaxed")
-            : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds })}
+            : t("lobby.card.timerShort", { seconds: room.timerDurationSeconds })}
         </Badge>
         <Badge tone="neutral" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
-          {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
+          {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.free")}
         </Badge>
         <span className="text-ink-mute font-mono text-xs tracking-wider">
           {t("lobby.matchmaking.elapsed")}{" "}

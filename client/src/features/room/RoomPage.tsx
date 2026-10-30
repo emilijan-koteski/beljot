@@ -1,15 +1,23 @@
-import { Coins, Crown, DoorOpen, History, Lock, Send, Shuffle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { ArrowLeftRight, Check, DoorOpen, UserPlus, Users } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { PasswordPromptDialog } from "@/features/lobby/components/PasswordPromptDialog";
-import { InviteFriendsDialog } from "@/features/room/components/InviteFriendsDialog";
-import { LastMatchDialog } from "@/features/room/components/LastMatchDialog";
+import { InviteFriendsDialog, InvitePlayers } from "@/features/room/components/InviteFriendsDialog";
+import { PlayerActionsDialog } from "@/features/room/components/PlayerActionsDialog";
 import { RoomChatDock } from "@/features/room/components/RoomChatDock";
-import { RoomPlayersMenu } from "@/features/room/components/RoomPlayersMenu";
-import { SeatTile } from "@/features/room/components/SeatTile";
+import { PhoneRoomCard, WideRoomHeader } from "@/features/room/components/RoomHeader";
+import { LastMatchOutcome, RoomLastMatch } from "@/features/room/components/RoomLastMatch";
+import {
+  RoomRoster,
+  RoomRosterDialog,
+  type RoomRosterProps,
+} from "@/features/room/components/RoomRoster";
+import { RoomTable } from "@/features/room/components/RoomTable";
+import { cardinalFor, type TableSeat } from "@/features/room/lib/tableSeat";
+import { useHorizontalSwipe } from "@/features/room/lib/useHorizontalSwipe";
 import {
   KickPlayerDialog,
   RemoveBotDialog,
@@ -17,12 +25,11 @@ import {
 } from "@/features/room/OwnerConfirmDialogs";
 import { RoomPrivacyDialog } from "@/features/room/RoomPrivacyDialog";
 import { FetchError } from "@/shared/api/axiosClient";
-import { HonorShield } from "@/shared/components/HonorShield";
-import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
-import { RoomRulesPopover } from "@/shared/components/roomRules/RoomRules";
-import { Badge } from "@/shared/components/ui/badge";
+import { PageShell } from "@/shared/components/layout/PageShell";
+import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
-import { CodeChip } from "@/shared/components/ui/code-chip";
+import { Panel } from "@/shared/components/ui/panel";
+import { Segmented } from "@/shared/components/ui/segmented";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   useAddBotMutation,
@@ -38,18 +45,11 @@ import {
 } from "@/shared/hooks/mutations/useRooms";
 import { useRoomLastMatchQuery } from "@/shared/hooks/queries/useMatches";
 import { useRoomDetailQuery } from "@/shared/hooks/queries/useRooms";
+import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
 import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { botDisplayName } from "@/shared/lib/botName";
-import { COIN_GOLD } from "@/shared/lib/coinGold";
-import { formatCoins } from "@/shared/lib/formatCoins";
-import {
-  honorFloorLabel,
-  honorQualifies,
-  honorRoomIsGated,
-  honorTierForScore,
-} from "@/shared/lib/honor";
+import { honorQualifies, honorRoomIsGated } from "@/shared/lib/honor";
 import { joinFailureMessage as sharedJoinFailureMessage } from "@/shared/lib/joinFailure";
-import { modeLabel, variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useWsConnectionState } from "@/shared/providers/WebSocketContext";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -57,45 +57,41 @@ import { useChatStore } from "@/shared/stores/chatStore";
 import { useRoomStore } from "@/shared/stores/roomStore";
 import type { Room, RoomPlayer } from "@/shared/types/apiTypes";
 
-// Waiting-room seat position. Seats map to fixed cardinals, unlike the in-game table
-// that rotates the viewer to the bottom.
-type CardinalPosition = "south" | "east" | "north" | "west";
+type RoomTab = "table" | "last";
 
-const SEAT_RENDER_ORDER = [0, 2, 1, 3] as const;
+const VIEW_ORDER = ["south", "east", "north", "west"] as const;
 
-const SEAT_TO_CARDINAL: Record<number, CardinalPosition> = {
-  0: "south",
-  1: "east",
-  2: "north",
-  3: "west",
-};
+const SCROLL_LIST = "overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]";
 
 function getPlayerAtSeat(players: RoomPlayer[], seatIndex: number): RoomPlayer | undefined {
   return players.find((p) => p.seat === seatIndex);
 }
 
-// Team-legend square mirroring the seat tiles: dashed and blinking while the viewer is unseated,
-// solid gold or silver with a team dot once seated.
-function LegendIndicator({ variant }: { variant: "neutral" | "us" | "them" }) {
-  const tokens = {
-    neutral: { border: "var(--brass)", dot: "var(--brass)", dashed: true, pulse: true },
-    us: { border: "var(--team-a)", dot: "var(--team-a-fill)", dashed: false, pulse: false },
-    them: { border: "var(--team-b)", dot: "var(--team-b-fill)", dashed: false, pulse: false },
-  }[variant];
+interface RoomCta {
+  label: string;
+  disabled: boolean;
+  testId: string;
+  onClick?: () => void;
+  title?: string;
+  waitingFor?: RoomPlayer;
+}
+
+/** The one action the viewer has, as the phone's bottom-bar button or the centre of the wide table. */
+function CtaButton({ cta, className }: { cta: RoomCta; className?: string }) {
   return (
-    <span
-      aria-hidden
-      className="inline-flex h-5 w-7 items-center justify-center rounded"
-      style={{ border: `2px ${tokens.dashed ? "dashed" : "solid"} ${tokens.border}` }}
+    <Button
+      size="cta"
+      onClick={cta.onClick}
+      disabled={cta.disabled}
+      title={cta.title}
+      data-testid={cta.testId}
+      className={cn("min-w-0", className)}
     >
-      <span
-        className={cn(
-          "size-2 rounded-full",
-          tokens.pulse && "animate-[pulse-dot_1.6s_ease-in-out_infinite]",
-        )}
-        style={{ background: tokens.dot }}
-      />
-    </span>
+      {cta.waitingFor !== undefined && (
+        <Avatar name={cta.waitingFor.username} avatarUrl={cta.waitingFor.avatarUrl} size={22} />
+      )}
+      <span className="min-w-0 truncate">{cta.label}</span>
+    </Button>
   );
 }
 
@@ -147,7 +143,14 @@ export function RoomPage() {
   const [removeBotConfirm, setRemoveBotConfirm] = useState<{ seat: number } | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
-  const [showLastMatch, setShowLastMatch] = useState(false);
+  const [tab, setTab] = useState<RoomTab>("table");
+  const [playerTarget, setPlayerTarget] = useState<number | null>(null);
+  const [showRoster, setShowRoster] = useState(false);
+  const band = useLayoutBand();
+  const swipe = useHorizontalSwipe(
+    () => setTab("last"),
+    () => setTab("table"),
+  );
 
   const [deepLinkPrivateRoom, setDeepLinkPrivateRoom] = useState<Room | null>(null);
   const [deepLinkPasswordError, setDeepLinkPasswordError] = useState<string | null>(null);
@@ -591,14 +594,10 @@ export function RoomPage() {
 
   if (roomQuery.isPending) {
     return (
-      <div className="mx-auto max-w-330 px-8 py-8" data-testid="room-page-loading">
-        <Skeleton className="mb-6 h-8 w-48 rounded" />
-        <div className="grid grid-cols-2 gap-6">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="border-border h-32 rounded-xl border" />
-          ))}
-        </div>
-      </div>
+      <PageShell testId="room-page-loading">
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-80 w-full rounded-[2rem]" />
+      </PageShell>
     );
   }
 
@@ -628,24 +627,18 @@ export function RoomPage() {
 
   const players = storePlayers.length > 0 ? storePlayers : roomQuery.data!.players;
 
-  const variantText = variantLabel(t, room.variant);
-  const matchModeText = modeLabel(t, room.matchMode);
-  const timerLabel =
-    room.timerStyle === "relaxed"
-      ? t("lobby.card.relaxed")
-      : t("lobby.card.timerSeconds", { seconds: room.timerDurationSeconds ?? "?" });
-
   const isOwner = currentUser !== null && currentUser.id === room.ownerId;
-  const canEditPrivacy = isOwner && room.status === "waiting" && !room.isQuickPlay;
+  const isWaiting = room.status === "waiting";
+  const canEditPrivacy = isOwner && isWaiting && !room.isQuickPlay;
   const seatedCount = players.filter((p) => p.seat !== null).length;
   const allSeated = seatedCount === 4;
 
   const seatedHumans = players.filter((p) => p.seat !== null && p.isBot !== true);
   const presenceTracked = returnedUserIds.length > 0;
-  const allReturned =
-    !presenceTracked || seatedHumans.every((p) => returnedUserIds.includes(p.userId));
   const isWaitingToReturn = (p: RoomPlayer): boolean =>
     presenceTracked && p.seat !== null && p.isBot !== true && !returnedUserIds.includes(p.userId);
+  const firstAway = seatedHumans.find(isWaitingToReturn);
+  const allReturned = firstAway === undefined;
 
   const isBelowHonorBar = (p: RoomPlayer): boolean =>
     honorRoomIsGated(room) &&
@@ -656,523 +649,335 @@ export function RoomPage() {
 
   const ownerPlayer = players.find((p) => p.userId === room.ownerId);
   const ownerUsername = ownerPlayer?.username ?? t("room.seatOwner");
-  const isRelaxed = room.timerStyle === "relaxed";
-
-  const viewerSeat = currentUser
-    ? (players.find((p) => p.userId === currentUser.id)?.seat ?? null)
-    : null;
-  const resolveSeatMode = (seatIndex: number): "us" | "them" | "neutral" => {
-    if (viewerSeat === null || viewerSeat === undefined) return "neutral";
-    return viewerSeat % 2 === seatIndex % 2 ? "us" : "them";
-  };
-
-  const yourPair = viewerSeat !== null && viewerSeat % 2 === 0 ? [0, 2] : [1, 3];
-  const otherPair = yourPair[0] === 0 ? [1, 3] : [0, 2];
-  const renderSlots = (pair: number[]) => (
-    <span className="text-ink-mute inline-flex flex-wrap items-center">
-      <span className="text-faint" aria-hidden>
-        (
-      </span>
-      <span className="inline-flex flex-wrap items-center gap-1">
-        {pair.map((seatIndex, i) => {
-          const p = getPlayerAtSeat(players, seatIndex);
-          const isYouSlot = p !== undefined && p.isBot !== true && p.userId === currentUser?.id;
-          return (
-            <span key={seatIndex} className="inline-flex items-center gap-1">
-              {i > 0 && <span className="text-faint">+</span>}
-              {p ? (
-                <span className={isYouSlot ? "text-accent font-semibold" : "text-ink-dim"}>
-                  {isYouSlot
-                    ? t("room.seatYouInline")
-                    : p.isBot === true
-                      ? botDisplayName(t, p.seat)
-                      : p.username}
-                </span>
-              ) : (
-                <span className="text-ink-mute animate-pulse">{t("room.legendOpen")}</span>
-              )}
-            </span>
-          );
-        })}
-      </span>
-      <span className="text-faint" aria-hidden>
-        )
-      </span>
-    </span>
-  );
-
-  const rosterTeam = (p: RoomPlayer): "A" | "B" | null => {
-    if (p.seat === null || viewerSeat === null) return null;
-    return resolveSeatMode(p.seat) === "us" ? "A" : "B";
-  };
-
+  const viewerPlayer = currentUser ? players.find((p) => p.userId === currentUser.id) : undefined;
+  const viewerSeat = viewerPlayer?.seat ?? null;
   const inSwapMode = swapSourceSeat !== null;
-  let ctaLabel: string;
-  let ctaDisabled = true;
-  let ctaOnClick: (() => void) | undefined;
-  let ctaTestId = "room-cta";
-  if (inSwapMode) {
-    ctaLabel = allSeated ? t("room.actionBarFinishSwap") : t("room.waitingForPlayers");
-  } else if (room.isQuickPlay) {
-    ctaLabel = allSeated ? t("room.autoStarting") : t("room.waitingForPlayers");
-  } else if (isOwner) {
-    ctaTestId = "start-game";
-    ctaDisabled =
-      !allSeated || !allReturned || blockedSeats.length > 0 || startGameMutation.isPending;
-    ctaOnClick = ctaDisabled ? undefined : handleStartGame;
-    ctaLabel = startGameMutation.isPending
-      ? t("room.matchStarting")
-      : !allSeated
-        ? t("room.waitingForPlayers")
-        : !allReturned
-          ? t("room.waitingForReturn")
-          : t("room.startMatch");
+  const phone = band === "phone";
+  const canInvite = isWaiting && !allSeated;
+
+  const teamOf = (seat: number): "A" | "B" | null =>
+    viewerSeat === null ? null : viewerSeat % 2 === seat % 2 ? "A" : "B";
+
+  const table: TableSeat[] = ([0, 1, 2, 3] as const).map((seat) => {
+    const player = getPlayerAtSeat(players, seat);
+    const isBot = player?.isBot === true;
+    const isYou = player !== undefined && !isBot && player.userId === currentUser?.id;
+    const isHost = player !== undefined && !isBot && player.userId === room.ownerId;
+    const canLeaveOwnSeat = isYou && isWaiting && !isHost && !inSwapMode;
+    const hostMenu = isOwner && isWaiting && player !== undefined && !isYou && !inSwapMode;
+    const pending =
+      (kickPlayerMutation.isPending &&
+        player !== undefined &&
+        kickPlayerMutation.variables?.userId === player.userId) ||
+      (swapSeatsMutation.isPending &&
+        (swapSeatsMutation.variables?.seatA === seat ||
+          swapSeatsMutation.variables?.seatB === seat)) ||
+      (leaveSeatMutation.isPending && isYou) ||
+      (addBotMutation.isPending && addBotMutation.variables?.seat === seat) ||
+      (removeBotMutation.isPending && removeBotMutation.variables?.seat === seat);
+    return {
+      seat,
+      cardinal: cardinalFor(seat, viewerSeat),
+      team: teamOf(seat),
+      player,
+      name: player === undefined ? "" : isBot ? botDisplayName(t, seat) : player.username,
+      isYou,
+      isHost,
+      returning: isWaiting && player !== undefined && isWaitingToReturn(player),
+      belowHonorBar: isWaiting && player !== undefined && isBelowHonorBar(player),
+      swapSource: swapSourceSeat === seat,
+      pending,
+      clickable: inSwapMode || player === undefined || canLeaveOwnSeat || hostMenu,
+      canAddBot: isOwner && isWaiting && player === undefined && !room.isQuickPlay,
+      hostMenu,
+    };
+  });
+  const tableFromViewer = [...table].sort(
+    (a, b) => VIEW_ORDER.indexOf(a.cardinal) - VIEW_ORDER.indexOf(b.cardinal),
+  );
+  const standing = players.filter((p) => p.seat === null && p.isBot !== true);
+  const inRoom = players.filter((p) => p.isBot !== true).length;
+
+  const handleSeat = (seat: number) => {
+    if (inSwapMode) {
+      handleSwapTarget(seat);
+      return;
+    }
+    const target = table[seat];
+    if (target === undefined) return;
+    if (target.player === undefined) {
+      handleSelectSeat(seat);
+      return;
+    }
+    if (target.isYou) {
+      if (target.clickable) handleLeaveSeat();
+      return;
+    }
+    if (target.hostMenu) setPlayerTarget(seat);
+  };
+
+  const actionTarget = playerTarget !== null ? table[playerTarget] : undefined;
+
+  let cta: RoomCta;
+  if (isOwner) {
+    const waiting = allSeated && !allReturned ? firstAway : undefined;
+    cta = {
+      testId: "start-game",
+      disabled:
+        inSwapMode ||
+        !allSeated ||
+        !allReturned ||
+        blockedSeats.length > 0 ||
+        startGameMutation.isPending,
+      label: startGameMutation.isPending
+        ? t("room.matchStarting")
+        : waiting !== undefined
+          ? t("room.waitingFor", { name: waiting.username })
+          : t("room.startMatch"),
+      title:
+        blockedSeats.length > 0
+          ? t("room.startBlockedByHonor", { minHonor: room.minHonor })
+          : undefined,
+      waitingFor: waiting,
+    };
+    cta.onClick = cta.disabled ? undefined : handleStartGame;
   } else {
-    ctaLabel = allSeated ? t("room.waitingForOwner") : t("room.waitingForPlayers");
+    const waiting = !allSeated ? undefined : (firstAway ?? ownerPlayer);
+    cta = {
+      testId: "room-cta",
+      disabled: true,
+      label:
+        waiting === undefined
+          ? t("room.waitingForPlayers")
+          : t("room.waitingFor", { name: waiting.username }),
+      waitingFor: waiting,
+    };
   }
 
+  const lastMatch = isWaiting ? lastMatchQuery.data : undefined;
+  const showLast = tab === "last" && lastMatch !== undefined;
+
+  const rosterProps: RoomRosterProps = {
+    table: tableFromViewer,
+    standing,
+    viewerId: currentUser?.id ?? null,
+    ownerId: room.ownerId,
+    canManage: isOwner && isWaiting,
+    canInvite,
+    onPromote: (p) => setTransferConfirm({ userId: p.userId, username: p.username }),
+    onKick: (p) => {
+      setSwapSourceSeat(null);
+      setKickConfirm({ seat: p.seat ?? -1, userId: p.userId, username: p.username });
+    },
+    onRemoveBot: (seat) => {
+      setSwapSourceSeat(null);
+      setRemoveBotConfirm({ seat });
+    },
+    onInvite: () => {
+      setShowRoster(false);
+      setShowInviteFriends(true);
+    },
+  };
+
+  const headerProps = {
+    room,
+    players,
+    ownerName: ownerUsername,
+    canEditPrivacy,
+    copied: justCopied,
+    onCopy: handleCopyLink,
+    onPrivacy: () => setShowPrivacy(true),
+  };
+
+  const center: ReactNode = phone ? (
+    <div
+      className={cn(
+        "bg-surface-elevated flex size-18 flex-col items-center justify-center rounded-full border shadow-sm",
+        allSeated ? "border-accent" : "border-brass/50",
+      )}
+      data-testid="table-center"
+    >
+      {allSeated ? (
+        <Check className="text-accent size-6" aria-hidden="true" />
+      ) : (
+        <span className="text-ink text-xl font-bold tabular-nums" data-testid="seated-count">
+          {seatedCount}
+          <span className="text-ink-mute text-sm">/4</span>
+        </span>
+      )}
+      <span className="text-ink-mute font-mono text-2xs tracking-caps uppercase">
+        {allSeated ? t("room.table.ready") : t("room.table.seated")}
+      </span>
+    </div>
+  ) : (
+    <div className="flex flex-col items-center gap-2 py-4 text-center" data-testid="table-center">
+      <span className="text-ink text-2xl font-bold tabular-nums" data-testid="seated-count">
+        {seatedCount}
+        <span className="text-ink-mute text-base">/4</span>
+      </span>
+      <span className="text-ink-mute font-mono text-2xs tracking-caps uppercase">
+        {t("room.table.seated")}
+      </span>
+      <CtaButton cta={cta} />
+    </div>
+  );
+
+  const sidePanels = (
+    <>
+      {canInvite && (
+        <Panel icon={<UserPlus />} title={t("roomInvite.panel.title")} testId="room-invite-panel">
+          <InvitePlayers roomId={room.id} active listClassName="max-h-56" />
+        </Panel>
+      )}
+      <Panel
+        icon={<Users />}
+        title={t("room.roster.title")}
+        aside={<span className="text-ink-mute">{inRoom}</span>}
+        testId="room-roster-panel"
+      >
+        <RoomRoster {...rosterProps} className={cn("max-h-80", SCROLL_LIST)} />
+      </Panel>
+    </>
+  );
+
+  const bottomBar = (
+    <div className="flex items-center gap-2" data-testid="action-bar">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleLeaveRoom}
+        aria-label={t("room.leaveRoom")}
+        data-testid="leave-room"
+        className="text-danger border-danger/30 hover:text-danger size-11 shrink-0 rounded-xl"
+      >
+        <DoorOpen className="size-5" />
+      </Button>
+      <CtaButton cta={cta} className="h-11 flex-1 text-base" />
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-330 px-4 pt-6 pb-24 md:px-8 md:pb-6">
-      <div data-testid="room-page">
-        <div
-          className="bg-surface border-border relative mb-4 rounded-lg border p-4 shadow-lg inset-shadow-bevel md:mb-6 md:p-6"
-          data-testid="room-info-card"
-        >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-px right-7 left-7 h-0.5 bg-[linear-gradient(90deg,transparent,var(--brass)_50%,transparent)] opacity-70"
+    <PageShell
+      testId="room-page"
+      sidebar={band === "desktop" ? sidePanels : undefined}
+      bottomBar={phone ? bottomBar : undefined}
+    >
+      {phone ? (
+        <PhoneRoomCard {...headerProps} inRoom={inRoom} onRoster={() => setShowRoster(true)} />
+      ) : (
+        <WideRoomHeader {...headerProps} onLeave={handleLeaveRoom} />
+      )}
+
+      {lastMatch !== undefined && (
+        <Segmented<RoomTab>
+          value={showLast ? "last" : "table"}
+          onValueChange={setTab}
+          ariaLabel={t("room.tabs.label")}
+          testId="room-tabs"
+          className={phone ? undefined : "w-80"}
+          options={[
+            { value: "table", label: t("room.tabs.table") },
+            {
+              value: "last",
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  {t("room.lastMatch.title")}
+                  <LastMatchOutcome outcome={lastMatch.outcome} />
+                </span>
+              ),
+            },
+          ]}
+        />
+      )}
+
+      <div className="flex flex-col gap-3.5" {...(phone && lastMatch !== undefined ? swipe : {})}>
+        {showLast ? (
+          <RoomLastMatch
+            match={lastMatch}
+            roomId={room.id}
+            playersInRoom={players.map((p) => p.userId)}
+            compact={band !== "desktop"}
           />
-
-          <div className="flex items-center gap-3">
-            <h1
-              className="text-ink m-0 min-w-0 flex-1 truncate text-xl leading-tight font-bold tracking-tight md:text-3xl"
-              data-testid="room-info-name"
-            >
-              {room.name}
-            </h1>
-            <div className="flex shrink-0 items-center gap-2">
-              {canEditPrivacy && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPrivacy(true)}
-                  data-testid="room-privacy-control"
-                  aria-label={
-                    room.isPrivate
-                      ? t("room.privacy.manageButtonPrivate")
-                      : t("room.privacy.manageButtonPublic")
-                  }
-                  className="w-7 px-0 whitespace-nowrap md:w-auto md:px-2.5"
-                >
-                  <Lock className="size-3.5" />
-                  <span className="hidden md:inline">
-                    {room.isPrivate
-                      ? t("room.privacy.manageButtonPrivate")
-                      : t("room.privacy.manageButtonPublic")}
-                  </span>
-                </Button>
-              )}
-              <CodeChip
-                code={room.code}
-                variant="compact"
-                copied={justCopied}
-                onCopy={handleCopyLink}
-                ariaLabel={t("room.copyLinkAriaLabel", { code: room.code })}
-                testId="copy-link"
-                codeTestId="room-code"
-                className="px-2.5 py-1 text-xs md:px-3 md:py-2 md:text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-col gap-3 md:mt-4 md:flex-row md:items-center md:justify-between md:gap-4">
-            <div className="text-ink-dim flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs md:text-sm">
-              <span className="inline-flex items-center gap-1.5">
-                <Crown className="text-brass-deep size-3" aria-hidden />
-                <Trans
-                  i18nKey="room.ownerLine"
-                  values={{ owner: ownerUsername }}
-                  components={{ name: <span className="text-ink font-semibold" /> }}
-                />
-              </span>
-              <span className="text-faint" aria-hidden>
-                ·
-              </span>
-              <RoomPlayersMenu
-                players={players}
-                ownerId={room.ownerId}
-                viewerId={currentUser?.id ?? null}
-                canManage={isOwner && room.status === "waiting"}
-                teamOf={rosterTeam}
-                promotePending={transferOwnershipMutation.isPending}
-                kickPending={kickPlayerMutation.isPending}
-                onPromote={(p) => setTransferConfirm({ userId: p.userId, username: p.username })}
-                onKick={(p) => {
-                  setSwapSourceSeat(null);
-                  setKickConfirm({ seat: p.seat ?? -1, userId: p.userId, username: p.username });
-                }}
-              />
-              <span className="text-faint" aria-hidden>
-                ·
-              </span>
-              <span
-                className={seatedCount === 4 ? "text-accent font-semibold" : undefined}
-                data-testid="seated-count"
-              >
-                {t("room.seatedCount", { current: seatedCount, max: 4 })}
-              </span>
-            </div>
-            <div
-              className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-xs md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
-              data-testid="room-info-badges"
-            >
-              <Badge tone="brass">
-                <span data-testid="badge-variant">{variantText}</span>
-              </Badge>
-              <Badge tone="brass">
-                <span data-testid="badge-match-mode">{matchModeText}</span>
-              </Badge>
-              <Badge
-                tone={isRelaxed ? "accent" : "neutral"}
-                icon={isRelaxed ? <RULE_ICONS.relaxedTimer /> : <RULE_ICONS.moveTimer />}
-              >
-                <span data-testid="badge-timer">{timerLabel}</span>
-              </Badge>
-              <Badge tone="brass" icon={<Coins className="size-3" style={{ color: COIN_GOLD }} />}>
-                <span data-testid="badge-buy-in">
-                  {room.coinBuyIn > 0 ? formatCoins(room.coinBuyIn) : t("lobby.card.buyInFree")}
-                </span>
-              </Badge>
-              {room.minHonor > 0 && (
-                <Badge
-                  tone="neutral"
-                  icon={<HonorShield tier={honorTierForScore(room.minHonor)} size={12} />}
-                >
-                  <span data-testid="badge-min-honor" data-min-honor={room.minHonor}>
-                    {t("lobby.card.minHonor", { minHonor: honorFloorLabel(room.minHonor) })}
-                  </span>
-                </Badge>
-              )}
-              {room.allowNewPlayers === false && (
-                <Badge tone="neutral" icon={<RULE_ICONS.veteransOnly className="size-3" />}>
-                  <span data-testid="badge-veterans-only">
-                    {t("lobby.createRoomModal.allowNewPlayersNo")}
-                  </span>
-                </Badge>
-              )}
-              {room.isQuickPlay && (
-                <Badge tone="accent" icon={<RULE_ICONS.quickPlay className="size-3" />}>
-                  <span data-testid="badge-quick-play">{t("lobby.quickPlay")}</span>
-                </Badge>
-              )}
-              {room.isPrivate ? (
-                <Badge tone="neutral" icon={<RULE_ICONS.private className="size-3" />}>
-                  <span data-testid="badge-private">{t("room.privacy.privateBadge")}</span>
-                </Badge>
-              ) : (
-                <Badge tone="neutral" icon={<RULE_ICONS.public className="size-3" />}>
-                  <span data-testid="badge-public">{t("room.privacy.publicBadge")}</span>
-                </Badge>
-              )}
-              {players.some((p) => p.isBot === true) && (
-                <Badge tone="bot" icon={<RULE_ICONS.bots className="size-3" />}>
-                  <span data-testid="badge-bots">{t("bots.tag")}</span>
-                </Badge>
-              )}
-              <RoomRulesPopover
-                room={{ ...room, players }}
-                live={room.status !== "waiting"}
-                labelled
-                className="bg-surface-sunken text-ink-dim mr-0 h-6 gap-1 rounded px-2 text-xs leading-none font-semibold md:px-2.5"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="border-border bg-surface mb-4 flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 sm:mb-6 sm:gap-3 sm:px-4 sm:py-3"
-          data-testid="action-bar"
-        >
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <Button
-              variant="ghost"
-              onClick={handleLeaveRoom}
-              data-testid="leave-room"
-              aria-label={t("room.leaveRoom")}
-              className="text-danger hover:text-danger size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
-            >
-              <DoorOpen className="size-5 sm:size-4" />
-              <span className="hidden sm:inline">{t("room.leaveRoom")}</span>
-            </Button>
-            {room.status === "waiting" && (
-              <Button
-                variant="ghost"
-                onClick={() => setShowInviteFriends(true)}
-                data-testid="open-invite-friends"
-                aria-label={t("roomInvite.panel.openButton")}
-                className="size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
-              >
-                <Send className="size-5 sm:size-4" />
-                <span className="hidden sm:inline">{t("roomInvite.panel.openButton")}</span>
-              </Button>
-            )}
-            {roomIsWaiting && lastMatchQuery.data !== undefined && (
-              <Button
-                variant="ghost"
-                onClick={() => setShowLastMatch(true)}
-                data-testid="open-last-match"
-                aria-label={t("room.lastMatch.openButton")}
-                className="size-11 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
-              >
-                <History className="size-5 sm:size-4" />
-                <span className="hidden sm:inline">{t("room.lastMatch.openButton")}</span>
-              </Button>
-            )}
+        ) : (
+          <>
             {inSwapMode && (
-              <Badge tone="accent" icon={<Shuffle />} data-testid="swap-mode-banner">
-                {t("room.actionBarSwap")}
-              </Badge>
-            )}
-          </div>
-          <Button
-            size="cta"
-            onClick={ctaOnClick}
-            disabled={ctaDisabled}
-            title={
-              !inSwapMode && isOwner && blockedSeats.length > 0
-                ? t("room.startBlockedByHonor", { minHonor: room.minHonor })
-                : !inSwapMode && isOwner && !allSeated
-                  ? t("room.startMatchDisabled")
-                  : undefined
-            }
-            data-testid={ctaTestId}
-            className="h-11 min-w-0 shrink px-3.5 text-sm sm:px-5.5"
-          >
-            <span className="min-w-0 truncate">{ctaLabel}</span>
-          </Button>
-        </div>
-
-        <div
-          className="border-brass bg-surface mb-3 rounded-lg border border-dashed px-3 py-2 sm:px-4 sm:py-3"
-          data-testid="team-legend"
-        >
-          {viewerSeat === null ? (
-            <div className="flex items-center justify-center gap-2 sm:gap-2.5">
-              <LegendIndicator variant="neutral" />
-              <span className="text-ink-dim text-xs sm:text-xs">{t("room.legendNeutral")}</span>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:gap-x-4 sm:gap-y-2 sm:text-xs">
-              <span className="inline-flex items-center gap-2" data-team="teamA">
-                <LegendIndicator variant="us" />
-                <span className="text-team-a font-semibold">{t("room.legendUs")}</span>
-                {renderSlots(yourPair)}
-              </span>
-              <span className="text-faint" aria-hidden>
-                {t("room.legendVs")}
-              </span>
-              <span className="inline-flex items-center gap-2" data-team="teamB">
-                <LegendIndicator variant="them" />
-                <span className="text-team-b font-semibold">{t("room.legendThem")}</span>
-                {renderSlots(otherPair)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="relative mb-4 sm:mb-6" data-testid="seats-grid">
-          <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden sm:block">
-            <div
-              className="absolute top-[12%] left-1/2 h-[76%] w-0.5 -translate-x-1/2 opacity-50"
-              style={{
-                background:
-                  viewerSeat === null
-                    ? "linear-gradient(180deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
-                    : viewerSeat % 2 === 0
-                      ? "linear-gradient(180deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
-                      : "linear-gradient(180deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
-              }}
-            />
-            <div
-              className="absolute top-1/2 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
-              style={{
-                background:
-                  viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
-                    : viewerSeat % 2 === 1
-                      ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
-                      : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
-              }}
-            />
-          </div>
-
-          <div aria-hidden className="pointer-events-none absolute inset-0 z-0 block sm:hidden">
-            <div
-              className="absolute top-1/4 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
-              style={{
-                background:
-                  viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
-                    : viewerSeat % 2 === 0
-                      ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
-                      : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
-              }}
-            />
-            <div
-              className="absolute top-3/4 left-[12%] h-0.5 w-[76%] -translate-y-1/2 opacity-50"
-              style={{
-                background:
-                  viewerSeat === null
-                    ? "linear-gradient(90deg, transparent 0%, var(--brass) 25%, var(--brass) 75%, transparent 100%)"
-                    : viewerSeat % 2 === 1
-                      ? "linear-gradient(90deg, transparent 0%, var(--team-a-edge) 20%, var(--team-a-edge) 80%, transparent 100%)"
-                      : "linear-gradient(90deg, transparent 0%, var(--team-b-edge-soft) 20%, var(--team-b-edge-soft) 80%, transparent 100%)",
-              }}
-            />
-          </div>
-
-          <div className="relative z-10 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1fr] sm:gap-5 sm:[grid-template-areas:'._north_.''west_center_east''._south_.']">
-            {SEAT_RENDER_ORDER.map((seatIndex) => {
-              const player = getPlayerAtSeat(players, seatIndex);
-              const cardinal = SEAT_TO_CARDINAL[seatIndex] as CardinalPosition;
-              const isBotSeat = player?.isBot === true;
-              const isCurrentUser =
-                player !== undefined &&
-                !isBotSeat &&
-                currentUser !== null &&
-                player.userId === currentUser.id;
-              const isSeatOwner =
-                player !== undefined && !isBotSeat && player.userId === room.ownerId;
-              const isWaiting = room.status === "waiting";
-              const ownerCanKick =
-                isOwner && isWaiting && player !== undefined && !isSeatOwner && !isBotSeat;
-              const ownerCanRemoveBot = isOwner && isWaiting && isBotSeat;
-              const ownerCanAddBot =
-                isOwner && isWaiting && player === undefined && !room.isQuickPlay;
-              const isSwapSource = swapSourceSeat === seatIndex;
-              const ownerCanInitiateSwap =
-                isOwner && isWaiting && player !== undefined && !isCurrentUser && !inSwapMode;
-              const canLeaveOwnSeat =
-                isCurrentUser && isWaiting && !room.isQuickPlay && !isSeatOwner && !inSwapMode;
-              const isClickable =
-                player === undefined || isCurrentUser || ownerCanInitiateSwap || inSwapMode;
-              const kickPendingForThisSeat =
-                kickPlayerMutation.isPending &&
-                player !== undefined &&
-                kickPlayerMutation.variables?.userId === player.userId;
-              const swapPendingForThisSeat =
-                swapSeatsMutation.isPending &&
-                (swapSeatsMutation.variables?.seatA === seatIndex ||
-                  swapSeatsMutation.variables?.seatB === seatIndex);
-              const leaveSeatPendingForThisSeat = leaveSeatMutation.isPending && isCurrentUser;
-              const botPendingForThisSeat =
-                (addBotMutation.isPending && addBotMutation.variables?.seat === seatIndex) ||
-                (removeBotMutation.isPending && removeBotMutation.variables?.seat === seatIndex);
-              const isPendingForThisSeat =
-                kickPendingForThisSeat ||
-                swapPendingForThisSeat ||
-                leaveSeatPendingForThisSeat ||
-                botPendingForThisSeat;
-
-              return (
-                <SeatTile
-                  key={seatIndex}
-                  seatIndex={seatIndex as 0 | 1 | 2 | 3}
-                  cardinal={cardinal}
-                  mode={resolveSeatMode(seatIndex)}
-                  player={player}
-                  isYou={isCurrentUser}
-                  isHost={isSeatOwner}
-                  isSwapSource={isSwapSource}
-                  swapMode={inSwapMode}
-                  isClickable={isClickable}
-                  isPending={isPendingForThisSeat}
-                  waitingToReturn={isWaiting && player !== undefined && isWaitingToReturn(player)}
-                  belowHonorBar={isWaiting && player !== undefined && isBelowHonorBar(player)}
-                  ownerCanActOnRow={ownerCanKick}
-                  onSelect={() => {
-                    if (inSwapMode) {
-                      handleSwapTarget(seatIndex);
-                      return;
-                    }
-                    if (ownerCanInitiateSwap) {
-                      setSwapSourceSeat(seatIndex);
-                      return;
-                    }
-                    if (canLeaveOwnSeat) {
-                      handleLeaveSeat();
-                      return;
-                    }
-                    if (isClickable) {
-                      handleSelectSeat(seatIndex);
-                    }
-                  }}
-                  onKick={
-                    ownerCanKick && player
-                      ? () => {
-                          setSwapSourceSeat(null);
-                          setKickConfirm({
-                            seat: seatIndex,
-                            userId: player.userId,
-                            username: player.username,
-                          });
-                        }
-                      : undefined
-                  }
-                  onPromote={
-                    ownerCanKick && player
-                      ? () => {
-                          setSwapSourceSeat(null);
-                          setTransferConfirm({
-                            userId: player.userId,
-                            username: player.username,
-                          });
-                        }
-                      : undefined
-                  }
-                  onAddBot={ownerCanAddBot ? () => handleAddBot(seatIndex) : undefined}
-                  onRemoveBot={
-                    ownerCanRemoveBot
-                      ? () => {
-                          setSwapSourceSeat(null);
-                          setRemoveBotConfirm({ seat: seatIndex });
-                        }
-                      : undefined
-                  }
-                />
-              );
-            })}
-
-            <div
-              className="hidden items-center justify-center sm:flex"
-              style={{ gridArea: "center" }}
-              aria-hidden
-              data-testid="table-center"
-            >
               <div
-                className="flex size-18 items-center justify-center rounded-lg border-2"
-                style={{
-                  transform: "rotate(45deg)",
-                  background:
-                    "radial-gradient(circle at 30% 30%, var(--felt-green) 0%, var(--accent-deep) 70%), var(--accent-deep)",
-                  borderColor: "var(--brass)",
-                  boxShadow: "var(--shadow-sm), inset 0 0 0 4px var(--brass-10)",
-                }}
+                className="bg-accent-soft text-accent-deep flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold"
+                data-testid="swap-mode-banner"
               >
-                <span
-                  className="font-mono text-2xs font-semibold tracking-caps uppercase"
-                  style={{ transform: "rotate(-45deg)", color: "var(--brass)" }}
-                >
-                  {t("room.tableCenter")}
-                </span>
+                <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1">{t("room.swap.pick")}</span>
+                <Button size="sm" variant="ghost" onClick={() => setSwapSourceSeat(null)}>
+                  {t("common.cancel")}
+                </Button>
               </div>
-            </div>
-          </div>
-        </div>
+            )}
+            <RoomTable
+              seats={table}
+              layout={phone ? "compact" : "wide"}
+              swapMode={inSwapMode}
+              canInvite={canInvite}
+              center={center}
+              onSeat={handleSeat}
+              onInvite={() => setShowInviteFriends(true)}
+              onAddBot={handleAddBot}
+            />
+            {phone && standing.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowRoster(true)}
+                className="text-ink-mute flex min-w-0 cursor-pointer items-center gap-2 px-1 text-xs"
+                data-testid="not-seated-line"
+              >
+                <Users className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="shrink-0">{t("room.roster.notSeatedShort")}</span>
+                {standing.map((p) => (
+                  <span key={p.userId} className="inline-flex min-w-0 items-center gap-1.5">
+                    <Avatar name={p.username} avatarUrl={p.avatarUrl} size={20} />
+                    <span className="text-ink truncate font-medium">{p.username}</span>
+                  </span>
+                ))}
+              </button>
+            )}
+          </>
+        )}
       </div>
 
-      <RoomChatDock roomId={room.id} />
+      {band === "tablet" && <div className="grid grid-cols-2 items-start gap-4">{sidePanels}</div>}
+
+      <RoomChatDock roomId={room.id} aboveBottomBar={phone} />
+
+      {phone && (
+        <RoomRosterDialog {...rosterProps} open={showRoster} onClose={() => setShowRoster(false)} />
+      )}
+
+      <PlayerActionsDialog
+        target={
+          actionTarget?.player !== undefined
+            ? { seat: actionTarget.seat, name: actionTarget.name, player: actionTarget.player }
+            : null
+        }
+        canPromote={actionTarget?.player !== undefined && actionTarget.player.isBot !== true}
+        onClose={() => setPlayerTarget(null)}
+        onSwap={() => {
+          if (playerTarget !== null) setSwapSourceSeat(playerTarget);
+          setPlayerTarget(null);
+        }}
+        onPromote={() => {
+          const p = actionTarget?.player;
+          if (p) setTransferConfirm({ userId: p.userId, username: p.username });
+          setPlayerTarget(null);
+        }}
+        onKick={() => {
+          const p = actionTarget?.player;
+          if (p) setKickConfirm({ seat: p.seat ?? -1, userId: p.userId, username: p.username });
+          setPlayerTarget(null);
+        }}
+        onRemoveBot={() => {
+          if (playerTarget !== null) setRemoveBotConfirm({ seat: playerTarget });
+          setPlayerTarget(null);
+        }}
+      />
 
       <TransferOwnershipDialog
         open={transferConfirm !== null}
@@ -1210,13 +1015,6 @@ export function RoomPage() {
         onOpenChange={setShowInviteFriends}
       />
 
-      <LastMatchDialog
-        open={showLastMatch}
-        roomId={room.id}
-        onOpenChange={setShowLastMatch}
-        playersInRoom={players.map((p) => p.userId)}
-      />
-
       <RoomPrivacyDialog open={showPrivacy} room={room} onClose={() => setShowPrivacy(false)} />
 
       <PasswordPromptDialog
@@ -1234,6 +1032,6 @@ export function RoomPage() {
           navigate("/lobby", { replace: true });
         }}
       />
-    </div>
+    </PageShell>
   );
 }

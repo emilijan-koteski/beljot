@@ -769,7 +769,7 @@ describe("LobbyPage support note", () => {
 
     const note = screen.getByTestId("support-note");
     expect(note.textContent).toContain("A hobby project. You can always buy me a coffee.");
-    const footnote = screen.getByText(/Showing/);
+    const footnote = screen.getByText(/\d+ of \d+ rooms/);
     expect(footnote.compareDocumentPosition(note)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 

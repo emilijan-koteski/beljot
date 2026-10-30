@@ -8,7 +8,9 @@
       "title": "Nešto je pošlo po zlu",
       "retry": "Pokušaj ponovno",
       "backToLobby": "Natrag u lobi"
-    }
+    },
+    "done": "Gotovo",
+    "cancel": "Odustani"
   },
   "team": {
     "us": "Mi",
@@ -432,7 +434,7 @@
       "notOwner": "Samo domaćin može pokrenuti meč",
       "notOwnerAction": "To može samo domaćin",
       "notAllSeated": "Sva 4 igrača moraju sjesti da bi počelo",
-      "roomStarted": "Meč je već počeo. Izbacivanje i zamjena mjesta više nisu dostupni.",
+      "roomStarted": "Meč je već počeo.",
       "seatNotOccupied": "Odaberi dva zauzeta mjesta za zamjenu.",
       "kickFailed": "Izbacivanje igrača nije uspjelo. Pokušaj ponovno.",
       "swapFailed": "Zamjena mjesta nije uspjela. Pokušaj ponovno.",
@@ -463,9 +465,9 @@
       "cancel": "Odustani"
     },
     "privacy": {
-      "dialogTitle": "Privatnost sobe",
+      "dialogTitle": "Tip sobe",
       "dialogDescription": "Igrači koji sjede ostaju u svakom slučaju.",
-      "modeLabel": "Pristup",
+      "modeLabel": "Tip",
       "public": "Otvorena",
       "private": "Privatna",
       "passwordLabel": "Lozinka",
@@ -477,8 +479,6 @@
       "toastPublic": "Soba je sada otvorena.",
       "privateBadge": "Privatna",
       "publicBadge": "Otvorena",
-      "manageButtonPrivate": "Privatnost: privatna",
-      "manageButtonPublic": "Privatnost: otvorena",
       "errors": {
         "passwordRequired": "Postavi lozinku za privatnu sobu",
         "passwordTooShort": "Lozinka mora imati najmanje 4 znaka",
@@ -489,35 +489,22 @@
       }
     },
     "waitingForPlayers": "Čekanje igrača",
-    "waitingForReturn": "Čekanje da se igrači vrate",
     "copyLinkAriaLabel": "Kopiraj kod sobe {{code}}",
-    "copyLinkSuccess": "Kod sobe kopiran!",
+    "copyLinkSuccess": "Kod kopiran",
     "copyLinkFailed": "Kopiranje nije uspjelo. Kod je {{code}}.",
-    "leaveRoom": "Napusti sobu",
-    "seatYou": "Ti",
+    "leaveRoom": "Izađi",
     "seatYouInline": "ti",
     "seatOwner": "Domaćin",
     "ownerLine": "Domaćin: <name>{{owner}}</name>",
-    "seatedCount": "{{current}} / {{max}} sjedi",
     "inRoomCount": "{{count}} u sobi",
-    "inRoomList": {
-      "ariaLabel": "Prikaži igrače u sobi",
-      "title": "Igrači u sobi",
-      "empty": "Još nema igrača",
-      "seated": "Mjesto {{seat}}",
-      "notSeated": "Stoji"
-    },
     "notFound": "Soba nije pronađena",
     "notFoundAction": "Natrag u lobi",
     "roomClosed": "Ova soba je zatvorena.",
     "returningToLobby": "Povratak u lobi…",
     "startMatch": "Pokreni meč",
-    "startMatchDisabled": "Sva 4 igrača moraju sjesti",
-    "startBlockedByHonor": "Jedan igrač za stolom je ispod minimuma ove sobe ({{minHonor}}).",
-    "waitingForOwner": "Čekanje da domaćin pokrene meč",
+    "startBlockedByHonor": "Igrač je ispod minimuma časti ({{minHonor}}).",
     "seatTaken": "To mjesto je zauzeto",
-    "matchStarting": "Meč počinje…",
-    "autoStarting": "Pokretanje meča…",
+    "matchStarting": "Počinje…",
     "kickIconLabel": "Izbaci {{username}}",
     "kickConfirm": {
       "title": "Izbaci {{name}}",
@@ -541,31 +528,35 @@
       "confirm": "Postavi domaćina",
       "cancel": "Odustani"
     },
-    "legendNeutral": "Slobodna mjesta · timovi se otkrivaju kad sjedneš",
-    "legendOpen": "slobodno",
-    "legendVs": "vs",
-    "legendUs": "Mi",
-    "legendThem": "Oni",
-    "actionBarSwap": "Zamjena · odaberi mjesto",
-    "actionBarFinishSwap": "Završi zamjenu za početak",
-    "tableCenter": "Soba",
-    "seatTile": {
-      "takeSeat": "Zauzmi ovo mjesto",
-      "moveHere": "Premjesti ovamo",
-      "swapHere": "Zamijeni ovdje",
-      "partner": "Partner",
-      "opponent": "Protivnik",
-      "waitingToReturn": "Čeka se povratak",
-      "pickTarget": "Za zamjenu",
-      "partnerSeat": "Mjesto partnera · slobodno",
-      "opponentSeat": "Mjesto protivnika · slobodno",
-      "openSeat": "Slobodno mjesto"
-    },
     "lastMatch": {
-      "openButton": "Posljednji meč",
-      "title": "Posljednji meč",
-      "loading": "Učitavanje posljednjeg meča…",
-      "unavailable": "Posljednji meč trenutno nije dostupan."
+      "title": "Posljednji meč"
+    },
+    "waitingFor": "Čeka se {{name}}",
+    "seat": {
+      "sit": "Sjedni",
+      "moveHere": "Premjesti ovamo",
+      "open": "Slobodno mjesto",
+      "returning": "Vraća se"
+    },
+    "table": {
+      "seated": "za stolom",
+      "ready": "Spremno"
+    },
+    "tabs": {
+      "label": "Prikaz sobe",
+      "table": "Stol"
+    },
+    "swap": {
+      "pick": "Odaberi mjesto za zamjenu"
+    },
+    "roster": {
+      "title": "U sobi",
+      "atTable": "Za stolom · {{count}}/4",
+      "notSeated": "Bez mjesta · {{count}}",
+      "notSeatedShort": "Bez mjesta:"
+    },
+    "playerActions": {
+      "swap": "Zamijeni mjesta"
     }
   },
   "roomInvite": {
@@ -581,23 +572,18 @@
       "decline": "Ne sada"
     },
     "panel": {
-      "openButton": "Pozovi igrače",
       "title": "Pozovi igrače",
       "tabsLabel": "Koga pozvati",
       "tabFriends": "Prijatelji",
       "tabLobby": "Lobi",
-      "loading": "Učitavanje prijatelja…",
-      "loadFailed": "Učitavanje prijatelja nije uspjelo. Pokušaj ponovno.",
-      "empty": "Još nemaš prijatelja. Pronađi igrače i pošalji zahtjev za prijateljstvo.",
-      "searchLabel": "Pretraži igrače u lobiju",
-      "searchPlaceholder": "Pretraži po korisničkom imenu…",
-      "lobbyLoading": "Učitavanje igrača…",
-      "lobbyLoadFailed": "Učitavanje igrača nije uspjelo. Pokušaj ponovno.",
-      "lobbyEmpty": "Trenutno nema drugih slobodnih igrača u lobiju.",
-      "lobbyNoMatch": "Nema igrača u lobiju sa „{{query}}“",
+      "loading": "Učitavanje igrača…",
+      "loadFailed": "Učitavanje igrača nije uspjelo. Pokušaj ponovno.",
+      "empty": "Još nemaš prijatelja.",
+      "searchPlaceholder": "Traži igrače",
+      "lobbyEmpty": "Nitko slobodan u lobiju.",
       "invite": "Pozovi",
       "invited": "Pozvan",
-      "done": "Gotovo"
+      "noMatch": "Nitko ne odgovara „{{query}}“"
     },
     "reasons": {
       "offline": "Offline",
@@ -654,7 +640,7 @@
     },
     "matchmaking": {
       "title": "Brza igra",
-      "subtitle": "Meč počinje čim četiri igrača budu spremna.",
+      "subtitle": "Počinje kad se skupe četiri igrača.",
       "eyebrow": "Tražim igrače",
       "elapsed": "proteklo",
       "seated": "{{found}} / 4 popunjeno",
@@ -670,9 +656,9 @@
     "createRoomModal": {
       "roomName": "Naziv sobe",
       "variant": "Varijanta",
-      "matchMode": "Igra se do",
+      "matchMode": "Cilj",
       "matchMode1001": "1001 bod",
-      "timerDuration": "Trajanje poteza (s)",
+      "timerDuration": "Tajmer",
       "cancel": "Otkaži",
       "errors": {
         "nameRequired": "Naziv sobe je obavezan",
@@ -689,7 +675,7 @@
         "ownNewPlayerNotAllowed": "Još si novi igrač i ne možeš sjesti u vlastitu sobu. Dozvoli nove igrače da nastaviš."
       },
       "headline": "Nova soba",
-      "roomNameInfo": "{{min}}–{{max}} znakova. Ako ga ne mijenjaš, soba nosi tvoje ime.",
+      "roomNameInfo": "{{min}}–{{max}} znakova.",
       "matchMode501": "501 bod",
       "matchMode701": "701 bod",
       "submit": "Kreiraj sobu",
@@ -697,46 +683,46 @@
       "preview": {
         "title": "Pregled u lobiju"
       },
-      "variantHint": "Bitolska dijeli pet karata i okreće adutsku kartu, hrvatska dijeli šest i adut se zove slobodno",
-      "matchModeHint": "501 je kratak, 701 srednji, 1001 puna utrka",
+      "variantHint": "Bitolska: pet karata i adutska karta. Hrvatska: šest karata, adut po izboru.",
+      "matchModeHint": "501 kratko, 701 srednje, 1001 dugo",
       "timerHintRelaxed": "Bez tajmera",
       "coinBuyIn": "Ulog",
-      "coinBuyInHint": "Svaki igrač ulaže ovoliko za meč · zadano 500",
+      "coinBuyInHint": "Ulog svakog igrača",
       "coinBuyInBalance": "stanje {{balance}}",
       "coinBuyInCustom": "Drugo",
       "privateRoom": "Tip sobe",
-      "privateRoomHint": "Privatne sobe ostaju na popisu, ali traže lozinku za ulazak",
+      "privateRoomHint": "Privatne sobe traže lozinku",
       "privacyPublic": "Otvorena",
       "privacyPrivate": "Privatna",
       "roomPassword": "Lozinka",
-      "minHonor": "Minimalna čast",
-      "minHonorAnyone": "Svatko",
+      "minHonor": "Čast",
+      "minHonorAnyone": "Bilo koja",
       "minHonorInfoBands": "Svaki prag je granica tijera časti: {{bands}}.",
       "minHonorInfoYou": "Tvoja čast je {{honor}} · {{tier}}.",
       "allowNewPlayers": "Novi igrači",
       "allowNewPlayersYes": "Dobrodošli",
       "allowNewPlayersNo": "Samo iskusni",
-      "allowNewPlayersHint": "Novi igrači još nemaju ocjenu časti. „Samo iskusni“ ih isključuje.",
+      "allowNewPlayersHint": "Novi igrači još nemaju čast",
       "roomPasswordHint": "Najmanje {{min}} znakova",
       "declarations": "Zvanja",
       "declarationsOn": "S zvanjima",
       "declarationsOff": "Bez zvanja",
-      "declarationsHint": "Isključeno: bez zvanja i Bele, samo bodovi iz karata",
+      "declarationsHint": "Isključeno: samo bodovi iz karata",
       "declarationsTransfer": "Zvanja pri padu",
       "declarationsTransferOn": "Pobjednicima",
       "declarationsTransferOff": "Poništena",
-      "declarationsTransferHint": "Kad ekipa padne ili ne uzme nijedan štih, njezina zvanja i Bela idu drugoj ekipi; kad se poništavaju, nitko ih ne dobiva",
+      "declarationsTransferHint": "Na pad ili kapot zvanja idu pobjednicima ili se poništavaju",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Prolaz",
       "matchEndStop": "Dosta",
-      "matchEndHint": "Uz „dosta“ meč završava u trenutku kad ekipa dosegne cilj, i usred dijeljenja, bez bonusa za zadnju ruku i bez kapota",
+      "matchEndHint": "Uz „dosta“ meč završava čim ekipa dosegne cilj, i usred dijeljenja",
       "direction": "Smjer dijeljenja",
       "directionCounterClockwise": "Udesno",
       "directionClockwise": "Ulijevo",
-      "directionHint": "Uobičajeno se ide udesno, a može i ulijevo: dijeljenje, licitiranje, štihovi i sljedeći djelitelj prate taj smjer",
+      "directionHint": "Dijeljenje, licitiranje i štihovi prate taj smjer",
       "defaultName": "Soba - {{username}}"
     },
-    "footnote": "Prikazano {{shown}} od {{total}} otvorenih soba · živo se osvježava",
+    "footnote": "{{shown}} od {{total}} soba",
     "actions": {
       "quickPlay": {
         "title": "Brza igra",
@@ -785,8 +771,8 @@
       "resultAria": "Pogledaj profil igrača {{username}}"
     },
     "empty": {
-      "title": "Nema otvorenih soba za tvoje filtre",
-      "description": "Obriši filtre, probaj Brzu igru ili stvori sobu.",
+      "title": "Nema takvih soba",
+      "description": "Obriši filtre ili stvori sobu.",
       "clear": "Obriši pretragu",
       "liveTitle": "Trenutno nema mečeva u tijeku",
       "liveDescription": "Mečevi se ovdje pojavljuju čim počnu."
@@ -794,7 +780,6 @@
     "card": {
       "quickPlay": "Brza igra",
       "relaxed": "Opušteno",
-      "timerSeconds": "{{seconds}}s tajmer",
       "joining": "Pridruživanje sobi \"{{name}}\"…",
       "variantBitola": "Bitola",
       "variantCroatia": "Hrvatska",
@@ -802,7 +787,6 @@
       "matchMode501": "501 bod",
       "matchMode701": "701 bod",
       "matchModeGeneric": "{{points}} bodova",
-      "buyInFree": "Bez uloga",
       "private": "Privatna",
       "minHonor": "{{minHonor}}",
       "minHonorLockedTitle": "Traži čast {{minHonor}}, ti si na {{honor}}.",

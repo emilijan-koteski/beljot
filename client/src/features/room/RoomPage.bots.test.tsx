@@ -211,8 +211,9 @@ describe("RoomPage bot seating", () => {
 
     renderRoomPage();
 
-    await waitFor(() => expect(screen.getByTestId("remove-bot-2")).toBeInTheDocument());
-    await userEvent.click(screen.getByTestId("remove-bot-2"));
+    await waitFor(() => expect(screen.getByTestId("player-seat-2")).toBeInTheDocument());
+    await userEvent.click(screen.getByTestId("player-seat-2"));
+    await userEvent.click(await screen.findByTestId("remove-bot-2"));
 
     expect(await screen.findByTestId("remove-bot-dialog-title")).toHaveTextContent("Bot 3");
     await userEvent.click(screen.getByTestId("remove-bot-confirm"));
@@ -220,7 +221,7 @@ describe("RoomPage bot seating", () => {
     await waitFor(() => expect(mockRemoveBot).toHaveBeenCalledWith(1, 2));
   });
 
-  it("bot tiles never show kick or promote controls", async () => {
+  it("a bot's seat actions offer removal but never kick or promote", async () => {
     useAuthStore.setState({ user: owner, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({ room, players: [human(10, "alice", 0), bot(2)] }),
@@ -229,6 +230,8 @@ describe("RoomPage bot seating", () => {
     renderRoomPage();
 
     await waitFor(() => expect(screen.getByTestId("player-seat-2")).toBeInTheDocument());
+    await userEvent.click(screen.getByTestId("player-seat-2"));
+    expect(await screen.findByTestId("remove-bot-2")).toBeInTheDocument();
     expect(screen.queryByTestId("kick-player-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("promote-seat-2")).not.toBeInTheDocument();
   });
@@ -244,6 +247,7 @@ describe("RoomPage bot seating", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("player-seat-1"));
+    await userEvent.click(await screen.findByTestId("swap-seat-1"));
     await userEvent.click(screen.getByTestId("player-seat-3"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 3));
@@ -260,6 +264,7 @@ describe("RoomPage bot seating", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("player-seat-1"));
+    await userEvent.click(await screen.findByTestId("swap-seat-1"));
     await userEvent.click(screen.getByTestId("player-seat-0"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 0));
@@ -281,6 +286,7 @@ describe("RoomPage bot seating", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-1")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("player-seat-1"));
+    await userEvent.click(await screen.findByTestId("swap-seat-1"));
     await userEvent.click(screen.getByTestId("player-seat-2"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 1, 2));
@@ -302,6 +308,7 @@ describe("RoomPage bot seating", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-2")).toBeInTheDocument());
     await userEvent.click(screen.getByTestId("player-seat-2"));
+    await userEvent.click(await screen.findByTestId("swap-seat-2"));
     await userEvent.click(screen.getByTestId("player-seat-1"));
 
     await waitFor(() => expect(mockSwapSeats).toHaveBeenCalledWith(1, 2, 1));

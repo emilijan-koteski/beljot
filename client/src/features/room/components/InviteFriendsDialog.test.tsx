@@ -47,26 +47,50 @@ function row(userId: number) {
     .find((r) => r.getAttribute("data-user-id") === String(userId))!;
 }
 
+async function openFriendsTab(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("invite-tab-friends"));
+}
+
 describe("InviteFriendsDialog", () => {
   beforeEach(() => {
     listInvitableFriendsSpy.mockReset();
     listInvitablePlayersSpy.mockReset();
     inviteToRoomSpy.mockReset();
+    listInvitablePlayersSpy.mockResolvedValue([]);
   });
 
-  it("opens on the Friends tab and does not load the lobby", async () => {
+  it("opens on the Lobby tab and does not load friends until asked", async () => {
+    const user = userEvent.setup();
     listInvitableFriendsSpy.mockResolvedValue(roster);
     renderDialog();
 
+    expect(screen.getByTestId("invite-tab-lobby")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("invite-tab-friends")).toHaveAttribute("aria-selected", "false");
+    await waitFor(() => expect(listInvitablePlayersSpy).toHaveBeenCalledWith(7, ""));
+    expect(listInvitableFriendsSpy).not.toHaveBeenCalled();
+
+    await openFriendsTab(user);
     await waitFor(() => expect(screen.getAllByTestId("invite-friend-row")).toHaveLength(4));
-    expect(screen.getByTestId("invite-tab-friends")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("invite-tab-lobby")).toHaveAttribute("aria-selected", "false");
-    expect(listInvitablePlayersSpy).not.toHaveBeenCalled();
+  });
+
+  it("filters the friends list by the search", async () => {
+    const user = userEvent.setup();
+    listInvitableFriendsSpy.mockResolvedValue(roster);
+    renderDialog();
+
+    await openFriendsTab(user);
+    await waitFor(() => expect(screen.getAllByTestId("invite-friend-row")).toHaveLength(4));
+    await user.type(screen.getByTestId("invite-search"), "cv");
+
+    await waitFor(() => expect(screen.getAllByTestId("invite-friend-row")).toHaveLength(1));
+    expect(row(202)).toBeInTheDocument();
   });
 
   it("lists every friend and disables the unavailable ones with a reason", async () => {
+    const user = userEvent.setup();
     listInvitableFriendsSpy.mockResolvedValue(roster);
     renderDialog();
+    await openFriendsTab(user);
 
     await waitFor(() => expect(screen.getAllByTestId("invite-friend-row")).toHaveLength(4));
 
@@ -86,6 +110,7 @@ describe("InviteFriendsDialog", () => {
     listInvitableFriendsSpy.mockResolvedValue(roster);
     inviteToRoomSpy.mockResolvedValue(undefined);
     renderDialog();
+    await openFriendsTab(user);
 
     await waitFor(() => expect(screen.getByTestId("invite-friend-200")).toBeEnabled());
     await user.click(screen.getByTestId("invite-friend-200"));
@@ -101,6 +126,7 @@ describe("InviteFriendsDialog", () => {
       new FetchError(409, "FRIEND_NOT_AVAILABLE", "friend is not available"),
     );
     renderDialog();
+    await openFriendsTab(user);
 
     await waitFor(() => expect(screen.getByTestId("invite-friend-200")).toBeEnabled());
     await user.click(screen.getByTestId("invite-friend-200"));
@@ -110,25 +136,31 @@ describe("InviteFriendsDialog", () => {
   });
 
   it("disables every row when the room itself is full", async () => {
+    const user = userEvent.setup();
     listInvitableFriendsSpy.mockResolvedValue([
       { userId: 200, username: "ana", avatarUrl: null, available: false, reason: "room_full" },
     ] satisfies InvitableFriend[]);
     renderDialog();
+    await openFriendsTab(user);
 
     await waitFor(() => expect(screen.getByTestId("invite-friend-200")).toBeDisabled());
     expect(screen.getByTestId("invite-friend-reason-200")).toBeInTheDocument();
   });
 
   it("shows the empty state when the viewer has no friends", async () => {
+    const user = userEvent.setup();
     listInvitableFriendsSpy.mockResolvedValue([]);
     renderDialog();
+    await openFriendsTab(user);
 
     expect(await screen.findByTestId("invite-friends-empty")).toBeInTheDocument();
   });
 
   it("shows a load failure rather than an empty list", async () => {
+    const user = userEvent.setup();
     listInvitableFriendsSpy.mockRejectedValue(new FetchError(500, "INTERNAL_ERROR", "boom"));
     renderDialog();
+    await openFriendsTab(user);
 
     expect(await screen.findByTestId("invite-friends-error")).toBeInTheDocument();
     expect(screen.queryByTestId("invite-friends-empty")).not.toBeInTheDocument();
@@ -158,7 +190,7 @@ describe("InviteFriendsDialog Lobby tab", () => {
     listInvitableFriendsSpy.mockResolvedValue([]);
   });
 
-  it("lists idle lobby players when the Lobby tab is selected", async () => {
+  it("lists idle lobby players on the Lobby tab", async () => {
     const user = userEvent.setup();
     listInvitablePlayersSpy.mockResolvedValue(lobby);
     renderDialog();
@@ -212,7 +244,7 @@ describe("InviteFriendsDialog Lobby tab", () => {
     await waitFor(() => expect(listInvitablePlayersSpy).toHaveBeenCalledWith(7, ""));
     listInvitablePlayersSpy.mockResolvedValue([lobby[0]]);
 
-    await user.type(screen.getByTestId("invite-lobby-search"), " mar ");
+    await user.type(screen.getByTestId("invite-search"), " mar ");
 
     await waitFor(() => expect(listInvitablePlayersSpy).toHaveBeenCalledWith(7, "mar"));
     expect(listInvitablePlayersSpy).not.toHaveBeenCalledWith(7, "m");
@@ -227,7 +259,7 @@ describe("InviteFriendsDialog Lobby tab", () => {
     await openLobbyTab(user);
 
     expect(await screen.findByTestId("invite-lobby-empty")).toHaveTextContent(
-      "Nobody else is free in the lobby right now.",
+      "No one free in the lobby.",
     );
   });
 
@@ -237,12 +269,10 @@ describe("InviteFriendsDialog Lobby tab", () => {
     renderDialog();
 
     await openLobbyTab(user);
-    await user.type(screen.getByTestId("invite-lobby-search"), "zzz");
+    await user.type(screen.getByTestId("invite-search"), "zzz");
 
     await waitFor(() =>
-      expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent(
-        'No lobby players match "zzz"',
-      ),
+      expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent('No one matches "zzz"'),
     );
   });
 
@@ -281,26 +311,22 @@ describe("InviteFriendsDialog Lobby tab", () => {
     const { rerender } = render(dialog(true));
 
     await openLobbyTab(user);
-    await user.type(screen.getByTestId("invite-lobby-search"), "mar");
+    await user.type(screen.getByTestId("invite-search"), "mar");
     await waitFor(() =>
-      expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent(
-        'No lobby players match "mar"',
-      ),
+      expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent('No one matches "mar"'),
     );
     const callsBeforeReopen = listInvitablePlayersSpy.mock.calls.length;
 
     rerender(dialog(false));
     rerender(dialog(true));
 
-    expect(screen.getByTestId("invite-lobby-search")).toHaveValue("");
-    expect(screen.queryByText('No lobby players match "mar"')).not.toBeInTheDocument();
+    expect(screen.getByTestId("invite-search")).toHaveValue("");
+    expect(screen.queryByText('No one matches "mar"')).not.toBeInTheDocument();
     await waitFor(() => expect(listInvitablePlayersSpy).toHaveBeenLastCalledWith(7, ""));
     const reopenCalls = listInvitablePlayersSpy.mock.calls.slice(callsBeforeReopen);
     expect(reopenCalls.length).toBeGreaterThan(0);
     expect(reopenCalls.every(([, term]) => term === "")).toBe(true);
-    expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent(
-      "Nobody else is free in the lobby right now.",
-    );
+    expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent("No one free in the lobby.");
   });
 
   it("disables every lobby row when the room is full", async () => {

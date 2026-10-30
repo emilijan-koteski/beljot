@@ -461,11 +461,11 @@ describe("CreateRoomModal room settings", () => {
     );
   });
 
-  it("offers anyone and each honor tier floor, naming the tier for screen readers", () => {
+  it("offers any honor and each honor tier floor, naming the tier for screen readers", () => {
     renderModal();
 
     expect(checked("min-honor-segmented-0")).toBe(true);
-    expect(screen.getByTestId("min-honor-segmented-0")).toHaveTextContent("Anyone");
+    expect(screen.getByTestId("min-honor-segmented-0")).toHaveTextContent("Any");
     expect(screen.getByTestId("min-honor-segmented-85")).toHaveTextContent("85+");
     expect(screen.getByTestId("min-honor-segmented-85")).toHaveAccessibleName(/Trusted/);
   });

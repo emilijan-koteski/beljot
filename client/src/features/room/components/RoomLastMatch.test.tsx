@@ -1,19 +1,13 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FetchError } from "@/shared/api/axiosClient";
 import type { MatchListItem } from "@/shared/api/matches";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser, QueryWrapper } from "@/test-utils";
-
-const mockGetRoomLastMatch = vi.fn();
-vi.mock("@/shared/api/matches", () => ({
-  getRoomLastMatch: (roomId: number) => mockGetRoomLastMatch(roomId),
-}));
 
 vi.mock("@/shared/api/friends", () => ({
   getFriendshipStatus: vi.fn(() => Promise.resolve({ status: "friends", requestId: 1 })),
@@ -29,7 +23,7 @@ vi.mock("@/shared/api/rooms", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { LastMatchDialog } from "./LastMatchDialog";
+import { LastMatchOutcome, RoomLastMatch } from "./RoomLastMatch";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
@@ -74,44 +68,30 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   };
 }
 
-function renderDialog({ open = true, playersInRoom = [] as number[] } = {}) {
+function renderPanel(playersInRoom: number[] = []) {
   return render(
     <QueryWrapper>
       <BrowserRouter>
-        <LastMatchDialog
-          open={open}
-          roomId={5}
-          onOpenChange={vi.fn()}
-          playersInRoom={playersInRoom}
-        />
+        <RoomLastMatch match={makeMatch()} roomId={5} playersInRoom={playersInRoom} compact />
       </BrowserRouter>
     </QueryWrapper>,
   );
 }
 
-describe("LastMatchDialog", () => {
+describe("RoomLastMatch", () => {
   beforeEach(() => {
-    mockGetRoomLastMatch.mockReset();
-    mockGetRoomLastMatch.mockResolvedValue(makeMatch());
     useAuthStore.setState({ user: makeUser({ id: 10, username: "viewer" }) });
   });
 
-  it("renders nothing and fetches nothing while closed", () => {
-    renderDialog({ open: false });
-    expect(screen.queryByTestId("last-match-dialog")).toBeNull();
-    expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
-  });
-
-  it("fetches the room's last match on open and shows it expanded", async () => {
-    renderDialog();
-    await waitFor(() => expect(mockGetRoomLastMatch).toHaveBeenCalledWith(5));
+  it("shows the match expanded with its hands", async () => {
+    renderPanel();
     expect(await screen.findByTestId("match-history-row")).toBeInTheDocument();
     expect(screen.getByTestId("match-history-detail")).toBeInTheDocument();
     expect(screen.getByTestId("match-history-hand-row")).toBeInTheDocument();
   });
 
   it("collapses and re-expands from the card's chevron", async () => {
-    renderDialog();
+    renderPanel();
     await screen.findByTestId("match-history-detail");
 
     await userEvent.click(screen.getByTestId("match-history-row-header"));
@@ -121,21 +101,25 @@ describe("LastMatchDialog", () => {
     expect(screen.getByTestId("match-history-detail")).toBeInTheDocument();
   });
 
-  it("offers Reinvite for a friend who is not currently in the room", async () => {
-    renderDialog();
+  it("offers Invite back to a player who is not in the room", async () => {
+    renderPanel();
     expect(await screen.findByTestId("match-player-reinvite-11")).toBeInTheDocument();
   });
 
-  it("hides Reinvite for a co-player already back at the table", async () => {
-    renderDialog({ playersInRoom: [11] });
+  it("hides Invite back for a player already back in the room", async () => {
+    renderPanel([11]);
     await screen.findByTestId("match-player-reinvite-12");
     expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
   });
+});
 
-  it("renders the unavailable line instead of crashing on a 404", async () => {
-    mockGetRoomLastMatch.mockRejectedValue(new FetchError(404, "NOT_FOUND", "not found"));
-    renderDialog();
-    expect(await screen.findByTestId("last-match-unavailable")).toBeInTheDocument();
-    expect(screen.queryByTestId("match-history-row")).toBeNull();
+describe("LastMatchOutcome", () => {
+  it("tags a win, a loss, and nothing for an abandoned match", () => {
+    const { rerender, container } = render(<LastMatchOutcome outcome="win" />);
+    expect(screen.getByText("Win")).toBeInTheDocument();
+    rerender(<LastMatchOutcome outcome="loss" />);
+    expect(screen.getByText("Loss")).toBeInTheDocument();
+    rerender(<LastMatchOutcome outcome="abandoned" />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

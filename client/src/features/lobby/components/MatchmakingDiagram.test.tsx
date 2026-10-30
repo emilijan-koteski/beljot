@@ -147,12 +147,12 @@ describe("MatchmakingDiagram", () => {
 
     expect(screen.getByText("Bitola")).toBeInTheDocument();
     expect(screen.getByText("1001 pts")).toBeInTheDocument();
-    expect(screen.getByText("30s timer")).toBeInTheDocument();
+    expect(screen.getByText("30s")).toBeInTheDocument();
     expect(screen.queryByText("Relaxed")).not.toBeInTheDocument();
     expect(screen.getByText("500")).toBeInTheDocument();
   });
 
-  it("shows 'Relaxed' and 'No stake' for a relaxed, free room", () => {
+  it("shows 'Relaxed' and 'Free' for a relaxed, free room", () => {
     render(
       <MatchmakingDiagram
         room={room({ timerStyle: "relaxed", timerDurationSeconds: null, coinBuyIn: 0 })}
@@ -166,7 +166,7 @@ describe("MatchmakingDiagram", () => {
     );
 
     expect(screen.getByText("Relaxed")).toBeInTheDocument();
-    expect(screen.getByText("No stake")).toBeInTheDocument();
+    expect(screen.getByText("Free")).toBeInTheDocument();
   });
 
   it("renders bot occupants with the localized bot name and glyph, never a blank", () => {

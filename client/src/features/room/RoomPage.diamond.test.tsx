@@ -118,9 +118,9 @@ afterEach(() => {
   useChatStore.setState({ lobbyMessages: [], matchMessages: [], roomMessages: [] });
 });
 
-describe("RoomPage diamond layout invariant", () => {
+describe("RoomPage table orientation", () => {
   it.each([0, 1, 2, 3])(
-    "viewerSeat=%i → seats are pinned to fixed cardinals (0=south, 1=east, 2=north, 3=west)",
+    "viewerSeat=%i → the viewer sits at the bottom and the next seat on their right, as at the match table",
     async (viewerSeat) => {
       useAuthStore.setState({
         user: makeUser({
@@ -146,10 +146,10 @@ describe("RoomPage diamond layout invariant", () => {
       const east = screen.getByTestId("seat-position-east");
       const west = screen.getByTestId("seat-position-west");
 
-      expect(south.className).toContain("sm:[grid-area:south]");
-      expect(north.className).toContain("sm:[grid-area:north]");
-      expect(east.className).toContain("sm:[grid-area:east]");
-      expect(west.className).toContain("sm:[grid-area:west]");
+      expect(south.className).toContain("[grid-area:south]");
+      expect(north.className).toContain("[grid-area:north]");
+      expect(east.className).toContain("[grid-area:east]");
+      expect(west.className).toContain("[grid-area:west]");
 
       function seatIndexAt(el: HTMLElement): number {
         const button = el.querySelector("[data-testid^='player-seat-']") as HTMLElement | null;
@@ -162,15 +162,17 @@ describe("RoomPage diamond layout invariant", () => {
         return Number(match![1]);
       }
 
-      expect(seatIndexAt(south as HTMLElement)).toBe(0);
-      expect(seatIndexAt(east as HTMLElement)).toBe(1);
-      expect(seatIndexAt(north as HTMLElement)).toBe(2);
-      expect(seatIndexAt(west as HTMLElement)).toBe(3);
+      expect(seatIndexAt(south as HTMLElement)).toBe(viewerSeat);
+      expect(seatIndexAt(east as HTMLElement)).toBe((viewerSeat + 1) % 4);
+      expect(seatIndexAt(north as HTMLElement)).toBe((viewerSeat + 2) % 4);
+      expect(seatIndexAt(west as HTMLElement)).toBe((viewerSeat + 3) % 4);
 
-      expect((south as HTMLElement).getAttribute("data-team")).toBe("teamA");
-      expect((north as HTMLElement).getAttribute("data-team")).toBe("teamA");
-      expect((east as HTMLElement).getAttribute("data-team")).toBe("teamB");
-      expect((west as HTMLElement).getAttribute("data-team")).toBe("teamB");
+      const ownTeam = viewerSeat % 2 === 0 ? "teamA" : "teamB";
+      const otherTeam = ownTeam === "teamA" ? "teamB" : "teamA";
+      expect((south as HTMLElement).getAttribute("data-team")).toBe(ownTeam);
+      expect((north as HTMLElement).getAttribute("data-team")).toBe(ownTeam);
+      expect((east as HTMLElement).getAttribute("data-team")).toBe(otherTeam);
+      expect((west as HTMLElement).getAttribute("data-team")).toBe(otherTeam);
     },
   );
 });

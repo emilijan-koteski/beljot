@@ -165,9 +165,12 @@ afterEach(async () => {
 });
 
 describe("RoomPage locale overflow", () => {
-  it.each(["en", "sr"] as const)(
-    "renders Us / Them legend labels without missing-key fallback in %s locale",
-    async (locale) => {
+  it.each([
+    ["en", "Ready"],
+    ["sr", "Spremno"],
+  ] as const)(
+    "renders the table labels without missing-key fallback in %s locale",
+    async (locale, ready) => {
       await i18n.changeLanguage(locale);
 
       renderRoomPage();
@@ -176,10 +179,8 @@ describe("RoomPage locale overflow", () => {
         expect(screen.getByTestId("seats-grid")).toBeInTheDocument();
       });
 
-      const expectedUs = locale === "en" ? "Us" : "Mi";
-      const expectedThem = locale === "en" ? "Them" : "Oni";
-      expect(screen.getByText(expectedUs)).toBeInTheDocument();
-      expect(screen.getByText(expectedThem)).toBeInTheDocument();
+      expect(screen.getByTestId("table-center")).toHaveTextContent(ready);
+      expect(screen.queryByText(/^room\./)).not.toBeInTheDocument();
 
       const seatGrid = screen.getByTestId("seats-grid");
       const tiles = seatGrid.querySelectorAll<HTMLElement>("[data-testid^='seat-position-']");

@@ -6,9 +6,15 @@ import { useRoomStore } from "@/shared/stores/roomStore";
 
 /**
  * Room-scoped chat dock that colors sender names gold or silver relative to the viewer's seat.
- * Falls back to the neutral accent when either side is unseated.
+ * On a phone its launcher sits above the pinned Leave and Start bar.
  */
-export function RoomChatDock({ roomId }: { roomId: number }) {
+export function RoomChatDock({
+  roomId,
+  aboveBottomBar = false,
+}: {
+  roomId: number;
+  aboveBottomBar?: boolean;
+}) {
   const me = useAuthStore((s) => s.user);
   const players = useRoomStore((s) => s.players);
   const viewerSeat =
@@ -23,5 +29,12 @@ export function RoomChatDock({ roomId }: { roomId: number }) {
     [players, viewerSeat],
   );
 
-  return <ChatDock variant="room" roomId={roomId} resolveNameColor={resolveNameColor} />;
+  return (
+    <ChatDock
+      variant="room"
+      roomId={roomId}
+      resolveNameColor={resolveNameColor}
+      launcherClassName={aboveBottomBar ? "bottom-19" : undefined}
+    />
+  );
 }
