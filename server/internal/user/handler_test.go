@@ -1095,7 +1095,7 @@ func TestGetProfile_SeasonRankPresentOnSelf(t *testing.T) {
 		keys = append(keys, k)
 	}
 	sortpkg.Strings(keys)
-	assert.Equal(t, []string{"division", "seasonName", "sp", "tier"}, keys)
+	assert.Equal(t, []string{"division", "gamesPlayed", "gamesWon", "players", "position", "seasonName", "sp", "tier"}, keys)
 	assert.Equal(t, float64(2), raw.SeasonRank["division"], "the division is a JSON number")
 }
 

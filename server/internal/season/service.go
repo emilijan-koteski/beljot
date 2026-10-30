@@ -320,11 +320,28 @@ func (s *Service) CurrentSeasonRank(userID uint, now time.Time) (*SeasonRankView
 		return nil, nil
 	}
 
+	standing, err := s.viewerPosition(userID, current.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	position := 0
+	if standing != nil {
+		position = standing.Position
+	}
+	players, err := s.repo.CountLeaderboard(current.ID)
+	if err != nil {
+		return nil, fmt.Errorf("counting leaderboard rows: %w", err)
+	}
+
 	tier, division := derivedRank(record.SP)
 	return &SeasonRankView{
-		SeasonName: current.Name,
-		Tier:       tier,
-		Division:   division,
-		SP:         record.SP,
+		SeasonName:  current.Name,
+		Tier:        tier,
+		Division:    division,
+		SP:          record.SP,
+		Position:    position,
+		Players:     players,
+		GamesPlayed: record.GamesPlayed,
+		GamesWon:    min(record.GamesWon, record.GamesPlayed),
 	}, nil
 }

@@ -205,13 +205,13 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 		return nil, 0, fmt.Errorf("season: leaderboard offset must be >= 0, got %d", offset)
 	}
 
-	var total int64
-	if err := r.leaderboardScope(seasonID).Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("counting leaderboard rows season=%d: %w", seasonID, err)
+	total, err := r.CountLeaderboard(seasonID)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	entries := make([]LeaderboardEntry, 0, min(limit, allocHintCap))
-	err := r.leaderboardScope(seasonID).
+	err = r.leaderboardScope(seasonID).
 		Select(`player_seasons.user_id       AS user_id,
 		        users.username               AS username,
 		        users.avatar_key             AS avatar_key,
@@ -254,6 +254,15 @@ func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*Leaderboa
 		return nil, nil
 	}
 	return &entries[0], nil
+}
+
+// CountLeaderboard returns how many players the season's leaderboard lists.
+func (r *GormRepository) CountLeaderboard(seasonID uint) (int64, error) {
+	var total int64
+	if err := r.leaderboardScope(seasonID).Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("counting leaderboard rows season=%d: %w", seasonID, err)
+	}
+	return total, nil
 }
 
 // FindSeasonByID returns the season with the given id, or (nil, nil) on a miss.
