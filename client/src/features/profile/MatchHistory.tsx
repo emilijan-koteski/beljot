@@ -104,7 +104,10 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
     const showLoadMore = items.length < total;
     body = (
       <>
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0" data-testid="match-history-list">
+        <ul
+          className="bg-surface border-border divide-border m-0 flex list-none flex-col divide-y overflow-hidden rounded-xl border p-0 shadow-xs"
+          data-testid="match-history-list"
+        >
           {items.map((match) => (
             <MatchStatsCard
               key={match.id}
