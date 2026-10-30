@@ -48,11 +48,9 @@ function renderRoster(overrides: Partial<RoomRosterProps> = {}) {
     viewerId: 10,
     ownerId: 10,
     canManage: true,
-    canInvite: true,
     onPromote: vi.fn(),
     onKick: vi.fn(),
     onRemoveBot: vi.fn(),
-    onInvite: vi.fn(),
     ...overrides,
   };
   render(
@@ -82,12 +80,10 @@ describe("RoomRoster", () => {
     await user.click(screen.getByTestId("kick-list-20"));
     await user.click(screen.getByTestId("promote-player-20"));
     await user.click(screen.getByTestId("roster-remove-bot-1"));
-    await user.click(screen.getByTestId("roster-invite-3"));
 
     expect(props.onKick).toHaveBeenCalledWith(DRAGAN);
     expect(props.onPromote).toHaveBeenCalledWith(DRAGAN);
     expect(props.onRemoveBot).toHaveBeenCalledWith(1);
-    expect(props.onInvite).toHaveBeenCalled();
   });
 
   it("lists the seats from the viewer round the table, then the players without a seat", () => {

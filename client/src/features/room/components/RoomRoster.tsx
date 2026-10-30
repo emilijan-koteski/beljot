@@ -1,4 +1,4 @@
-import { Armchair, Bot, Crown, Hourglass, Send, Users, UserX } from "lucide-react";
+import { Armchair, Bot, Crown, Hourglass, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,12 +20,10 @@ export interface RoomRosterProps {
   viewerId: number | null;
   ownerId: number;
   canManage: boolean;
-  canInvite: boolean;
   className?: string;
   onPromote: (player: RoomPlayer) => void;
   onKick: (player: RoomPlayer) => void;
   onRemoveBot: (seat: number) => void;
-  onInvite: () => void;
 }
 
 /** Everyone in the room: the table round from the viewer, open seats included, then whoever has no seat. */
@@ -41,12 +39,7 @@ export function RoomRoster({ table, standing, className, ...rest }: RoomRosterPr
         <ul className="divide-border m-0 list-none divide-y p-0">
           {table.map((s) =>
             s.player === undefined ? (
-              <OpenSeatRow
-                key={s.seat}
-                seat={s}
-                canInvite={rest.canInvite}
-                onInvite={rest.onInvite}
-              />
+              <OpenSeatRow key={s.seat} seat={s} />
             ) : (
               <PlayerRow
                 key={s.seat}
@@ -105,15 +98,7 @@ export function RoomRosterDialog({ open, onClose, ...roster }: RoomRosterDialogP
   );
 }
 
-function OpenSeatRow({
-  seat,
-  canInvite,
-  onInvite,
-}: {
-  seat: TableSeat;
-  canInvite: boolean;
-  onInvite: () => void;
-}) {
+function OpenSeatRow({ seat }: { seat: TableSeat }) {
   const { t } = useTranslation();
   return (
     <li className="flex items-center gap-2.5 py-2">
@@ -133,25 +118,11 @@ function OpenSeatRow({
       <span className="text-ink-dim min-w-0 flex-1 text-sm font-semibold">
         {t("room.seat.open")}
       </span>
-      {canInvite && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onInvite}
-          data-testid={`roster-invite-${seat.seat}`}
-        >
-          <Send className="size-3.5" />
-          {t("roomInvite.panel.invite")}
-        </Button>
-      )}
     </li>
   );
 }
 
-interface PlayerRowProps extends Omit<
-  RoomRosterProps,
-  "table" | "standing" | "className" | "canInvite" | "onInvite"
-> {
+interface PlayerRowProps extends Omit<RoomRosterProps, "table" | "standing" | "className"> {
   player: RoomPlayer;
   name: string;
   team: "A" | "B" | null;
