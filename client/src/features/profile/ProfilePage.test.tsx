@@ -1,14 +1,15 @@
 import "@/shared/i18n/i18n";
 
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CareerResponse } from "@/shared/api/career";
 import type { ProfileResponse } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { CurrentSeasonResponse } from "@/shared/types/apiTypes";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeUser, mockViewportWidth, QueryWrapper } from "@/test-utils";
 
 import { ProfilePage } from "./ProfilePage";
 
@@ -58,6 +59,17 @@ const currentSeason: CurrentSeasonResponse = {
   gamesPlayed: 31,
   gamesWon: 15,
   gamesCompleted: 29,
+};
+
+const RANK = {
+  seasonName: "2026 Q3",
+  tier: "gold",
+  division: 2,
+  sp: 680,
+  position: 3,
+  players: 40,
+  gamesPlayed: 31,
+  gamesWon: 15,
 };
 
 function renderProfilePage() {
@@ -116,8 +128,15 @@ function careerFixture(overrides: Partial<CareerResponse> = {}): CareerResponse 
   };
 }
 
+let restoreViewport = () => {};
+
 describe("ProfilePage", () => {
+  afterEach(() => {
+    restoreViewport();
+  });
+
   beforeEach(() => {
+    restoreViewport = mockViewportWidth(1280);
     mockGetProfile.mockReset();
     mockGetCareer.mockReset();
     mockGetUserMatches.mockReset();
@@ -409,65 +428,20 @@ describe("ProfilePage", () => {
     ).toHaveAttribute("href", "/players/3");
   });
 
-  it("renders the card-deck picker with the store's deck selected, even with no career data", async () => {
+  it("links to Settings and keeps every preference off the profile", async () => {
     mockGetProfile.mockResolvedValueOnce(profileFixture());
-    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
-    useAuthStore.setState({
-      token: "test-token",
-      user: makeUser({ cardDeckPreference: "croatian" }),
-      isLoading: false,
-    });
-
     renderProfilePage();
 
-    const panel = await screen.findByTestId("profile-card-deck");
-    expect(panel).toBeInTheDocument();
-    expect(screen.getByTestId("profile-deck-option-croatian")).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(screen.getByTestId("profile-deck-option-french")).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
-  });
-
-  it("renders the audio switches with the store's state, even with no career data", async () => {
-    mockGetProfile.mockResolvedValueOnce(profileFixture());
-    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
-    useAuthStore.setState({
-      token: "test-token",
-      user: makeUser({ soundEnabled: false, musicEnabled: true }),
-      isLoading: false,
-    });
-
-    renderProfilePage();
-
-    const panel = await screen.findByTestId("profile-audio");
-    expect(within(screen.getByTestId("profile-sidebar")).getByTestId("profile-audio")).toBe(panel);
-    expect(screen.getByTestId("profile-sound-toggle")).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByTestId("profile-music-toggle")).toHaveAttribute("aria-checked", "true");
-  });
-
-  it("renders the invite privacy switch with the store's state, even with no career data", async () => {
-    mockGetProfile.mockResolvedValueOnce(profileFixture());
-    mockGetCareer.mockRejectedValueOnce(new Error("no career yet"));
-    useAuthStore.setState({
-      token: "test-token",
-      user: makeUser({ allowNonFriendInvites: false }),
-      isLoading: false,
-    });
-
-    renderProfilePage();
-
-    const panel = await screen.findByTestId("profile-invites");
-    expect(within(screen.getByTestId("profile-sidebar")).getByTestId("profile-invites")).toBe(
-      panel,
-    );
-    expect(screen.getByTestId("profile-allow-non-friend-invites")).toHaveAttribute(
-      "aria-checked",
-      "false",
-    );
+    expect(await screen.findByTestId("profile-settings-link")).toHaveAttribute("href", "/settings");
+    for (const id of [
+      "profile-card-deck",
+      "profile-audio",
+      "profile-invites",
+      "profile-linked-accounts",
+    ]) {
+      expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("profile-avatar-edit")).not.toBeInTheDocument();
   });
 
   it("keeps the second-person streak copy and the Play link on the viewer's own profile", async () => {
@@ -483,33 +457,29 @@ describe("ProfilePage", () => {
     expect(screen.getByTestId("profile-streak-play")).toBeInTheDocument();
   });
 
-  it("renders the rank banner from the current-season endpoint", async () => {
-    mockGetProfile.mockResolvedValueOnce(profileFixture());
+  it("shows this season's rank, the climb to the next rank, place and record", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: RANK }));
     renderProfilePage();
 
-    const banner = await screen.findByTestId("rank-banner");
-    expect(banner).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("rank-tier-name").textContent).toBe("Gold 2");
-    expect(screen.getByTestId("rank-progress")).toHaveAttribute("aria-valuenow", "19");
+    const card = await screen.findByTestId("leaderboard-standing");
+    expect(card).toHaveTextContent("Gold 2");
+    await waitFor(() => expect(card).toHaveTextContent("54 SP to Gold 3"));
+    expect(within(card).getByTestId("leaderboard-standing-place")).toHaveTextContent("#3");
+    expect(within(card).getByTestId("leaderboard-standing-place")).toHaveTextContent("of 40");
+    expect(within(card).getByTestId("leaderboard-standing-record")).toHaveTextContent("15–16");
+    expect(screen.getByTestId("profile-season")).toHaveTextContent("2026 Q3");
   });
 
-  it("places the rank banner above the streak callout", async () => {
-    mockGetProfile.mockResolvedValueOnce(profileFixture());
-    mockGetCareer.mockResolvedValue(careerFixture({ streak: { kind: "win", length: 3 } }));
-
+  it("invites a first match when you have not played this season", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: null }));
     renderProfilePage();
 
-    const banner = await screen.findByTestId("rank-banner");
-    const callout = await screen.findByTestId("profile-streak");
-    expect(banner.compareDocumentPosition(callout)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const card = await screen.findByTestId("leaderboard-standing-empty");
+    expect(within(card).getByRole("link", { name: "Play" })).toHaveAttribute("href", "/lobby");
   });
 
-  it("renders the archive without the section's rank chip when the viewer has season history", async () => {
-    mockGetProfile.mockResolvedValueOnce(
-      profileFixture({
-        seasonRank: { seasonName: "2026 Q3", tier: "gold", division: 2, sp: 680 },
-      }),
-    );
+  it("lists past seasons in the sidebar when there is season history", async () => {
+    mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: RANK }));
     mockGetSeasonArchive.mockResolvedValue({
       items: [
         {
@@ -531,10 +501,9 @@ describe("ProfilePage", () => {
     const list = await screen.findByTestId("prior-season-archive");
     expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
     expect(mockGetSeasonArchive).toHaveBeenCalledWith(1);
-    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
   });
 
-  it("renders no archive section at all without season history", async () => {
+  it("leaves the past-seasons panel out without season history", async () => {
     mockGetProfile.mockResolvedValueOnce(profileFixture({ seasonRank: null }));
     mockGetSeasonArchive.mockResolvedValue({ items: [] });
 
@@ -544,7 +513,32 @@ describe("ProfilePage", () => {
       expect(screen.getByTestId("profile-username")).toHaveTextContent("testuser");
     });
     await waitFor(() => expect(mockGetSeasonArchive).toHaveBeenCalled());
-    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("profile-season-section")).not.toBeInTheDocument();
+  });
+
+  it("splits a phone profile into Overview, Matches and Seasons tabs", async () => {
+    restoreViewport();
+    restoreViewport = () => {};
+    const user = userEvent.setup();
+    mockGetProfile.mockResolvedValueOnce(
+      profileFixture({ totalGamesPlayed: 4, wins: 2, losses: 2 }),
+    );
+    renderProfilePage();
+
+    expect(await screen.findByTestId("profile-stats")).toBeInTheDocument();
+    expect(screen.queryByTestId("match-history")).not.toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByTestId("profile-tabs")).getByRole("radio", { name: "Matches" }),
+    );
+    expect(await screen.findByTestId("match-history")).toBeInTheDocument();
+    expect(screen.queryByTestId("profile-stats")).not.toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByTestId("profile-tabs")).getByRole("radio", { name: "Seasons" }),
+    );
+    expect(await screen.findByTestId("profile-seasons-empty")).toHaveTextContent(
+      "No finished seasons yet.",
+    );
   });
 });

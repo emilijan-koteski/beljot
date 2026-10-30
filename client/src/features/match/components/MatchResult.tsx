@@ -216,7 +216,7 @@ export function MatchResult({
                 {statsOpen && (
                   <div
                     id="match-result-stats-panel"
-                    className="parchment-inset mt-2 max-h-[46vh] overflow-y-auto rounded-xl p-2 text-left"
+                    className="border-brass/60 mt-2 max-h-[46vh] overflow-y-auto rounded-xl border bg-black/10 text-left"
                     data-testid="match-result-stats-panel"
                   >
                     <ul className="m-0 list-none p-0">

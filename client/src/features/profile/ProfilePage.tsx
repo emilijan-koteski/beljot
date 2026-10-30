@@ -1,7 +1,10 @@
+import { Settings } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import type { MatchFilter } from "@/shared/api/matches";
+import { buttonVariants } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { useCurrentSeasonQuery } from "@/shared/hooks/queries/useCurrentSeason";
@@ -9,18 +12,13 @@ import { useProfileQuery } from "@/shared/hooks/queries/useProfile";
 import { xpBarFill } from "@/shared/lib/xpLevel";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { AudioPanel } from "./components/AudioPanel";
-import { CardDeckPanel } from "./components/CardDeckPanel";
-import { IdentityHero } from "./components/IdentityHero";
-import { InvitePrivacyPanel } from "./components/InvitePrivacyPanel";
-import { LinkedAccounts } from "./components/LinkedAccounts";
-import { Milestones } from "./components/Milestones";
-import { PartnerSpotlight } from "./components/PartnerSpotlight";
-import { RankBanner } from "./components/RankBanner";
-import { Rivalries } from "./components/Rivalries";
-import { SeasonSection } from "./components/SeasonSection";
-import { StatsGrid } from "./components/StatsGrid";
-import { StreakCallout } from "./components/StreakCallout";
+import { CareerCard } from "./components/CareerCard";
+import { careerSlots } from "./components/careerSlots";
+import { HonorCard } from "./components/HonorCard";
+import { PastSeasons } from "./components/PastSeasons";
+import { ProfileHero } from "./components/ProfileHero";
+import { ProfileLayout } from "./components/ProfileLayout";
+import { ProfileSeasonCard } from "./components/ProfileSeasonCard";
 import { MatchHistory } from "./MatchHistory";
 
 /**
@@ -56,6 +54,10 @@ function useAdoptProfileHonor(
   }, [honorScore, honorTier, honorIsNew]);
 }
 
+/**
+ * Your own profile: who you are, this season, your career, honor and people, matches and past seasons.
+ * Everything you can change about your account lives on the Settings page, linked from the hero.
+ */
 export function ProfilePage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
@@ -78,110 +80,89 @@ export function ProfilePage() {
     );
   }
 
-  const username = profile?.username ?? user?.username ?? "";
-  const createdAt = profile?.createdAt ?? user?.createdAt ?? "";
   const wins = profile?.wins ?? 0;
   const losses = profile?.losses ?? 0;
   const abandoned = profile?.abandoned ?? 0;
   const games = profile?.totalGamesPlayed ?? 0;
-  const winRate = games === 0 ? null : Math.round((wins / games) * 100);
-
   const xpFallback = xpBarFill(user?.totalXp ?? 0, user?.level ?? 0);
-
-  const counts: Record<MatchFilter, number> = {
-    all: games,
-    win: wins,
-    loss: losses,
-    abandoned,
-  };
+  const counts: Record<MatchFilter, number> = { all: games, win: wins, loss: losses, abandoned };
+  const slots = careerSlots(career, true, {
+    text: t("profile.careerError"),
+    testId: "profile-career-error",
+  });
 
   return (
-    <div className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7" data-testid="profile-page">
-      <IdentityHero
-        username={username}
-        avatarUrl={profile ? (profile.avatarLargeUrl ?? null) : (user?.avatarUrl ?? null)}
-        userId={user?.id}
-        usernameChangedAt={profile?.usernameChangedAt}
-        createdAt={createdAt}
-        lastPlayedAt={career.data?.lastPlayedAt}
-        games={games}
-        wins={wins}
-        losses={losses}
-        capots={career.data?.capots ?? 0}
-        walletBalance={user?.walletBalance ?? 0}
-        loginStreakDays={user?.loginStreakDays ?? 0}
-        level={profile?.level ?? user?.level ?? 0}
-        xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
-        xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
-        winRate={winRate}
-        honor={
-          profile
-            ? {
-                score: profile.honorScore,
-                tier: profile.honorTier,
-                completedTotal: profile.honorCompletedTotal,
-                abandonedTotal: profile.honorAbandonedTotal,
-                isNewPlayer: profile.isNewPlayer,
-                trendDelta: profile.honorTrendDelta,
-                trendDirection: profile.honorTrendDirection,
-              }
-            : undefined
-        }
-      />
-
-      <RankBanner season={seasonQuery.data} />
-
-      {career.data && <StreakCallout streak={career.data.streak} />}
-
-      {isError ? (
-        <section
-          className="bg-surface border-border mb-5 rounded-lg border p-6"
-          data-testid="profile-stats"
-        >
-          <p className="text-danger text-sm" data-testid="profile-stats-error">
-            {t("profile.stats.error")}
-          </p>
-        </section>
-      ) : (
-        <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
+    <ProfileLayout
+      testId="profile-page"
+      hero={(layout) => (
+        <ProfileHero
+          layout={layout}
+          username={profile?.username ?? user?.username ?? ""}
+          avatarUrl={profile ? (profile.avatarLargeUrl ?? null) : (user?.avatarUrl ?? null)}
+          createdAt={profile?.createdAt ?? user?.createdAt ?? ""}
+          lastPlayedAt={career.data?.lastPlayedAt}
+          level={profile?.level ?? user?.level ?? 0}
+          xpIntoLevel={profile?.xpIntoLevel ?? xpFallback.xpIntoLevel}
+          xpForNextLevel={profile?.xpForNextLevel ?? xpFallback.xpForNextLevel}
+          seasonRank={profile?.seasonRank}
+          honor={
+            profile
+              ? {
+                  score: profile.honorScore,
+                  tier: profile.honorTier,
+                  isNewPlayer: profile.isNewPlayer,
+                }
+              : undefined
+          }
+          walletBalance={user?.walletBalance ?? 0}
+          loginStreakDays={user?.loginStreakDays ?? 0}
+          action={
+            <Link
+              to="/settings"
+              className={buttonVariants({ variant: "outline", size: "sm", className: "gap-1.5" })}
+              data-testid="profile-settings-link"
+            >
+              <Settings className="size-4" />
+              {t("nav.settings")}
+            </Link>
+          }
+        />
       )}
-
-      <SeasonSection userId={user?.id} seasonRank={profile?.seasonRank} showCurrentRank={false} />
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <MatchHistory userId={user?.id} counts={counts} />
-
-        <aside className="flex flex-col gap-3.5 lg:sticky lg:top-20" data-testid="profile-sidebar">
-          <LinkedAccounts userId={user?.id} />
-
-          <CardDeckPanel />
-
-          <AudioPanel />
-
-          <InvitePrivacyPanel />
-
-          {career.isError ? (
-            <p className="text-danger text-sm" data-testid="profile-career-error">
-              {t("profile.careerError")}
-            </p>
-          ) : career.data ? (
-            <>
-              <PartnerSpotlight partners={career.data.topPartners} />
-              <Rivalries rivals={career.data.topRivals} />
-              <Milestones
-                capots={career.data.capots}
-                careerPoints={career.data.careerPoints}
-                bestHand={career.data.bestHand}
-                avgMatchSeconds={career.data.avgMatchSeconds}
-              />
-            </>
-          ) : (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 rounded-lg" />
-            ))
-          )}
-        </aside>
-      </div>
-    </div>
+      season={
+        <ProfileSeasonCard
+          seasonRank={profile?.seasonRank}
+          progress={seasonQuery.data}
+          subjectIsSelf
+        />
+      }
+      career={
+        <CareerCard
+          games={games}
+          wins={wins}
+          losses={losses}
+          abandoned={abandoned}
+          streak={career.data?.streak}
+          statsError={isError}
+        />
+      }
+      honor={
+        profile && (
+          <HonorCard
+            score={profile.honorScore}
+            tier={profile.honorTier}
+            completedTotal={profile.honorCompletedTotal}
+            abandonedTotal={profile.honorAbandonedTotal}
+            isNewPlayer={profile.isNewPlayer}
+            trendDelta={profile.honorTrendDelta}
+            trendDirection={profile.honorTrendDirection}
+          />
+        )
+      }
+      highlights={slots.highlights}
+      partners={slots.partners}
+      rivals={slots.rivals}
+      matches={<MatchHistory userId={user?.id} counts={counts} />}
+      seasons={(compact) => <PastSeasons userId={user?.id} compact={compact} />}
+    />
   );
 }

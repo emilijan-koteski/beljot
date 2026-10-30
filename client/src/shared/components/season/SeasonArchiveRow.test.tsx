@@ -15,6 +15,7 @@ function renderRow(over: Partial<Parameters<typeof SeasonArchiveRow>[0]> = {}) {
         tier="silver"
         division={null}
         gamesPlayed={14}
+        gamesWon={9}
         {...over}
       />
     </ul>,
@@ -27,13 +28,13 @@ describe("SeasonArchiveRow", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("renders the season token verbatim, the stored tier, the SP and the games", () => {
+  it("renders the season token verbatim, the stored tier, the SP and the season record", () => {
     renderRow();
 
     expect(screen.getByTestId("season-archive-name").textContent).toBe("2026 Q2");
     expect(screen.getByTestId("season-archive-tier").textContent).toBe("Silver");
     expect(screen.getByTestId("season-archive-sp").textContent).toContain((1800).toLocaleString());
-    expect(screen.getByTestId("season-archive-games").textContent).toBe("14");
+    expect(screen.getByTestId("season-archive-record").textContent).toBe("9–5 · 64%");
     expect(screen.getByTestId("season-archive-row")).toHaveAttribute("data-tier", "silver");
   });
 
@@ -56,13 +57,15 @@ describe("SeasonArchiveRow", () => {
     expect(summary.textContent).toContain((1800).toLocaleString());
     expect(summary.textContent).toContain("14");
 
+    expect(summary.textContent).toContain("Wins: 9, losses: 5");
+
     for (const cell of [
       "season-archive-name",
       "season-archive-tier",
       "season-archive-sp",
-      "season-archive-games",
+      "season-archive-record",
     ]) {
-      expect(screen.getByTestId(cell)).toHaveAttribute("aria-hidden", "true");
+      expect(screen.getByTestId(cell).closest('[aria-hidden="true"]'), cell).not.toBeNull();
     }
   });
 

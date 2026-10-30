@@ -17,7 +17,10 @@ interface RoomLastMatchProps {
 export function RoomLastMatch({ match, roomId, playersInRoom, compact }: RoomLastMatchProps) {
   const [open, setOpen] = useState(true);
   return (
-    <ul className="m-0 list-none p-0" data-testid="last-match-panel">
+    <ul
+      className="bg-surface border-border divide-border m-0 flex list-none flex-col divide-y overflow-hidden rounded-xl border p-0 shadow-xs"
+      data-testid="last-match-panel"
+    >
       <MatchStatsCard
         match={match}
         isOpen={open}

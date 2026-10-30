@@ -21,9 +21,8 @@ const FILTERS: { id: MatchFilter; labelKey: string }[] = [
 ];
 
 /**
- * Filter chips (with server-accurate counts) + a newest/oldest sort toggle
- * above the match list. Selecting a chip / toggling sort re-queries from page
- * one via the infinite query's key.
+ * Filter chips with server-accurate counts, scrolling sideways when they run out of room, and a newest/oldest toggle.
+ * Selecting a chip or toggling the sort re-queries from page one via the infinite query's key.
  */
 export function HistoryFilters({
   filter,
@@ -35,11 +34,8 @@ export function HistoryFilters({
   const { t } = useTranslation();
 
   return (
-    <div
-      className="bg-surface border-border mb-3.5 flex flex-wrap items-center gap-2.5 rounded-lg border px-4 py-3"
-      data-testid="match-history-filters"
-    >
-      <div className="flex flex-wrap gap-1.5">
+    <div className="flex min-w-0 items-center gap-2" data-testid="match-history-filters">
+      <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none]">
         {FILTERS.map((f) => {
           const active = filter === f.id;
           return (
@@ -49,6 +45,7 @@ export function HistoryFilters({
               count={counts[f.id]}
               onClick={() => onFilterChange(f.id)}
               aria-pressed={active}
+              className="shrink-0"
               data-testid={`match-history-filter-${f.id}`}
               data-active={active}
             >
@@ -58,10 +55,10 @@ export function HistoryFilters({
         })}
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
-        <span className="text-ink-mute text-xs">{t("profile.matchHistory.sort.label")}</span>
+      <div className="flex shrink-0 items-center gap-1.5">
         <Button
           variant="outline"
+          size="sm"
           onClick={() => onSortChange(sort === "new" ? "old" : "new")}
           data-testid="match-history-sort"
           data-sort={sort}

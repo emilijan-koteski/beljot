@@ -6,11 +6,11 @@ type WinRateRingProps = {
   rate: number | null;
 };
 
-const SIZE = 160;
-const STROKE = 14;
+const SIZE = 96;
+const STROKE = 9;
 
 /**
- * Featured win-rate ring for the Identity Hero: a felt-green arc over a sunken
+ * Win-rate ring for the Career card: a felt-green arc over a sunken
  * track, with the percentage + "Win rate" label centered. The arc animates on
  * change unless the user prefers reduced motion.
  */
@@ -58,10 +58,10 @@ export function WinRateRing({ rate }: WinRateRingProps) {
         />
       </svg>
       <div className="flex flex-col items-center">
-        <span className="text-ink text-4xl leading-none font-bold tracking-tight tabular-nums">
+        <span className="text-ink text-xl leading-none font-bold tracking-tight tabular-nums">
           {rate === null ? t("profile.stats.winRateEmpty") : `${rate}%`}
         </span>
-        <span className="text-brass-deep mt-1 max-w-30 text-center font-mono text-2xs leading-tight font-semibold tracking-caps uppercase">
+        <span className="text-ink-mute mt-1 max-w-18 text-center text-2xs leading-tight font-semibold">
           {t("profile.winRate")}
         </span>
       </div>

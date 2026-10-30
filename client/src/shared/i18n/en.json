@@ -27,7 +27,8 @@
     "logout": "Log out",
     "signedInAs": "Signed in as",
     "menu": "Menu",
-    "accountMenu": "Account menu for {{username}}"
+    "accountMenu": "Account menu for {{username}}",
+    "settings": "Settings"
   },
   "profile": {
     "title": "Profile",
@@ -176,7 +177,8 @@
         "up": "Improving",
         "flat": "Steady",
         "down": "Slipping"
-      }
+      },
+      "record": "{{finished}} finished · {{left}} left early"
     },
     "matchHistory": {
       "eyebrow": "Activity",
@@ -253,14 +255,14 @@
     },
     "partners": {
       "eyebrow": "Spotlight",
-      "title": "Most-played partner",
+      "title": "Partners",
       "matchesTogether": "{{count}} matches together",
       "empty": "No regular partners yet. Play a few matches.",
       "emptyPublic": "No regular partners yet."
     },
     "rivals": {
       "eyebrow": "Rivalry",
-      "title": "Across the table",
+      "title": "Rivals",
       "empty": "No rivals yet. Play a few matches.",
       "emptyPublic": "No rivals yet."
     },
@@ -295,7 +297,7 @@
     },
     "milestones": {
       "eyebrow": "Milestones",
-      "title": "Career highlights",
+      "title": "Highlights",
       "careerPointsLabel": "Career points",
       "careerPointsHint": "total points scored",
       "capotsLabel": "Capots made",
@@ -307,6 +309,18 @@
       "avgLengthLabel": "Avg. match length",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "completed matches"
+    },
+    "tabs": {
+      "label": "Profile sections",
+      "overview": "Overview",
+      "matches": "Matches",
+      "seasons": "Seasons"
+    },
+    "seasonCard": {
+      "title": "This season · {{season}}"
+    },
+    "seasons": {
+      "empty": "No finished seasons yet."
     }
   },
   "publicProfile": {
@@ -1474,5 +1488,26 @@
     "botsLive": "Bots play these seats.",
     "botsStake": "They pay no buy-in, so the winners split the players' stakes.",
     "previewCaption": "Players see this when they hover the rule icons:"
+  },
+  "settings": {
+    "title": "Settings",
+    "sectionsLabel": "Settings sections",
+    "sections": {
+      "account": "Account",
+      "signIn": "Sign-in",
+      "game": "Game",
+      "sound": "Sound",
+      "privacy": "Privacy"
+    },
+    "password": {
+      "label": "Password",
+      "send": "Send link",
+      "sending": "Sending…",
+      "sent": "Link sent to {{email}}.",
+      "sentBadge": "Sent"
+    },
+    "language": {
+      "label": "Language"
+    }
   }
 }

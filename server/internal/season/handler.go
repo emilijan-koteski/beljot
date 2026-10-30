@@ -206,12 +206,16 @@ type ArchiveView struct {
 }
 
 // SeasonRankView is the subject's active-season standing on both profile DTOs, null when they have not played.
-// It exposes only what the leaderboard already shows, with the rank derived from SP.
+// It exposes only what the leaderboard already shows; Position is 0 when the leaderboard would not list them.
 type SeasonRankView struct {
-	SeasonName string `json:"seasonName"`
-	Tier       string `json:"tier"`
-	Division   *int   `json:"division"`
-	SP         int    `json:"sp"`
+	SeasonName  string `json:"seasonName"`
+	Tier        string `json:"tier"`
+	Division    *int   `json:"division"`
+	SP          int    `json:"sp"`
+	Position    int    `json:"position"`
+	Players     int64  `json:"players"`
+	GamesPlayed int    `json:"gamesPlayed"`
+	GamesWon    int    `json:"gamesWon"`
 }
 
 // GetSeasons handles GET /api/v1/seasons: every season window, newest-first,

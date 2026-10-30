@@ -4,9 +4,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { HonorHeroBand } from "./HonorHeroBand";
+import { HonorCard } from "./HonorCard";
 
-type Props = Parameters<typeof HonorHeroBand>[0];
+type Props = Parameters<typeof HonorCard>[0];
 
 function renderBand(overrides: Partial<Props> = {}) {
   const props: Props = {
@@ -21,12 +21,12 @@ function renderBand(overrides: Partial<Props> = {}) {
   };
   return render(
     <MemoryRouter>
-      <HonorHeroBand {...props} />
+      <HonorCard {...props} />
     </MemoryRouter>,
   );
 }
 
-describe("HonorHeroBand (honour redesign R3)", () => {
+describe("HonorCard (honour redesign R3)", () => {
   it("exposes the score, tier, new-player flag and trend as data attributes", () => {
     renderBand({ score: 96, tier: "exemplary", trendDelta: 4, trendDirection: "up" });
 

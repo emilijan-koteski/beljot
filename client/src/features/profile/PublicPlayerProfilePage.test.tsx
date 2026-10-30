@@ -2,14 +2,14 @@ import "@/shared/i18n/i18n";
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FetchError } from "@/shared/api/axiosClient";
 import type { CareerResponse } from "@/shared/api/career";
 import type { MatchesListResponse, MatchListItem } from "@/shared/api/matches";
 import type { PublicProfileResponse } from "@/shared/api/profile";
 import { useAuthStore } from "@/shared/stores/authStore";
-import { makeUser, QueryWrapper } from "@/test-utils";
+import { makeUser, mockViewportWidth, QueryWrapper } from "@/test-utils";
 
 import { PublicPlayerProfilePage } from "./PublicPlayerProfilePage";
 
@@ -120,8 +120,15 @@ function renderAt(id: string) {
   );
 }
 
+let restoreViewport = () => {};
+
 describe("PublicPlayerProfilePage (Story 11.3)", () => {
+  afterEach(() => {
+    restoreViewport();
+  });
+
   beforeEach(() => {
+    restoreViewport = mockViewportWidth(1280);
     mockGetPublicProfile.mockReset();
     mockGetCareer.mockReset();
     mockGetUserMatches.mockReset();
@@ -268,10 +275,19 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
     expect(within(history).queryByText("You")).not.toBeInTheDocument();
   });
 
-  it("renders the subject's seasonal rank chip and prior-season archive", async () => {
+  it("shows the subject's season card without a next-rank bar, and their past seasons", async () => {
     mockGetPublicProfile.mockResolvedValue(
       publicProfileFixture({
-        seasonRank: { seasonName: "2026 Q3", tier: "silver", division: 2, sp: 420 },
+        seasonRank: {
+          seasonName: "2026 Q3",
+          tier: "silver",
+          division: 2,
+          sp: 420,
+          position: 12,
+          players: 40,
+          gamesPlayed: 20,
+          gamesWon: 11,
+        },
       }),
     );
     mockGetSeasonArchive.mockResolvedValue({
@@ -283,6 +299,7 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
           tier: "bronze",
           division: null,
           gamesPlayed: 8,
+          gamesWon: 3,
           startedAt: "2026-04-01T00:00:00Z",
           endsAt: "2026-07-01T00:00:00Z",
         },
@@ -291,13 +308,27 @@ describe("PublicPlayerProfilePage (Story 11.3)", () => {
 
     renderAt("2");
 
-    const chip = await screen.findByTestId("profile-season");
-    expect(chip).toHaveAttribute("data-tier", "silver");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Silver 2");
-    expect(chip.textContent).toContain("2026 Q3");
+    const card = await screen.findByTestId("leaderboard-standing");
+    expect(card).toHaveTextContent("Silver 2");
+    expect(screen.getByTestId("profile-season")).toHaveTextContent("2026 Q3");
+    expect(within(card).getByTestId("leaderboard-standing-place")).toHaveTextContent("#12");
+    expect(within(card).getByTestId("leaderboard-standing-record")).toHaveTextContent("11–9");
+    expect(card).not.toHaveTextContent(/SP to/);
     const list = await screen.findByTestId("prior-season-archive");
     expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(1);
     expect(mockGetSeasonArchive).toHaveBeenCalledWith(2);
+  });
+
+  it("shows the friend action in the hero, and never a Settings link", async () => {
+    mockGetPublicProfile.mockResolvedValue(publicProfileFixture());
+    renderAt("2");
+
+    const hero = await screen.findByTestId("profile-identity-hero");
+    await waitFor(() =>
+      expect(within(hero).queryByTestId("friend-button-loading")).not.toBeInTheDocument(),
+    );
+    expect(within(hero).getByTestId("friend-button-add")).toBeInTheDocument();
+    expect(screen.queryByTestId("profile-settings-link")).not.toBeInTheDocument();
   });
 
   it("renders no seasonal-rank section for a subject without season history", async () => {

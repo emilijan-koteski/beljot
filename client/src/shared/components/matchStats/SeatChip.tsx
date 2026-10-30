@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { Avatar } from "@/shared/components/ui/avatar";
+import { cn } from "@/shared/lib/utils";
 
 type SeatChipProps = {
   name: string;
@@ -12,6 +13,9 @@ type SeatChipProps = {
   avatarUrl?: string | null;
   userId?: number;
 };
+
+const CHIP =
+  "text-ink inline-flex h-6 max-w-40 items-center gap-1 rounded-md pr-1.5 pl-0.5 text-xs font-medium";
 
 /**
  * Team-tinted player pill with an optional "YOU" badge.
@@ -37,13 +41,13 @@ export function SeatChip({
         name={name}
         avatarUrl={bot ? null : avatarUrl}
         team={team}
-        size={20}
+        size={18}
         icon={bot ? <Bot aria-hidden="true" /> : undefined}
       />
       <span className="truncate">{name}</span>
       {you && (
         <span
-          className="bg-ink ml-0.5 rounded px-1.5 py-px text-2xs font-bold tracking-wider uppercase"
+          className="bg-ink ml-0.5 rounded px-1 py-px text-2xs leading-none font-bold tracking-wider uppercase"
           style={{ color: "var(--bg)" }}
         >
           {t("profile.matchHistory.you")}
@@ -58,7 +62,10 @@ export function SeatChip({
         to={`/players/${userId}`}
         onClick={(e) => e.stopPropagation()}
         aria-label={t("friends.viewProfileAria", { username: name })}
-        className="text-ink focus-visible:ring-ring/70 inline-flex h-7 items-center gap-1.5 rounded-lg pr-2 pl-1 text-xs font-medium underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
+        className={cn(
+          CHIP,
+          "focus-visible:ring-ring/70 underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none",
+        )}
         style={tint}
         data-testid="match-seat-chip"
       >
@@ -68,11 +75,7 @@ export function SeatChip({
   }
 
   return (
-    <span
-      className="text-ink inline-flex h-7 items-center gap-1.5 rounded-lg pr-2 pl-1 text-xs font-medium"
-      style={tint}
-      data-testid="match-seat-chip"
-    >
+    <span className={CHIP} style={tint} data-testid="match-seat-chip">
       {content}
     </span>
   );

@@ -24,6 +24,7 @@ import { ProfilePage } from "@/features/profile/ProfilePage";
 import { PublicPlayerProfilePage } from "@/features/profile/PublicPlayerProfilePage";
 import { RoomPage } from "@/features/room/RoomPage";
 import { RulesPage } from "@/features/rules/RulesPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { AppLayout } from "@/shared/components/AppLayout";
 import { GuestRoute } from "@/shared/components/GuestRoute";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
@@ -85,6 +86,7 @@ function createAppRouter() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/players/:id" element={<PublicPlayerProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/rooms/:id" element={<RoomPage />} />
             <Route path="/matchmaking/:id" element={<MatchmakingPage />} />
           </Route>

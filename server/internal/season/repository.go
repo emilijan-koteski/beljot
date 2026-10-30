@@ -16,6 +16,8 @@ type Repository interface {
 
 	FindLeaderboardEntry(seasonID, userID uint) (*LeaderboardEntry, error)
 
+	CountLeaderboard(seasonID uint) (int64, error)
+
 	CountAhead(seasonID uint, sp int, userID uint) (int64, error)
 
 	FindSeasonByID(id uint) (*Season, error)

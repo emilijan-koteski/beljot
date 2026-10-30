@@ -197,6 +197,13 @@ func (m *mockRepo) FindLeaderboardEntry(seasonID, userID uint) (*season.Leaderbo
 	return nil, nil
 }
 
+func (m *mockRepo) CountLeaderboard(seasonID uint) (int64, error) {
+	if m.countErr != nil {
+		return 0, m.countErr
+	}
+	return int64(len(m.visibleRows(seasonID))), nil
+}
+
 func (m *mockRepo) CountAhead(seasonID uint, sp int, userID uint) (int64, error) {
 	m.aheadCalls++
 	if m.countErr != nil {
@@ -1738,6 +1745,50 @@ func TestCurrentSeasonRank_ZeroSPRowIsIronNotNil(t *testing.T) {
 	require.NotNil(t, rank.Division)
 	assert.Equal(t, 1, *rank.Division, "0 SP is Iron 1")
 	assert.Equal(t, 0, rank.SP)
+}
+
+func TestCurrentSeasonRank_CarriesPlaceAndSeasonRecord(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.rows[key(41, testWindow.ID)] = &season.PlayerSeason{UserID: 41, SeasonID: testWindow.ID, SP: 900, GamesPlayed: 12}
+	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{
+		UserID: 42, SeasonID: testWindow.ID, SP: 700, GamesPlayed: 30, GamesCompleted: 28, GamesWon: 19,
+	}
+	repo.rows[key(43, testWindow.ID)] = &season.PlayerSeason{UserID: 43, SeasonID: testWindow.ID, SP: 300, GamesPlayed: 4}
+	repo.usernames[41], repo.usernames[42], repo.usernames[43] = "ana", "kiro", "luka"
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, rank)
+	assert.Equal(t, 2, rank.Position, "one player ahead on SP")
+	assert.Equal(t, int64(3), rank.Players)
+	assert.Equal(t, 30, rank.GamesPlayed)
+	assert.Equal(t, 19, rank.GamesWon)
+}
+
+func TestCurrentSeasonRank_UnlistedRowHasNoPlace(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.rows[key(41, testWindow.ID)] = &season.PlayerSeason{UserID: 41, SeasonID: testWindow.ID, SP: 900, GamesPlayed: 12}
+	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{UserID: 42, SeasonID: testWindow.ID, SP: 0, GamesPlayed: 0}
+	repo.usernames[41], repo.usernames[42] = "ana", "kiro"
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, rank)
+	assert.Equal(t, 0, rank.Position, "the leaderboard does not list a row with no games, so it has no place")
+	assert.Equal(t, int64(1), rank.Players)
+}
+
+func TestCurrentSeasonRank_CountFailureSurfaces(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	repo.rows[key(42, testWindow.ID)] = &season.PlayerSeason{UserID: 42, SeasonID: testWindow.ID, SP: 120, GamesPlayed: 3}
+	repo.countErr = errors.New("db down")
+	svc := season.NewService(repo)
+
+	rank, err := svc.CurrentSeasonRank(42, time.Now().UTC())
+	require.Error(t, err)
+	assert.Nil(t, rank)
 }
 
 func TestCurrentSeasonRank_ResolverFailureSurfaces(t *testing.T) {

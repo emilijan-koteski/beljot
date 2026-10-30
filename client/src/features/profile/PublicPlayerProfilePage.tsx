@@ -10,13 +10,13 @@ import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useCareerQuery } from "@/shared/hooks/queries/useCareer";
 import { usePublicProfileQuery } from "@/shared/hooks/queries/usePublicProfile";
 
-import { IdentityHero } from "./components/IdentityHero";
-import { Milestones } from "./components/Milestones";
-import { PartnerSpotlight } from "./components/PartnerSpotlight";
-import { Rivalries } from "./components/Rivalries";
-import { SeasonSection } from "./components/SeasonSection";
-import { StatsGrid } from "./components/StatsGrid";
-import { StreakCallout } from "./components/StreakCallout";
+import { CareerCard } from "./components/CareerCard";
+import { careerSlots } from "./components/careerSlots";
+import { HonorCard } from "./components/HonorCard";
+import { PastSeasons } from "./components/PastSeasons";
+import { ProfileHero } from "./components/ProfileHero";
+import { ProfileLayout } from "./components/ProfileLayout";
+import { ProfileSeasonCard } from "./components/ProfileSeasonCard";
 import { MatchHistory } from "./MatchHistory";
 
 /**
@@ -30,9 +30,8 @@ function parseCanonicalUserId(id: string | undefined): number | undefined {
 }
 
 /**
- * Read-only profile of another player at /players/:id, kept separate from ProfilePage so
- * self-only side effects are never mounted. The page is keyed by subject id so navigating
- * between cached profiles remounts its local state.
+ * Another player's profile at /players/:id, with the friend action and nothing private, kept apart from ProfilePage
+ * so self-only side effects never mount. It is keyed by subject id, so moving between cached profiles resets its tabs.
  */
 export function PublicPlayerProfilePage() {
   const { t } = useTranslation();
@@ -98,87 +97,69 @@ export function PublicPlayerProfilePage() {
   const wins = profile.wins;
   const losses = profile.losses;
   const abandoned = profile.abandoned;
-  const winRate = games === 0 ? null : Math.round((wins / games) * 100);
-
-  const counts: Record<MatchFilter, number> = {
-    all: games,
-    win: wins,
-    loss: losses,
-    abandoned,
-  };
+  const counts: Record<MatchFilter, number> = { all: games, win: wins, loss: losses, abandoned };
+  const slots = careerSlots(career, false, {
+    text: t("profile.careerError"),
+    testId: "public-profile-career-error",
+  });
 
   return (
-    <div
+    <ProfileLayout
       key={validId}
-      className="mx-auto max-w-330 px-4 py-8 pb-32 md:px-7"
-      data-testid="public-profile-page"
-    >
-      <IdentityHero
-        username={profile.username}
-        avatarUrl={profile.avatarLargeUrl ?? null}
-        userId={undefined}
-        createdAt={profile.createdAt}
-        lastPlayedAt={career.data?.lastPlayedAt}
-        games={games}
-        wins={wins}
-        losses={losses}
-        capots={career.data?.capots ?? 0}
-        hidePrivatePills
-        walletBalance={0}
-        loginStreakDays={0}
-        level={profile.level}
-        xpIntoLevel={profile.xpIntoLevel}
-        xpForNextLevel={profile.xpForNextLevel}
-        winRate={winRate}
-        honor={{
-          subjectIsSelf: false,
-          score: profile.honorScore,
-          tier: profile.honorTier,
-          completedTotal: profile.honorCompletedTotal,
-          abandonedTotal: profile.honorAbandonedTotal,
-          isNewPlayer: profile.isNewPlayer,
-          trendDelta: profile.honorTrendDelta,
-          trendDirection: profile.honorTrendDirection,
-        }}
-      />
-
-      {validId !== undefined && <FriendButton userId={validId} username={profile.username} />}
-
-      {career.data && <StreakCallout streak={career.data.streak} subjectIsSelf={false} />}
-
-      <StatsGrid games={games} wins={wins} losses={losses} abandoned={abandoned} />
-
-      <SeasonSection userId={validId} seasonRank={profile.seasonRank} />
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <MatchHistory userId={validId} counts={counts} subjectIsSelf={false} />
-
-        <aside
-          className="flex flex-col gap-3.5 lg:sticky lg:top-20"
-          data-testid="public-profile-sidebar"
-        >
-          {career.isError ? (
-            <p className="text-danger text-sm" data-testid="public-profile-career-error">
-              {t("profile.careerError")}
-            </p>
-          ) : career.data ? (
-            <>
-              <PartnerSpotlight partners={career.data.topPartners} subjectIsSelf={false} />
-              <Rivalries rivals={career.data.topRivals} subjectIsSelf={false} />
-              <Milestones
-                capots={career.data.capots}
-                careerPoints={career.data.careerPoints}
-                bestHand={career.data.bestHand}
-                avgMatchSeconds={career.data.avgMatchSeconds}
-              />
-            </>
-          ) : (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 rounded-lg" />
-            ))
-          )}
-        </aside>
-      </div>
-    </div>
+      testId="public-profile-page"
+      hero={(layout) => (
+        <ProfileHero
+          layout={layout}
+          username={profile.username}
+          avatarUrl={profile.avatarLargeUrl ?? null}
+          createdAt={profile.createdAt}
+          lastPlayedAt={career.data?.lastPlayedAt}
+          level={profile.level}
+          xpIntoLevel={profile.xpIntoLevel}
+          xpForNextLevel={profile.xpForNextLevel}
+          seasonRank={profile.seasonRank}
+          honor={{
+            score: profile.honorScore,
+            tier: profile.honorTier,
+            isNewPlayer: profile.isNewPlayer,
+          }}
+          action={
+            validId !== undefined && (
+              <div className="flex flex-wrap justify-center gap-2">
+                <FriendButton userId={validId} username={profile.username} compact />
+              </div>
+            )
+          }
+        />
+      )}
+      season={<ProfileSeasonCard seasonRank={profile.seasonRank} subjectIsSelf={false} />}
+      career={
+        <CareerCard
+          games={games}
+          wins={wins}
+          losses={losses}
+          abandoned={abandoned}
+          streak={career.data?.streak}
+          subjectIsSelf={false}
+        />
+      }
+      honor={
+        <HonorCard
+          subjectIsSelf={false}
+          score={profile.honorScore}
+          tier={profile.honorTier}
+          completedTotal={profile.honorCompletedTotal}
+          abandonedTotal={profile.honorAbandonedTotal}
+          isNewPlayer={profile.isNewPlayer}
+          trendDelta={profile.honorTrendDelta}
+          trendDirection={profile.honorTrendDirection}
+        />
+      }
+      highlights={slots.highlights}
+      partners={slots.partners}
+      rivals={slots.rivals}
+      matches={<MatchHistory userId={validId} counts={counts} subjectIsSelf={false} />}
+      seasons={(compact) => <PastSeasons userId={validId} compact={compact} />}
+    />
   );
 }

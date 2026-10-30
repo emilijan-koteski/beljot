@@ -4,12 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { RankLadderPanel, SeasonPanel } from "@/features/leaderboard/components/LeaderboardPanels";
 import { LeaderboardPodium } from "@/features/leaderboard/components/LeaderboardPodium";
-import { SeasonStandingCard } from "@/features/leaderboard/components/SeasonStandingCard";
 import { queryKeys } from "@/shared/api/queryKeys";
 import type { SeasonSelector } from "@/shared/api/season";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { PageShell } from "@/shared/components/layout/PageShell";
 import { LeaderboardRow, LeaderboardTableHeader } from "@/shared/components/season/LeaderboardRow";
+import { SeasonStandingCard } from "@/shared/components/season/SeasonStandingCard";
 import { Button } from "@/shared/components/ui/button";
 import { Chips } from "@/shared/components/ui/chips";
 import { Eyebrow } from "@/shared/components/ui/eyebrow";

@@ -27,7 +27,8 @@
     "logout": "Одјави се",
     "signedInAs": "Најавен како",
     "menu": "Мени",
-    "accountMenu": "Мени на сметката за {{username}}"
+    "accountMenu": "Мени на сметката за {{username}}",
+    "settings": "Поставки"
   },
   "profile": {
     "title": "Профил",
@@ -176,7 +177,8 @@
         "up": "Во подем",
         "flat": "Стабилно",
         "down": "Во пад"
-      }
+      },
+      "record": "{{finished}} завршени · {{left}} напуштени"
     },
     "matchHistory": {
       "eyebrow": "Активност",
@@ -253,14 +255,14 @@
     },
     "partners": {
       "eyebrow": "Во фокус",
-      "title": "Најчест партнер",
+      "title": "Партнери",
       "matchesTogether": "{{count}} мечеви заедно",
       "empty": "Сè уште нема редовни партнери. Одиграј неколку мечеви.",
       "emptyPublic": "Сè уште нема редовни партнери."
     },
     "rivals": {
       "eyebrow": "Ривалство",
-      "title": "Од другата страна на масата",
+      "title": "Ривали",
       "empty": "Сè уште нема ривали. Одиграј неколку мечеви.",
       "emptyPublic": "Сè уште нема ривали."
     },
@@ -295,7 +297,7 @@
     },
     "milestones": {
       "eyebrow": "Пресвртници",
-      "title": "Врвови во кариерата",
+      "title": "Врвови",
       "careerPointsLabel": "Поени во кариера",
       "careerPointsHint": "вкупно освоени поени",
       "capotsLabel": "Направени чаљо",
@@ -307,6 +309,18 @@
       "avgLengthLabel": "Просечно траење на меч",
       "avgLengthValue": "{{minutes}}м",
       "avgLengthHint": "завршени мечеви"
+    },
+    "tabs": {
+      "label": "Делови од профилот",
+      "overview": "Преглед",
+      "matches": "Мечеви",
+      "seasons": "Сезони"
+    },
+    "seasonCard": {
+      "title": "Оваа сезона · {{season}}"
+    },
+    "seasons": {
+      "empty": "Сè уште нема завршени сезони."
     }
   },
   "publicProfile": {
@@ -1474,5 +1488,26 @@
     "botsLive": "На овие места играат ботови.",
     "botsStake": "Не плаќаат влог, па победниците ги делат влоговите на играчите.",
     "previewCaption": "Играчите го гледаат ова кога ќе поминат преку иконите за правила:"
+  },
+  "settings": {
+    "title": "Поставки",
+    "sectionsLabel": "Делови од поставките",
+    "sections": {
+      "account": "Сметка",
+      "signIn": "Најава",
+      "game": "Игра",
+      "sound": "Звук",
+      "privacy": "Приватност"
+    },
+    "password": {
+      "label": "Лозинка",
+      "send": "Испрати линк",
+      "sending": "Се испраќа…",
+      "sent": "Линкот е испратен на {{email}}.",
+      "sentBadge": "Испратено"
+    },
+    "language": {
+      "label": "Јазик"
+    }
   }
 }

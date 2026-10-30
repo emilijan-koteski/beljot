@@ -449,12 +449,11 @@ describe("MatchHistory", () => {
     mockGetUserMatches.mockResolvedValueOnce(makeResponse([makeMatch()], 1));
     renderMatchHistory();
     const row = await screen.findByTestId("match-history-row");
-    const buttons = within(row).getAllByRole("button");
-    expect(buttons).toHaveLength(2);
-    expect(buttons[0]).toHaveAccessibleName(/^Rules: /);
-    expect(buttons[1]).toHaveAccessibleName(EXPAND_ROW);
-    expect(buttons[1]).toHaveAttribute("aria-expanded", "false");
-    expect(buttons[1]).toHaveAttribute("aria-controls", "match-history-detail-1");
+    expect(within(row).getAllByRole("button")).toHaveLength(2);
+    expect(within(row).getByRole("button", { name: /^Rules: / })).toBeInTheDocument();
+    const toggle = within(row).getByRole("button", { name: EXPAND_ROW });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "match-history-detail-1");
   });
 
   it("localizes the chip link aria-label in the mk locale", async () => {

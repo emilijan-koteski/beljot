@@ -181,134 +181,100 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
     };
   };
 
+  const notesFor = (h: MatchHandView, d: ReturnType<typeof derive>) =>
+    handHasNotes(h) && (
+      <span className="mt-1 flex flex-wrap gap-1">
+        <HandNotes
+          hand={h}
+          capotIsUs={d.capotIsUs}
+          lastTrickIsUs={d.lastTrickIsUs}
+          contractingIsUs={d.contractingIsUs}
+          usColor={usColor}
+          themColor={themColor}
+        />
+      </span>
+    );
+  const total = (value: number, won: boolean, color: string) => (
+    <span
+      className="text-right text-sm font-bold tabular-nums"
+      style={{ color: won ? color : "var(--ink-mute)" }}
+    >
+      {value}
+    </span>
+  );
+  const number = (n: number) => (
+    <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
+      {String(n).padStart(2, "0")}
+    </span>
+  );
+  const head = "text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase";
+
   if (isCompact) {
+    const cols = "grid-cols-[1.5rem_minmax(0,1fr)_2.75rem_2.75rem]";
     return (
-      <div className="flex flex-col gap-2" data-testid="match-history-hands-grid">
-        {hands.map((h) => {
-          const d = derive(h);
-          return (
+      <div className="flex flex-col" data-testid="match-history-hands-grid">
+        <div className={cn("grid items-center gap-2 px-1 pb-1", cols, head)}>
+          <span>{t("profile.matchHistory.hand.col.number")}</span>
+          <span>{t("profile.matchHistory.hand.col.hand")}</span>
+          <span className="text-right" style={{ color: usColor }}>
+            {t("team.us")}
+          </span>
+          <span className="text-right" style={{ color: themColor }}>
+            {t("team.them")}
+          </span>
+        </div>
+        <div className="divide-brass/20 border-brass/20 flex flex-col divide-y border-t">
+          {hands.map((h) => {
+            const d = derive(h);
+            return (
+              <div
+                key={h.handNumber}
+                className={cn("grid items-start gap-2 px-1 py-1.5", cols)}
+                data-testid="match-history-hand-row"
+                data-hand-number={h.handNumber}
+              >
+                {number(h.handNumber)}
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="text-ink-dim text-xs">{d.desc}</span>
+                  <span className="text-ink-mute text-2xs tabular-nums">
+                    {t("profile.matchHistory.hand.col.cards")} {d.us.card}/{d.them.card} ·{" "}
+                    {t("profile.matchHistory.hand.col.declarations")} {d.us.decl}/{d.them.decl}
+                  </span>
+                  {notesFor(h, d)}
+                </span>
+                {total(d.us.total, d.usWonHand, usColor)}
+                {total(d.them.total, !d.usWonHand, themColor)}
+              </div>
+            );
+          })}
+          {hasUnscoredHand && (
             <div
-              key={h.handNumber}
-              className="border-border bg-surface-2 rounded-lg border p-3"
-              data-testid="match-history-hand-row"
-              data-hand-number={h.handNumber}
+              className={cn("grid items-start gap-2 px-1 py-1.5", cols)}
+              data-testid="match-history-unscored-hand"
             >
-              <div className="flex items-baseline gap-2">
-                <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
-                  {String(h.handNumber).padStart(2, "0")}
-                </span>
-                <span className="text-ink-dim text-sm">{d.desc}</span>
-              </div>
-
-              <div className="mt-2 flex items-center gap-5">
-                <div className="flex items-baseline gap-1.5">
-                  <span
-                    className="text-2xs font-semibold tracking-widest uppercase"
-                    style={{ color: usColor }}
-                  >
-                    {t("team.us")}
-                  </span>
-                  <span
-                    className="text-lg font-bold tabular-nums"
-                    style={{ color: d.usWonHand ? usColor : "var(--ink)" }}
-                  >
-                    {d.us.total}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span
-                    className="text-2xs font-semibold tracking-widest uppercase"
-                    style={{ color: themColor }}
-                  >
-                    {t("team.them")}
-                  </span>
-                  <span
-                    className="text-lg font-bold tabular-nums"
-                    style={{ color: !d.usWonHand ? themColor : "var(--ink)" }}
-                  >
-                    {d.them.total}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-ink-mute mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums">
-                <span>
-                  <span className="tracking-wider uppercase">
-                    {t("profile.matchHistory.hand.col.cards")}
-                  </span>{" "}
-                  {d.us.card} <span className="text-faint">/</span> {d.them.card}
-                </span>
-                <span>
-                  <span className="tracking-wider uppercase">
-                    {t("profile.matchHistory.hand.col.declarations")}
-                  </span>{" "}
-                  {d.us.decl} <span className="text-faint">/</span> {d.them.decl}
-                </span>
-              </div>
-
-              {handHasNotes(h) && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <HandNotes
-                    hand={h}
-                    capotIsUs={d.capotIsUs}
-                    lastTrickIsUs={d.lastTrickIsUs}
-                    contractingIsUs={d.contractingIsUs}
-                    usColor={usColor}
-                    themColor={themColor}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {hasUnscoredHand && (
-          <div
-            className="border-border/70 bg-surface-2/60 rounded-lg border border-dashed p-3"
-            data-testid="match-history-unscored-hand"
-          >
-            <div className="flex items-baseline gap-2">
-              <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
-                {String(hands.length + 1).padStart(2, "0")}
-              </span>
-              <span className="text-ink-dim text-sm">
+              {number(hands.length + 1)}
+              <span className="text-ink-dim text-xs italic">
                 {t("profile.matchHistory.hand.unfinished")}
               </span>
+              <span className="text-ink text-right text-sm font-bold tabular-nums">
+                {unscoredUs}
+              </span>
+              <span className="text-ink text-right text-sm font-bold tabular-nums">
+                {unscoredThem}
+              </span>
             </div>
-            <div className="mt-2 flex items-center gap-5">
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className="text-2xs font-semibold tracking-widest uppercase"
-                  style={{ color: usColor }}
-                >
-                  {t("team.us")}
-                </span>
-                <span className="text-lg font-bold tabular-nums">{unscoredUs}</span>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className="text-2xs font-semibold tracking-widest uppercase"
-                  style={{ color: themColor }}
-                >
-                  {t("team.them")}
-                </span>
-                <span className="text-lg font-bold tabular-nums">{unscoredThem}</span>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
 
-  const cols = "44px minmax(120px,1fr) 56px 56px 90px 110px minmax(120px,1fr)";
+  const cols = "grid-cols-[1.75rem_minmax(8rem,1fr)_3rem_3rem_5rem_6.5rem_minmax(7rem,1fr)]";
 
   return (
     <div className="overflow-x-auto" data-testid="match-history-hands-grid">
-      <div className="min-w-155">
-        <div
-          className="text-brass-deep grid items-center gap-3 px-2.5 py-1.5 font-mono text-2xs font-semibold tracking-caps uppercase"
-          style={{ gridTemplateColumns: cols }}
-        >
+      <div className="min-w-140">
+        <div className={cn("grid items-center gap-3 px-1 pb-1", cols, head)}>
           <span>{t("profile.matchHistory.hand.col.number")}</span>
           <span>{t("profile.matchHistory.hand.col.hand")}</span>
           <span className="text-right" style={{ color: usColor }}>
@@ -321,74 +287,60 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
           <span>{t("profile.matchHistory.hand.col.declarations")}</span>
           <span>{t("profile.matchHistory.hand.col.notes")}</span>
         </div>
-
-        {hands.map((h, idx) => {
-          const d = derive(h);
-          return (
+        <div className="divide-brass/20 border-brass/20 flex flex-col divide-y border-t">
+          {hands.map((h) => {
+            const d = derive(h);
+            return (
+              <div
+                key={h.handNumber}
+                className={cn("grid items-center gap-3 px-1 py-1.5", cols)}
+                data-testid="match-history-hand-row"
+                data-hand-number={h.handNumber}
+              >
+                {number(h.handNumber)}
+                <span className="text-ink-dim text-xs">{d.desc}</span>
+                {total(d.us.total, d.usWonHand, usColor)}
+                {total(d.them.total, !d.usWonHand, themColor)}
+                <span className="text-ink-dim text-xs tabular-nums">
+                  {d.us.card} <span className="text-faint">/</span> {d.them.card}
+                </span>
+                <span className="text-ink-dim text-xs tabular-nums">
+                  {d.us.decl} <span className="text-faint">/</span> {d.them.decl}
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  <HandNotes
+                    hand={h}
+                    capotIsUs={d.capotIsUs}
+                    lastTrickIsUs={d.lastTrickIsUs}
+                    contractingIsUs={d.contractingIsUs}
+                    usColor={usColor}
+                    themColor={themColor}
+                  />
+                </span>
+              </div>
+            );
+          })}
+          {hasUnscoredHand && (
             <div
-              key={h.handNumber}
-              className={cn(
-                "grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm",
-                idx % 2 === 0 && "bg-surface-2",
-              )}
-              style={{ gridTemplateColumns: cols }}
-              data-testid="match-history-hand-row"
-              data-hand-number={h.handNumber}
+              className={cn("grid items-center gap-3 px-1 py-1.5", cols)}
+              data-testid="match-history-unscored-hand"
             >
-              <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
-                {String(h.handNumber).padStart(2, "0")}
+              {number(hands.length + 1)}
+              <span className="text-ink-dim text-xs italic">
+                {t("profile.matchHistory.hand.unfinished")}
               </span>
-              <span className="text-ink-dim text-xs">{d.desc}</span>
-              <span
-                className="text-right text-base font-semibold tabular-nums"
-                style={{ color: d.usWonHand ? usColor : "var(--ink-mute)" }}
-              >
-                {d.us.total}
+              <span className="text-ink text-right text-sm font-bold tabular-nums">
+                {unscoredUs}
               </span>
-              <span
-                className="text-right text-base font-semibold tabular-nums"
-                style={{ color: !d.usWonHand ? themColor : "var(--ink-mute)" }}
-              >
-                {d.them.total}
+              <span className="text-ink text-right text-sm font-bold tabular-nums">
+                {unscoredThem}
               </span>
-              <span className="text-ink-dim text-xs tabular-nums">
-                {d.us.card} <span className="text-faint">/</span> {d.them.card}
-              </span>
-              <span className="text-ink-dim text-xs tabular-nums">
-                {d.us.decl} <span className="text-faint">/</span> {d.them.decl}
-              </span>
-              <span className="flex flex-wrap gap-1.5">
-                <HandNotes
-                  hand={h}
-                  capotIsUs={d.capotIsUs}
-                  lastTrickIsUs={d.lastTrickIsUs}
-                  contractingIsUs={d.contractingIsUs}
-                  usColor={usColor}
-                  themColor={themColor}
-                />
-              </span>
+              <span />
+              <span />
+              <span />
             </div>
-          );
-        })}
-        {hasUnscoredHand && (
-          <div
-            className="grid items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
-            style={{ gridTemplateColumns: cols }}
-            data-testid="match-history-unscored-hand"
-          >
-            <span className="text-ink-mute font-mono text-2xs font-semibold tabular-nums">
-              {String(hands.length + 1).padStart(2, "0")}
-            </span>
-            <span className="text-ink-dim text-xs italic">
-              {t("profile.matchHistory.hand.unfinished")}
-            </span>
-            <span className="text-right font-bold tabular-nums">{unscoredUs}</span>
-            <span className="text-right font-bold tabular-nums">{unscoredThem}</span>
-            <span />
-            <span />
-            <span />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -406,8 +358,8 @@ interface MatchStatsCardProps {
 }
 
 /**
- * One match as a collapsible card: a viewer-relative header plus an expandable per-hand breakdown.
- * Open state is controlled by the caller.
+ * One match as a compact row: outcome, score and date, the four players, then variant, mode and length, opening
+ * to a per-hand table. It sits in a list card its caller draws; open state is the caller's too.
  */
 export function MatchStatsCard({
   match,
@@ -452,114 +404,41 @@ export function MatchStatsCard({
   const themScore = viewerTeamIndex === 0 ? match.teamBScore : match.teamAScore;
 
   const detailId = `match-history-detail-${match.id}`;
+  const endedEarly =
+    (match.endReason === "abandonment" || match.endReason === "surrender") &&
+    match.outcome !== "abandoned";
+  const joiner = "text-ink-mute text-2xs tracking-wider lowercase";
 
   return (
     <li
-      className="bg-surface border-border overflow-hidden rounded-lg border transition-[border-color,box-shadow] hover:border-brass hover:shadow-md"
+      className={cn("transition-colors", isOpen && "bg-brass/5")}
       data-testid="match-history-row"
       data-match-id={match.id}
     >
       <div
         onClick={onToggle}
-        className="flex cursor-pointer flex-col gap-3 p-4 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center md:gap-5"
+        className="hover:bg-brass/5 flex cursor-pointer flex-col gap-1.5 px-3.5 py-2.5 transition-colors"
         data-testid="match-history-row-header"
       >
-        <div className="flex min-w-22 flex-col gap-0.5">
-          <span className="text-ink text-base font-semibold">
-            {formatLocalizedDate(match.completedAt, t, "short")}
-          </span>
-          <span className="text-ink-mute text-xs tabular-nums">
-            {formatClockTime(match.completedAt)} ·{" "}
-            {formatDuration(match.startedAt, match.completedAt, t)}
-          </span>
-          <span
-            className="text-ink-mute mt-0.5 text-2xs font-semibold tracking-wider uppercase"
-            data-testid="match-history-variant"
-            data-variant={match.variant}
-          >
-            {variantLabel(t, match.variant)}
-          </span>
-          <MatchRulesPopover
-            rules={match}
-            zIndex={rulesZIndex}
-            className="mt-1 mr-0 -ml-1 self-start"
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <SeatChip
-              name={subjectName}
-              avatarUrl={subject?.avatarUrl}
-              team={usTeam}
-              you={subjectIsSelf}
-            />
-            <span className="text-ink-mute text-2xs tracking-widest uppercase">
-              {t("profile.matchHistory.with")}
+        <div className="flex items-center gap-2">
+          <OutcomeChip outcome={match.outcome} />
+          <span className="border-brass/40 bg-brass/10 inline-flex items-baseline gap-1 rounded-md border px-1.5 py-px tabular-nums">
+            <span
+              className="text-base leading-tight font-bold"
+              style={{ color: usColor }}
+              data-team={usTeam === "A" ? "teamA" : "teamB"}
+            >
+              {usScore}
             </span>
-            <SeatChip
-              name={teammate.name}
-              bot={teammate.bot}
-              avatarUrl={teammate.avatarUrl}
-              userId={teammate.userId}
-              team={usTeam}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink-mute text-2xs tracking-widest uppercase">
-              {t("profile.matchHistory.versus")}
+            <span className="text-brass-deep text-xs">–</span>
+            <span
+              className="text-base leading-tight font-bold"
+              style={{ color: themColor }}
+              data-team={themTeam === "A" ? "teamA" : "teamB"}
+            >
+              {themScore}
             </span>
-            <SeatChip
-              name={opponent1.name}
-              bot={opponent1.bot}
-              avatarUrl={opponent1.avatarUrl}
-              userId={opponent1.userId}
-              team={themTeam}
-            />
-            <span className="text-ink-mute text-2xs tracking-widest uppercase">
-              {t("profile.matchHistory.and")}
-            </span>
-            <SeatChip
-              name={opponent2.name}
-              bot={opponent2.bot}
-              avatarUrl={opponent2.avatarUrl}
-              userId={opponent2.userId}
-              team={themTeam}
-            />
-          </div>
-        </div>
-
-        <div className="bg-surface-elevated border-border flex items-center gap-2.5 self-start rounded-xl border px-3.5 py-2 md:self-center">
-          <span
-            className="text-2xl leading-none font-bold tracking-tight tabular-nums"
-            style={{ color: usColor }}
-            data-team={usTeam === "A" ? "teamA" : "teamB"}
-          >
-            {usScore}
           </span>
-          <span className="text-faint font-medium">–</span>
-          <span
-            className="text-2xl leading-none font-bold tracking-tight tabular-nums"
-            style={{ color: themColor }}
-            data-team={themTeam === "A" ? "teamA" : "teamB"}
-          >
-            {themScore}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2.5 self-start md:self-center">
-          {(match.endReason === "abandonment" || match.endReason === "surrender") &&
-            match.outcome !== "abandoned" && (
-              <span
-                className="text-ink-mute text-xs italic"
-                data-testid="match-history-ended-early"
-                data-end-reason={match.endReason}
-              >
-                {match.endReason === "abandonment"
-                  ? t("profile.matchHistory.endedEarlyAbandonment")
-                  : t("profile.matchHistory.endedEarlySurrender")}
-              </span>
-            )}
           {match.hasBots === true && (
             <Badge
               tone="bot"
@@ -570,14 +449,17 @@ export function MatchStatsCard({
               {t("bots.tag")}
             </Badge>
           )}
-          <OutcomeChip outcome={match.outcome} />
+          <span className="text-ink-mute ml-auto text-xs whitespace-nowrap tabular-nums">
+            {formatLocalizedDate(match.completedAt, t, "short")} ·{" "}
+            {formatClockTime(match.completedAt)}
+          </span>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
             }}
-            className="text-ink-mute hover:text-ink focus-visible:ring-ring/70 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
+            className="text-brass-deep hover:text-ink focus-visible:ring-ring/70 -mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-3 focus-visible:outline-none"
             aria-expanded={isOpen}
             aria-controls={detailId}
             aria-label={
@@ -585,10 +467,73 @@ export function MatchStatsCard({
             }
           >
             <ChevronDown
-              className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+              className={cn("size-4 transition-transform", isOpen && "rotate-180")}
               aria-hidden="true"
             />
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <SeatChip
+              name={subjectName}
+              avatarUrl={subject?.avatarUrl}
+              team={usTeam}
+              you={subjectIsSelf}
+            />
+            <span className={joiner}>{t("profile.matchHistory.with")}</span>
+            <SeatChip
+              name={teammate.name}
+              bot={teammate.bot}
+              avatarUrl={teammate.avatarUrl}
+              userId={teammate.userId}
+              team={usTeam}
+            />
+            <span className={joiner}>{t("profile.matchHistory.versus")}</span>
+            <SeatChip
+              name={opponent1.name}
+              bot={opponent1.bot}
+              avatarUrl={opponent1.avatarUrl}
+              userId={opponent1.userId}
+              team={themTeam}
+            />
+            <span className={joiner}>{t("profile.matchHistory.and")}</span>
+            <SeatChip
+              name={opponent2.name}
+              bot={opponent2.bot}
+              avatarUrl={opponent2.avatarUrl}
+              userId={opponent2.userId}
+              team={themTeam}
+            />
+          </div>
+
+          <div className="text-ink-mute flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs">
+            <span
+              className="font-semibold tracking-wider uppercase"
+              data-testid="match-history-variant"
+              data-variant={match.variant}
+            >
+              {variantLabel(t, match.variant)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{match.matchMode}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">
+              {formatDuration(match.startedAt, match.completedAt, t)}
+            </span>
+            <MatchRulesPopover rules={match} zIndex={rulesZIndex} className="-my-1 ml-0.5" />
+            {endedEarly && (
+              <span
+                className="italic"
+                data-testid="match-history-ended-early"
+                data-end-reason={match.endReason}
+              >
+                {match.endReason === "abandonment"
+                  ? t("profile.matchHistory.endedEarlyAbandonment")
+                  : t("profile.matchHistory.endedEarlySurrender")}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -597,7 +542,7 @@ export function MatchStatsCard({
           id={detailId}
           data-testid="match-history-detail"
           data-match-id={match.id}
-          className="border-border bg-ink/2.5 border-t px-4 pt-3 pb-4.5"
+          className="border-brass/25 flex flex-col gap-3 border-t px-3.5 pt-2 pb-3"
         >
           <HandsGrid
             hands={match.hands}
