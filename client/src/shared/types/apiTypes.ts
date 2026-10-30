@@ -220,10 +220,17 @@ export interface SeasonArchiveResponse {
   items: SeasonArchiveEntry[];
 }
 
-/** The subject's standing in the active season; a played season at 0 SP is a real rank. */
+/**
+ * The subject's standing in the active season; a played season at 0 SP is a real rank.
+ * `position` is 0 when the leaderboard does not list them; `players` is how many it lists.
+ */
 export interface SeasonRank {
   seasonName: string;
   tier: string;
   division: number | null;
   sp: number;
+  position: number;
+  players: number;
+  gamesPlayed: number;
+  gamesWon: number;
 }

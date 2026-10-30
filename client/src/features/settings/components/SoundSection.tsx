@@ -1,3 +1,4 @@
+import { Volume2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAudioVolume } from "@/shared/audio/useAudioVolume";
@@ -11,7 +12,7 @@ import {
 } from "@/shared/lib/audioPreference";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { SidePanel } from "./SidePanel";
+import { SettingsGroup, SettingsRow } from "./SettingsGroup";
 
 const ROWS = [
   {
@@ -64,6 +65,7 @@ function VolumeRow({
       className="flex items-center gap-3 transition-opacity data-disabled:opacity-50"
     >
       <Slider
+        className="flex-1 data-disabled:opacity-100"
         min={0}
         max={100}
         step={1}
@@ -73,7 +75,6 @@ function VolumeRow({
         disabled={disabled}
         aria-label={label}
         getAriaValueText={(v) => `${v}%`}
-        className="data-disabled:opacity-100"
       />
       <span
         aria-hidden
@@ -86,47 +87,43 @@ function VolumeRow({
 }
 
 /**
- * Self-only profile sidebar panel for the sound and music switches and volumes.
+ * The Sound group of Settings: a switch and a volume slider for sound effects and for music.
  * Writes go through `persistAudioPreferences`, so they stay ordered with in-match changes.
  */
-export function AudioPanel() {
+export function SoundSection() {
   const { t } = useTranslation();
   const soundEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.soundEnabled));
   const musicEnabled = resolveAudioEnabled(useAuthStore((s) => s.user?.musicEnabled));
   const values: Record<AudioSwitchField, boolean> = { soundEnabled, musicEnabled };
 
   return (
-    <SidePanel
-      eyebrow={t("profile.audio.eyebrow")}
-      title={t("profile.audio.title")}
+    <SettingsGroup
+      id="sound"
+      title={t("settings.sections.sound")}
+      icon={<Volume2 />}
       testId="profile-audio"
     >
-      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.audio.description")}</p>
-      <div className="flex flex-col gap-2">
-        {ROWS.map((row) => (
-          <div
-            key={row.field}
-            className="border-border bg-surface-elevated flex flex-col gap-2 rounded-md border px-3 py-2.5"
-          >
-            <label className="flex cursor-pointer items-center justify-between gap-3">
-              <span className="text-ink text-sm font-medium">{t(row.labelKey)}</span>
-              <Switch
-                checked={values[row.field]}
-                onCheckedChange={(checked) =>
-                  void persistAudioPreferences({ [row.field]: checked })
-                }
-                data-testid={row.testId}
-              />
-            </label>
-            <VolumeRow
-              field={row.volume.field}
-              label={t(row.volume.labelKey)}
-              disabled={!values[row.field]}
-              testId={row.volume.testId}
+      {ROWS.map((row) => (
+        <SettingsRow
+          key={row.field}
+          asLabel
+          label={t(row.labelKey)}
+          control={
+            <Switch
+              checked={values[row.field]}
+              onCheckedChange={(checked) => void persistAudioPreferences({ [row.field]: checked })}
+              data-testid={row.testId}
             />
-          </div>
-        ))}
-      </div>
-    </SidePanel>
+          }
+        >
+          <VolumeRow
+            field={row.volume.field}
+            label={t(row.volume.labelKey)}
+            disabled={!values[row.field]}
+            testId={row.volume.testId}
+          />
+        </SettingsRow>
+      ))}
+    </SettingsGroup>
   );
 }

@@ -1,42 +1,30 @@
 import "@/shared/i18n/i18n";
 
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { QueryWrapper } from "@/test-utils";
+import { ProfileHero } from "./ProfileHero";
 
-import { IdentityHero } from "./IdentityHero";
-
-type HeroProps = Parameters<typeof IdentityHero>[0];
+type HeroProps = Parameters<typeof ProfileHero>[0];
 
 function renderHero(overrides: Partial<HeroProps> = {}) {
   const props: HeroProps = {
     username: "kiro",
     createdAt: "2026-01-01T00:00:00Z",
-    games: 10,
-    wins: 6,
-    losses: 4,
-    capots: 1,
-    walletBalance: 5000,
-    loginStreakDays: 0,
     level: 3,
     xpIntoLevel: 150,
     xpForNextLevel: 350,
-    winRate: 60,
+    layout: "wide",
     ...overrides,
   };
-  return render(
-    <QueryWrapper>
-      <IdentityHero {...props} />
-    </QueryWrapper>,
-  );
+  return render(<ProfileHero {...props} />);
 }
 
-describe("IdentityHero XP (Story 9.5)", () => {
-  it("renders the level label and XP progress bar from the profile", () => {
-    renderHero({ level: 3, xpIntoLevel: 150, xpForNextLevel: 350 });
-
+describe("ProfileHero", () => {
+  it("renders the name, member-since line, level label and XP bar", () => {
+    renderHero();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("kiro");
+    expect(screen.getByTestId("profile-member-since")).toHaveTextContent("Member since");
     expect(screen.getByTestId("profile-level")).toHaveTextContent("Level 3");
     expect(screen.getByTestId("profile-xp")).toHaveTextContent("150 / 350 XP");
     expect(screen.getByTestId("profile-xp-bar")).toHaveAttribute("aria-valuenow", "43");
@@ -44,54 +32,56 @@ describe("IdentityHero XP (Story 9.5)", () => {
 
   it("renders Level 0 at an empty bar for a fresh profile", () => {
     renderHero({ level: 0, xpIntoLevel: 0, xpForNextLevel: 50 });
-
     expect(screen.getByTestId("profile-level")).toHaveTextContent("Level 0");
     expect(screen.getByTestId("profile-xp-bar")).toHaveAttribute("aria-valuenow", "0");
   });
-});
 
-describe("IdentityHero private pills (Story 11.3)", () => {
-  it("renders the wallet and login-streak pills by default (self profile)", () => {
-    const { container } = renderHero({ walletBalance: 5000, loginStreakDays: 3 });
-
-    expect(container.querySelector('[aria-label^="Coins"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label^="Day streak"]')).not.toBeNull();
+  it("shows the season rank and honor chips", () => {
+    renderHero({
+      seasonRank: {
+        seasonName: "2026 Q4",
+        tier: "gold",
+        division: 2,
+        sp: 680,
+        position: 3,
+        players: 40,
+        gamesPlayed: 12,
+        gamesWon: 7,
+      },
+      honor: { score: 96, tier: "exemplary", isNewPlayer: false },
+    });
+    expect(screen.getByTestId("profile-hero-rank")).toHaveTextContent("Gold 2");
+    expect(screen.getByTestId("profile-hero-honor")).toHaveTextContent("96");
+    expect(screen.getByTestId("profile-hero-honor")).toHaveTextContent("Exemplary");
   });
 
-  it("hides the wallet and login-streak pills when hidePrivatePills is set (public profile)", () => {
-    const { container } = renderHero({
-      walletBalance: 5000,
-      loginStreakDays: 3,
-      hidePrivatePills: true,
-    });
+  it("names a newcomer's honor chip instead of showing a score", () => {
+    renderHero({ honor: { score: 80, tier: "fair", isNewPlayer: true } });
+    expect(screen.getByTestId("profile-hero-honor")).toHaveTextContent("New player");
+  });
 
+  it("shows the coins and a streak of two days or more when given them", () => {
+    const { container } = renderHero({ walletBalance: 5000, loginStreakDays: 3 });
+    expect(container.querySelector('[aria-label^="Coins"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label^="Day streak"]')).toHaveTextContent("3");
+  });
+
+  it("leaves the coins and streak out when they are not given (someone else's profile)", () => {
+    const { container } = renderHero();
     expect(container.querySelector('[aria-label^="Coins"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Day streak"]')).toBeNull();
   });
-});
 
-describe("IdentityHero avatar", () => {
-  const LARGE = "https://assets.test/avatars/p/256.webp";
-
-  it("draws the large avatar eagerly in the hero disc", () => {
-    const { container } = renderHero({ avatarUrl: LARGE });
-    const img = container.querySelector("img");
-    expect(img).toHaveAttribute("src", LARGE);
+  it("draws the large avatar eagerly", () => {
+    const url = "https://assets.test/avatars/kiro/256.webp";
+    renderHero({ avatarUrl: url });
+    const img = screen.getByTestId("profile-identity-hero").querySelector("img");
+    expect(img).toHaveAttribute("src", url);
     expect(img).toHaveAttribute("loading", "eager");
-    expect(img).toHaveAttribute("width", "96");
   });
 
-  it("offers the edit button on the self profile and opens the dialog", async () => {
-    const user = userEvent.setup();
-    renderHero({ userId: 1, avatarUrl: null });
-
-    await user.click(screen.getByTestId("profile-avatar-edit"));
-    expect(screen.getByTestId("avatar-dialog")).toBeInTheDocument();
-  });
-
-  it("renders no avatar edit affordance on a public profile", () => {
-    renderHero({ userId: undefined, avatarUrl: LARGE, hidePrivatePills: true });
-    expect(screen.queryByTestId("profile-avatar-edit")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("avatar-dialog")).not.toBeInTheDocument();
+  it("renders the page's action", () => {
+    renderHero({ action: <button type="button">Settings</button>, layout: "phone" });
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
   });
 });

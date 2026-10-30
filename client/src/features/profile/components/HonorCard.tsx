@@ -1,13 +1,15 @@
-import { HelpCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HonorBandMeter } from "@/shared/components/HonorBandMeter";
 import { HonorExplainerDialog } from "@/shared/components/HonorExplainerDialog";
 import { HonorShield } from "@/shared/components/HonorShield";
-import { Eyebrow } from "@/shared/components/ui/eyebrow";
+import { Button } from "@/shared/components/ui/button";
+import { Panel } from "@/shared/components/ui/panel";
 import {
   HONOR_NEW_PLAYER_MIN_MATCHES,
+  HONOR_TIER_COLOR,
   HONOR_TREND_WINDOW,
   honorCountOrZero,
   honorIsNewPlayer,
@@ -17,7 +19,7 @@ import {
   normalizeHonorTrendDirection,
 } from "@/shared/lib/honor";
 
-export type HonorHeroBandProps = {
+export type HonorCardProps = {
   score: number;
   tier: string;
   completedTotal: number;
@@ -41,10 +43,10 @@ const TREND_COLOR: Record<HonorTrendDirection, string> = {
 };
 
 /**
- * Full-width honour band at the foot of the identity hero: score and tier, band meter, and trend.
+ * The Honor card: score and tier with the recent trend, the band meter, and finished versus left-early counts.
  * Newcomers see match progress instead of a score; the real score stays on the data attributes.
  */
-export function HonorHeroBand({
+export function HonorCard({
   score: rawScore,
   tier,
   completedTotal: rawCompletedTotal,
@@ -53,7 +55,7 @@ export function HonorHeroBand({
   trendDelta: rawTrendDelta,
   trendDirection,
   subjectIsSelf = true,
-}: HonorHeroBandProps) {
+}: HonorCardProps) {
   const { t } = useTranslation();
   const [explainerOpen, setExplainerOpen] = useState(false);
 
@@ -70,31 +72,30 @@ export function HonorHeroBand({
   const played = completedTotal + abandonedTotal;
 
   return (
-    <div
-      className="border-border col-span-1 border-t pt-4 sm:col-span-2"
-      data-testid="profile-honor"
-      data-honor={score}
-      data-tier={resolvedTier}
-      data-new-player={String(isNewPlayer)}
-      data-trend-direction={direction}
-    >
-      <div className="mb-1 flex items-center gap-1.5">
-        <Eyebrow>{t("profile.honor.eyebrow")}</Eyebrow>
-        <button
-          type="button"
+    <Panel
+      icon={<HonorShield tier={isNewPlayer ? "fair" : resolvedTier} size={16} />}
+      title={t("profile.honor.eyebrow")}
+      aside={
+        <Button
+          variant="link"
+          size="inline"
+          className="text-xs"
           onClick={() => setExplainerOpen(true)}
-          className="text-brass-deep hover:text-ink flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:ring-ring/70 focus-visible:outline-none"
-          aria-label={t("profile.honor.explainer.open")}
-          title={t("profile.honor.explainer.open")}
           data-testid="profile-honor-explainer-button"
         >
-          <HelpCircle className="size-3.5" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <HonorShield tier={isNewPlayer ? "fair" : resolvedTier} size={20} className="shrink-0" />
+          {t("profile.honor.explainer.open")}
+        </Button>
+      }
+    >
+      <div
+        className="flex flex-col gap-3"
+        data-testid="profile-honor"
+        data-honor={score}
+        data-tier={resolvedTier}
+        data-new-player={String(isNewPlayer)}
+        data-trend-direction={direction}
+      >
+        <div className="flex items-center gap-3">
           {isNewPlayer ? (
             <span
               className="text-ink text-2xl leading-none font-bold tabular-nums tracking-tight"
@@ -107,63 +108,55 @@ export function HonorHeroBand({
               })}
             </span>
           ) : (
-            <div className="flex items-baseline gap-2">
+            <span className="flex items-baseline gap-2">
               <span
-                className="text-3xl leading-none font-bold tracking-tight tabular-nums"
-                style={{ color: "var(--ink)" }}
+                className="text-ink text-3xl leading-none font-bold tracking-tight tabular-nums"
                 data-testid="profile-honor-score"
               >
                 {score}
               </span>
               <span
-                className="text-brass-deep font-mono text-2xs font-semibold tracking-widest uppercase"
+                className="text-sm font-semibold"
+                style={{ color: HONOR_TIER_COLOR[resolvedTier] }}
                 data-testid="profile-honor-tier"
               >
                 {t(`profile.honor.tier.${resolvedTier}`)}
               </span>
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-45 flex-1">
-          {isNewPlayer ? (
-            <p className="text-ink-dim m-0 text-sm" data-testid="profile-honor-new-hint">
-              {t(
-                subjectIsSelf ? "profile.honor.newPlayerHint" : "profile.honor.newPlayerHintPublic",
-              )}
-            </p>
-          ) : (
-            <HonorBandMeter score={score} testId="profile-honor-meter" />
-          )}
-        </div>
-
-        {!isNewPlayer && (
-          <div
-            className="flex flex-col gap-0.5"
-            data-testid="profile-honor-trend"
-            data-trend-direction={direction}
-            data-trend-delta={String(trendDelta)}
-            title={t(
-              subjectIsSelf ? "profile.honor.trendTooltip" : "profile.honor.trendTooltipPublic",
-              { window: HONOR_TREND_WINDOW },
-            )}
-          >
-            <span className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
-              {t("profile.honor.lastWindow", { window: HONOR_TREND_WINDOW })}
             </span>
+          )}
+          {!isNewPlayer && (
             <span
-              className="inline-flex items-center gap-1 text-base leading-none font-bold tabular-nums"
+              className="bg-surface-sunken ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums"
               style={{ color: TREND_COLOR[direction] }}
+              data-testid="profile-honor-trend"
+              data-trend-direction={direction}
+              data-trend-delta={String(trendDelta)}
+              title={t(
+                subjectIsSelf ? "profile.honor.trendTooltip" : "profile.honor.trendTooltipPublic",
+                { window: HONOR_TREND_WINDOW },
+              )}
             >
               <TrendIcon className="size-3.5 shrink-0" aria-hidden="true" />
               {direction === "flat" ? null : `${trendDelta > 0 ? "+" : ""}${trendDelta}`}
               <span className="sr-only">{t(`profile.honor.trend.${direction}`)}</span>
             </span>
-          </div>
+          )}
+        </div>
+
+        {isNewPlayer ? (
+          <p className="text-ink-dim m-0 text-sm" data-testid="profile-honor-new-hint">
+            {t(subjectIsSelf ? "profile.honor.newPlayerHint" : "profile.honor.newPlayerHintPublic")}
+          </p>
+        ) : (
+          <HonorBandMeter score={score} testId="profile-honor-meter" />
         )}
+
+        <span className="text-ink-mute text-xs tabular-nums" data-testid="profile-honor-record">
+          {t("profile.honor.record", { finished: completedTotal, left: abandonedTotal })}
+        </span>
       </div>
 
       <HonorExplainerDialog open={explainerOpen} onOpenChange={setExplainerOpen} />
-    </div>
+    </Panel>
   );
 }

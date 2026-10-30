@@ -5,7 +5,7 @@ import { SEASON_TIER_COLOR, SEASON_TIER_SOFT } from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 
 /**
- * Badge scale. `md` is the RankBanner's original size; `sm` fits a list row;
+ * Badge scale. `md` sits in season cards; `sm` fits a list row;
  * `lg` is the medallion of the post-match rank-change dialog.
  */
 type TierBadgeSize = "sm" | "md" | "lg";

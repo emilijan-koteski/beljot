@@ -8,7 +8,7 @@ import { resetCardDeckRequestSequence } from "@/shared/lib/cardDeckPreference";
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser } from "@/test-utils";
 
-import { CardDeckPanel } from "./CardDeckPanel";
+import { CardDeckRow } from "./CardDeckRow";
 
 const mockUpdatePreferences = vi.fn();
 vi.mock("@/shared/api/profile", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-describe("CardDeckPanel", () => {
+describe("CardDeckRow", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
     mockUpdatePreferences.mockResolvedValue({ cardDeckPreference: "croatian" });
@@ -32,7 +32,7 @@ describe("CardDeckPanel", () => {
   });
 
   it("marks the stored deck as the selected radio", () => {
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     expect(screen.getByTestId("profile-deck-option-french")).toHaveAttribute(
       "aria-checked",
@@ -45,7 +45,7 @@ describe("CardDeckPanel", () => {
   });
 
   it("previews each deck with a suit that actually differs between them", () => {
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     const previews = Array.from(document.querySelectorAll("img")).map((i) => i.getAttribute("src"));
     expect(previews).toContain("/cards/french/AD.svg");
@@ -54,7 +54,7 @@ describe("CardDeckPanel", () => {
 
   it("writes the deck optimistically and PATCHes only the deck field", async () => {
     const user = userEvent.setup();
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     await user.click(screen.getByTestId("profile-deck-option-croatian"));
 
@@ -66,7 +66,7 @@ describe("CardDeckPanel", () => {
   it("reverts the store deck when the PATCH fails", async () => {
     const user = userEvent.setup();
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     await user.click(screen.getByTestId("profile-deck-option-croatian"));
 
@@ -81,7 +81,7 @@ describe("CardDeckPanel", () => {
 
   it("does not PATCH when the already-selected deck is clicked again", async () => {
     const user = userEvent.setup();
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     await user.click(screen.getByTestId("profile-deck-option-french"));
 
@@ -96,7 +96,7 @@ describe("CardDeckPanel", () => {
       user: makeUser({ id: 7, cardDeckPreference: "hungarian" as never }),
       isLoading: false,
     });
-    render(<CardDeckPanel />);
+    render(<CardDeckRow />);
 
     await user.click(screen.getByTestId("profile-deck-option-croatian"));
 

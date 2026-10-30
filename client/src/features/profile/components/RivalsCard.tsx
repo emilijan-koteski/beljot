@@ -1,77 +1,43 @@
+import { Swords } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
 
 import type { RivalStat } from "@/shared/api/career";
-import { Avatar } from "@/shared/components/ui/avatar";
+import { SeasonRecord } from "@/shared/components/season/LeaderboardRow";
+import { Panel } from "@/shared/components/ui/panel";
 
-import { SidePanel } from "./SidePanel";
-import { WinLoseBar } from "./WinLoseBar";
+import { PersonRow } from "./PersonRow";
 
-type RivalriesProps = {
+type RivalsCardProps = {
   rivals: RivalStat[];
   subjectIsSelf?: boolean;
 };
 
-/** Soft-deleted rivals arrive with a valid id but an empty username; linking them would 404. */
-function isSoftDeleted(rival: RivalStat): boolean {
-  return rival.username === "";
-}
-
-/**
- * Sidebar panel of most-faced opponents with the viewer's head-to-head record
- * and a win-share bar. Rival avatars use the silver "Them" palette.
- */
-export function Rivalries({ rivals, subjectIsSelf = true }: RivalriesProps) {
+/** The most-faced opponents, each with the subject's wins and losses against them. */
+export function RivalsCard({ rivals, subjectIsSelf = true }: RivalsCardProps) {
   const { t } = useTranslation();
 
   return (
-    <SidePanel
-      eyebrow={t("profile.rivals.eyebrow")}
-      title={t("profile.rivals.title")}
-      testId="profile-rivals"
-    >
+    <Panel icon={<Swords />} title={t("profile.rivals.title")} testId="profile-rivals">
       {rivals.length === 0 ? (
-        <p className="text-ink-mute text-sm">
+        <p className="text-ink-mute m-0 text-sm">
           {t(subjectIsSelf ? "profile.rivals.empty" : "profile.rivals.emptyPublic")}
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {rivals.map((r) => {
-            const total = r.wins + r.losses;
-            const winPct = total === 0 ? 0 : Math.round((r.wins / total) * 100);
-            return (
-              <li
-                key={r.userId}
-                className="bg-surface-elevated border-border flex flex-col gap-1.5 rounded-md border p-2.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  {!isSoftDeleted(r) ? (
-                    <Link
-                      to={`/players/${r.userId}`}
-                      aria-label={t("friends.viewProfileAria", { username: r.username })}
-                      className="focus-visible:ring-ring/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-md underline-offset-2 hover:underline focus-visible:ring-3 focus-visible:outline-none"
-                    >
-                      <Avatar name={r.username} avatarUrl={r.avatarUrl} team="B" size={24} />
-                      <span className="text-ink truncate text-sm font-medium">{r.username}</span>
-                    </Link>
-                  ) : (
-                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                      <Avatar name={r.username} avatarUrl={r.avatarUrl} team="B" size={24} />
-                      <span className="text-ink truncate text-sm font-medium">{r.username}</span>
-                    </div>
-                  )}
-                  <span className="text-ink-dim text-xs tabular-nums">
-                    {total}
-                    <span className="text-faint"> · </span>
-                    <span className="text-ink font-semibold">{winPct}%</span>
-                  </span>
-                </div>
-                <WinLoseBar winPct={winPct} />
-              </li>
-            );
-          })}
+        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+          {rivals.map((r) => (
+            <PersonRow
+              key={r.userId}
+              userId={r.userId}
+              username={r.username}
+              avatarUrl={r.avatarUrl}
+              team="B"
+              sub={t("season.leaderboard.played", { count: r.wins + r.losses })}
+            >
+              <SeasonRecord won={r.wins} played={r.wins + r.losses} />
+            </PersonRow>
+          ))}
         </ul>
       )}
-    </SidePanel>
+    </Panel>
   );
 }

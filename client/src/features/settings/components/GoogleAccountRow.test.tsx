@@ -7,7 +7,7 @@ import { FetchError } from "@/shared/api/axiosClient";
 import type { LinkedIdentity } from "@/shared/api/identities";
 import { expectActionBeforeStatusQuo, QueryWrapper } from "@/test-utils";
 
-import { LinkedAccounts } from "./LinkedAccounts";
+import { GoogleAccountRow } from "./GoogleAccountRow";
 
 const mockGetIdentities = vi.fn();
 const mockLinkIdentity = vi.fn();
@@ -46,12 +46,12 @@ function googleIdentity(overrides: Partial<LinkedIdentity> = {}): LinkedIdentity
 function renderPanel(userId: number | undefined = 1) {
   return render(
     <QueryWrapper>
-      <LinkedAccounts userId={userId} />
+      <GoogleAccountRow userId={userId} />
     </QueryWrapper>,
   );
 }
 
-describe("LinkedAccounts", () => {
+describe("GoogleAccountRow", () => {
   beforeEach(() => {
     mockGetIdentities.mockReset();
     mockLinkIdentity.mockReset();

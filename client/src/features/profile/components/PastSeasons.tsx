@@ -1,104 +1,72 @@
+import { Medal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { EmptyState } from "@/shared/components/EmptyState";
 import { SeasonArchiveRow } from "@/shared/components/season/SeasonArchiveRow";
-import { TierBadge } from "@/shared/components/season/TierBadge";
+import { Panel } from "@/shared/components/ui/panel";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useSeasonArchiveQuery } from "@/shared/hooks/queries/useSeasonArchive";
-import {
-  normalizeSeasonDivision,
-  normalizeSeasonTier,
-  SEASON_TIER_COLOR,
-  SEASON_TIER_LINE,
-  seasonRankLabel,
-  seasonSpOrZero,
-} from "@/shared/lib/seasonTier";
-import type { SeasonRank } from "@/shared/types/apiTypes";
-
-import { SectionHeader } from "./SectionHeader";
 
 type Props = {
   userId: number | undefined;
-  seasonRank: SeasonRank | null | undefined;
-  showCurrentRank?: boolean;
+  compact?: boolean;
 };
 
 /**
- * Profile season section: current-rank chip and prior-season archive, each hidden when empty.
- * The archive gates on its rows, not on isError, so a failed background refetch never hides it.
+ * Past seasons, newest first, each with its final rank, SP and record; it gates on rows, so a failed refetch never hides it.
+ * `compact` is the desktop sidebar panel, which stays away without history, while the full list says so instead.
  */
-export function SeasonSection({ userId, seasonRank, showCurrentRank = true }: Props) {
+export function PastSeasons({ userId, compact = false }: Props) {
   const { t } = useTranslation();
   const archive = useSeasonArchiveQuery(userId);
-
   const items = archive.data?.items ?? [];
-  const hasRank = showCurrentRank && seasonRank !== null && seasonRank !== undefined;
-  const hasArchive = items.length > 0;
 
-  if (!hasRank && !hasArchive) return null;
+  if (compact && items.length === 0) return null;
 
-  let chip = null;
-  if (hasRank) {
-    const sp = seasonSpOrZero(seasonRank.sp);
-    const tier = normalizeSeasonTier(seasonRank.tier, sp);
-    const rankName = seasonRankLabel(t, tier, normalizeSeasonDivision(tier, seasonRank.division));
-    chip = (
-      <div
-        data-testid="profile-season"
-        data-tier={tier}
-        className="bg-surface-elevated flex items-center gap-2.5 rounded-md border px-3 py-2"
-        style={{ borderColor: SEASON_TIER_LINE[tier] }}
+  let body;
+  if (items.length > 0) {
+    body = (
+      <ul
+        data-testid="prior-season-archive"
+        aria-label={t("season.archive.listLabel")}
+        className="divide-border m-0 flex list-none flex-col divide-y p-0"
       >
-        <span className="sr-only">
-          {t("season.archive.currentAria", {
-            season: seasonRank.seasonName,
-            tier: rankName,
-            sp: sp.toLocaleString(),
-          })}
-        </span>
-        <TierBadge tier={tier} size="sm" data-testid="profile-season-badge" />
-        <div aria-hidden="true" className="flex min-w-0 flex-col">
-          <span
-            data-testid="profile-season-tier"
-            className="text-sm leading-tight font-semibold"
-            style={{ color: SEASON_TIER_COLOR[tier] }}
-          >
-            {rankName}
-          </span>
-          <span className="text-ink-dim text-xs leading-tight tabular-nums">
-            {t("season.banner.sp", { sp: sp.toLocaleString() })}
-            <span className="text-ink-mute"> · {seasonRank.seasonName}</span>
-          </span>
-        </div>
-      </div>
+        {items.map((row) => (
+          <SeasonArchiveRow
+            key={row.seasonId}
+            seasonName={row.seasonName}
+            sp={row.sp}
+            tier={row.tier}
+            division={row.division}
+            gamesPlayed={row.gamesPlayed}
+            gamesWon={row.gamesWon}
+          />
+        ))}
+      </ul>
+    );
+  } else if (archive.isPending) {
+    body = <Skeleton className="my-3 h-12 rounded-md" />;
+  } else {
+    body = (
+      <EmptyState testId="profile-seasons-empty" className="my-3">
+        {t("profile.seasons.empty")}
+      </EmptyState>
     );
   }
 
+  if (compact) {
+    return (
+      <Panel icon={<Medal />} title={t("season.archive.listLabel")} testId="profile-season-section">
+        {body}
+      </Panel>
+    );
+  }
   return (
-    <section className="mb-5" data-testid="profile-season-section">
-      <SectionHeader
-        eyebrow={t("season.archive.eyebrow")}
-        title={t("season.archive.title")}
-        sub={t(chip ? "season.archive.sub" : "season.archive.subArchiveOnly")}
-        right={chip}
-      />
-
-      {hasArchive && (
-        <ul
-          data-testid="prior-season-archive"
-          aria-label={t("season.archive.listLabel")}
-          className="m-0 flex list-none flex-col gap-1.5 p-0"
-        >
-          {items.map((row) => (
-            <SeasonArchiveRow
-              key={row.seasonId}
-              seasonName={row.seasonName}
-              sp={row.sp}
-              tier={row.tier}
-              division={row.division}
-              gamesPlayed={row.gamesPlayed}
-            />
-          ))}
-        </ul>
-      )}
+    <section
+      className="bg-surface border-border rounded-xl border px-4 shadow-xs"
+      data-testid="profile-season-section"
+    >
+      {body}
     </section>
   );
 }

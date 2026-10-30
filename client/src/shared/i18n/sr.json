@@ -27,7 +27,8 @@
     "logout": "Odjavi se",
     "signedInAs": "Prijavljen kao",
     "menu": "Meni",
-    "accountMenu": "Meni naloga za {{username}}"
+    "accountMenu": "Meni naloga za {{username}}",
+    "settings": "Podešavanja"
   },
   "profile": {
     "title": "Profil",
@@ -176,7 +177,8 @@
         "up": "U usponu",
         "flat": "Stabilno",
         "down": "U padu"
-      }
+      },
+      "record": "{{finished}} završeno · {{left}} napušteno"
     },
     "matchHistory": {
       "eyebrow": "Aktivnost",
@@ -253,14 +255,14 @@
     },
     "partners": {
       "eyebrow": "U fokusu",
-      "title": "Najčešći saigrač",
+      "title": "Saigrači",
       "matchesTogether": "{{count}} mečeva zajedno",
       "empty": "Još nema stalnih saigrača. Odigraj nekoliko mečeva.",
       "emptyPublic": "Još nema stalnih saigrača."
     },
     "rivals": {
       "eyebrow": "Rivalstvo",
-      "title": "S druge strane stola",
+      "title": "Rivali",
       "empty": "Još nema rivala. Odigraj nekoliko mečeva.",
       "emptyPublic": "Još nema rivala."
     },
@@ -295,7 +297,7 @@
     },
     "milestones": {
       "eyebrow": "Prekretnice",
-      "title": "Vrhunci karijere",
+      "title": "Vrhunci",
       "careerPointsLabel": "Poeni u karijeri",
       "careerPointsHint": "ukupno osvojenih poena",
       "capotsLabel": "Ostvareni kapoti",
@@ -307,6 +309,18 @@
       "avgLengthLabel": "Pros. trajanje meča",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "završeni mečevi"
+    },
+    "tabs": {
+      "label": "Delovi profila",
+      "overview": "Pregled",
+      "matches": "Mečevi",
+      "seasons": "Sezone"
+    },
+    "seasonCard": {
+      "title": "Ova sezona · {{season}}"
+    },
+    "seasons": {
+      "empty": "Još nema završenih sezona."
     }
   },
   "publicProfile": {
@@ -1474,5 +1488,26 @@
     "botsLive": "Na ovim mestima igraju botovi.",
     "botsStake": "Ne plaćaju ulog, pa pobednici dele uloge igrača.",
     "previewCaption": "Igrači ovo vide kad pređu preko ikonica pravila:"
+  },
+  "settings": {
+    "title": "Podešavanja",
+    "sectionsLabel": "Delovi podešavanja",
+    "sections": {
+      "account": "Nalog",
+      "signIn": "Prijava",
+      "game": "Igra",
+      "sound": "Zvuk",
+      "privacy": "Privatnost"
+    },
+    "password": {
+      "label": "Lozinka",
+      "send": "Pošalji link",
+      "sending": "Šaljem…",
+      "sent": "Link je poslat na {{email}}.",
+      "sentBadge": "Poslato"
+    },
+    "language": {
+      "label": "Jezik"
+    }
   }
 }

@@ -5,10 +5,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SeasonSection } from "@/features/profile/components/SeasonSection";
+import { PastSeasons } from "@/features/profile/components/PastSeasons";
 import { getSeasonArchive } from "@/shared/api/season";
 import { i18n } from "@/shared/i18n/i18n";
-import type { SeasonArchiveResponse, SeasonRank } from "@/shared/types/apiTypes";
+import type { SeasonArchiveResponse } from "@/shared/types/apiTypes";
 
 vi.mock("@/shared/api/season", () => ({
   getSeasonArchive: vi.fn(),
@@ -46,192 +46,56 @@ function archive(over: Partial<SeasonArchiveResponse> = {}): SeasonArchiveRespon
   };
 }
 
-const rank: SeasonRank = { seasonName: "2026 Q4", tier: "gold", division: 2, sp: 680 };
-
-function renderSection(props: {
-  userId: number | undefined;
-  seasonRank: SeasonRank | null | undefined;
-  showCurrentRank?: boolean;
-}) {
+function renderSeasons(props: { userId: number | undefined; compact?: boolean }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
-  return render(<SeasonSection {...props} />, { wrapper });
+  return render(<PastSeasons {...props} />, { wrapper });
 }
 
-describe("SeasonSection", () => {
-  beforeEach(() => {
+describe("PastSeasons", () => {
+  beforeEach(async () => {
     mockGetArchive.mockReset();
+    await i18n.changeLanguage("en");
   });
 
-  it("renders the current-rank chip and the archive newest-first", async () => {
+  it("lists the subject's past seasons newest first, each with its record", async () => {
     mockGetArchive.mockResolvedValue(archive());
+    renderSeasons({ userId: 7 });
 
-    renderSection({ userId: 2, seasonRank: rank });
-
-    const chip = screen.getByTestId("profile-season");
-    expect(chip).toHaveAttribute("data-tier", "gold");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
-    expect(chip.textContent).toContain((680).toLocaleString());
-    expect(chip.textContent).toContain("2026 Q4");
-    expect(chip.querySelector(".sr-only")?.textContent).toBe(
-      `Current season 2026 Q4: Gold 2, ${(680).toLocaleString()} SP`,
+    const rows = await screen.findAllByTestId("season-archive-row");
+    expect(rows.map((r) => r.getAttribute("data-season"))).toEqual(["2026 Q2", "2026 Q1"]);
+    expect(rows[0]!.querySelector('[data-testid="season-archive-record"]')?.textContent).toBe(
+      "7–7 · 50%",
     );
-
-    const list = await screen.findByTestId("prior-season-archive");
-    const rows = list.querySelectorAll('[data-testid="season-archive-row"]');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveAttribute("data-season", "2026 Q2");
-    expect(rows[1]).toHaveAttribute("data-season", "2026 Q1");
-    expect(mockGetArchive).toHaveBeenCalledWith(2);
+    expect(mockGetArchive).toHaveBeenCalledWith(7);
   });
 
-  it("shows the current rank with its division and a pre-division archive row without", async () => {
-    mockGetArchive.mockResolvedValue(archive());
-
-    renderSection({ userId: 2, seasonRank: rank });
-
-    const list = await screen.findByTestId("prior-season-archive");
-    const first = list.querySelector('[data-testid="season-archive-row"]');
-    expect(first).toHaveAttribute("data-tier", "silver");
-    expect(first?.querySelector('[data-testid="season-archive-tier"]')?.textContent).toBe("Silver");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Gold 2");
-  });
-
-  it("renders no archive section at all when the archive is empty", async () => {
+  it("says there are no finished seasons yet in the full list", async () => {
     mockGetArchive.mockResolvedValue({ items: [] });
+    renderSeasons({ userId: 7 });
 
-    renderSection({ userId: 2, seasonRank: rank });
-
-    expect(screen.getByTestId("profile-season")).toBeInTheDocument();
-    await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
-    expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("profile-seasons-empty")).toHaveTextContent(
+      "No finished seasons yet.",
+    );
   });
 
-  it("hides the rank chip when seasonRank is null, keeping the archive", async () => {
+  it("titles the compact panel and leaves it out without history", async () => {
     mockGetArchive.mockResolvedValue(archive());
+    const { unmount } = renderSeasons({ userId: 7, compact: true });
+    expect(await screen.findByTestId("profile-season-section")).toHaveTextContent("Past seasons");
+    unmount();
 
-    renderSection({ userId: 2, seasonRank: null });
-
-    await screen.findByTestId("prior-season-archive");
-    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
-  });
-
-  it("contributes nothing to the DOM when there is no rank and no archive", async () => {
     mockGetArchive.mockResolvedValue({ items: [] });
-
-    renderSection({ userId: 2, seasonRank: null });
-
-    await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
+    renderSeasons({ userId: 8, compact: true });
+    await waitFor(() => expect(mockGetArchive).toHaveBeenCalledWith(8));
     expect(screen.queryByTestId("profile-season-section")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
   });
 
-  it("renders no archive on a failed read, without an error surface", async () => {
-    mockGetArchive.mockRejectedValue(new Error("boom"));
-
-    renderSection({ userId: 2, seasonRank: rank });
-
-    expect(screen.getByTestId("profile-season")).toBeInTheDocument();
-    await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
-    expect(screen.queryByTestId("prior-season-archive")).not.toBeInTheDocument();
-  });
-
-  it("does not query the archive while the subject id is unresolved", () => {
-    renderSection({ userId: undefined, seasonRank: rank });
-
-    expect(mockGetArchive).not.toHaveBeenCalled();
-    expect(screen.getByTestId("profile-season")).toBeInTheDocument();
-  });
-
-  it("renders a 0-SP current rank as Iron", () => {
-    mockGetArchive.mockResolvedValue({ items: [] });
-
-    renderSection({
-      userId: 2,
-      seasonRank: { seasonName: "2026 Q3", tier: "iron", division: 1, sp: 0 },
-    });
-
-    const chip = screen.getByTestId("profile-season");
-    expect(chip).toHaveAttribute("data-tier", "iron");
-    expect(screen.getByTestId("profile-season-tier").textContent).toBe("Iron 1");
-  });
-
-  it("falls back to the SP bucket for an unrecognised rank tier token", () => {
-    mockGetArchive.mockResolvedValue({ items: [] });
-
-    renderSection({
-      userId: 2,
-      seasonRank: { seasonName: "2026 Q3", tier: "mythic", division: 2, sp: 700 },
-    });
-
-    expect(screen.getByTestId("profile-season")).toHaveAttribute("data-tier", "gold");
-  });
-
-  it("keeps the rendered archive when a refetch fails", async () => {
-    mockGetArchive.mockResolvedValueOnce(archive());
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<SeasonSection userId={2} seasonRank={rank} />, {
-      wrapper: ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-      ),
-    });
-
-    const list = await screen.findByTestId("prior-season-archive");
-    expect(list.querySelectorAll('[data-testid="season-archive-row"]')).toHaveLength(2);
-
-    mockGetArchive.mockRejectedValueOnce(new Error("offline"));
-    await qc.refetchQueries({ queryKey: ["season", "archive", 2] });
-
-    await waitFor(() => expect(qc.getQueryState(["season", "archive", 2])?.status).toBe("error"));
-    expect(screen.getByTestId("prior-season-archive")).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId("prior-season-archive")
-        .querySelectorAll('[data-testid="season-archive-row"]'),
-    ).toHaveLength(2);
-  });
-
-  it("omits the chip when the caller suppresses it, keeping the archive", async () => {
-    mockGetArchive.mockResolvedValue(archive());
-
-    renderSection({ userId: 2, seasonRank: rank, showCurrentRank: false });
-
-    await waitFor(() => expect(screen.getByTestId("prior-season-archive")).toBeInTheDocument());
-    expect(screen.queryByTestId("profile-season")).not.toBeInTheDocument();
-  });
-
-  it("drops the current-rank clause from the subtitle when the chip is suppressed", async () => {
-    mockGetArchive.mockResolvedValue(archive());
-
-    renderSection({ userId: 2, seasonRank: rank, showCurrentRank: false });
-
-    const section = await screen.findByTestId("profile-season-section");
-    expect(section.textContent).toContain(i18n.t("season.archive.subArchiveOnly"));
-    expect(section.textContent).not.toContain(i18n.t("season.archive.sub"));
-  });
-
-  it("drops the clause for a subject with no current standing, chip left enabled", async () => {
-    mockGetArchive.mockResolvedValue(archive());
-
-    renderSection({ userId: 2, seasonRank: null });
-
-    const section = await screen.findByTestId("profile-season-section");
-    expect(section.textContent).toContain(i18n.t("season.archive.subArchiveOnly"));
-  });
-
-  it("renders nothing at all with the chip suppressed and an empty archive", async () => {
-    mockGetArchive.mockResolvedValue({ items: [] });
-
-    const { container } = renderSection({
-      userId: 2,
-      seasonRank: rank,
-      showCurrentRank: false,
-    });
-
-    await waitFor(() => expect(mockGetArchive).toHaveBeenCalled());
-    expect(container).toBeEmptyDOMElement();
+  it("keeps the rows when a background refetch fails", async () => {
+    mockGetArchive.mockResolvedValueOnce(archive()).mockRejectedValue(new Error("boom"));
+    renderSeasons({ userId: 7 });
+    expect(await screen.findAllByTestId("season-archive-row")).toHaveLength(2);
   });
 });

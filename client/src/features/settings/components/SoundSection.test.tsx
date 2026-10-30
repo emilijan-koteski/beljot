@@ -8,7 +8,7 @@ import { resetAudioPreferenceRequestSequence } from "@/shared/lib/audioPreferenc
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser } from "@/test-utils";
 
-import { AudioPanel } from "./AudioPanel";
+import { SoundSection } from "./SoundSection";
 
 const mockUpdatePreferences = vi.fn();
 vi.mock("@/shared/api/profile", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-describe("AudioPanel", () => {
+describe("SoundSection", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
     mockUpdatePreferences.mockResolvedValue({});
@@ -32,9 +32,9 @@ describe("AudioPanel", () => {
   });
 
   it("shows each switch in the stored state, labelled by its row", () => {
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
-    expect(screen.getByTestId("profile-audio")).toHaveTextContent("Sound & music");
+    expect(screen.getByTestId("profile-audio")).toHaveTextContent("Sound");
     const sound = screen.getByRole("switch", { name: "Sound effects" });
     const music = screen.getByRole("switch", { name: "Music" });
     expect(sound).toBe(screen.getByTestId("profile-sound-toggle"));
@@ -51,7 +51,7 @@ describe("AudioPanel", () => {
         musicEnabled: undefined as never,
       },
     });
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     expect(screen.getByTestId("profile-sound-toggle")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("profile-music-toggle")).toHaveAttribute("aria-checked", "true");
@@ -59,7 +59,7 @@ describe("AudioPanel", () => {
 
   it("writes a switch optimistically and PATCHes only its own field", async () => {
     const user = userEvent.setup();
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     await user.click(screen.getByTestId("profile-music-toggle"));
 
@@ -72,7 +72,7 @@ describe("AudioPanel", () => {
 
   it("toggles from its row label too", async () => {
     const user = userEvent.setup();
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     await user.click(screen.getByText("Sound effects"));
 
@@ -84,7 +84,7 @@ describe("AudioPanel", () => {
   it("reverts the switch when the PATCH fails", async () => {
     const user = userEvent.setup();
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     await user.click(screen.getByTestId("profile-sound-toggle"));
 
@@ -117,7 +117,7 @@ function pointerDrag(testId: string) {
   };
 }
 
-describe("AudioPanel volume sliders", () => {
+describe("SoundSection volume sliders", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
     mockUpdatePreferences.mockResolvedValue({});
@@ -140,7 +140,7 @@ describe("AudioPanel volume sliders", () => {
   }
 
   it("puts a named slider under each switch, showing the stored level", () => {
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     const sound = screen.getByRole("slider", { name: "Sound effects volume" });
     const music = screen.getByRole("slider", { name: "Music volume" });
@@ -160,14 +160,14 @@ describe("AudioPanel volume sliders", () => {
         musicVolume: undefined as never,
       },
     });
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     expect(slider("profile-sound-volume")).toHaveAttribute("aria-valuenow", "70");
     expect(slider("profile-music-volume")).toHaveAttribute("aria-valuenow", "70");
   });
 
   it("disables the slider of a switched-off channel, value kept", () => {
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     expect(slider("profile-music-volume")).toBeDisabled();
     expect(slider("profile-music-volume")).toHaveAttribute("aria-valuenow", "80");
@@ -176,7 +176,7 @@ describe("AudioPanel volume sliders", () => {
 
   it("re-enables the slider on the kept value when its switch comes back on", async () => {
     const user = userEvent.setup();
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     await user.click(screen.getByTestId("profile-music-toggle"));
 
@@ -186,7 +186,7 @@ describe("AudioPanel volume sliders", () => {
   });
 
   it("persists a committed level as ONE PATCH of that field only", () => {
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     fireEvent.change(slider("profile-sound-volume"), { target: { value: "20" } });
 
@@ -197,7 +197,7 @@ describe("AudioPanel volume sliders", () => {
   });
 
   it("keeps the slider outside the switch's label, so using it never toggles the switch", () => {
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     expect(screen.getByTestId("profile-sound-volume").closest("label")).toBeNull();
     expect(screen.getByTestId("profile-music-volume").closest("label")).toBeNull();
@@ -213,7 +213,7 @@ describe("AudioPanel volume sliders", () => {
     useAuthStore.setState({
       user: makeUser({ id: 7, musicEnabled: true, soundVolume: 45, musicVolume: 80 }),
     });
-    render(<AudioPanel />);
+    render(<SoundSection />);
     const drag = pointerDrag("profile-music-volume");
 
     drag.down(40);
@@ -234,7 +234,7 @@ describe("AudioPanel volume sliders", () => {
 
   it("reverts the slider when the PATCH fails", async () => {
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    render(<AudioPanel />);
+    render(<SoundSection />);
 
     fireEvent.change(slider("profile-sound-volume"), { target: { value: "90" } });
 

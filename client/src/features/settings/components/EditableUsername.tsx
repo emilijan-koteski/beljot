@@ -23,10 +23,10 @@ type EditableUsernameProps = {
 };
 
 const TITLE_CLASS =
-  "text-ink m-0 min-w-0 [overflow-wrap:anywhere] text-[clamp(32px,6vw,48px)] leading-none font-bold tracking-tight";
+  "text-ink m-0 min-w-0 [overflow-wrap:anywhere] text-2xl leading-tight font-bold tracking-tight";
 
 /**
- * Profile username title with edit-in-place: Enter saves, Escape cancels.
+ * The player's name with edit-in-place: Enter saves, Escape cancels.
  * Client validation gives instant feedback; the server stays authoritative and errors show inline.
  */
 export function EditableUsername({ username, userId, usernameChangedAt }: EditableUsernameProps) {
@@ -133,7 +133,7 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
             disabled={mutation.isPending}
             aria-label={t("profile.editUsername.inputLabel")}
             aria-invalid={error ? true : undefined}
-            className="h-auto min-w-0 max-w-60 py-1 text-2xl font-bold tracking-tight"
+            className="h-auto min-w-0 max-w-60 py-1 text-xl font-bold tracking-tight"
             data-testid="profile-username-input"
           />
           <Button
@@ -175,9 +175,9 @@ export function EditableUsername({ username, userId, usernameChangedAt }: Editab
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 items-center gap-2">
-        <h1 className={TITLE_CLASS} data-testid="profile-username">
+        <span className={TITLE_CLASS} data-testid="profile-username">
           {username}
-        </h1>
+        </span>
         {userId !== undefined && (
           <Button
             variant="ghost"

@@ -7,7 +7,7 @@ import { persistCardDeck } from "@/shared/lib/cardDeckPreference";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { SidePanel } from "./SidePanel";
+import { SettingsRow } from "./SettingsGroup";
 
 const DECKS = [
   { code: "french", labelKey: "cardDeck.french" },
@@ -17,10 +17,10 @@ const DECKS = [
 const ACE_OF_DIAMONDS_SHOWS_MOST_DECK_DIFFERENCE = "AD" as const;
 
 /**
- * Self-only profile picker for the card deck, saved optimistically with a silent revert on failure.
- * It is a private preference, so it must never appear on the public profile page.
+ * The card deck setting, French or Croatian, shown as each deck's ace; saved optimistically with a silent revert.
+ * `wide` puts the choice on the row's right instead of under its name.
  */
-export function CardDeckPanel() {
+export function CardDeckRow({ wide = false }: { wide?: boolean }) {
   const { t } = useTranslation();
   const active = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
 
@@ -29,58 +29,67 @@ export function CardDeckPanel() {
     await persistCardDeck(next, active);
   }
 
-  return (
-    <SidePanel
-      eyebrow={t("profile.cardDeck.eyebrow")}
-      title={t("profile.cardDeck.title")}
-      testId="profile-card-deck"
+  const choices = (
+    <div
+      className={cn("flex gap-2.5", wide && "w-64 shrink-0")}
+      role="radiogroup"
+      aria-label={t("profile.cardDeck.title")}
     >
-      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.cardDeck.description")}</p>
-      <div className="flex gap-2.5" role="radiogroup" aria-label={t("profile.cardDeck.title")}>
-        {DECKS.map((deck) => {
-          const selected = active === deck.code;
-          const previewUrl = cardFaceUrl(ACE_OF_DIAMONDS_SHOWS_MOST_DECK_DIFFERENCE, deck.code);
-          return (
-            <button
-              key={deck.code}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => handleSelect(deck.code)}
-              data-testid={`profile-deck-option-${deck.code}`}
-              className={cn(
-                "flex flex-1 cursor-pointer flex-col items-center gap-1.5 rounded-md border px-2 py-2.5 transition-colors",
-                selected
-                  ? "border-accent bg-accent-soft"
-                  : "border-border bg-surface-elevated hover:bg-surface-sunken",
-              )}
-            >
-              <img
-                key={previewUrl}
-                src={previewUrl}
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                className="h-[63px] w-[45px] rounded-xs shadow-felt-sm"
-                style={{
-                  background:
-                    "linear-gradient(180deg, var(--card-face) 0%, var(--card-face-shade) 100%)",
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.visibility = "hidden";
-                }}
-                onLoad={(e) => {
-                  e.currentTarget.style.visibility = "";
-                }}
-              />
-              <span className="text-ink flex items-center gap-1 text-xs font-medium">
-                {t(deck.labelKey)}
-                {selected && <Check className="text-accent size-3" strokeWidth={2.6} />}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </SidePanel>
+      {DECKS.map((deck) => {
+        const selected = active === deck.code;
+        const previewUrl = cardFaceUrl(ACE_OF_DIAMONDS_SHOWS_MOST_DECK_DIFFERENCE, deck.code);
+        return (
+          <button
+            key={deck.code}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => handleSelect(deck.code)}
+            data-testid={`profile-deck-option-${deck.code}`}
+            className={cn(
+              "flex flex-1 cursor-pointer flex-col items-center gap-1.5 rounded-lg border px-2 py-2.5 transition-colors",
+              selected
+                ? "border-accent bg-accent-soft"
+                : "border-border bg-surface-elevated hover:bg-surface-sunken",
+            )}
+          >
+            <img
+              key={previewUrl}
+              src={previewUrl}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="h-[63px] w-[45px] rounded-xs shadow-felt-sm"
+              style={{
+                background:
+                  "linear-gradient(180deg, var(--card-face) 0%, var(--card-face-shade) 100%)",
+              }}
+              onError={(e) => {
+                e.currentTarget.style.visibility = "hidden";
+              }}
+              onLoad={(e) => {
+                e.currentTarget.style.visibility = "";
+              }}
+            />
+            <span className="text-ink flex items-center gap-1 text-xs font-semibold">
+              {selected && <Check className="text-accent size-3" strokeWidth={2.6} />}
+              {t(deck.labelKey)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <SettingsRow
+      testId="profile-card-deck"
+      label={t("profile.cardDeck.title")}
+      hint={t("profile.cardDeck.description")}
+      stack={!wide}
+      control={wide ? choices : undefined}
+    >
+      {!wide && choices}
+    </SettingsRow>
   );
 }

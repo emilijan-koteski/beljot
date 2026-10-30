@@ -10,7 +10,6 @@ import { Skeleton } from "@/shared/components/ui/skeleton";
 import { useUserMatchesInfiniteQuery } from "@/shared/hooks/queries/useMatches";
 
 import { HistoryFilters } from "./components/HistoryFilters";
-import { SectionHeader } from "./components/SectionHeader";
 
 interface MatchHistoryProps {
   userId: number | undefined;
@@ -41,17 +40,13 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
   };
 
   const header = (
-    <SectionHeader
-      eyebrow={t("profile.matchHistory.eyebrow")}
-      title={t("profile.matchHistory.title")}
-      sub={t("profile.matchHistory.sub")}
-    />
+    <h2 className="text-ink m-0 text-lg font-semibold">{t("profile.matchHistory.title")}</h2>
   );
 
   const hasNoGamesAtAll = counts.all === 0 && !query.isPending && !query.isError;
   if (hasNoGamesAtAll) {
     return (
-      <section data-testid="match-history">
+      <section data-testid="match-history" className="flex flex-col gap-3">
         {header}
         <EmptyState
           testId="match-history-empty"
@@ -125,7 +120,7 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
             variant="outline"
             onClick={() => query.fetchNextPage()}
             disabled={query.isFetchingNextPage}
-            className="mt-2.5 h-9 w-full"
+            className="h-9 w-full"
             data-testid="match-history-load-more"
           >
             {query.isFetchingNextPage
@@ -133,7 +128,7 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
               : t("profile.matchHistory.loadMore")}
           </Button>
         )}
-        <p className="text-ink-mute mt-4 text-center text-xs" data-testid="match-history-count">
+        <p className="text-ink-mute m-0 text-center text-xs" data-testid="match-history-count">
           {t("profile.matchHistory.showing", { shown: items.length, total })}
         </p>
       </>
@@ -141,9 +136,11 @@ export function MatchHistory({ userId, counts, subjectIsSelf = true }: MatchHist
   }
 
   return (
-    <section data-testid="match-history">
-      {header}
-      {filters}
+    <section data-testid="match-history" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {header}
+        {filters}
+      </div>
       {body}
     </section>
   );

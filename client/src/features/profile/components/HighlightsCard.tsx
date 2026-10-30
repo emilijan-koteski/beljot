@@ -1,58 +1,70 @@
+import { Clock, Medal, Sparkles, Trophy } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { BestHand } from "@/shared/api/career";
+import { Panel } from "@/shared/components/ui/panel";
 import { formatLocalizedDate } from "@/shared/lib/formatDate";
 
-import { SidePanel } from "./SidePanel";
-
-type MilestonesProps = {
+type HighlightsCardProps = {
   capots: number;
   careerPoints: number;
   bestHand?: BestHand;
   avgMatchSeconds: number;
 };
 
-function MilestoneRow({ label, hint, value }: { label: string; hint: string; value: string }) {
+function Tile({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  hint: string;
+}) {
   return (
-    <li className="bg-surface-elevated border-border grid grid-cols-[1fr_auto] items-center gap-2.5 rounded-md border px-3 py-2.5">
-      <div className="min-w-0">
-        <div className="text-ink text-sm font-medium">{label}</div>
-        <div className="text-ink-mute mt-0.5 truncate text-xs">{hint}</div>
-      </div>
-      <div className="text-ink self-center text-2xl font-bold tracking-tight tabular-nums">
-        {value}
-      </div>
+    <li className="bg-surface-sunken/60 flex min-w-0 flex-col gap-0.5 rounded-lg px-3 py-2.5">
+      <span className="text-ink-mute flex items-start gap-1.5 text-2xs leading-tight font-semibold tracking-wider uppercase [&>svg]:mt-px [&>svg]:size-3 [&>svg]:shrink-0">
+        {icon}
+        <span>{label}</span>
+      </span>
+      <span className="text-ink text-lg font-bold tabular-nums">{value}</span>
+      <span className="text-ink-mute truncate text-2xs">{hint}</span>
     </li>
   );
 }
 
-/**
- * Sidebar panel of three career highlights: capots called, best single hand,
- * and average match length. Driven by the career aggregates endpoint.
- */
-export function Milestones({ capots, careerPoints, bestHand, avgMatchSeconds }: MilestonesProps) {
+/** Career highlights in four tiles: points scored, capots, the best single hand and the average match length. */
+export function HighlightsCard({
+  capots,
+  careerPoints,
+  bestHand,
+  avgMatchSeconds,
+}: HighlightsCardProps) {
   const { t } = useTranslation();
   const avgMinutes = Math.round(avgMatchSeconds / 60);
 
   return (
-    <SidePanel
-      eyebrow={t("profile.milestones.eyebrow")}
-      title={t("profile.milestones.title")}
-      testId="profile-milestones"
-    >
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        <MilestoneRow
+    <Panel icon={<Sparkles />} title={t("profile.milestones.title")} testId="profile-milestones">
+      <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0">
+        <Tile
+          icon={<Trophy />}
           label={t("profile.milestones.careerPointsLabel")}
-          hint={t("profile.milestones.careerPointsHint")}
           value={careerPoints.toLocaleString()}
+          hint={t("profile.milestones.careerPointsHint")}
         />
-        <MilestoneRow
+        <Tile
+          icon={<Medal />}
           label={t("profile.milestones.capotsLabel")}
-          hint={t("profile.milestones.capotsHint")}
           value={String(capots)}
+          hint={t("profile.milestones.capotsHint")}
         />
-        <MilestoneRow
+        <Tile
+          icon={<Sparkles />}
           label={t("profile.milestones.bestHandLabel")}
+          value={bestHand ? String(bestHand.points) : t("profile.milestones.bestHandEmpty")}
           hint={
             bestHand
               ? t("profile.milestones.bestHandHint", {
@@ -61,14 +73,14 @@ export function Milestones({ capots, careerPoints, bestHand, avgMatchSeconds }: 
                 })
               : t("profile.milestones.bestHandHintEmpty")
           }
-          value={bestHand ? String(bestHand.points) : t("profile.milestones.bestHandEmpty")}
         />
-        <MilestoneRow
+        <Tile
+          icon={<Clock />}
           label={t("profile.milestones.avgLengthLabel")}
-          hint={t("profile.milestones.avgLengthHint")}
           value={t("profile.milestones.avgLengthValue", { minutes: avgMinutes })}
+          hint={t("profile.milestones.avgLengthHint")}
         />
       </ul>
-    </SidePanel>
+    </Panel>
   );
 }

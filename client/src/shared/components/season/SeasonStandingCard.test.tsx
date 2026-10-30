@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SeasonStandingCard } from "@/features/leaderboard/components/SeasonStandingCard";
+import { SeasonStandingCard } from "@/shared/components/season/SeasonStandingCard";
 import { i18n } from "@/shared/i18n/i18n";
 import type { CurrentSeasonResponse, LeaderboardViewer } from "@/shared/types/apiTypes";
 

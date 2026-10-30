@@ -1,3 +1,4 @@
+import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Switch } from "@/shared/components/ui/switch";
@@ -7,35 +8,35 @@ import {
 } from "@/shared/lib/invitePreference";
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { SidePanel } from "./SidePanel";
+import { SettingsGroup, SettingsRow } from "./SettingsGroup";
 
 /**
- * Self-only profile switch for room invites from players who are not friends, saved optimistically.
- * It is a private preference, so it must never appear on the public profile page.
+ * The Privacy group of Settings: whether players who are not friends can invite you, saved optimistically.
+ * It is a private preference, so it never appears on a public profile.
  */
-export function InvitePrivacyPanel() {
+export function PrivacySection() {
   const { t } = useTranslation();
   const allowed = resolveAllowNonFriendInvites(useAuthStore((s) => s.user?.allowNonFriendInvites));
 
   return (
-    <SidePanel
-      eyebrow={t("profile.invites.eyebrow")}
-      title={t("profile.invites.title")}
+    <SettingsGroup
+      id="privacy"
+      title={t("settings.sections.privacy")}
+      icon={<ShieldCheck />}
       testId="profile-invites"
     >
-      <p className="text-ink-mute mb-2.5 text-xs">{t("profile.invites.description")}</p>
-      <div className="border-border bg-surface-elevated rounded-md border px-3 py-2.5">
-        <label className="flex cursor-pointer items-center justify-between gap-3">
-          <span className="text-ink text-sm font-medium">
-            {t("profile.invites.allowNonFriends")}
-          </span>
+      <SettingsRow
+        asLabel
+        label={t("profile.invites.allowNonFriends")}
+        hint={t("profile.invites.description")}
+        control={
           <Switch
             checked={allowed}
             onCheckedChange={(checked) => void persistAllowNonFriendInvites(checked)}
             data-testid="profile-allow-non-friend-invites"
           />
-        </label>
-      </div>
-    </SidePanel>
+        }
+      />
+    </SettingsGroup>
   );
 }

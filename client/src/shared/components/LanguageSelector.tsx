@@ -1,22 +1,14 @@
 import { Check, ChevronDown, Globe } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { updatePreferences } from "@/shared/api/profile";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { LANGUAGE_OPTIONS, useChangeLanguage } from "@/shared/hooks/useChangeLanguage";
 import { cn } from "@/shared/lib/utils";
-import { useAuthStore } from "@/shared/stores/authStore";
-
-const languagesLatinThenCyrillic = [
-  { code: "en", labelKey: "language.en" },
-  { code: "hr", labelKey: "language.hr" },
-  { code: "sr", labelKey: "language.sr" },
-  { code: "mk", labelKey: "language.mk" },
-] as const;
 
 type LanguageSelectorProps = {
   persistToServer?: boolean;
@@ -29,27 +21,7 @@ export function LanguageSelector({
 }: LanguageSelectorProps = {}) {
   const { t, i18n } = useTranslation();
 
-  async function handleLanguageChange(lang: string) {
-    if (lang === i18n.language) return;
-    await i18n.changeLanguage(lang);
-
-    if (!persistToServer) return;
-
-    const user = useAuthStore.getState().user;
-    if (!user) return;
-
-    const previousPreference = user.languagePreference;
-    useAuthStore.getState().setUser({ ...user, languagePreference: lang });
-
-    try {
-      await updatePreferences(user.id, { languagePreference: lang });
-    } catch {
-      const current = useAuthStore.getState().user;
-      if (current?.id === user.id) {
-        useAuthStore.getState().setUser({ ...current, languagePreference: previousPreference });
-      }
-    }
-  }
+  const handleLanguageChange = useChangeLanguage(persistToServer);
 
   const currentLang = i18n.language.slice(0, 2).toUpperCase();
   const triggerTestId = `${testIdPrefix}-selector`;
@@ -67,7 +39,7 @@ export function LanguageSelector({
         <ChevronDown className="hidden size-3 opacity-70 md:block" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
-        {languagesLatinThenCyrillic.map((lang) => {
+        {LANGUAGE_OPTIONS.map((lang) => {
           const active = lang.code === i18n.language;
           return (
             <DropdownMenuItem

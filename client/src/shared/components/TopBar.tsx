@@ -1,4 +1,4 @@
-import { ChevronDown, Coins, HandHeart, LogOut, Menu } from "lucide-react";
+import { ChevronDown, Coins, HandHeart, LogOut, Menu, Settings } from "lucide-react";
 import { type MouseEvent as ReactMouseEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
@@ -201,6 +201,14 @@ export function TopBar({
               </div>
               <div className="mx-1 my-1 h-px bg-border" />
               <DropdownMenuItem
+                render={<Link to="/settings" />}
+                data-testid="nav-settings"
+                className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
+              >
+                <Settings className="text-ink-dim size-3.5" />
+                <span className="whitespace-nowrap">{t("nav.settings")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onClick={() => setSupportOpen(true)}
                 data-testid="nav-support"
                 className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
@@ -266,6 +274,16 @@ export function TopBar({
                   );
                 })}
               {showNav && <div className="mx-1 my-1 h-px bg-border" />}
+              {showUserMenu && user && (
+                <DropdownMenuItem
+                  render={<Link to="/settings" />}
+                  data-testid="nav-menu-settings"
+                  className="text-ink hover:bg-surface-sunken flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium"
+                >
+                  <Settings className="text-ink-dim size-3.5" />
+                  <span className="whitespace-nowrap">{t("nav.settings")}</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => setSupportOpen(true)}
                 data-testid="nav-menu-support"

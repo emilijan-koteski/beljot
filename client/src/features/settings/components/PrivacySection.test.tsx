@@ -8,7 +8,7 @@ import { resetInvitePreferenceRequestSequence } from "@/shared/lib/invitePrefere
 import { useAuthStore } from "@/shared/stores/authStore";
 import { makeUser } from "@/test-utils";
 
-import { InvitePrivacyPanel } from "./InvitePrivacyPanel";
+import { PrivacySection } from "./PrivacySection";
 
 const mockUpdatePreferences = vi.fn();
 vi.mock("@/shared/api/profile", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-describe("InvitePrivacyPanel", () => {
+describe("PrivacySection", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
     mockUpdatePreferences.mockResolvedValue({});
@@ -33,9 +33,9 @@ describe("InvitePrivacyPanel", () => {
 
   it("shows the switch in the stored state, labelled by its row", () => {
     useAuthStore.setState({ user: makeUser({ id: 7, allowNonFriendInvites: false }) });
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
-    expect(screen.getByTestId("profile-invites")).toHaveTextContent("Room invites");
+    expect(screen.getByTestId("profile-invites")).toHaveTextContent("Privacy");
     const toggle = screen.getByRole("switch", { name: "Invites from non-friends" });
     expect(toggle).toBe(screen.getByTestId("profile-allow-non-friend-invites"));
     expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -45,7 +45,7 @@ describe("InvitePrivacyPanel", () => {
     useAuthStore.setState({
       user: { ...makeUser({ id: 7 }), allowNonFriendInvites: undefined as never },
     });
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
     expect(screen.getByTestId("profile-allow-non-friend-invites")).toHaveAttribute(
       "aria-checked",
@@ -55,7 +55,7 @@ describe("InvitePrivacyPanel", () => {
 
   it("turns the switch off optimistically and PATCHes only its own field", async () => {
     const user = userEvent.setup();
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
 
@@ -70,7 +70,7 @@ describe("InvitePrivacyPanel", () => {
 
   it("toggles from its row label too", async () => {
     const user = userEvent.setup();
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
     await user.click(screen.getByText("Invites from non-friends"));
 
@@ -80,7 +80,7 @@ describe("InvitePrivacyPanel", () => {
   it("reverts the switch when the PATCH fails", async () => {
     const user = userEvent.setup();
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
 
@@ -102,7 +102,7 @@ describe("InvitePrivacyPanel", () => {
           rejectFirst = reject;
         }),
     );
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
@@ -122,7 +122,7 @@ describe("InvitePrivacyPanel", () => {
           rejectFirst = reject;
         }),
     );
-    render(<InvitePrivacyPanel />);
+    render(<PrivacySection />);
     const toggle = screen.getByTestId("profile-allow-non-friend-invites");
 
     await user.click(toggle);

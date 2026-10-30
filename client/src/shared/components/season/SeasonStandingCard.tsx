@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
@@ -17,18 +18,24 @@ import {
 import { cn } from "@/shared/lib/utils";
 import type { CurrentSeasonResponse, LeaderboardViewer } from "@/shared/types/apiTypes";
 
+export type SeasonStanding = Pick<
+  LeaderboardViewer,
+  "position" | "sp" | "tier" | "division" | "gamesPlayed" | "gamesWon"
+>;
+
 interface SeasonStandingCardProps {
-  standing: LeaderboardViewer | null;
+  standing: SeasonStanding | null;
   total: number;
   progress?: CurrentSeasonResponse;
   past: boolean;
   layout: "stack" | "row";
+  header?: ReactNode;
 }
 
 const CARD = "bg-surface border-border flex rounded-xl border p-4 shadow-xs";
 
 /**
- * The viewer's season at a glance: rank and SP with the climb to the next rank, then place, record and win rate.
+ * A season at a glance: rank and SP with the climb to the next rank when `progress` is known, then place, record and win rate.
  * Without a standing it invites a first match in the running season and stays away from a past one.
  */
 export function SeasonStandingCard({
@@ -37,6 +44,7 @@ export function SeasonStandingCard({
   progress,
   past,
   layout,
+  header,
 }: SeasonStandingCardProps) {
   const { t } = useTranslation();
 
@@ -44,6 +52,7 @@ export function SeasonStandingCard({
     if (past) return null;
     return (
       <section className={cn(CARD, "flex-col gap-3")} data-testid="leaderboard-standing-empty">
+        {header}
         <div className="flex items-center gap-3">
           <TierBadge tier="iron" size="md" glow={false} />
           <div className="flex min-w-0 flex-col">
@@ -74,7 +83,7 @@ export function SeasonStandingCard({
     {
       key: "place",
       label: t("season.leaderboard.place"),
-      value: `#${standing.position.toLocaleString()}`,
+      value: standing.position > 0 ? `#${standing.position.toLocaleString()}` : "–",
       sub: t("season.leaderboard.placeOf", { total: total.toLocaleString() }),
     },
     {
@@ -97,6 +106,7 @@ export function SeasonStandingCard({
       style={{ borderColor: SEASON_TIER_LINE[tier] }}
       data-testid="leaderboard-standing"
     >
+      {header}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <TierBadge tier={tier} size="md" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -111,9 +121,9 @@ export function SeasonStandingCard({
               </span>
             </span>
           </div>
-          {past || progress === undefined ? (
+          {past ? (
             <span className="text-ink-mute text-xs">{t("season.leaderboard.finalRank")}</span>
-          ) : (
+          ) : progress === undefined ? null : (
             <div className="flex flex-col gap-1">
               <span className="bg-surface-sunken h-1.5 overflow-hidden rounded-full">
                 <span

@@ -420,6 +420,29 @@ describe("TopBar support entry", () => {
     );
   });
 
+  it("links to Settings from the desktop user menu, above support", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByTestId("nav-user"));
+    const item = await screen.findByTestId("nav-settings");
+
+    expect(item).toHaveAttribute("href", "/settings");
+    expect(item).toHaveTextContent("Settings");
+    expect(item.compareDocumentPosition(screen.getByTestId("nav-support"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("links to Settings from the phone menu", async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByTestId("nav-menu"));
+
+    expect(await screen.findByTestId("nav-menu-settings")).toHaveAttribute("href", "/settings");
+  });
+
   it("opens the explainer dialog from the desktop user menu", async () => {
     const user = userEvent.setup();
     renderWithRouter();

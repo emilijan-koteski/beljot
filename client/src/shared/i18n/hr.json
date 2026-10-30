@@ -27,7 +27,8 @@
     "logout": "Odjavi se",
     "signedInAs": "Prijavljen kao",
     "menu": "Izbornik",
-    "accountMenu": "Izbornik računa za {{username}}"
+    "accountMenu": "Izbornik računa za {{username}}",
+    "settings": "Postavke"
   },
   "profile": {
     "title": "Profil",
@@ -176,7 +177,8 @@
         "up": "U usponu",
         "flat": "Stabilno",
         "down": "U padu"
-      }
+      },
+      "record": "{{finished}} završeno · {{left}} napušteno"
     },
     "matchHistory": {
       "eyebrow": "Aktivnost",
@@ -253,14 +255,14 @@
     },
     "partners": {
       "eyebrow": "U fokusu",
-      "title": "Najčešći suigrač",
+      "title": "Suigrači",
       "matchesTogether": "{{count}} mečeva zajedno",
       "empty": "Još nema stalnih suigrača. Odigraj nekoliko mečeva.",
       "emptyPublic": "Još nema stalnih suigrača."
     },
     "rivals": {
       "eyebrow": "Rivalstvo",
-      "title": "S druge strane stola",
+      "title": "Rivali",
       "empty": "Još nema rivala. Odigraj nekoliko mečeva.",
       "emptyPublic": "Još nema rivala."
     },
@@ -295,7 +297,7 @@
     },
     "milestones": {
       "eyebrow": "Prekretnice",
-      "title": "Vrhunci karijere",
+      "title": "Vrhunci",
       "careerPointsLabel": "Bodovi u karijeri",
       "careerPointsHint": "ukupno osvojenih bodova",
       "capotsLabel": "Ostvarene štiglje",
@@ -307,6 +309,18 @@
       "avgLengthLabel": "Prosj. trajanje meča",
       "avgLengthValue": "{{minutes}}m",
       "avgLengthHint": "dovršeni mečevi"
+    },
+    "tabs": {
+      "label": "Dijelovi profila",
+      "overview": "Pregled",
+      "matches": "Mečevi",
+      "seasons": "Sezone"
+    },
+    "seasonCard": {
+      "title": "Ova sezona · {{season}}"
+    },
+    "seasons": {
+      "empty": "Još nema završenih sezona."
     }
   },
   "publicProfile": {
@@ -1474,5 +1488,26 @@
     "botsLive": "Na ovim mjestima igraju botovi.",
     "botsStake": "Ne plaćaju ulog, pa pobjednici dijele uloge igrača.",
     "previewCaption": "Igrači ovo vide kad prijeđu preko ikona pravila:"
+  },
+  "settings": {
+    "title": "Postavke",
+    "sectionsLabel": "Dijelovi postavki",
+    "sections": {
+      "account": "Račun",
+      "signIn": "Prijava",
+      "game": "Igra",
+      "sound": "Zvuk",
+      "privacy": "Privatnost"
+    },
+    "password": {
+      "label": "Lozinka",
+      "send": "Pošalji link",
+      "sending": "Šaljem…",
+      "sent": "Link je poslan na {{email}}.",
+      "sentBadge": "Poslano"
+    },
+    "language": {
+      "label": "Jezik"
+    }
   }
 }

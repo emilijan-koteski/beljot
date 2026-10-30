@@ -12,20 +12,19 @@ import {
 } from "@/shared/hooks/mutations/useIdentities";
 import { useIdentitiesQuery } from "@/shared/hooks/queries/useIdentities";
 
-import { SidePanel } from "./SidePanel";
 import { UnlinkAccountDialog } from "./UnlinkAccountDialog";
 
-interface LinkedAccountsProps {
+interface GoogleAccountRowProps {
   userId: number | undefined;
 }
 
 const GOOGLE = "google";
 
 /**
- * Profile sidebar panel that links or unlinks the Google SSO account.
+ * The Google row of Settings' sign-in group: links or unlinks the Google SSO account.
  * Unlink is disabled with a hint when it would remove a passwordless account's only sign-in.
  */
-export function LinkedAccounts({ userId }: LinkedAccountsProps) {
+export function GoogleAccountRow({ userId }: GoogleAccountRowProps) {
   const { t } = useTranslation();
   const { data, isPending, isError } = useIdentitiesQuery(userId);
   const linkMutation = useLinkIdentityMutation(userId ?? 0);
@@ -79,81 +78,66 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
     });
   }
 
+  let status: string | null = null;
+  if (data) {
+    status = google
+      ? t("profile.linkedAccounts.linkedAs", { email: google.email })
+      : t("profile.linkedAccounts.notLinked");
+  }
+
   return (
-    <SidePanel
-      eyebrow={t("profile.linkedAccounts.eyebrow")}
-      title={t("profile.linkedAccounts.title")}
-      testId="profile-linked-accounts"
-    >
+    <div className="flex flex-col gap-3 px-4 py-3.5" data-testid="profile-linked-accounts">
       {isPending ? (
-        <Skeleton className="h-14 rounded-md" testId="linked-accounts-loading" />
+        <Skeleton className="h-10 rounded-md" testId="linked-accounts-loading" />
       ) : isError || !data ? (
-        <p className="text-danger text-sm" data-testid="linked-accounts-error">
+        <p className="text-danger m-0 text-sm" data-testid="linked-accounts-error">
           {t("profile.linkedAccounts.loadError")}
         </p>
       ) : (
-        <>
-          <p className="text-ink-mute mb-2.5 text-xs">{t("profile.linkedAccounts.description")}</p>
-          <div
-            className="bg-surface-elevated border-border rounded-md border px-3 py-2.5"
-            data-testid="linked-account-google"
-          >
-            {google ? (
-              <div className="flex items-center justify-between gap-2.5">
-                <div className="min-w-0">
-                  <div className="text-ink flex items-center gap-2 text-sm font-medium">
-                    <img src="/google.svg" alt="" aria-hidden="true" className="size-4 shrink-0" />
-                    {t("profile.linkedAccounts.google")}
-                  </div>
-                  <div
-                    className="text-ink-mute mt-0.5 truncate text-xs"
-                    data-testid="linked-account-google-status"
-                  >
-                    {t("profile.linkedAccounts.linkedAs", { email: google.email })}
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={!canUnlink || unlinkMutation.isPending}
-                    onClick={() => setUnlinkOpen(true)}
-                    data-testid="unlink-google-button"
-                  >
-                    {t("profile.linkedAccounts.unlink")}
-                  </Button>
-                  {!canUnlink && (
-                    <span
-                      className="text-ink-mute max-w-40 text-right text-2xs leading-tight"
-                      data-testid="unlink-google-hint"
-                    >
-                      {t("profile.linkedAccounts.passwordlessHint")}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                <div>
-                  <div className="text-ink flex items-center gap-2 text-sm font-medium">
-                    <img src="/google.svg" alt="" aria-hidden="true" className="size-4 shrink-0" />
-                    {t("profile.linkedAccounts.google")}
-                  </div>
-                  <div
-                    className="text-ink-mute mt-0.5 text-xs"
-                    data-testid="linked-account-google-status"
-                  >
-                    {t("profile.linkedAccounts.notLinked")}
-                  </div>
-                </div>
-                <div data-testid="link-google-slot">
-                  <GoogleSignInButton onCredential={handleGoogleCredential} />
-                </div>
-              </div>
+        <div className="flex flex-col gap-3" data-testid="linked-account-google">
+          <div className="flex items-center gap-3">
+            <span className="border-border bg-surface-elevated flex size-9 shrink-0 items-center justify-center rounded-full border">
+              <img src="/google.svg" alt="" aria-hidden="true" className="size-4" />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-ink text-sm font-semibold">
+                {t("profile.linkedAccounts.google")}
+              </span>
+              <span
+                className="text-ink-mute truncate text-xs"
+                data-testid="linked-account-google-status"
+              >
+                {status}
+              </span>
+              {google && !canUnlink && (
+                <span
+                  className="text-ink-mute text-2xs leading-tight"
+                  data-testid="unlink-google-hint"
+                >
+                  {t("profile.linkedAccounts.passwordlessHint")}
+                </span>
+              )}
+            </div>
+            {google && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={!canUnlink || unlinkMutation.isPending}
+                onClick={() => setUnlinkOpen(true)}
+                data-testid="unlink-google-button"
+              >
+                {t("profile.linkedAccounts.unlink")}
+              </Button>
             )}
           </div>
-        </>
+          {!google && (
+            <div data-testid="link-google-slot">
+              <GoogleSignInButton onCredential={handleGoogleCredential} />
+            </div>
+          )}
+        </div>
       )}
 
       {google && (
@@ -168,6 +152,6 @@ export function LinkedAccounts({ userId }: LinkedAccountsProps) {
           }}
         />
       )}
-    </SidePanel>
+    </div>
   );
 }
