@@ -66,7 +66,8 @@ export function LeaderboardTableHeader({ showRank = false }: { showRank?: boolea
   );
 }
 
-function Record({ won, played }: { won: number; played: number }) {
+/** A season record as wins in green, a dash, then losses in red. */
+export function SeasonRecord({ won, played }: { won: number; played: number }) {
   return (
     <span data-testid="leaderboard-record" className="tabular-nums">
       <span className="text-accent-deep font-semibold">{won}</span>
@@ -203,7 +204,7 @@ export function LeaderboardRow({
               {rank}
               {!table && won !== undefined && played !== undefined && (
                 <span className="text-ink-mute inline-flex items-center gap-1">
-                  <Record won={won} played={played} />
+                  <SeasonRecord won={won} played={played} />
                   <span>·</span>
                   <span data-testid="leaderboard-win-rate">{rate}%</span>
                 </span>
@@ -223,7 +224,9 @@ export function LeaderboardRow({
       {table && (
         <>
           <span aria-hidden="true" className="text-right text-sm">
-            {won !== undefined && played !== undefined && <Record won={won} played={played} />}
+            {won !== undefined && played !== undefined && (
+              <SeasonRecord won={won} played={played} />
+            )}
           </span>
           <span
             aria-hidden="true"

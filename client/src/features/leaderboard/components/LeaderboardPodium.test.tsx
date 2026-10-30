@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LeaderboardPodium } from "@/features/leaderboard/components/LeaderboardPodium";
+import { SEASON_TIER_COLOR } from "@/shared/lib/seasonTier";
 import type { LeaderboardRow } from "@/shared/types/apiTypes";
 
 function row(position: number): LeaderboardRow {
@@ -43,6 +44,24 @@ describe("LeaderboardPodium", () => {
     const [second, first] = screen.getAllByTestId("leaderboard-podium-place");
     expect(within(first!).getByRole("link", { name: "p1" })).toHaveAttribute("href", "/players/10");
     expect(within(second!).getByRole("link", { name: "p2" })).toHaveAttribute("href", "/profile");
+  });
+
+  it("rings each avatar in its medal colour alone", () => {
+    renderPodium([row(1), row(2), row(3)]);
+    const [second, first, third] = screen.getAllByTestId("leaderboard-podium-avatar");
+    expect(first!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.gold}`);
+    expect(second!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.silver}`);
+    expect(third!.style.border).toBe(`2px solid ${SEASON_TIER_COLOR.bronze}`);
+    expect(first!.style.boxShadow).toBe("none");
+  });
+
+  it("shows each top player's season record and win rate", () => {
+    renderPodium([row(1), { ...row(2), gamesPlayed: 31, gamesWon: 19 }, row(3)]);
+    const [second] = screen.getAllByTestId("leaderboard-podium-place");
+    const record = within(second!).getByTestId("leaderboard-podium-record");
+    expect(within(record).getByTestId("leaderboard-record").textContent).toBe("19–12");
+    expect(record).toHaveTextContent("61%");
+    expect(record).toHaveTextContent("Wins: 19, losses: 12");
   });
 
   it("keeps the steps in place when the season has fewer than three players", () => {

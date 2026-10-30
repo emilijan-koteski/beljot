@@ -2,6 +2,7 @@ import { Crown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { SeasonRecord } from "@/shared/components/season/LeaderboardRow";
 import { Avatar } from "@/shared/components/ui/avatar";
 import {
   normalizeSeasonDivision,
@@ -9,6 +10,7 @@ import {
   SEASON_TIER_COLOR,
   seasonRankLabel,
   seasonSpOrZero,
+  seasonWinRate,
 } from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 import type { LeaderboardRow } from "@/shared/types/apiTypes";
@@ -44,6 +46,8 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
         const sp = seasonSpOrZero(row.sp);
         const tier = normalizeSeasonTier(row.tier, sp);
         const self = viewerId !== null && row.userId === viewerId;
+        const played = seasonSpOrZero(row.gamesPlayed);
+        const won = Math.min(seasonSpOrZero(row.gamesWon), played);
         const avatar = size === "lg" ? (place === 1 ? 72 : 60) : place === 1 ? 60 : 48;
         return (
           <div
@@ -52,7 +56,7 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
             data-testid="leaderboard-podium-place"
             data-place={place}
           >
-            <span className="relative">
+            <span className="relative flex">
               {place === 1 && (
                 <Crown
                   className="absolute -top-5 left-1/2 size-5 -translate-x-1/2"
@@ -60,12 +64,13 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
                   aria-hidden="true"
                 />
               )}
-              <span
-                className="block rounded-full p-0.5"
-                style={{ boxShadow: `0 0 0 3px ${medal}` }}
-              >
-                <Avatar name={row.username} avatarUrl={row.avatarUrl} size={avatar} />
-              </span>
+              <Avatar
+                name={row.username}
+                avatarUrl={row.avatarUrl}
+                size={avatar}
+                ring={medal}
+                testId="leaderboard-podium-avatar"
+              />
               <span
                 className="text-surface absolute -right-1 -bottom-1 flex size-5.5 items-center justify-center rounded-full text-2xs font-bold"
                 style={{ background: medal }}
@@ -85,6 +90,16 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
               style={{ color: SEASON_TIER_COLOR[tier] }}
             >
               {seasonRankLabel(t, tier, normalizeSeasonDivision(tier, row.division))}
+            </span>
+            <span className="-mt-1 text-2xs tabular-nums" data-testid="leaderboard-podium-record">
+              <span className="sr-only">
+                {t("season.leaderboard.recordAria", { won, lost: played - won })}
+              </span>
+              <span aria-hidden="true" className="text-ink-mute inline-flex items-center gap-1">
+                <SeasonRecord won={won} played={played} />
+                <span>·</span>
+                <span>{seasonWinRate(won, played)}%</span>
+              </span>
             </span>
             <div
               className={cn(

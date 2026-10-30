@@ -73,4 +73,9 @@ describe("Avatar", () => {
     const { container: halo } = render(<Avatar name="marko" avatarUrl={URL_A} halo="profile" />);
     expect((halo.firstChild as HTMLElement).style.boxShadow).toContain("var(--brass)");
   });
+
+  it("recolours the ring when given one, whatever the team", () => {
+    const { container } = render(<Avatar name="marko" team="A" ring="var(--rt5)" />);
+    expect((container.firstChild as HTMLElement).style.border).toBe("2px solid var(--rt5)");
+  });
 });
