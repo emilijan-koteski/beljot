@@ -153,6 +153,7 @@ export interface CurrentSeasonResponse {
   spForNextDivision: number;
   gamesPlayed: number;
   gamesCompleted: number;
+  gamesWon: number;
 }
 
 /** One leaderboard row; `position` is its 1-based slot in the whole season order, not the page index. */
@@ -165,6 +166,7 @@ export interface LeaderboardRow {
   tier: string;
   division: number | null;
   gamesPlayed: number;
+  gamesWon: number;
 }
 
 /** The viewer's own standing, without a username since the client already has it. */
@@ -175,6 +177,7 @@ export interface LeaderboardViewer {
   tier: string;
   division: number | null;
   gamesPlayed: number;
+  gamesWon: number;
 }
 
 /** One offset page of a season's standings; `viewer` is null only when the caller has not played that season. */
@@ -207,6 +210,7 @@ export interface SeasonArchiveEntry {
   tier: string;
   division: number | null;
   gamesPlayed: number;
+  gamesWon: number;
   startedAt: string;
   endsAt: string;
 }

@@ -1407,10 +1407,7 @@
       "abandoned": "Napuštanje meča: {{change}} SP"
     },
     "leaderboard": {
-      "eyebrow": "Sezona",
       "title": "Rang lista",
-      "sub": "Ko se najbrže penje ove sezone, po sezonskim poenima.",
-      "subPast": "Konačan poredak za sezonu {{season}}, po sezonskim poenima.",
       "loading": "Učitavanje…",
       "error": "Učitavanje rang liste nije uspelo. Pokušaj ponovo.",
       "empty": "Još niko nije osvojio sezonske poene ove sezone.",
@@ -1419,17 +1416,34 @@
       "retry": "Pokušaj ponovo",
       "showing": "Prikazano {{shown}} od {{total}} igrača",
       "you": "Ti",
-      "yourPosition": "Tvoja pozicija",
       "spValue": "{{sp}} SP",
       "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
-      "gamesAria": "Odigrani mečevi: {{games}}",
       "yourProfileAria": "Pogledaj svoj profil",
       "columns": {
-        "position": "Pozicija",
         "tier": "Rang",
         "sp": "SP",
-        "games": "Odigranih mečeva"
-      }
+        "games": "Odigranih mečeva",
+        "player": "Igrač",
+        "record": "Učinak",
+        "winRate": "% pobeda"
+      },
+      "seasonLine": "{{season}} · završava za {{days}}d",
+      "seasonEnded": "{{season}} · konačni poredak",
+      "place": "Mesto",
+      "placeOf": "od {{total}}",
+      "record": "Učinak",
+      "played": "{{count}} odigrano",
+      "winRate": "% pobeda",
+      "toNext": "Još {{sp}} SP do ranga {{rank}}",
+      "finalRank": "Konačni rang",
+      "notOnBoard": "Još nisi na rang listi",
+      "notOnBoardSub": "Jedan odigran meč i tu si.",
+      "topThree": "Prva tri",
+      "resetNote": "Rangovi se resetuju svake sezone. Konačni rang ostaje na tvom profilu.",
+      "ranks": "Rangovi",
+      "floor": "{{sp}}+ SP",
+      "spUnit": "SP",
+      "recordAria": "Pobede: {{won}}, porazi: {{lost}}"
     }
   },
   "support": {

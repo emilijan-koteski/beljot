@@ -95,7 +95,7 @@ export function TopBar({
         <span
           className={cn(
             "text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
-            showFullBrand ? "inline" : "hidden lg:inline",
+            showFullBrand ? "inline" : "hidden xl:inline",
           )}
           data-testid="app-name"
         >
@@ -128,12 +128,12 @@ export function TopBar({
         </div>
       )}
 
-      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2 lg:gap-2.5">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 pl-3 sm:gap-2 lg:gap-2.5">
         {user && <HeaderRankChip />}
 
         {user && xp && (
           <>
-            <div className="flex shrink-0 sm:hidden">
+            <div className="flex shrink-0 lg:hidden">
               <LevelRing
                 level={user.level}
                 fraction={xp.fraction}
@@ -145,7 +145,7 @@ export function TopBar({
                 testId="xp-ring"
               />
             </div>
-            <div className="hidden shrink-0 items-center gap-2 sm:flex" data-testid="xp-indicator">
+            <div className="hidden shrink-0 items-center gap-2 lg:flex" data-testid="xp-indicator">
               <span
                 className="text-ink text-xs font-semibold whitespace-nowrap tabular-nums"
                 data-testid="xp-level"
@@ -179,7 +179,7 @@ export function TopBar({
         {showUserMenu && user && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-2 pl-1 transition-colors md:flex lg:pr-3"
+              className="bg-surface-elevated hover:bg-surface-sunken aria-expanded:bg-surface-sunken hidden min-w-0 items-center gap-2 rounded-full border border-border py-1 pr-2 pl-1 transition-colors md:flex xl:pr-3"
               data-testid="nav-user"
               aria-label={t("nav.accountMenu", { username: user.username })}
             >
@@ -189,7 +189,7 @@ export function TopBar({
                 size={26}
                 testId="nav-user-avatar"
               />
-              <span className="text-ink hidden max-w-40 truncate text-sm font-medium lg:inline">
+              <span className="text-ink hidden max-w-40 truncate text-sm font-medium xl:inline">
                 {user.username}
               </span>
               <ChevronDown className="text-ink-dim size-3 shrink-0 opacity-70" />

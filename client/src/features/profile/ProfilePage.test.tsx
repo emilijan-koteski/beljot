@@ -56,6 +56,7 @@ const currentSeason: CurrentSeasonResponse = {
   spIntoDivision: 13,
   spForNextDivision: 67,
   gamesPlayed: 31,
+  gamesWon: 15,
   gamesCompleted: 29,
 };
 
@@ -518,6 +519,7 @@ describe("ProfilePage", () => {
           tier: "silver",
           division: null,
           gamesPlayed: 14,
+          gamesWon: 7,
           startedAt: "2026-04-01T00:00:00Z",
           endsAt: "2026-07-01T00:00:00Z",
         },

@@ -118,6 +118,7 @@ type ReplayedPlayer struct {
 	Division       int
 	GamesPlayed    int
 	GamesCompleted int
+	GamesWon       int
 }
 
 // ReplaySummary counts what a replay did with the matches it was given.
@@ -181,6 +182,9 @@ func ReplayMatches(matches []match.Match, f SPFormula, l Ladder, observe func(Re
 			p.GamesPlayed++
 			if s.Completed {
 				p.GamesCompleted++
+			}
+			if s.Team == o.WinnerTeam {
+				p.GamesWon++
 			}
 		}
 		if observe != nil {

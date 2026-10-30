@@ -80,6 +80,24 @@ export function seasonRankLabel(t: TFunction, tier: SeasonTier, division: number
   return division === null ? tierName : t("season.rank", { tier: tierName, division });
 }
 
+/** The rank one step above: the next division in the tier, else the next tier's first; null at the top. */
+export function nextSeasonRank(
+  tier: SeasonTier,
+  division: number | null,
+): { tier: SeasonTier; division: number | null } | null {
+  if (division !== null && division < DIVISIONS_PER_TIER) return { tier, division: division + 1 };
+  const next = SEASON_TIERS[SEASON_TIERS.indexOf(tier) + 1];
+  if (next === undefined) return null;
+  return { tier: next, division: seasonTierHasDivisions(next) ? 1 : null };
+}
+
+/** Wins as a whole-number percentage of games played; 0 before the first game. */
+export function seasonWinRate(won: number, played: number): number {
+  const games = seasonSpOrZero(played);
+  if (games === 0) return 0;
+  return Math.round((Math.min(seasonSpOrZero(won), games) / games) * 100);
+}
+
 /** A signed SP change for display ("+24", "−13" with U+2212, or "0"); never clamped at 0. */
 export function formatSpChange(change: number): string {
   if (!Number.isFinite(change)) return "0";

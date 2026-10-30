@@ -136,19 +136,20 @@ func TestFindPlayerSeason_MissIsNilNotAnError(t *testing.T) {
 type fixedAward struct {
 	change    int
 	completed bool
+	won       bool
 }
 
 // applyAwards writes one match through ApplySeasonPoints with FIXED changes, so a
 // persistence test controls the numbers exactly. The formula's own wiring into
 // the transaction is covered by the Service tests below.
 func applyAwards(repo *season.GormRepository, seasonID uint, awards map[uint]fixedAward) (map[uint]season.PlayerSeasonSnapshot, error) {
-	completed := make(map[uint]bool, len(awards))
+	seats := make(map[uint]season.SeatResult, len(awards))
 	changes := make(map[uint]int, len(awards))
 	for id, a := range awards {
-		completed[id] = a.completed
+		seats[id] = season.SeatResult{Completed: a.completed, Won: a.won}
 		changes[id] = a.change
 	}
-	return repo.ApplySeasonPoints(seasonID, completed, func(map[uint]int) (map[uint]int, error) {
+	return repo.ApplySeasonPoints(seasonID, seats, func(map[uint]int) (map[uint]int, error) {
 		return changes, nil
 	})
 }
@@ -376,7 +377,7 @@ func TestApplySeasonPoints_ChangesSeeTheLockedTotals(t *testing.T) {
 	require.NoError(t, err)
 
 	var seen map[uint]int
-	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]bool{veteran.ID: true, rookie.ID: true},
+	snaps, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SeatResult{veteran.ID: {Completed: true}, rookie.ID: {Completed: true}},
 		func(current map[uint]int) (map[uint]int, error) {
 			seen = current
 			return map[uint]int{veteran.ID: -20, rookie.ID: 30}, nil
@@ -409,7 +410,7 @@ func TestApplySeasonPoints_AFailedComputationWritesNothing(t *testing.T) {
 	}
 	for name, changes := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := repo.ApplySeasonPoints(s.ID, map[uint]bool{veteran.ID: true, rookie.ID: true}, changes)
+			_, err := repo.ApplySeasonPoints(s.ID, map[uint]season.SeatResult{veteran.ID: {Completed: true}, rookie.ID: {Completed: true}}, changes)
 			require.Error(t, err)
 
 			row, err := repo.FindPlayerSeason(rookie.ID, s.ID)
@@ -529,7 +530,7 @@ func TestApplySeasonPoints_ConcurrentMatchesSharingAPlayerLoseNoChange(t *testin
 	)
 	match := func(i int, other uint) {
 		defer wg.Done()
-		_, errs[i] = repo.ApplySeasonPoints(s.ID, map[uint]bool{shared.ID: true, other: true},
+		_, errs[i] = repo.ApplySeasonPoints(s.ID, map[uint]season.SeatResult{shared.ID: {Completed: true}, other: {Completed: true}},
 			func(current map[uint]int) (map[uint]int, error) {
 				mu.Lock()
 				seen = append(seen, current[shared.ID])
@@ -626,6 +627,36 @@ func fullLadder(t *testing.T, repo *season.GormRepository, seasonID uint) []seas
 	entries, _, err := repo.LeaderboardPage(seasonID, 100, 0)
 	require.NoError(t, err)
 	return entries
+}
+
+// Wins add up per season next to games played, and every leaderboard read returns them.
+func TestApplySeasonPoints_CountsWins(t *testing.T) {
+	db := getTestDB(t)
+	repo := season.NewGormRepository(db)
+	s := makeSeason(t, db, time.Date(2092, time.January, 1, 0, 0, 0, 0, time.UTC))
+	u := makeUser(t, db, "wins@s.test")
+
+	for _, won := range []bool{true, false, true} {
+		snaps, err := applyAwards(repo, s.ID, map[uint]fixedAward{u.ID: {change: 10, completed: true, won: won}})
+		require.NoError(t, err)
+		require.Contains(t, snaps, u.ID)
+	}
+
+	row, err := repo.FindPlayerSeason(u.ID, s.ID)
+	require.NoError(t, err)
+	require.NotNil(t, row)
+	assert.Equal(t, 3, row.GamesPlayed)
+	assert.Equal(t, 2, row.GamesWon)
+
+	page, _, err := repo.LeaderboardPage(s.ID, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	assert.Equal(t, 2, page[0].GamesWon)
+
+	entry, err := repo.FindLeaderboardEntry(s.ID, u.ID)
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.Equal(t, 2, entry.GamesWon)
 }
 
 func TestLeaderboardPage_OrdersBySPDescending(t *testing.T) {

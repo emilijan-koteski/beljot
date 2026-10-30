@@ -12,7 +12,7 @@ import {
 } from "@/shared/lib/seasonTier";
 
 /**
- * The header's seasonal rank indicator: tier badge plus rank name, badge only below `sm`.
+ * The header's seasonal rank indicator: tier badge plus rank name, badge only below `lg`.
  * It also hosts the app's only {@link useSeasonWindowWatch}.
  */
 export function HeaderRankChip() {
@@ -35,7 +35,7 @@ export function HeaderRankChip() {
       <span
         aria-hidden="true"
         data-testid="header-rank-tier"
-        className="hidden text-xs font-semibold whitespace-nowrap sm:inline"
+        className="hidden text-xs font-semibold whitespace-nowrap lg:inline"
         style={{ color: SEASON_TIER_COLOR[tier] }}
       >
         {rankName}

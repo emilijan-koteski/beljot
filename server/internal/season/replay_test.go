@@ -187,11 +187,11 @@ func TestReplayMatches(t *testing.T) {
 	got := season.ReplayMatches(matches, f, ladder, func(rm season.ReplayedMatch) { seen = append(seen, rm) })
 
 	assert.Equal(t, []season.ReplayedPlayer{
-		{UserID: 1, SP: 32, Tier: "bronze", Division: 2, GamesPlayed: 3, GamesCompleted: 3},
-		{UserID: 2, SP: 34, Tier: "bronze", Division: 3, GamesPlayed: 2, GamesCompleted: 2},
-		{UserID: 3, SP: 0, Tier: "iron", Division: 1, GamesPlayed: 1, GamesCompleted: 1},
-		{UserID: 4, SP: 0, Tier: "iron", Division: 1, GamesPlayed: 2, GamesCompleted: 1},
-	}, got.Players, "ascending user ID; the abandoner's abandoned match is played, not completed")
+		{UserID: 1, SP: 32, Tier: "bronze", Division: 2, GamesPlayed: 3, GamesCompleted: 3, GamesWon: 2},
+		{UserID: 2, SP: 34, Tier: "bronze", Division: 3, GamesPlayed: 2, GamesCompleted: 2, GamesWon: 1},
+		{UserID: 3, SP: 0, Tier: "iron", Division: 1, GamesPlayed: 1, GamesCompleted: 1, GamesWon: 0},
+		{UserID: 4, SP: 0, Tier: "iron", Division: 1, GamesPlayed: 2, GamesCompleted: 1, GamesWon: 1},
+	}, got.Players, "ascending user ID; the abandoner's abandoned match is played, not completed, and won by the other team")
 
 	assert.Equal(t, season.ReplaySummary{
 		Loaded: 5, Scored: 3,
@@ -245,6 +245,13 @@ func TestReplayMatches_IsTheAwardPathArithmetic(t *testing.T) {
 	want, err := season.ComputeSPChanges(o, map[uint]int{})
 	require.NoError(t, err)
 
+	won := map[uint]int{}
+	for _, s := range o.Seats {
+		if s.Team == o.WinnerTeam {
+			won[s.UserID] = 1
+		}
+	}
+
 	got := season.ReplayMatches([]match.Match{m}, season.DefaultSPFormula(), season.DefaultLadder(), nil)
 	require.Len(t, got.Players, 4)
 	for _, p := range got.Players {
@@ -252,6 +259,7 @@ func TestReplayMatches_IsTheAwardPathArithmetic(t *testing.T) {
 		tier, division := season.RankForSP(sp)
 		assert.Equal(t, season.ReplayedPlayer{
 			UserID: p.UserID, SP: sp, Tier: tier, Division: division, GamesPlayed: 1, GamesCompleted: 1,
+			GamesWon: won[p.UserID],
 		}, p)
 	}
 }
