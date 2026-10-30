@@ -1,4 +1,4 @@
-import { Bot, Coins, Trophy, X } from "lucide-react";
+import { Bot, Coins, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
@@ -81,9 +81,7 @@ export function MatchmakingDiagram({
       </p>
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 md:mt-4">
-        <Badge tone="neutral" icon={<Trophy className="size-3 text-(--accent)" />}>
-          {variantLabel(t, room.variant)}
-        </Badge>
+        <Badge tone="neutral">{variantLabel(t, room.variant)}</Badge>
         <Badge tone="neutral">{modeLabel(t, room.matchMode)}</Badge>
         <Badge tone="accent" icon={<TimerIcon className="size-3 text-(--accent)" />}>
           {room.timerStyle === "relaxed"

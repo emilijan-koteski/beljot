@@ -1,4 +1,4 @@
-import { Coins, Crown, DoorOpen, History, Lock, Send, Shuffle, Trophy } from "lucide-react";
+import { Coins, Crown, DoorOpen, History, Lock, Send, Shuffle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
@@ -827,7 +827,7 @@ export function RoomPage() {
               className="flex flex-wrap items-center gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-xs md:justify-end md:gap-2 md:[&>span]:px-2.5 md:[&>span]:py-1 md:[&>span]:text-xs"
               data-testid="room-info-badges"
             >
-              <Badge tone="brass" icon={<Trophy className="size-3" />}>
+              <Badge tone="brass">
                 <span data-testid="badge-variant">{variantText}</span>
               </Badge>
               <Badge tone="brass">
