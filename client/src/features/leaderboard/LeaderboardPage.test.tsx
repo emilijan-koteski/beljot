@@ -1,7 +1,7 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
@@ -16,15 +16,31 @@ import type {
   LeaderboardRow,
   SeasonsListResponse,
 } from "@/shared/types/apiTypes";
-import { makeUser } from "@/test-utils";
+import { makeUser, mockViewportWidth } from "@/test-utils";
 
 vi.mock("@/shared/api/season", () => ({
   getSeasonLeaderboard: vi.fn(),
   getSeasons: vi.fn(),
+  getCurrentSeason: vi.fn(() =>
+    Promise.resolve({
+      seasonName: "2026 Q3",
+      endsAt: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+      sp: 120,
+      rankTier: "iron",
+      rankDivision: 3,
+      spIntoDivision: 20,
+      spForNextDivision: 50,
+      gamesPlayed: 3,
+      gamesCompleted: 3,
+      gamesWon: 1,
+    }),
+  ),
 }));
 
 const mockGet = vi.mocked(getSeasonLeaderboard);
 const mockGetSeasons = vi.mocked(getSeasons);
+
+let restoreViewport = () => {};
 
 const DAY = 86_400_000;
 function seasonsFixture(): SeasonsListResponse {
@@ -58,6 +74,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     tier: "gold",
     division: 2,
     gamesPlayed: 5,
+    gamesWon: 2,
   }));
 }
 
@@ -89,6 +106,8 @@ describe("LeaderboardPage", () => {
 
   afterEach(() => {
     cleanup();
+    restoreViewport();
+    restoreViewport = () => {};
     useAuthStore.setState({ token: null, user: null, isLoading: false });
   });
 
@@ -122,8 +141,8 @@ describe("LeaderboardPage", () => {
     renderPage();
 
     const list = await screen.findAllByTestId("leaderboard-row");
-    expect(list).toHaveLength(25);
-    expect(list[0]!.querySelector('[data-testid="leaderboard-position"]')).toHaveTextContent("1");
+    expect(list).toHaveLength(22);
+    expect(list[0]!.querySelector('[data-testid="leaderboard-position"]')).toHaveTextContent("4");
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("25");
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("60");
   });
@@ -147,7 +166,7 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-load-more"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(40);
+      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(37);
     });
     expect(mockGet).toHaveBeenLastCalledWith(25, 25, "current");
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
@@ -157,7 +176,7 @@ describe("LeaderboardPage", () => {
     mockGet.mockResolvedValue(response({ items: rows(1, 3), total: 3 }));
     renderPage();
 
-    await screen.findAllByTestId("leaderboard-row");
+    await screen.findByTestId("leaderboard-podium");
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
 
@@ -166,7 +185,15 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 25,
-        viewer: { position: 7, userId: 7, sp: 772, tier: "gold", division: 3, gamesPlayed: 5 },
+        viewer: {
+          position: 7,
+          userId: 7,
+          sp: 772,
+          tier: "gold",
+          division: 3,
+          gamesPlayed: 5,
+          gamesWon: 2,
+        },
       }),
     );
     renderPage();
@@ -183,7 +210,15 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 400,
-        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
+        viewer: {
+          position: 340,
+          userId: 999,
+          sp: 120,
+          tier: "iron",
+          division: 3,
+          gamesPlayed: 3,
+          gamesWon: 1,
+        },
       }),
     );
     renderPage();
@@ -204,7 +239,15 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 400,
-        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
+        viewer: {
+          position: 340,
+          userId: 999,
+          sp: 120,
+          tier: "iron",
+          division: 3,
+          gamesPlayed: 3,
+          gamesWon: 1,
+        },
       }),
     );
     renderPage();
@@ -224,28 +267,31 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByTestId("leaderboard-pinned")).not.toBeInTheDocument();
   });
 
-  it("renders a row's games played alongside its SP", async () => {
+  it("renders a row's season record and win rate alongside its SP", async () => {
     mockGet.mockResolvedValue(
       response({
         items: [
+          ...rows(1, 3),
           {
-            position: 1,
-            userId: 1,
+            position: 4,
+            userId: 40,
             username: "ada",
             avatarUrl: null,
             sp: 700,
             tier: "gold",
             division: 2,
             gamesPlayed: 31,
+            gamesWon: 15,
           },
         ],
-        total: 1,
+        total: 4,
       }),
     );
     renderPage();
 
     const row = await screen.findByTestId("leaderboard-row");
-    expect(row.querySelector('[data-testid="leaderboard-games"]')).toHaveTextContent("31");
+    expect(row.querySelector('[data-testid="leaderboard-record"]')?.textContent).toBe("15–16");
+    expect(row.querySelector('[data-testid="leaderboard-win-rate"]')).toHaveTextContent("48%");
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent(
       (700).toLocaleString(),
     );
@@ -264,7 +310,7 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("leaderboard-page-error")).toBeInTheDocument();
     });
-    expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(25);
+    expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(22);
     expect(screen.queryByTestId("leaderboard-error")).not.toBeInTheDocument();
     expect(screen.getByTestId("leaderboard-retry")).toBeInTheDocument();
   });
@@ -284,7 +330,7 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-retry"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(40);
+      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(37);
     });
     expect(screen.queryByTestId("leaderboard-page-error")).not.toBeInTheDocument();
   });
@@ -308,7 +354,7 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-load-more"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(30);
+      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(27);
     });
     expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
   });
@@ -326,7 +372,7 @@ describe("LeaderboardPage", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("leaderboard-load-more")).not.toBeInTheDocument();
     });
-    expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(25);
+    expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(22);
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("60");
   });
 
@@ -344,6 +390,7 @@ describe("LeaderboardPage", () => {
             tier: "iron",
             division: 3,
             gamesPlayed: 3,
+            gamesWon: 1,
           },
         }),
       )
@@ -359,6 +406,7 @@ describe("LeaderboardPage", () => {
             tier: "iron",
             division: 3,
             gamesPlayed: 4,
+            gamesWon: 2,
           },
         }),
       );
@@ -370,7 +418,7 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-load-more"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(51);
+      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(48);
     });
     expect(screen.getByTestId("leaderboard-pinned")).toHaveTextContent("310");
     expect(screen.getByTestId("leaderboard-count")).toHaveTextContent("55");
@@ -389,7 +437,7 @@ describe("LeaderboardPage", () => {
     await user.click(screen.getByTestId("leaderboard-load-more"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(29);
+      expect(screen.getAllByTestId("leaderboard-row")).toHaveLength(26);
     });
     const ids = screen.getAllByTestId("leaderboard-row").map((r) => r.getAttribute("data-user-id"));
     expect(new Set(ids).size).toBe(ids.length);
@@ -402,7 +450,15 @@ describe("LeaderboardPage", () => {
       response({
         items: rows(1, 25),
         total: 400,
-        viewer: { position: 340, userId: 999, sp: 120, tier: "iron", division: 3, gamesPlayed: 3 },
+        viewer: {
+          position: 340,
+          userId: 999,
+          sp: 120,
+          tier: "iron",
+          division: 3,
+          gamesPlayed: 3,
+          gamesWon: 1,
+        },
       }),
     );
     renderPage();
@@ -460,6 +516,7 @@ describe("LeaderboardPage", () => {
   });
 
   it("renders the current season's divisions and an ended season's stored bare tier", async () => {
+    restoreViewport = mockViewportWidth(1280);
     const user = userEvent.setup();
     mockGetSeasons.mockResolvedValue(seasonsFixture());
     mockGet.mockImplementation((_limit, _offset, season) =>
@@ -467,20 +524,22 @@ describe("LeaderboardPage", () => {
         season === 5
           ? response({
               items: [
+                ...rows(1, 3),
                 {
-                  position: 1,
-                  userId: 3,
+                  position: 4,
+                  userId: 30,
                   username: "veteran",
                   avatarUrl: null,
                   sp: 3500,
                   tier: "gold",
                   division: null,
                   gamesPlayed: 90,
+                  gamesWon: 45,
                 },
               ],
-              total: 1,
+              total: 4,
             })
-          : response({ items: rows(1, 1), total: 1 }),
+          : response({ items: rows(1, 4), total: 4 }),
       ),
     );
     renderPage();
@@ -492,7 +551,7 @@ describe("LeaderboardPage", () => {
 
     await waitFor(() => {
       const row = screen.getByTestId("leaderboard-row");
-      expect(row).toHaveAttribute("data-user-id", "3");
+      expect(row).toHaveAttribute("data-user-id", "30");
     });
     const past = screen.getByTestId("leaderboard-row");
     expect(past.querySelector('[data-testid="leaderboard-tier"]')?.textContent).toBe("Gold");
@@ -560,16 +619,17 @@ describe("LeaderboardPage", () => {
     renderPage();
 
     await screen.findByTestId("leaderboard-season-picker");
-    expect(screen.getByText(i18n.t("season.leaderboard.sub"))).toBeInTheDocument();
+    const running = i18n.t("season.leaderboard.seasonLine", { season: "2026 Q3", days: 60 });
+    expect(screen.getByText(running)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("leaderboard-season-picker-5"));
 
     await waitFor(() =>
       expect(
-        screen.getByText(i18n.t("season.leaderboard.subPast", { season: "2026 Q2" })),
+        screen.getByText(i18n.t("season.leaderboard.seasonEnded", { season: "2026 Q2" })),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByText(i18n.t("season.leaderboard.sub"))).not.toBeInTheDocument();
+    expect(screen.queryByText(running)).not.toBeInTheDocument();
   });
 
   it("uses the past-season empty copy for an ended season with no scorers", async () => {
@@ -621,5 +681,118 @@ describe("LeaderboardPage", () => {
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "leaderboard"] }));
     expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "list"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["season", "current"] });
+  });
+});
+
+describe("LeaderboardPage layout", () => {
+  const standing = {
+    position: 40,
+    userId: 7,
+    sp: 340,
+    tier: "silver",
+    division: 1,
+    gamesPlayed: 10,
+    gamesWon: 7,
+  };
+
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockGetSeasons.mockReset();
+    mockGetSeasons.mockResolvedValue({ items: [] });
+    useAuthStore.setState({
+      token: "t",
+      user: makeUser({ id: 7, username: "kiro" }),
+      isLoading: false,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    restoreViewport();
+    restoreViewport = () => {};
+    vi.unstubAllGlobals();
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("puts the top three on the podium and the rest in the list", async () => {
+    mockGet.mockResolvedValue(response());
+    renderPage();
+
+    const podium = await screen.findByTestId("leaderboard-podium");
+    expect(within(podium).getAllByTestId("leaderboard-podium-place")).toHaveLength(3);
+    const ids = screen.getAllByTestId("leaderboard-row").map((r) => r.getAttribute("data-user-id"));
+    expect(ids).not.toContain("1");
+    expect(ids[0]).toBe("4");
+  });
+
+  it("shows the viewer's standing above the list on a phone", async () => {
+    mockGet.mockResolvedValue(response({ total: 400, viewer: standing }));
+    renderPage();
+
+    const card = await screen.findByTestId("leaderboard-standing");
+    expect(within(card).getByTestId("leaderboard-standing-place")).toHaveTextContent("#40");
+    expect(within(card).getByTestId("leaderboard-standing-record")).toHaveTextContent("7–3");
+  });
+
+  it("pins the viewer's row to the bottom once the standing card scrolls away", async () => {
+    let report: IntersectionObserverCallback = () => {};
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          report = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    mockGet.mockResolvedValue(response({ total: 400, viewer: standing }));
+    renderPage();
+
+    await screen.findByTestId("leaderboard-standing");
+    expect(screen.queryByTestId("leaderboard-sticky-self")).not.toBeInTheDocument();
+
+    act(() =>
+      report(
+        [
+          {
+            isIntersecting: false,
+            boundingClientRect: { top: -120 },
+          } as unknown as IntersectionObserverEntry,
+        ],
+        {} as IntersectionObserver,
+      ),
+    );
+
+    const sticky = screen.getByTestId("leaderboard-sticky-self");
+    expect(within(sticky).getByTestId("leaderboard-row")).toHaveAttribute("data-self", "true");
+  });
+
+  it("lays the desktop out as a ranked table beside the standing, season and rank panels", async () => {
+    restoreViewport = mockViewportWidth(1280);
+    mockGet.mockResolvedValue(response({ total: 400, viewer: standing }));
+    renderPage();
+
+    await screen.findByTestId("leaderboard-list");
+    expect(screen.getByText(i18n.t("season.leaderboard.columns.tier"))).toBeInTheDocument();
+    expect(screen.getAllByTestId("leaderboard-tier-badge").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("leaderboard-standing")).toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-season-panel")).toBeInTheDocument();
+    const ranks = screen.getByTestId("leaderboard-ranks");
+    expect(ranks.querySelector('[data-tier="silver"]')).toHaveTextContent(
+      i18n.t("season.leaderboard.you"),
+    );
+  });
+
+  it("drops the rank column from the tablet table", async () => {
+    restoreViewport = mockViewportWidth(820);
+    mockGet.mockResolvedValue(response({ total: 400, viewer: standing }));
+    renderPage();
+
+    await screen.findByTestId("leaderboard-list");
+    expect(screen.queryByText(i18n.t("season.leaderboard.columns.tier"))).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leaderboard-tier-badge")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leaderboard-ranks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("leaderboard-standing")).toBeInTheDocument();
   });
 });

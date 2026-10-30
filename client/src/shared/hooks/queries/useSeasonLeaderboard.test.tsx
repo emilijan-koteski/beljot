@@ -28,6 +28,7 @@ function rows(from: number, n: number): LeaderboardRow[] {
     tier: "gold",
     division: 2,
     gamesPlayed: 5,
+    gamesWon: 2,
   }));
 }
 

@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { LeaderboardRow } from "@/shared/components/season/LeaderboardRow";
+import { LeaderboardRow, LeaderboardTableHeader } from "@/shared/components/season/LeaderboardRow";
 import { i18n } from "@/shared/i18n/i18n";
 
 const base = {
@@ -15,13 +15,19 @@ const base = {
   tier: "gold",
   division: 2 as number | null,
   gamesPlayed: 31,
+  gamesWon: 19,
+};
+
+type RowProps = Partial<typeof base> & {
+  isSelf?: boolean;
+  avatarUrl?: string | null;
+  layout?: "list" | "table";
+  showRank?: boolean;
 };
 
 // The username cell is a <Link> since the row became a way into a player's
 // profile, so every render needs a router around it.
-function renderRow(
-  props: Partial<typeof base> & { isSelf?: boolean; avatarUrl?: string | null } = {},
-) {
+function renderRow(props: RowProps = {}) {
   return render(
     <MemoryRouter>
       <ul>
@@ -37,7 +43,7 @@ afterEach(async () => {
 });
 
 describe("LeaderboardRow", () => {
-  it("renders position, username, SP and games played", () => {
+  it("renders position, username, SP and the season record", () => {
     renderRow();
     const row = screen.getByTestId("leaderboard-row");
     expect(row.querySelector('[data-testid="leaderboard-position"]')).toHaveTextContent("4");
@@ -45,7 +51,8 @@ describe("LeaderboardRow", () => {
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent(
       (700).toLocaleString(),
     );
-    expect(row.querySelector('[data-testid="leaderboard-games"]')).toHaveTextContent("31");
+    expect(row.querySelector('[data-testid="leaderboard-record"]')?.textContent).toBe("19–12");
+    expect(row.querySelector('[data-testid="leaderboard-win-rate"]')).toHaveTextContent("61%");
   });
 
   it("carries the row identity attributes the surfaces select on", () => {
@@ -60,48 +67,43 @@ describe("LeaderboardRow", () => {
     expect(screen.getByTestId("leaderboard-you")).toBeInTheDocument();
   });
 
-  it("omits the games cell when no count is supplied (the lobby widget)", () => {
-    render(
-      <MemoryRouter>
-        <ul>
-          <LeaderboardRow {...base} gamesPlayed={undefined} />
-        </ul>
-      </MemoryRouter>,
-    );
-    expect(screen.queryByTestId("leaderboard-games")).not.toBeInTheDocument();
+  it("omits the record when no games count is supplied", () => {
+    renderRow({ gamesPlayed: undefined });
+    expect(screen.queryByTestId("leaderboard-record")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("leaderboard-win-rate")).not.toBeInTheDocument();
   });
 
-  it("renders a zero games count rather than dropping the cell", () => {
-    renderRow({ gamesPlayed: 0 });
-    expect(screen.getByTestId("leaderboard-games")).toHaveTextContent("0");
+  it("renders a zero record rather than dropping it", () => {
+    renderRow({ gamesPlayed: 0, gamesWon: 0 });
+    expect(screen.getByTestId("leaderboard-record").textContent).toBe("0–0");
+    expect(screen.getByTestId("leaderboard-win-rate")).toHaveTextContent("0%");
+  });
+
+  it("never counts more wins than games played", () => {
+    renderRow({ gamesPlayed: 31, gamesWon: 40 });
+    expect(screen.getByTestId("leaderboard-record").textContent).toBe("31–0");
+    expect(screen.getByTestId("leaderboard-win-rate")).toHaveTextContent("100%");
   });
 
   it("survives absent numbers from a newer server without printing NaN", () => {
-    render(
-      <MemoryRouter>
-        <ul>
-          <LeaderboardRow
-            {...base}
-            sp={undefined as unknown as number}
-            gamesPlayed={undefined as unknown as number}
-          />
-        </ul>
-      </MemoryRouter>,
-    );
+    renderRow({
+      sp: undefined as unknown as number,
+      gamesPlayed: undefined as unknown as number,
+      gamesWon: undefined as unknown as number,
+    });
     const row = screen.getByTestId("leaderboard-row");
     expect(row.textContent).not.toContain("NaN");
     expect(row.querySelector('[data-testid="leaderboard-sp"]')).toHaveTextContent("0");
   });
 
-  it("exposes one screen-reader summary naming position, player, tier, SP and games", () => {
+  it("exposes one screen-reader summary naming position, player, rank, SP and record", () => {
     renderRow();
     const summary = screen.getByTestId("leaderboard-row-summary");
     expect(summary.className).toContain("sr-only");
     expect(summary).toHaveTextContent("4");
-    expect(summary).toHaveTextContent("kiro");
     expect(summary).toHaveTextContent("kiro, Gold 2,");
     expect(summary).toHaveTextContent((700).toLocaleString());
-    expect(summary).toHaveTextContent("31");
+    expect(summary).toHaveTextContent("Wins: 19, losses: 12");
   });
 
   it("names the viewer's own row as theirs in the summary", () => {
@@ -111,27 +113,46 @@ describe("LeaderboardRow", () => {
     );
   });
 
-  it("hides every visible cell and the badge from assistive tech", () => {
+  it("hides every visible cell from assistive tech in the list layout", () => {
     renderRow({ isSelf: true });
     const row = screen.getByTestId("leaderboard-row");
-
     for (const id of [
       "leaderboard-position",
       "leaderboard-tier",
       "leaderboard-sp",
-      "leaderboard-games",
+      "leaderboard-record",
+      "leaderboard-win-rate",
       "leaderboard-you",
-      "leaderboard-tier-badge",
     ]) {
-      expect(row.querySelector(`[data-testid="${id}"]`), id).toHaveAttribute("aria-hidden", "true");
+      const cell = row.querySelector(`[data-testid="${id}"]`);
+      expect(cell, id).not.toBeNull();
+      expect(cell?.closest('[aria-hidden="true"]'), id).not.toBeNull();
     }
     expect(row).not.toHaveAttribute("aria-label");
+  });
+
+  it("hides every visible cell and the badge from assistive tech in the table layout", () => {
+    renderRow({ isSelf: true, layout: "table", showRank: true });
+    const row = screen.getByTestId("leaderboard-row");
+    for (const id of [
+      "leaderboard-position",
+      "leaderboard-tier",
+      "leaderboard-tier-badge",
+      "leaderboard-sp",
+      "leaderboard-record",
+      "leaderboard-win-rate",
+      "leaderboard-you",
+    ]) {
+      const cell = row.querySelector(`[data-testid="${id}"]`);
+      expect(cell, id).not.toBeNull();
+      expect(cell?.closest('[aria-hidden="true"]'), id).not.toBeNull();
+    }
   });
 
   it("leaves the username link exposed to assistive tech, with its own label", () => {
     renderRow();
     const name = screen.getByTestId("leaderboard-username");
-    expect(name).not.toHaveAttribute("aria-hidden");
+    expect(name.closest('[aria-hidden="true"]')).toBeNull();
     expect(name).toHaveAttribute(
       "aria-label",
       i18n.t("friends.viewProfileAria", { username: "kiro" }),
@@ -146,20 +167,37 @@ describe("LeaderboardRow", () => {
   });
 
   it("normalizes an unknown tier token from the SP bucket", () => {
-    renderRow({ tier: "mythic", sp: 700 });
+    renderRow({ tier: "mythic", sp: 700, layout: "table", showRank: true });
     expect(screen.getByTestId("leaderboard-tier-badge")).toHaveAttribute("data-tier", "gold");
     expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent("Gold 2");
   });
 
-  it("renders the tier badge at the compact list scale", () => {
+  it("keeps the tier badge out of the phone list", () => {
     renderRow();
+    expect(screen.queryByTestId("leaderboard-tier-badge")).not.toBeInTheDocument();
+  });
+
+  it("renders the tier badge at the compact scale in the table's rank column", () => {
+    renderRow({ layout: "table", showRank: true });
     expect(screen.getByTestId("leaderboard-tier-badge").className).toContain("size-7");
+  });
+
+  it("renders the record and win rate as table cells on wider screens", () => {
+    renderRow({ layout: "table" });
+    expect(screen.getByTestId("leaderboard-record").textContent).toBe("19–12");
+    expect(screen.getByTestId("leaderboard-win-rate")).toHaveTextContent("61%");
   });
 
   it("localizes the summary", async () => {
     await i18n.changeLanguage("mk");
     renderRow();
     expect(screen.getByTestId("leaderboard-row-summary")).toHaveTextContent("Злато 2");
+  });
+
+  it("writes the SP unit in the viewer's language", async () => {
+    await i18n.changeLanguage("mk");
+    renderRow();
+    expect(screen.getByTestId("leaderboard-sp")).toHaveTextContent("СП");
   });
 
   it("renders the rank as text, tier plus division, in the tier's own colour", () => {
@@ -175,7 +213,7 @@ describe("LeaderboardRow", () => {
   });
 
   it("renders an ended pre-division row as its stored tier, with no division", () => {
-    renderRow({ sp: 3500, tier: "gold", division: null });
+    renderRow({ sp: 3500, tier: "gold", division: null, layout: "table", showRank: true });
     expect(screen.getByTestId("leaderboard-tier").textContent).toBe("Gold");
     expect(screen.getByTestId("leaderboard-tier-badge")).toHaveAttribute("data-tier", "gold");
   });
@@ -213,6 +251,16 @@ describe("LeaderboardRow", () => {
   });
 });
 
+describe("LeaderboardTableHeader", () => {
+  it("adds the rank column only when the table shows ranks", () => {
+    const { rerender } = render(<LeaderboardTableHeader />);
+    expect(screen.queryByText(i18n.t("season.leaderboard.columns.tier"))).not.toBeInTheDocument();
+    rerender(<LeaderboardTableHeader showRank />);
+    expect(screen.getByText(i18n.t("season.leaderboard.columns.tier"))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("season.leaderboard.columns.record"))).toBeInTheDocument();
+  });
+});
+
 describe("LeaderboardRow avatar", () => {
   it("draws the player's picture in a lazy disc beside the name", () => {
     const url = "https://assets.test/avatars/k/128.webp";
@@ -220,7 +268,7 @@ describe("LeaderboardRow avatar", () => {
     const img = screen.getByTestId("leaderboard-row").querySelector("img");
     expect(img).toHaveAttribute("src", url);
     expect(img).toHaveAttribute("loading", "lazy");
-    expect(img).toHaveAttribute("width", "24");
+    expect(img).toHaveAttribute("width", "34");
   });
 
   it("falls back to the initial without one", () => {

@@ -32,6 +32,7 @@ const seasonFixture: CurrentSeasonResponse = {
   spIntoDivision: 13,
   spForNextDivision: 67,
   gamesPlayed: 31,
+  gamesWon: 15,
   gamesCompleted: 29,
 };
 

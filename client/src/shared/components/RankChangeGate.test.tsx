@@ -34,6 +34,7 @@ const seasonAfterMatch: CurrentSeasonResponse = {
   spIntoDivision: 23,
   spForNextDivision: 67,
   gamesPlayed: 12,
+  gamesWon: 6,
   gamesCompleted: 12,
 };
 

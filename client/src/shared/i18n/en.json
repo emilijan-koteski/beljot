@@ -1407,10 +1407,7 @@
       "abandoned": "You abandoned: {{change}} SP"
     },
     "leaderboard": {
-      "eyebrow": "Season",
       "title": "Leaderboard",
-      "sub": "Who is climbing fastest this season, by Season Points.",
-      "subPast": "Final standings for {{season}}, by Season Points.",
       "loading": "Loading…",
       "error": "Couldn't load the leaderboard. Try again.",
       "empty": "Nobody has earned Season Points yet this season.",
@@ -1419,17 +1416,34 @@
       "retry": "Retry",
       "showing": "Showing {{shown}} of {{total}} players",
       "you": "You",
-      "yourPosition": "Your position",
       "spValue": "{{sp}} SP",
       "rowAria": "{{position}}. {{username}}, {{tier}}, {{sp}} SP",
-      "gamesAria": "Matches played: {{games}}",
       "yourProfileAria": "View your profile",
       "columns": {
-        "position": "Position",
-        "tier": "Tier",
+        "tier": "Rank",
         "sp": "SP",
-        "games": "Matches played"
-      }
+        "games": "Matches played",
+        "player": "Player",
+        "record": "W–L",
+        "winRate": "Win %"
+      },
+      "seasonLine": "{{season}} · ends in {{days}}d",
+      "seasonEnded": "{{season}} · final standings",
+      "place": "Place",
+      "placeOf": "of {{total}}",
+      "record": "Record",
+      "played": "{{count}} played",
+      "winRate": "Win rate",
+      "toNext": "{{sp}} SP to {{rank}}",
+      "finalRank": "Final rank",
+      "notOnBoard": "You're not on the board yet",
+      "notOnBoardSub": "One finished match puts you on it.",
+      "topThree": "Top three",
+      "resetNote": "Ranks reset each season. Your final rank stays on your profile.",
+      "ranks": "Ranks",
+      "floor": "{{sp}}+ SP",
+      "spUnit": "SP",
+      "recordAria": "Wins: {{won}}, losses: {{lost}}"
     }
   },
   "support": {
