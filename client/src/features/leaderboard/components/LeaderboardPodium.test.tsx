@@ -55,6 +55,15 @@ describe("LeaderboardPodium", () => {
     expect(first!.style.boxShadow).toBe("none");
   });
 
+  it("shows each top player's season record and win rate", () => {
+    renderPodium([row(1), { ...row(2), gamesPlayed: 31, gamesWon: 19 }, row(3)]);
+    const [second] = screen.getAllByTestId("leaderboard-podium-place");
+    const record = within(second!).getByTestId("leaderboard-podium-record");
+    expect(within(record).getByTestId("leaderboard-record").textContent).toBe("19–12");
+    expect(record).toHaveTextContent("61%");
+    expect(record).toHaveTextContent("Wins: 19, losses: 12");
+  });
+
   it("keeps the steps in place when the season has fewer than three players", () => {
     renderPodium([row(1), row(2)]);
     const places = screen.getAllByTestId("leaderboard-podium-place");

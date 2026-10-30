@@ -2,6 +2,7 @@ import { Crown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { SeasonRecord } from "@/shared/components/season/LeaderboardRow";
 import { Avatar } from "@/shared/components/ui/avatar";
 import {
   normalizeSeasonDivision,
@@ -9,6 +10,7 @@ import {
   SEASON_TIER_COLOR,
   seasonRankLabel,
   seasonSpOrZero,
+  seasonWinRate,
 } from "@/shared/lib/seasonTier";
 import { cn } from "@/shared/lib/utils";
 import type { LeaderboardRow } from "@/shared/types/apiTypes";
@@ -44,6 +46,8 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
         const sp = seasonSpOrZero(row.sp);
         const tier = normalizeSeasonTier(row.tier, sp);
         const self = viewerId !== null && row.userId === viewerId;
+        const played = seasonSpOrZero(row.gamesPlayed);
+        const won = Math.min(seasonSpOrZero(row.gamesWon), played);
         const avatar = size === "lg" ? (place === 1 ? 72 : 60) : place === 1 ? 60 : 48;
         return (
           <div
@@ -86,6 +90,16 @@ export function LeaderboardPodium({ top, viewerId, size }: LeaderboardPodiumProp
               style={{ color: SEASON_TIER_COLOR[tier] }}
             >
               {seasonRankLabel(t, tier, normalizeSeasonDivision(tier, row.division))}
+            </span>
+            <span className="-mt-1 text-2xs tabular-nums" data-testid="leaderboard-podium-record">
+              <span className="sr-only">
+                {t("season.leaderboard.recordAria", { won, lost: played - won })}
+              </span>
+              <span aria-hidden="true" className="text-ink-mute inline-flex items-center gap-1">
+                <SeasonRecord won={won} played={played} />
+                <span>·</span>
+                <span>{seasonWinRate(won, played)}%</span>
+              </span>
             </span>
             <div
               className={cn(
