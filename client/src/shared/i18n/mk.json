@@ -8,7 +8,9 @@
       "title": "Нешто тргна наопаку",
       "retry": "Обиди се повторно",
       "backToLobby": "Назад во лоби"
-    }
+    },
+    "done": "Готово",
+    "cancel": "Откажи"
   },
   "team": {
     "us": "Ние",
@@ -432,7 +434,7 @@
       "notOwner": "Само домаќинот може да го започне мечот",
       "notOwnerAction": "Тоа може само домаќинот",
       "notAllSeated": "Мора сите 4 играчи да седнат за да започне мечот",
-      "roomStarted": "Мечот веќе започна. Исфрлање и замена на места повеќе не се достапни.",
+      "roomStarted": "Мечот веќе започна.",
       "seatNotOccupied": "Избери две зафатени места за замена.",
       "kickFailed": "Исфрлањето на играчот не успеа. Обиди се повторно.",
       "swapFailed": "Замената на местата не успеа. Обиди се повторно.",
@@ -463,9 +465,9 @@
       "cancel": "Откажи"
     },
     "privacy": {
-      "dialogTitle": "Приватност на собата",
+      "dialogTitle": "Тип на соба",
       "dialogDescription": "Играчите што седат остануваат во секој случај.",
-      "modeLabel": "Пристап",
+      "modeLabel": "Тип",
       "public": "Отворена",
       "private": "Приватна",
       "passwordLabel": "Лозинка",
@@ -477,8 +479,6 @@
       "toastPublic": "Собата сега е отворена.",
       "privateBadge": "Приватна",
       "publicBadge": "Отворена",
-      "manageButtonPrivate": "Приватност: приватна",
-      "manageButtonPublic": "Приватност: отворена",
       "errors": {
         "passwordRequired": "Постави лозинка за приватната соба",
         "passwordTooShort": "Лозинката мора да има најмалку 4 знаци",
@@ -489,35 +489,22 @@
       }
     },
     "waitingForPlayers": "Се чекаат играчи",
-    "waitingForReturn": "Се чека играчите да се вратат",
     "copyLinkAriaLabel": "Копирај код на соба {{code}}",
-    "copyLinkSuccess": "Кодот на собата е копиран!",
+    "copyLinkSuccess": "Кодот е копиран",
     "copyLinkFailed": "Копирањето не успеа. Кодот е {{code}}.",
-    "leaveRoom": "Напушти соба",
-    "seatYou": "Ти",
+    "leaveRoom": "Излези",
     "seatYouInline": "ти",
     "seatOwner": "Домаќин",
     "ownerLine": "Домаќин: <name>{{owner}}</name>",
-    "seatedCount": "{{current}} / {{max}} седат",
     "inRoomCount": "{{count}} во собата",
-    "inRoomList": {
-      "ariaLabel": "Прикажи играчи во собата",
-      "title": "Играчи во собата",
-      "empty": "Сè уште нема играчи",
-      "seated": "Место {{seat}}",
-      "notSeated": "Стои"
-    },
     "notFound": "Собата не е најдена",
     "notFoundAction": "Назад во лоби",
     "roomClosed": "Оваа соба е затворена.",
     "returningToLobby": "Враќање во лоби…",
     "startMatch": "Започни меч",
-    "startMatchDisabled": "Сите 4 играчи мора да седнат",
-    "startBlockedByHonor": "Еден играч на масата е под минимумот на оваа соба ({{minHonor}}).",
-    "waitingForOwner": "Се чека домаќинот да го започне мечот",
+    "startBlockedByHonor": "Играч е под минимумот на чест ({{minHonor}}).",
     "seatTaken": "Тоа место е зафатено",
-    "matchStarting": "Мечот започнува…",
-    "autoStarting": "Мечот започнува…",
+    "matchStarting": "Почнува…",
     "kickIconLabel": "Исфрли {{username}}",
     "kickConfirm": {
       "title": "Исфрли {{name}}",
@@ -541,31 +528,35 @@
       "confirm": "Постави домаќин",
       "cancel": "Откажи"
     },
-    "legendNeutral": "Слободни места · тимовите се откриваат кога ќе седнеш",
-    "legendOpen": "слободно",
-    "legendVs": "против",
-    "legendUs": "Ние",
-    "legendThem": "Тие",
-    "actionBarSwap": "Замена · избери место",
-    "actionBarFinishSwap": "Заврши замена за почеток на меч",
-    "tableCenter": "Соба",
-    "seatTile": {
-      "takeSeat": "Заземи го местото",
-      "moveHere": "Премести овде",
-      "swapHere": "Замени тука",
-      "partner": "Партнер",
-      "opponent": "Противник",
-      "waitingToReturn": "Се чека враќање",
-      "pickTarget": "За замена",
-      "partnerSeat": "Место за партнерот · слободно",
-      "opponentSeat": "Место за противникот · слободно",
-      "openSeat": "Слободно место"
-    },
     "lastMatch": {
-      "openButton": "Последен меч",
-      "title": "Последен меч",
-      "loading": "Се вчитува последниот меч…",
-      "unavailable": "Последниот меч не е достапен во моментов."
+      "title": "Последен меч"
+    },
+    "waitingFor": "Се чека {{name}}",
+    "seat": {
+      "sit": "Седни",
+      "moveHere": "Премести овде",
+      "open": "Слободно место",
+      "returning": "Се враќа"
+    },
+    "table": {
+      "seated": "на масата",
+      "ready": "Подготвено"
+    },
+    "tabs": {
+      "label": "Приказ на собата",
+      "table": "Маса"
+    },
+    "swap": {
+      "pick": "Избери место за замена"
+    },
+    "roster": {
+      "title": "Во собата",
+      "atTable": "На масата · {{count}}/4",
+      "notSeated": "Без место · {{count}}",
+      "notSeatedShort": "Без место:"
+    },
+    "playerActions": {
+      "swap": "Замени места"
     }
   },
   "roomInvite": {
@@ -581,23 +572,18 @@
       "decline": "Не сега"
     },
     "panel": {
-      "openButton": "Покани играчи",
       "title": "Покани играчи",
       "tabsLabel": "Кого да поканиш",
       "tabFriends": "Пријатели",
       "tabLobby": "Лоби",
-      "loading": "Вчитување пријатели…",
-      "loadFailed": "Вчитувањето на пријателите не успеа. Обиди се повторно.",
-      "empty": "Сè уште немаш пријатели. Пронајди играчи и испрати барање за пријателство.",
-      "searchLabel": "Пребарувај играчи во лобито",
-      "searchPlaceholder": "Пребарувај по корисничко име…",
-      "lobbyLoading": "Вчитување играчи…",
-      "lobbyLoadFailed": "Вчитувањето на играчите не успеа. Обиди се повторно.",
-      "lobbyEmpty": "Моментално нема други слободни играчи во лобито.",
-      "lobbyNoMatch": "Нема играчи во лобито со „{{query}}“",
+      "loading": "Вчитување играчи…",
+      "loadFailed": "Вчитувањето на играчите не успеа. Обиди се повторно.",
+      "empty": "Сè уште немаш пријатели.",
+      "searchPlaceholder": "Барај играчи",
+      "lobbyEmpty": "Никој слободен во лобито.",
       "invite": "Покани",
       "invited": "Поканет",
-      "done": "Готово"
+      "noMatch": "Никој не одговара на „{{query}}“"
     },
     "reasons": {
       "offline": "Офлајн",
@@ -654,7 +640,7 @@
     },
     "matchmaking": {
       "title": "Брза игра",
-      "subtitle": "Мечот започнува штом четворица играчи се подготвени.",
+      "subtitle": "Почнува кога ќе се соберат четворица играчи.",
       "eyebrow": "Барам играчи",
       "elapsed": "изминато",
       "seated": "{{found}} / 4 пополнети",
@@ -670,9 +656,9 @@
     "createRoomModal": {
       "roomName": "Име на собата",
       "variant": "Варијанта",
-      "matchMode": "Се игра до",
+      "matchMode": "Цел",
       "matchMode1001": "1001 поен",
-      "timerDuration": "Време за потег (s)",
+      "timerDuration": "Тајмер",
       "cancel": "Откажи",
       "errors": {
         "nameRequired": "Името на собата е задолжително",
@@ -689,7 +675,7 @@
         "ownNewPlayerNotAllowed": "Уште си нов играч и не можеш да седнеш во сопствената соба. Дозволи нови играчи за да продолжиш."
       },
       "headline": "Нова соба",
-      "roomNameInfo": "{{min}}–{{max}} знаци. Ако не го менуваш, собата го носи твоето име.",
+      "roomNameInfo": "{{min}}–{{max}} знаци.",
       "matchMode501": "501 поен",
       "matchMode701": "701 поен",
       "submit": "Креирај соба",
@@ -697,46 +683,46 @@
       "preview": {
         "title": "Преглед во лобито"
       },
-      "variantHint": "Битолската дели пет карти и отвора адутска карта, хрватската дели шест и адутот се именува слободно",
-      "matchModeHint": "501 е краток, 701 среден, 1001 целосна трка",
+      "variantHint": "Битолска: пет карти и адутска карта. Хрватска: шест карти, адут по избор.",
+      "matchModeHint": "501 кратко, 701 средно, 1001 долго",
       "timerHintRelaxed": "Без тајмер",
       "coinBuyIn": "Влог",
-      "coinBuyInHint": "Секој играч вложува толку за меч · стандардно 500",
+      "coinBuyInHint": "Влог на секој играч",
       "coinBuyInBalance": "салдо {{balance}}",
       "coinBuyInCustom": "Друго",
       "privateRoom": "Тип на соба",
-      "privateRoomHint": "Приватните соби остануваат на листата, но бараат лозинка за влез",
+      "privateRoomHint": "Приватните соби бараат лозинка",
       "privacyPublic": "Отворена",
       "privacyPrivate": "Приватна",
       "roomPassword": "Лозинка",
-      "minHonor": "Минимална чест",
-      "minHonorAnyone": "Секој",
+      "minHonor": "Чест",
+      "minHonorAnyone": "Секоја",
       "minHonorInfoBands": "Секој праг е граница на тиер на чест: {{bands}}.",
       "minHonorInfoYou": "Твојата чест е {{honor}} · {{tier}}.",
       "allowNewPlayers": "Нови играчи",
       "allowNewPlayersYes": "Добредојдени",
       "allowNewPlayersNo": "Само искусни",
-      "allowNewPlayersHint": "Новите играчи сè уште немаат оценка на чест. „Само искусни“ ги исклучува.",
+      "allowNewPlayersHint": "Новите играчи сè уште немаат чест",
       "roomPasswordHint": "Најмалку {{min}} знаци",
       "declarations": "Најави",
       "declarationsOn": "Со најави",
       "declarationsOff": "Без најави",
-      "declarationsHint": "Исклучено: без најави и Бељот, само поени од картите",
+      "declarationsHint": "Исклучено: само поени од картите",
       "declarationsTransfer": "Најави при пад",
       "declarationsTransferOn": "Кај победниците",
       "declarationsTransferOff": "Поништени",
-      "declarationsTransferHint": "Кога тим ќе падне или нема да земе ниту еден штих, неговите најави и Бељот одат кај другиот тим; кога се поништуваат, никој не ги добива",
+      "declarationsTransferHint": "При пад или чаљо, најавите одат кај победниците или се поништуваат",
       "matchEnd": "Крај на мечот",
       "matchEndFinish": "Доиграј",
       "matchEndStop": "Доста",
-      "matchEndHint": "Со „доста“ мечот завршува во моментот кога тим ќе ја достигне целта, дури и среде делење, без бонус за последна рака и без чаљо",
+      "matchEndHint": "Со „доста“ мечот завршува штом тим ја достигне целта, и среде делење",
       "direction": "Насока на делење",
       "directionCounterClockwise": "Надесно",
       "directionClockwise": "Налево",
-      "directionHint": "Вообичаено се оди надесно, а може и налево: делењето, лицитирањето, штиховите и следниот дилер ја следат таа насока",
+      "directionHint": "Делењето, лицитирањето и штиховите ја следат насоката",
       "defaultName": "Соба - {{username}}"
     },
-    "footnote": "Прикажани {{shown}} од {{total}} отворени соби · се освежува во живо",
+    "footnote": "{{shown}} од {{total}} соби",
     "actions": {
       "quickPlay": {
         "title": "Брза игра",
@@ -785,8 +771,8 @@
       "resultAria": "Погледни го профилот на {{username}}"
     },
     "empty": {
-      "title": "Нема отворени соби за твоите филтри",
-      "description": "Исчисти ги филтрите, пробај „Брза игра“ или креирај соба.",
+      "title": "Нема такви соби",
+      "description": "Исчисти ги филтрите или креирај соба.",
       "clear": "Исчисти пребарување",
       "liveTitle": "Моментално нема мечеви во тек",
       "liveDescription": "Мечевите се појавуваат тука штом ќе почнат."
@@ -794,7 +780,6 @@
     "card": {
       "quickPlay": "Брза игра",
       "relaxed": "Опуштено",
-      "timerSeconds": "{{seconds}}s тајмер",
       "joining": "Се приклучуваш во \"{{name}}\"…",
       "variantBitola": "Битола",
       "variantCroatia": "Хрватска",
@@ -802,7 +787,6 @@
       "matchMode501": "501 поен",
       "matchMode701": "701 поен",
       "matchModeGeneric": "{{points}} поени",
-      "buyInFree": "Без влог",
       "private": "Приватна",
       "minHonor": "{{minHonor}}",
       "minHonorLockedTitle": "Бара чест {{minHonor}}, ти си на {{honor}}.",

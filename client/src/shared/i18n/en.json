@@ -8,7 +8,9 @@
       "title": "Something went wrong",
       "retry": "Try again",
       "backToLobby": "Back to lobby"
-    }
+    },
+    "done": "Done",
+    "cancel": "Cancel"
   },
   "team": {
     "us": "Us",
@@ -432,7 +434,7 @@
       "notOwner": "Only the host can start the match",
       "notOwnerAction": "Only the host can do that",
       "notAllSeated": "All 4 players must be seated to start",
-      "roomStarted": "The match has already started. Kick and seat swap are no longer available.",
+      "roomStarted": "The match has already started.",
       "seatNotOccupied": "Pick two seated players to swap.",
       "kickFailed": "Couldn't kick the player. Try again.",
       "swapFailed": "Couldn't swap seats. Try again.",
@@ -463,9 +465,9 @@
       "cancel": "Cancel"
     },
     "privacy": {
-      "dialogTitle": "Room privacy",
+      "dialogTitle": "Room type",
       "dialogDescription": "Seated players stay either way.",
-      "modeLabel": "Access",
+      "modeLabel": "Type",
       "public": "Open",
       "private": "Private",
       "passwordLabel": "Password",
@@ -477,8 +479,6 @@
       "toastPublic": "Room is now open.",
       "privateBadge": "Private",
       "publicBadge": "Open",
-      "manageButtonPrivate": "Privacy: Private",
-      "manageButtonPublic": "Privacy: Open",
       "errors": {
         "passwordRequired": "Set a password for the private room",
         "passwordTooShort": "Password must be at least 4 characters",
@@ -489,35 +489,22 @@
       }
     },
     "waitingForPlayers": "Waiting for players",
-    "waitingForReturn": "Waiting for players to return",
     "copyLinkAriaLabel": "Copy room code {{code}}",
-    "copyLinkSuccess": "Room code copied!",
+    "copyLinkSuccess": "Code copied",
     "copyLinkFailed": "Couldn't copy. The code is {{code}}.",
-    "leaveRoom": "Leave room",
-    "seatYou": "You",
+    "leaveRoom": "Leave",
     "seatYouInline": "you",
     "seatOwner": "Host",
     "ownerLine": "Hosted by <name>{{owner}}</name>",
-    "seatedCount": "{{current}} / {{max}} seated",
     "inRoomCount": "{{count}} in room",
-    "inRoomList": {
-      "ariaLabel": "Show players in room",
-      "title": "Players in room",
-      "empty": "No players yet",
-      "seated": "Seat {{seat}}",
-      "notSeated": "Standing"
-    },
     "notFound": "Room not found",
     "notFoundAction": "Back to lobby",
     "roomClosed": "This room is closed.",
     "returningToLobby": "Returning to lobby…",
     "startMatch": "Start match",
-    "startMatchDisabled": "All 4 players must be seated",
-    "startBlockedByHonor": "A seated player is below this room's minimum of {{minHonor}}.",
-    "waitingForOwner": "Waiting for host to start the match",
+    "startBlockedByHonor": "A player is below the honor minimum ({{minHonor}}).",
     "seatTaken": "That seat is already taken",
-    "matchStarting": "Match starting…",
-    "autoStarting": "Starting match…",
+    "matchStarting": "Starting…",
     "kickIconLabel": "Kick {{username}}",
     "kickConfirm": {
       "title": "Kick {{name}}",
@@ -541,31 +528,35 @@
       "confirm": "Make host",
       "cancel": "Cancel"
     },
-    "legendNeutral": "Open seats · teams reveal once you sit down",
-    "legendOpen": "open",
-    "legendVs": "vs",
-    "legendUs": "Us",
-    "legendThem": "Them",
-    "actionBarSwap": "Swap mode · pick a seat",
-    "actionBarFinishSwap": "Finish swap to start",
-    "tableCenter": "Room",
-    "seatTile": {
-      "takeSeat": "Take this seat",
-      "moveHere": "Move here",
-      "swapHere": "Swap here",
-      "partner": "Partner",
-      "opponent": "Opponent",
-      "waitingToReturn": "Waiting to return",
-      "pickTarget": "To swap",
-      "partnerSeat": "Partner seat · open",
-      "opponentSeat": "Opponent seat · open",
-      "openSeat": "Open seat"
-    },
     "lastMatch": {
-      "openButton": "Last match",
-      "title": "Last match",
-      "loading": "Loading the last match…",
-      "unavailable": "The last match isn't available right now."
+      "title": "Last match"
+    },
+    "waitingFor": "Waiting for {{name}}",
+    "seat": {
+      "sit": "Sit",
+      "moveHere": "Move here",
+      "open": "Open seat",
+      "returning": "Returning"
+    },
+    "table": {
+      "seated": "seated",
+      "ready": "Ready"
+    },
+    "tabs": {
+      "label": "Room view",
+      "table": "Table"
+    },
+    "swap": {
+      "pick": "Pick a seat to swap with"
+    },
+    "roster": {
+      "title": "In the room",
+      "atTable": "At the table · {{count}}/4",
+      "notSeated": "Not seated · {{count}}",
+      "notSeatedShort": "Not seated:"
+    },
+    "playerActions": {
+      "swap": "Swap seats"
     }
   },
   "roomInvite": {
@@ -581,23 +572,18 @@
       "decline": "Not now"
     },
     "panel": {
-      "openButton": "Invite players",
       "title": "Invite players",
       "tabsLabel": "Who to invite",
       "tabFriends": "Friends",
       "tabLobby": "Lobby",
-      "loading": "Loading friends…",
-      "loadFailed": "Couldn't load your friends. Try again.",
-      "empty": "No friends yet. Find players and send a friend request.",
-      "searchLabel": "Search lobby players",
-      "searchPlaceholder": "Search by username…",
-      "lobbyLoading": "Loading players…",
-      "lobbyLoadFailed": "Couldn't load lobby players. Try again.",
-      "lobbyEmpty": "Nobody else is free in the lobby right now.",
-      "lobbyNoMatch": "No lobby players match \"{{query}}\"",
+      "loading": "Loading players…",
+      "loadFailed": "Couldn't load players. Try again.",
+      "empty": "No friends yet.",
+      "searchPlaceholder": "Search players",
+      "lobbyEmpty": "No one free in the lobby.",
       "invite": "Invite",
       "invited": "Invited",
-      "done": "Done"
+      "noMatch": "No one matches \"{{query}}\""
     },
     "reasons": {
       "offline": "Offline",
@@ -654,7 +640,7 @@
     },
     "matchmaking": {
       "title": "Quick Play",
-      "subtitle": "The match starts as soon as four players are ready.",
+      "subtitle": "Starts when four players are in.",
       "eyebrow": "Searching for players",
       "elapsed": "elapsed",
       "seated": "{{found}} / 4 seated",
@@ -670,9 +656,9 @@
     "createRoomModal": {
       "roomName": "Room name",
       "variant": "Variant",
-      "matchMode": "Play to",
+      "matchMode": "Target",
       "matchMode1001": "1001 points",
-      "timerDuration": "Move time (s)",
+      "timerDuration": "Timer",
       "cancel": "Cancel",
       "errors": {
         "nameRequired": "Room name is required",
@@ -689,7 +675,7 @@
         "ownNewPlayerNotAllowed": "You're still a new player, so you can't sit in your own room. Welcome new players to continue."
       },
       "headline": "New room",
-      "roomNameInfo": "{{min}}–{{max}} characters. Left as it is, the room carries your name.",
+      "roomNameInfo": "{{min}}–{{max}} characters.",
       "matchMode501": "501 points",
       "matchMode701": "701 points",
       "submit": "Create room",
@@ -697,46 +683,46 @@
       "preview": {
         "title": "Lobby preview"
       },
-      "variantHint": "Bitola deals five cards and turns up a trump candidate; Croatian deals six and lets the taker name any suit",
-      "matchModeHint": "501 is quick, 701 medium, 1001 the full race",
+      "variantHint": "Bitola: five cards and a trump candidate. Croatian: six cards, trump by choice.",
+      "matchModeHint": "501 quick, 701 medium, 1001 long",
       "timerHintRelaxed": "No timer",
       "coinBuyIn": "Buy-in",
-      "coinBuyInHint": "Each player stakes this to play · default 500",
+      "coinBuyInHint": "Each player's stake",
       "coinBuyInBalance": "balance {{balance}}",
       "coinBuyInCustom": "Other",
       "privateRoom": "Room type",
-      "privateRoomHint": "Private rooms stay listed but need a password to join",
+      "privateRoomHint": "Private rooms need a password",
       "privacyPublic": "Open",
       "privacyPrivate": "Private",
       "roomPassword": "Password",
-      "minHonor": "Minimum honor",
-      "minHonorAnyone": "Anyone",
+      "minHonor": "Honor",
+      "minHonorAnyone": "Any",
       "minHonorInfoBands": "Each threshold is an honor-tier boundary: {{bands}}.",
       "minHonorInfoYou": "Your honor is {{honor}} · {{tier}}.",
       "allowNewPlayers": "New players",
       "allowNewPlayersYes": "Welcome",
       "allowNewPlayersNo": "Veterans only",
-      "allowNewPlayersHint": "New players have no honor score yet. \"Veterans only\" keeps them out.",
+      "allowNewPlayersHint": "New players have no honor yet",
       "roomPasswordHint": "At least {{min}} characters",
       "declarations": "Declarations",
       "declarationsOn": "On",
       "declarationsOff": "Off",
-      "declarationsHint": "Off: no declarations or Belote, card points only",
+      "declarationsHint": "Off: card points only",
       "declarationsTransfer": "Declarations on a fall",
       "declarationsTransferOn": "To the winners",
       "declarationsTransferOff": "Voided",
-      "declarationsTransferHint": "When a team goes down or takes no trick, its declarations and Belote go to the other team; voided, nobody scores them",
+      "declarationsTransferHint": "On a fall or capot, declarations go to the winners or are voided",
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
-      "matchEndHint": "Stop at target ends the match the moment a team reaches it, even mid-hand, with no last-trick or capot bonus",
+      "matchEndHint": "Stop at target ends the match as soon as a team reaches it, even mid-hand",
       "direction": "Direction",
       "directionCounterClockwise": "To the right",
       "directionClockwise": "To the left",
-      "directionHint": "The turn passes to the right, as usual, or to the left: the deal, the bidding, the tricks and the next dealer all follow it",
+      "directionHint": "The deal, bidding and tricks all follow it",
       "defaultName": "Room - {{username}}"
     },
-    "footnote": "Showing {{shown}} of {{total}} open rooms · refreshes live",
+    "footnote": "{{shown}} of {{total}} rooms",
     "actions": {
       "quickPlay": {
         "title": "Quick Play",
@@ -785,8 +771,8 @@
       "resultAria": "View {{username}}'s profile"
     },
     "empty": {
-      "title": "No open rooms match your filters",
-      "description": "Clear the filters, try Quick Play, or create a room.",
+      "title": "No rooms match",
+      "description": "Clear the filters or create a room.",
       "clear": "Clear search",
       "liveTitle": "No matches in play right now",
       "liveDescription": "Matches show up here as soon as they start."
@@ -794,7 +780,6 @@
     "card": {
       "quickPlay": "Quick Play",
       "relaxed": "Relaxed",
-      "timerSeconds": "{{seconds}}s timer",
       "joining": "Joining \"{{name}}\"…",
       "variantBitola": "Bitola",
       "variantCroatia": "Croatian",
@@ -802,7 +787,6 @@
       "matchMode501": "501 pts",
       "matchMode701": "701 pts",
       "matchModeGeneric": "{{points}} pts",
-      "buyInFree": "No stake",
       "private": "Private",
       "minHonor": "{{minHonor}}",
       "minHonorLockedTitle": "Needs honor {{minHonor}}, you're at {{honor}}.",

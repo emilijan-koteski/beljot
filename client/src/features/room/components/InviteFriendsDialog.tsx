@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import { Check, Send, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -17,14 +17,17 @@ import { useInvitableFriends } from "@/shared/hooks/queries/useInvitableFriends"
 import { useInvitablePlayers } from "@/shared/hooks/queries/useInvitablePlayers";
 import { useDebounce } from "@/shared/hooks/useDebounce";
 import { inviteFailure } from "@/shared/lib/inviteFailure";
+import { cn } from "@/shared/lib/utils";
 import type { InvitableFriend } from "@/shared/types/apiTypes";
 
-type InviteTab = "friends" | "lobby";
+type InviteTab = "lobby" | "friends";
 
 const TABS = [
-  { value: "friends", labelKey: "roomInvite.panel.tabFriends" },
   { value: "lobby", labelKey: "roomInvite.panel.tabLobby" },
+  { value: "friends", labelKey: "roomInvite.panel.tabFriends" },
 ] as const satisfies ReadonlyArray<{ value: InviteTab; labelKey: string }>;
+
+const SCROLL_LIST = "overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]";
 
 function isInviteTab(value: unknown): value is InviteTab {
   return value === "friends" || value === "lobby";
@@ -53,31 +56,56 @@ interface InviteFriendsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Inviter-side panel with a Friends tab and a searchable Lobby tab of idle non-friends, both annotated server-side.
- * Per-row state and the search reset on each open because RoomPage keeps this dialog mounted.
- */
+/** The invite list in the app's dialog, opened from an open seat or the room roster. */
 export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriendsDialogProps) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<InviteTab>("friends");
+  return (
+    <AppDialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      icon={<UserPlus />}
+      title={t("roomInvite.panel.title")}
+      primary={{
+        label: t("common.done"),
+        onClick: () => onOpenChange(false),
+        testId: "invite-friends-done",
+      }}
+      testId="invite-friends-dialog"
+    >
+      <InvitePlayers
+        roomId={roomId}
+        active={open}
+        listClassName="max-h-80"
+        onRoomGone={() => onOpenChange(false)}
+      />
+    </AppDialog>
+  );
+}
+
+interface InvitePlayersProps {
+  roomId: number;
+  active: boolean;
+  listClassName?: string;
+  onRoomGone?: () => void;
+}
+
+/**
+ * Who to invite: lobby players first, then friends, a search over the open tab and one row per player.
+ * Unavailable players stay listed with the reason; the rows scroll inside `listClassName`'s height.
+ */
+export function InvitePlayers({ roomId, active, listClassName, onRoomGone }: InvitePlayersProps) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<InviteTab>("lobby");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
-  const lobbySearch = search.trim() === "" ? "" : debouncedSearch.trim();
-  const friendsQuery = useInvitableFriends(roomId, open && tab === "friends");
-  const lobbyQuery = useInvitablePlayers(roomId, lobbySearch, open && tab === "lobby");
+  const query = search.trim() === "" ? "" : debouncedSearch.trim();
+  const friendsQuery = useInvitableFriends(roomId, active && tab === "friends");
+  const lobbyQuery = useInvitablePlayers(roomId, query, active && tab === "lobby");
   const inviteMutation = useInviteToRoomMutation();
 
   const [invited, setInvited] = useState<Record<number, boolean>>({});
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    if (open) {
-      setInvited({});
-      setRowErrors({});
-    }
-    setSearch("");
-  }, [open]);
 
   async function invite(row: InvitableFriend) {
     setPendingId(row.userId);
@@ -95,7 +123,7 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
         setInvited((prev) => ({ ...prev, [row.userId]: true }));
       } else if (kind === "roomGone") {
         toast.error(message);
-        onOpenChange(false);
+        onRoomGone?.();
       } else {
         setRowErrors((prev) => ({ ...prev, [row.userId]: message }));
       }
@@ -104,82 +132,58 @@ export function InviteFriendsDialog({ open, roomId, onOpenChange }: InviteFriend
     }
   }
 
-  const rowState = {
-    invited,
-    rowErrors,
-    pendingId,
-    onInvite: (row: InvitableFriend) => void invite(row),
-  };
+  const friends = friendsQuery.data?.filter((row) =>
+    row.username.toLowerCase().includes(query.toLowerCase()),
+  );
+  const lobby = tab === "lobby";
+  const rows = lobby ? lobbyQuery.data : friends;
+  const state = lobby ? lobbyQuery : friendsQuery;
 
   return (
-    <AppDialog
-      open={open}
-      onClose={() => onOpenChange(false)}
-      icon={<UserPlus />}
-      title={t("roomInvite.panel.title")}
-      primary={{
-        label: t("roomInvite.panel.done"),
-        onClick: () => onOpenChange(false),
-        testId: "invite-friends-done",
-      }}
-      testId="invite-friends-dialog"
-    >
-      <div className="flex flex-col gap-4">
-        <Tabs
-          value={tab}
-          onValueChange={(value) => {
-            if (isInviteTab(value)) setTab(value);
-          }}
-        >
-          <TabsList aria-label={t("roomInvite.panel.tabsLabel")} className="w-full">
-            {TABS.map(({ value, labelKey }) => (
-              <TabsTrigger key={value} value={value} data-testid={`invite-tab-${value}`}>
-                {t(labelKey)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
-        {tab === "friends" ? (
-          <InviteList
-            rows={friendsQuery.data}
-            isPending={friendsQuery.isPending}
-            isError={friendsQuery.isError}
-            loadingText={t("roomInvite.panel.loading")}
-            errorText={t("roomInvite.panel.loadFailed")}
-            emptyText={t("roomInvite.panel.empty")}
-            stateTestId="invite-friends"
-            rowTestId="invite-friend"
-            {...rowState}
-          />
-        ) : (
-          <div className="flex flex-col gap-2">
-            <SearchInput
-              value={search}
-              onValueChange={setSearch}
-              placeholder={t("roomInvite.panel.searchPlaceholder")}
-              aria-label={t("roomInvite.panel.searchLabel")}
-              data-testid="invite-lobby-search"
-            />
-            <InviteList
-              rows={lobbyQuery.data}
-              isPending={lobbyQuery.isPending}
-              isError={lobbyQuery.isError}
-              loadingText={t("roomInvite.panel.lobbyLoading")}
-              errorText={t("roomInvite.panel.lobbyLoadFailed")}
-              emptyText={
-                lobbySearch === ""
-                  ? t("roomInvite.panel.lobbyEmpty")
-                  : t("roomInvite.panel.lobbyNoMatch", { query: lobbySearch })
-              }
-              stateTestId="invite-lobby"
-              rowTestId="invite-player"
-              {...rowState}
-            />
-          </div>
-        )}
-      </div>
-    </AppDialog>
+    <div className="flex flex-col gap-2.5">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          if (isInviteTab(value)) setTab(value);
+        }}
+      >
+        <TabsList aria-label={t("roomInvite.panel.tabsLabel")} className="w-full">
+          {TABS.map(({ value, labelKey }) => (
+            <TabsTrigger key={value} value={value} data-testid={`invite-tab-${value}`}>
+              {t(labelKey)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <SearchInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder={t("roomInvite.panel.searchPlaceholder")}
+        aria-label={t("roomInvite.panel.searchPlaceholder")}
+        data-testid="invite-search"
+      />
+      <InviteList
+        rows={rows}
+        isPending={state.isPending}
+        isError={state.isError}
+        loadingText={t("roomInvite.panel.loading")}
+        errorText={t("roomInvite.panel.loadFailed")}
+        emptyText={
+          query !== ""
+            ? t("roomInvite.panel.noMatch", { query })
+            : lobby
+              ? t("roomInvite.panel.lobbyEmpty")
+              : t("roomInvite.panel.empty")
+        }
+        stateTestId={lobby ? "invite-lobby" : "invite-friends"}
+        rowTestId={lobby ? "invite-player" : "invite-friend"}
+        listClassName={listClassName}
+        invited={invited}
+        rowErrors={rowErrors}
+        pendingId={pendingId}
+        onInvite={(row) => void invite(row)}
+      />
+    </div>
   );
 }
 
@@ -192,6 +196,7 @@ interface InviteListProps {
   emptyText: string;
   stateTestId: string;
   rowTestId: string;
+  listClassName?: string;
   invited: Record<number, boolean>;
   rowErrors: Record<number, string>;
   pendingId: number | null;
@@ -208,6 +213,7 @@ function InviteList({
   emptyText,
   stateTestId,
   rowTestId,
+  listClassName,
   invited,
   rowErrors,
   pendingId,
@@ -234,7 +240,13 @@ function InviteList({
   }
 
   return (
-    <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
+    <ul
+      className={cn(
+        "divide-border m-0 flex list-none flex-col divide-y p-0",
+        SCROLL_LIST,
+        listClassName,
+      )}
+    >
       {rows.map((row) => {
         const isInvited = invited[row.userId] === true;
         const rowError = rowErrors[row.userId];
@@ -242,18 +254,18 @@ function InviteList({
         return (
           <li
             key={row.userId}
-            className="flex items-center gap-2 rounded-lg px-1.5 py-2"
+            className="flex items-center gap-2.5 py-2"
             data-testid={`${rowTestId}-row`}
             data-user-id={row.userId}
             data-available={row.available === true ? "true" : "false"}
           >
-            <Avatar name={row.username} avatarUrl={row.avatarUrl} size={24} className="shrink-0" />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-ink truncate font-medium">{row.username}</span>
+            <Avatar name={row.username} avatarUrl={row.avatarUrl} size={32} className="shrink-0" />
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="text-ink truncate text-sm font-semibold">{row.username}</span>
               {(rowError !== undefined || row.available !== true) && (
                 <span
                   className={
-                    rowError !== undefined ? "text-danger text-xs" : "text-ink-mute text-xs"
+                    rowError !== undefined ? "text-danger text-2xs" : "text-ink-mute text-2xs"
                   }
                   data-testid={`${rowTestId}-reason-${row.userId}`}
                 >
@@ -261,7 +273,6 @@ function InviteList({
                 </span>
               )}
             </span>
-
             <Button
               type="button"
               size="sm"
@@ -272,12 +283,12 @@ function InviteList({
             >
               {isInvited ? (
                 <>
-                  <Check className="size-3" />
+                  <Check className="size-3.5" />
                   {t("roomInvite.panel.invited")}
                 </>
               ) : (
                 <>
-                  <Send className="size-3" />
+                  <Send className="size-3.5" />
                   {t("roomInvite.panel.invite")}
                 </>
               )}

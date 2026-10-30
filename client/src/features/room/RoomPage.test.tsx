@@ -262,7 +262,7 @@ describe("RoomPage", () => {
     expect(within(screen.getByTestId("player-seat-1")).getByText("bob")).toBeInTheDocument();
   });
 
-  it("displays empty seats with take-a-seat prompts", async () => {
+  it("displays empty seats with a Sit prompt", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
 
     mockGetRoom.mockResolvedValue(
@@ -290,7 +290,7 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    expect(screen.getAllByText("Take this seat")).toHaveLength(3);
+    expect(screen.getAllByText("Sit")).toHaveLength(3);
   });
 
   it("highlights current user seat with You indicator", async () => {
@@ -318,7 +318,7 @@ describe("RoomPage", () => {
     renderRoomPage();
 
     await waitFor(() => {
-      expect(screen.getByText("You")).toBeInTheDocument();
+      expect(within(screen.getByTestId("player-seat-0")).getByText(/you/)).toBeInTheDocument();
     });
   });
 
@@ -750,36 +750,6 @@ describe("RoomPage", () => {
     });
 
     expect(screen.getByText("Room not found")).toBeInTheDocument();
-  });
-
-  it("renders Us and Them legend labels once seated", async () => {
-    useAuthStore.setState({ user: defaultUser, token: "tok" });
-
-    mockGetRoom.mockResolvedValue(
-      makeRoomDetail({
-        room: { ...defaultRoom, playerCount: 1 },
-        players: [
-          {
-            id: 1,
-            roomId: 1,
-            userId: 10,
-            username: "alice",
-            avatarUrl: null,
-            seat: 0,
-            team: "teamA",
-            isBot: false,
-            createdAt: "",
-          },
-        ],
-      }),
-    );
-
-    renderRoomPage();
-
-    await waitFor(() => {
-      expect(screen.getByText("Us")).toBeInTheDocument();
-    });
-    expect(screen.getByText("Them")).toBeInTheDocument();
   });
 
   it("calls selectSeat API when clicking an empty seat", async () => {
@@ -1374,7 +1344,7 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("room-cta")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("room-cta")).toHaveTextContent(/Waiting for host to start the match/);
+    expect(screen.getByTestId("room-cta")).toHaveTextContent("Waiting for alice");
     expect(screen.queryByTestId("start-game")).not.toBeInTheDocument();
   });
 
@@ -1633,7 +1603,13 @@ describe("RoomPage", () => {
     });
   }
 
-  it("renders kick icons only for owner on non-owner seated tiles in waiting status", async () => {
+  async function openSeatActions(user: ReturnType<typeof userEvent.setup>, seat: number) {
+    await user.click(screen.getByTestId(`player-seat-${seat}`));
+    await screen.findByTestId("player-actions-dialog");
+  }
+
+  it("opens the host's actions on another player's seat, never on their own", async () => {
+    const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(fourSeatedRoomQuery());
 
@@ -1643,13 +1619,16 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("kick-player-0")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("player-seat-0"));
+    expect(screen.queryByTestId("player-actions-dialog")).not.toBeInTheDocument();
+
+    await openSeatActions(user, 1);
     expect(screen.getByTestId("kick-player-1")).toBeInTheDocument();
-    expect(screen.getByTestId("kick-player-2")).toBeInTheDocument();
-    expect(screen.getByTestId("kick-player-3")).toBeInTheDocument();
+    expect(screen.getByTestId("promote-seat-1")).toBeInTheDocument();
+    expect(screen.getByTestId("swap-seat-1")).toBeInTheDocument();
   });
 
-  it("hides kick icons for non-owner viewers", async () => {
+  it("gives non-owner viewers no actions on other players' seats", async () => {
     useAuthStore.setState({
       user: { ...defaultUser, id: 20, username: "bob" },
       token: "tok",
@@ -1662,13 +1641,12 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("kick-player-0")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kick-player-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kick-player-2")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kick-player-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("player-seat-0")).toBeDisabled();
+    expect(screen.getByTestId("player-seat-2")).toBeDisabled();
+    expect(screen.getByTestId("player-seat-3")).toBeDisabled();
   });
 
-  it("hides kick icons once room status transitions away from waiting", async () => {
+  it("locks the host's seat actions once room status transitions away from waiting", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     const data = fourSeatedRoomQuery();
     mockGetRoom.mockResolvedValue(
@@ -1684,9 +1662,9 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-0")).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("kick-player-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kick-player-2")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kick-player-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("player-seat-1")).toBeDisabled();
+    expect(screen.getByTestId("player-seat-2")).toBeDisabled();
+    expect(screen.getByTestId("player-seat-3")).toBeDisabled();
   });
 
   it("opens kick confirmation dialog and fires kick mutation on confirm", async () => {
@@ -1698,9 +1676,10 @@ describe("RoomPage", () => {
     renderRoomPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId("kick-player-1")).toBeInTheDocument();
+      expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
+    await openSeatActions(user, 1);
     await user.click(screen.getByTestId("kick-player-1"));
 
     await waitFor(() => {
@@ -1721,9 +1700,10 @@ describe("RoomPage", () => {
     renderRoomPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId("kick-player-1")).toBeInTheDocument();
+      expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
+    await openSeatActions(user, 1);
     await user.click(screen.getByTestId("kick-player-1"));
 
     await waitFor(() => {
@@ -1735,7 +1715,7 @@ describe("RoomPage", () => {
     expect(mockKickPlayer).not.toHaveBeenCalled();
   });
 
-  it("enters swap mode on first seated-seat click and swaps on second click", async () => {
+  it("enters swap mode from the seat's actions and swaps on the next seat click", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(fourSeatedRoomQuery());
@@ -1749,7 +1729,8 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByTestId("player-seat-1"));
+    await openSeatActions(user, 1);
+    await user.click(screen.getByTestId("swap-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
@@ -1798,7 +1779,8 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByTestId("player-seat-1"));
+    await openSeatActions(user, 1);
+    await user.click(screen.getByTestId("swap-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
@@ -1819,7 +1801,8 @@ describe("RoomPage", () => {
       expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByTestId("player-seat-1"));
+    await openSeatActions(user, 1);
+    await user.click(screen.getByTestId("swap-seat-1"));
     await waitFor(() => {
       expect(screen.getByTestId("swap-mode-banner")).toBeInTheDocument();
     });
@@ -2037,9 +2020,10 @@ describe("RoomPage", () => {
     renderRoomPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId("kick-player-1")).toBeInTheDocument();
+      expect(screen.getByTestId("player-seat-1")).toBeInTheDocument();
     });
 
+    await openSeatActions(user, 1);
     await user.click(screen.getByTestId("kick-player-1"));
     await waitFor(() => {
       expect(screen.getByTestId("kick-confirm")).toBeInTheDocument();
@@ -2140,7 +2124,7 @@ describe("RoomPage honour", () => {
     ...honor,
   });
 
-  it("shows the gate in the badges row, and not at all when ungated", async () => {
+  it("shows the honor floor in the settings line", async () => {
     useAuthStore.setState({ user: defaultUser, token: "tok" });
     mockGetRoom.mockResolvedValue(
       makeRoomDetail({
@@ -2154,7 +2138,6 @@ describe("RoomPage honour", () => {
     await waitFor(() =>
       expect(screen.getByTestId("badge-min-honor")).toHaveAttribute("data-min-honor", "85"),
     );
-    expect(screen.getByTestId("badge-veterans-only")).toBeInTheDocument();
   });
 
   it("names every standard match rule on the Rules badge, absent fields included", async () => {
@@ -2169,7 +2152,6 @@ describe("RoomPage honour", () => {
     renderRoomPage();
 
     const trigger = await screen.findByTestId("room-rules-trigger");
-    expect(trigger).toHaveTextContent("Rules");
     expect(trigger).toHaveAccessibleName(
       "Rules: Direction: To the right, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
     );
@@ -2227,7 +2209,6 @@ describe("RoomPage honour", () => {
 
     await waitFor(() => expect(screen.getByTestId("player-seat-0")).toBeInTheDocument());
     expect(screen.queryByTestId("badge-min-honor")).toBeNull();
-    expect(screen.queryByTestId("badge-veterans-only")).toBeNull();
   });
 
   it("shows each seat its own tier, and rings only the seat under the room's bar", async () => {
@@ -2376,25 +2357,27 @@ describe("RoomPage last match", () => {
     );
   }
 
-  it("hides the button when the room's last match 404s", async () => {
+  it("hides the Last match tab when the room's last match 404s", async () => {
     seedRoom();
     renderRoomPage();
 
     await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
     await waitFor(() => expect(mockGetRoomLastMatch).toHaveBeenCalledWith(1));
-    expect(screen.queryByTestId("open-last-match")).toBeNull();
+    expect(screen.queryByTestId("room-tabs-last")).toBeNull();
   });
 
-  it("shows the button once the match arrives and opens the dialog", async () => {
+  it("shows the Last match tab once the match arrives and opens it", async () => {
     seedRoom();
     mockGetRoomLastMatch.mockResolvedValue(lastMatch);
     renderRoomPage();
 
-    const button = await screen.findByTestId("open-last-match");
-    expect(screen.queryByTestId("last-match-dialog")).toBeNull();
+    const tab = await screen.findByTestId("room-tabs-last");
+    expect(screen.queryByTestId("last-match-panel")).toBeNull();
+    expect(tab).toHaveTextContent("Win");
 
-    await userEvent.click(button);
-    expect(await screen.findByTestId("last-match-dialog")).toBeInTheDocument();
+    await userEvent.click(tab);
+    expect(await screen.findByTestId("last-match-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("seats-grid")).toBeNull();
   });
 
   it("hides Reinvite for a co-player who is already seated in the room", async () => {
@@ -2409,8 +2392,8 @@ describe("RoomPage last match", () => {
     mockGetFriendshipStatus.mockResolvedValue({ status: "friends", requestId: 1 });
     renderRoomPage();
 
-    await userEvent.click(await screen.findByTestId("open-last-match"));
-    await screen.findByTestId("last-match-dialog");
+    await userEvent.click(await screen.findByTestId("room-tabs-last"));
+    await screen.findByTestId("last-match-panel");
 
     expect(await screen.findByTestId("match-player-reinvite-12")).toBeInTheDocument();
     expect(screen.queryByTestId("match-player-reinvite-11")).toBeNull();
@@ -2429,22 +2412,22 @@ describe("RoomPage last match", () => {
 
     await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
     expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("open-last-match")).toBeNull();
+    expect(screen.queryByTestId("room-tabs-last")).toBeNull();
   });
 
-  it("drops the button when the room leaves waiting, even with the row still cached", async () => {
+  it("drops the tab when the room leaves waiting, even with the row still cached", async () => {
     seedRoom();
     mockGetRoomLastMatch.mockResolvedValue(lastMatch);
     renderRoomPage();
 
-    await screen.findByTestId("open-last-match");
+    await screen.findByTestId("room-tabs-last");
 
     const { useRoomStore } = await import("@/shared/stores/roomStore");
     act(() => {
       useRoomStore.getState().setRoom({ ...defaultRoom, status: "playing" });
     });
 
-    expect(screen.queryByTestId("open-last-match")).toBeNull();
+    expect(screen.queryByTestId("room-tabs-last")).toBeNull();
   });
 
   it("does not read the last match for a quick-play room", async () => {
@@ -2473,6 +2456,6 @@ describe("RoomPage last match", () => {
 
     await waitFor(() => expect(screen.getByTestId("action-bar")).toBeInTheDocument());
     expect(mockGetRoomLastMatch).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("open-last-match")).toBeNull();
+    expect(screen.queryByTestId("room-tabs-last")).toBeNull();
   });
 });
