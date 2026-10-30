@@ -8,7 +8,7 @@ import "time"
 type Repository interface {
 	CurrentSeason(now time.Time) (*Season, error)
 
-	ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error)
+	ApplySeasonPoints(seasonID uint, seats map[uint]SeatResult, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error)
 
 	FindPlayerSeason(userID, seasonID uint) (*PlayerSeason, error)
 

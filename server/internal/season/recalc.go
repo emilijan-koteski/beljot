@@ -153,9 +153,10 @@ func rewriteSeason(tx *gorm.DB, s Season, res *RecalculationResult) error {
 				rank_division   = ?,
 				games_played    = ?,
 				games_completed = ?,
+				games_won       = ?,
 				updated_at      = NOW()
 			WHERE user_id = ? AND season_id = ?`,
-			p.SP, p.Tier, divisionOrNil(p.Division), p.GamesPlayed, p.GamesCompleted, p.UserID, s.ID,
+			p.SP, p.Tier, divisionOrNil(p.Division), p.GamesPlayed, p.GamesCompleted, p.GamesWon, p.UserID, s.ID,
 		).Error; err != nil {
 			return fmt.Errorf("writing player_season user=%d season=%d: %w", p.UserID, s.ID, err)
 		}

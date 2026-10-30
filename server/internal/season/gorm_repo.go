@@ -83,14 +83,14 @@ func (r *GormRepository) FindPlayerSeason(userID, seasonID uint) (*PlayerSeason,
 
 // ApplySeasonPoints scores one match in a single transaction: it upserts and locks each player's row
 // in ascending user-ID order, computes all changes at once, then writes the floored totals and ranks.
-func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error) {
-	snapshots := make(map[uint]PlayerSeasonSnapshot, len(completed))
-	if len(completed) == 0 {
+func (r *GormRepository) ApplySeasonPoints(seasonID uint, seats map[uint]SeatResult, changes SPChanges) (map[uint]PlayerSeasonSnapshot, error) {
+	snapshots := make(map[uint]PlayerSeasonSnapshot, len(seats))
+	if len(seats) == 0 {
 		return snapshots, nil
 	}
 
-	ids := make([]uint, 0, len(completed))
-	for id := range completed {
+	ids := make([]uint, 0, len(seats))
+	for id := range seats {
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
@@ -134,14 +134,18 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 			}
 			next := ApplySPChange(current[id], delta)
 			tier, division := RankForSP(next)
-			present := 0
-			if completed[id] {
+			present, won := 0, 0
+			if seats[id].Completed {
 				present = 1
+			}
+			if seats[id].Won {
+				won = 1
 			}
 
 			var row struct {
 				GamesPlayed    int
 				GamesCompleted int
+				GamesWon       int
 			}
 			if err := tx.Raw(`
 				UPDATE player_seasons
@@ -150,10 +154,11 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 					rank_division   = ?,
 					games_played    = games_played + 1,
 					games_completed = games_completed + ?,
+					games_won       = games_won + ?,
 					updated_at      = NOW()
 				WHERE user_id = ? AND season_id = ?
-				RETURNING games_played, games_completed`,
-				next, tier, divisionOrNil(division), present, id, seasonID,
+				RETURNING games_played, games_completed, games_won`,
+				next, tier, divisionOrNil(division), present, won, id, seasonID,
 			).Scan(&row).Error; err != nil {
 				return fmt.Errorf("writing player_season user=%d season=%d: %w", id, seasonID, err)
 			}
@@ -165,6 +170,7 @@ func (r *GormRepository) ApplySeasonPoints(seasonID uint, completed map[uint]boo
 				Division:       division,
 				GamesPlayed:    row.GamesPlayed,
 				GamesCompleted: row.GamesCompleted,
+				GamesWon:       row.GamesWon,
 			}
 		}
 		return nil
@@ -212,7 +218,8 @@ func (r *GormRepository) LeaderboardPage(seasonID uint, limit, offset int) ([]Le
 		        player_seasons.sp            AS sp,
 		        player_seasons.rank_tier     AS rank_tier,
 		        player_seasons.rank_division AS rank_division,
-		        player_seasons.games_played  AS games_played`).
+		        player_seasons.games_played  AS games_played,
+		        player_seasons.games_won     AS games_won`).
 		Order("player_seasons.sp DESC").
 		Order("player_seasons.user_id ASC").
 		Limit(limit).
@@ -235,7 +242,8 @@ func (r *GormRepository) FindLeaderboardEntry(seasonID, userID uint) (*Leaderboa
 		        player_seasons.sp            AS sp,
 		        player_seasons.rank_tier     AS rank_tier,
 		        player_seasons.rank_division AS rank_division,
-		        player_seasons.games_played  AS games_played`).
+		        player_seasons.games_played  AS games_played,
+		        player_seasons.games_won     AS games_won`).
 		Where("player_seasons.user_id = ?", userID).
 		Limit(1).
 		Scan(&entries).Error
@@ -288,7 +296,8 @@ func (r *GormRepository) PlayerSeasonArchive(userID uint, now time.Time) ([]Arch
 		        player_seasons.sp            AS sp,
 		        player_seasons.rank_tier     AS rank_tier,
 		        player_seasons.rank_division AS rank_division,
-		        player_seasons.games_played  AS games_played`).
+		        player_seasons.games_played  AS games_played,
+		        player_seasons.games_won     AS games_won`).
 		Order("seasons.started_at DESC").
 		Scan(&entries).Error
 	if err != nil {

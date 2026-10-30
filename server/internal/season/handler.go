@@ -25,6 +25,7 @@ type CurrentSeasonView struct {
 	SPForNextDivision int       `json:"spForNextDivision"`
 	GamesPlayed       int       `json:"gamesPlayed"`
 	GamesCompleted    int       `json:"gamesCompleted"`
+	GamesWon          int       `json:"gamesWon"`
 }
 
 // Handler serves the season endpoints.
@@ -80,6 +81,7 @@ type LeaderboardRowView struct {
 	Tier        string  `json:"tier"`
 	Division    *int    `json:"division"`
 	GamesPlayed int     `json:"gamesPlayed"`
+	GamesWon    int     `json:"gamesWon"`
 }
 
 // LeaderboardViewerView is the caller's own standing, positioned under the list's total order
@@ -91,6 +93,7 @@ type LeaderboardViewerView struct {
 	Tier        string `json:"tier"`
 	Division    *int   `json:"division"`
 	GamesPlayed int    `json:"gamesPlayed"`
+	GamesWon    int    `json:"gamesWon"`
 }
 
 // LeaderboardView is the GET /api/v1/leaderboard body in the shared { items, total, limit, offset } shape.
@@ -192,6 +195,7 @@ type ArchiveRowView struct {
 	Tier        string    `json:"tier"`
 	Division    *int      `json:"division"`
 	GamesPlayed int       `json:"gamesPlayed"`
+	GamesWon    int       `json:"gamesWon"`
 	StartedAt   time.Time `json:"startedAt"`
 	EndsAt      time.Time `json:"endsAt"`
 }

@@ -52,14 +52,14 @@ func (s *Service) resolveSeason(now time.Time) (*Season, error) {
 // ApplySeasonPoints scores the match for every human seat in one repository transaction
 // and returns each player's post-write snapshot. An outcome with no human seat never touches the DB.
 func (s *Service) ApplySeasonPoints(outcome match.MatchOutcome, now time.Time) (map[uint]match.PlayerSeasonSnapshot, error) {
-	completed := make(map[uint]bool, len(outcome.Seats))
+	seats := make(map[uint]SeatResult, len(outcome.Seats))
 	for _, seat := range outcome.Seats {
 		if seat.IsBot || seat.UserID == 0 {
 			continue
 		}
-		completed[seat.UserID] = seat.Completed
+		seats[seat.UserID] = SeatResult{Completed: seat.Completed, Won: seat.Team == outcome.WinnerTeam}
 	}
-	if len(completed) == 0 {
+	if len(seats) == 0 {
 		return map[uint]match.PlayerSeasonSnapshot{}, nil
 	}
 
@@ -68,7 +68,7 @@ func (s *Service) ApplySeasonPoints(outcome match.MatchOutcome, now time.Time) (
 		return nil, err
 	}
 
-	snapshots, err := s.repo.ApplySeasonPoints(current.ID, completed, func(sp map[uint]int) (map[uint]int, error) {
+	snapshots, err := s.repo.ApplySeasonPoints(current.ID, seats, func(sp map[uint]int) (map[uint]int, error) {
 		return ComputeSPChanges(outcome, sp)
 	})
 	if err != nil {
@@ -146,11 +146,12 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 		return nil, fmt.Errorf("reading player season: %w", err)
 	}
 
-	sp, gamesPlayed, gamesCompleted := 0, 0, 0
+	sp, gamesPlayed, gamesCompleted, gamesWon := 0, 0, 0, 0
 	if record != nil {
 		sp = record.SP
 		gamesPlayed = record.GamesPlayed
 		gamesCompleted = record.GamesCompleted
+		gamesWon = record.GamesWon
 	}
 
 	tier, division, intoStep, forNextStep := RankProgress(sp)
@@ -165,6 +166,7 @@ func (s *Service) CurrentSeasonView(userID uint, now time.Time) (*CurrentSeasonV
 		SPForNextDivision: forNextStep,
 		GamesPlayed:       gamesPlayed,
 		GamesCompleted:    gamesCompleted,
+		GamesWon:          gamesWon,
 	}, nil
 }
 
@@ -208,6 +210,7 @@ func (s *Service) LeaderboardView(userID, seasonID uint, limit, offset int, now 
 			Tier:        tier,
 			Division:    division,
 			GamesPlayed: e.GamesPlayed,
+			GamesWon:    e.GamesWon,
 		})
 	}
 
@@ -249,6 +252,7 @@ func (s *Service) viewerPosition(userID, seasonID uint, ended bool) (*Leaderboar
 		Tier:        tier,
 		Division:    division,
 		GamesPlayed: entry.GamesPlayed,
+		GamesWon:    entry.GamesWon,
 	}, nil
 }
 
@@ -293,6 +297,7 @@ func (s *Service) ArchiveView(userID uint, now time.Time) (*ArchiveView, error) 
 			Tier:        tier,
 			Division:    division,
 			GamesPlayed: e.GamesPlayed,
+			GamesWon:    e.GamesWon,
 			StartedAt:   e.StartedAt,
 			EndsAt:      e.EndsAt,
 		})

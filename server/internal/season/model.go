@@ -23,8 +23,15 @@ type PlayerSeason struct {
 	RankDivision   *int      `gorm:"column:rank_division" json:"rankDivision"`
 	GamesPlayed    int       `gorm:"column:games_played" json:"gamesPlayed"`
 	GamesCompleted int       `gorm:"column:games_completed" json:"gamesCompleted"`
+	GamesWon       int       `gorm:"column:games_won" json:"gamesWon"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+// SeatResult is one human's part in a scored match: whether they were at the table at the end, and whether their team won.
+type SeatResult struct {
+	Completed bool
+	Won       bool
 }
 
 // SPChanges computes one match's SP change per seated human from their locked current totals, before the 0 floor.
@@ -40,6 +47,7 @@ type PlayerSeasonSnapshot struct {
 	Division       int
 	GamesPlayed    int
 	GamesCompleted int
+	GamesWon       int
 }
 
 // LeaderboardEntry is a scan target for one row of the leaderboard join of player_seasons and users.
@@ -52,6 +60,7 @@ type LeaderboardEntry struct {
 	RankTier     string  `gorm:"column:rank_tier"`
 	RankDivision *int    `gorm:"column:rank_division"`
 	GamesPlayed  int     `gorm:"column:games_played"`
+	GamesWon     int     `gorm:"column:games_won"`
 }
 
 // ArchiveEntry is a scan target for one ended, played season in a player's archive, with its stored rank snapshot.
@@ -65,4 +74,5 @@ type ArchiveEntry struct {
 	RankTier     string    `gorm:"column:rank_tier"`
 	RankDivision *int      `gorm:"column:rank_division"`
 	GamesPlayed  int       `gorm:"column:games_played"`
+	GamesWon     int       `gorm:"column:games_won"`
 }

@@ -65,9 +65,9 @@ func (m *mockRepo) CurrentSeason(time.Time) (*season.Season, error) {
 // ApplySeasonPoints mirrors the GORM transaction's shape: every listed player's
 // current total (missing = 0) goes to `changes` at once, each new total is
 // floored at 0, and the counters move. Nothing is written if `changes` fails.
-func (m *mockRepo) ApplySeasonPoints(seasonID uint, completed map[uint]bool, changes season.SPChanges) (map[uint]season.PlayerSeasonSnapshot, error) {
-	current := make(map[uint]int, len(completed))
-	for userID := range completed {
+func (m *mockRepo) ApplySeasonPoints(seasonID uint, seats map[uint]season.SeatResult, changes season.SPChanges) (map[uint]season.PlayerSeasonSnapshot, error) {
+	current := make(map[uint]int, len(seats))
+	for userID := range seats {
 		if row := m.rows[key(userID, seasonID)]; row != nil {
 			current[userID] = row.SP
 		} else {
@@ -79,16 +79,19 @@ func (m *mockRepo) ApplySeasonPoints(seasonID uint, completed map[uint]bool, cha
 		return nil, err
 	}
 
-	out := make(map[uint]season.PlayerSeasonSnapshot, len(completed))
-	for userID, present := range completed {
+	out := make(map[uint]season.PlayerSeasonSnapshot, len(seats))
+	for userID, seat := range seats {
 		row := m.rows[key(userID, seasonID)]
-		played, done := 0, 0
+		played, done, won := 0, 0, 0
 		if row != nil {
-			played, done = row.GamesPlayed, row.GamesCompleted
+			played, done, won = row.GamesPlayed, row.GamesCompleted, row.GamesWon
 		}
 		played++
-		if present {
+		if seat.Completed {
 			done++
+		}
+		if seat.Won {
+			won++
 		}
 		delta, ok := deltas[userID]
 		if !ok {
@@ -100,6 +103,7 @@ func (m *mockRepo) ApplySeasonPoints(seasonID uint, completed map[uint]bool, cha
 		m.rows[key(userID, seasonID)] = &season.PlayerSeason{
 			UserID: userID, SeasonID: seasonID, SP: next,
 			RankTier: tier, RankDivision: divPtr(division), GamesPlayed: played, GamesCompleted: done,
+			GamesWon: won,
 		}
 		out[userID] = season.PlayerSeasonSnapshot{
 			SP: next, PreviousSP: prev, Tier: tier, Division: division,
@@ -367,6 +371,7 @@ func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 		"endsAt",
 		"gamesCompleted",
 		"gamesPlayed",
+		"gamesWon",
 		"rankDivision",
 		"rankTier",
 		"seasonName",
@@ -378,7 +383,7 @@ func TestGetCurrentSeason_WirePayloadKeysAreExact(t *testing.T) {
 	assert.IsType(t, "", data["seasonName"])
 	assert.IsType(t, "", data["endsAt"])
 	assert.IsType(t, "", data["rankTier"])
-	for _, numeric := range []string{"sp", "rankDivision", "spIntoDivision", "spForNextDivision", "gamesPlayed", "gamesCompleted"} {
+	for _, numeric := range []string{"sp", "rankDivision", "spIntoDivision", "spForNextDivision", "gamesPlayed", "gamesCompleted", "gamesWon"} {
 		assert.IsType(t, float64(0), data[numeric], "%s must be a JSON number", numeric)
 	}
 	assert.Equal(t, float64(2), data["rankDivision"], "680 SP is Gold 2")
@@ -606,6 +611,33 @@ func TestApplySeasonPoints_PrecomputesTheSnapshot(t *testing.T) {
 	}, got[4], "10 -> 0 reports the applied change")
 }
 
+// A seat wins when its team is the winner team: seats 0 and 2 here. Each match
+// adds to the season's win count, which /seasons/current then reports.
+func TestApplySeasonPoints_CountsTheWinningTeamsWins(t *testing.T) {
+	repo := newMockRepo(testWindow)
+	svc := season.NewService(repo)
+
+	_, err := svc.ApplySeasonPoints(fourHumanOutcome(), time.Now().UTC())
+	require.NoError(t, err)
+	lost := fourHumanOutcome()
+	lost.WinnerTeam = 1
+	_, err = svc.ApplySeasonPoints(lost, time.Now().UTC())
+	require.NoError(t, err)
+	_, err = svc.ApplySeasonPoints(fourHumanOutcome(), time.Now().UTC())
+	require.NoError(t, err)
+
+	for userID, want := range map[uint]int{1: 2, 2: 1, 3: 2, 4: 1} {
+		row := repo.rows[key(userID, testWindow.ID)]
+		require.NotNil(t, row)
+		assert.Equal(t, 3, row.GamesPlayed, "user %d", userID)
+		assert.Equal(t, want, row.GamesWon, "user %d", userID)
+	}
+
+	view, err := svc.CurrentSeasonView(1, time.Now().UTC())
+	require.NoError(t, err)
+	assert.Equal(t, 2, view.GamesWon)
+}
+
 // The reason walks the outcome's seats: the expired seat is "abandoned", its
 // teammate "partner_abandoned", both opponents "normal". Master and Grandmaster
 // carry no division.
@@ -709,17 +741,17 @@ func TestGetLeaderboard_WirePayloadKeysAreExact(t *testing.T) {
 	require.Len(t, items, 3)
 	row, ok := items[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, []string{"avatarUrl", "division", "gamesPlayed", "position", "sp", "tier", "userId", "username"},
+	assert.Equal(t, []string{"avatarUrl", "division", "gamesPlayed", "gamesWon", "position", "sp", "tier", "userId", "username"},
 		sortedKeys(row), "exact row key set")
 
 	viewer, ok := data["viewer"].(map[string]any)
 	require.True(t, ok, "viewer must be an object when the caller has SP")
-	assert.Equal(t, []string{"division", "gamesPlayed", "position", "sp", "tier", "userId"},
+	assert.Equal(t, []string{"division", "gamesPlayed", "gamesWon", "position", "sp", "tier", "userId"},
 		sortedKeys(viewer), "the viewer block deliberately carries no username")
 
 	assert.IsType(t, "", row["username"])
 	assert.IsType(t, "", row["tier"])
-	for _, numeric := range []string{"position", "userId", "sp", "division", "gamesPlayed"} {
+	for _, numeric := range []string{"position", "userId", "sp", "division", "gamesPlayed", "gamesWon"} {
 		assert.IsType(t, float64(0), row[numeric], "%s must be a JSON number", numeric)
 	}
 	assert.IsType(t, float64(0), viewer["division"])
@@ -1536,14 +1568,14 @@ func TestGetPlayerSeasonArchive_WirePayloadKeysAreExact(t *testing.T) {
 	row, ok := items[0].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t,
-		[]string{"division", "endsAt", "gamesPlayed", "seasonId", "seasonName", "sp", "startedAt", "tier"},
+		[]string{"division", "endsAt", "gamesPlayed", "gamesWon", "seasonId", "seasonName", "sp", "startedAt", "tier"},
 		sortedKeys(row), "exact wire key set for an archive row")
 
 	assert.IsType(t, "", row["seasonName"])
 	assert.IsType(t, "", row["tier"])
 	assert.Equal(t, "platinum", row["tier"], "the STORED rank the season finished on, never the one 450 SP derives")
 	assert.Equal(t, float64(3), row["division"])
-	for _, numeric := range []string{"seasonId", "sp", "gamesPlayed"} {
+	for _, numeric := range []string{"seasonId", "sp", "gamesPlayed", "gamesWon"} {
 		assert.IsType(t, float64(0), row[numeric], "%s must be a JSON number", numeric)
 	}
 	for _, ts := range []string{"startedAt", "endsAt"} {
