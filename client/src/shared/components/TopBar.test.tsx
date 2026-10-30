@@ -344,13 +344,13 @@ describe("TopBar seasonal rank chip", () => {
     expect(chip.textContent).not.toContain("SP");
   });
 
-  it("drops the tier name below sm, leaving the badge alone on phones", async () => {
+  it("drops the tier name below lg, leaving the badge alone on phones and tablets", async () => {
     renderWithRouter();
 
     await screen.findByTestId("header-rank");
     const name = screen.getByTestId("header-rank-tier");
     expect(name.className).toContain("hidden");
-    expect(name.className).toContain("sm:inline");
+    expect(name.className).toContain("lg:inline");
     expect(screen.getByTestId("header-rank-badge").className).not.toContain("hidden");
   });
 
