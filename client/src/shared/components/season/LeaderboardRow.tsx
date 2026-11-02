@@ -216,7 +216,7 @@ export function LeaderboardRow({
 
       {table && showRank && (
         <span aria-hidden="true" className="flex items-center gap-2 text-xs">
-          <TierBadge tier={safeTier} size="sm" glow={false} data-testid="leaderboard-tier-badge" />
+          <TierBadge tier={safeTier} size="sm" data-testid="leaderboard-tier-badge" />
           {rank}
         </span>
       )}

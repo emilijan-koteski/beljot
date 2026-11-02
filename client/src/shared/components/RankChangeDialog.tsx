@@ -59,7 +59,7 @@ export function RankChangeDialog({
       open={open}
       onClose={onClose}
       tone="celebration"
-      art={<TierBadge tier={tier} size="lg" glow={promoted} data-testid="rank-change-badge" />}
+      art={<TierBadge tier={tier} size="lg" data-testid="rank-change-badge" />}
       title={
         <>
           {title} <span className="sr-only">{rank}</span>

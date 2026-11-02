@@ -19,19 +19,17 @@ const SIZE_CLASSES: Record<TierBadgeSize, { ring: string; glyph: string }> = {
 type Props = {
   tier: SeasonTier;
   size?: TierBadgeSize;
-  glow?: boolean;
   className?: string;
   "data-testid"?: string;
 };
 
 /**
- * The seasonal tier badge: colour ring, tinted ground and an optional glow.
+ * The seasonal tier badge: a colour ring on a tinted ground, flat with no glow.
  * Decorative and aria-hidden, since every surface also renders the tier name as text.
  */
 export function TierBadge({
   tier,
   size = "md",
-  glow = true,
   className,
   "data-testid": testId = "tier-badge",
 }: Props) {
@@ -42,13 +40,11 @@ export function TierBadge({
     <span
       data-testid={testId}
       data-tier={tier}
-      data-glow={glow}
       aria-hidden="true"
       className={cn("grid shrink-0 place-items-center rounded-full", ring, className)}
       style={{
         background: SEASON_TIER_SOFT[tier],
         border: `1px solid ${color}`,
-        boxShadow: glow ? `0 0 12px -2px ${color}` : "none",
         color,
       }}
     >

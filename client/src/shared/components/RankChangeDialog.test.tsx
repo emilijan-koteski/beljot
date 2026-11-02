@@ -50,7 +50,6 @@ describe("RankChangeDialog", () => {
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Gold 2");
     expect(screen.getByTestId("rank-change-sp")).toHaveTextContent(/^\+40 SP$/);
     expect(screen.getByTestId("rank-change-progress")).toHaveAttribute("aria-valuenow", "34");
-    expect(screen.getByTestId("rank-change-badge")).toHaveAttribute("data-glow", "true");
   });
 
   it("announces a demotion in the same layout without the celebration", () => {
@@ -62,7 +61,6 @@ describe("RankChangeDialog", () => {
     expect(dialog).not.toHaveTextContent("Rank up");
     expect(screen.getByTestId("rank-change-rank")).toHaveTextContent("Silver 3");
     expect(screen.getByTestId("rank-change-sp")).toHaveTextContent(/^−20 SP$/);
-    expect(screen.getByTestId("rank-change-badge")).toHaveAttribute("data-glow", "false");
   });
 
   it("names a single tier without a division and fills the bar toward Grandmaster", () => {

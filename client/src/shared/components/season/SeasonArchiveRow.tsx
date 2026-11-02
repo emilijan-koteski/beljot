@@ -54,7 +54,7 @@ export function SeasonArchiveRow({ seasonName, sp, tier, division, gamesPlayed, 
         {t("season.leaderboard.recordAria", { won, lost: games - won })}
       </span>
 
-      <TierBadge tier={safeTier} size="sm" glow={false} data-testid="season-archive-tier-badge" />
+      <TierBadge tier={safeTier} size="sm" data-testid="season-archive-tier-badge" />
 
       <span aria-hidden="true" className="flex min-w-0 flex-1 flex-col leading-tight">
         <span
