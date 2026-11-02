@@ -7,6 +7,7 @@ import "time"
 type PreferencesUpdate struct {
 	LanguagePreference    *string
 	CardDeckPreference    *string
+	ThemePreference       *string
 	SoundEnabled          *bool
 	MusicEnabled          *bool
 	SoundVolume           *int
@@ -17,6 +18,7 @@ type PreferencesUpdate struct {
 // IsEmpty reports whether the update names no column at all.
 func (p PreferencesUpdate) IsEmpty() bool {
 	return p.LanguagePreference == nil && p.CardDeckPreference == nil &&
+		p.ThemePreference == nil &&
 		p.SoundEnabled == nil && p.MusicEnabled == nil &&
 		p.SoundVolume == nil && p.MusicVolume == nil &&
 		p.AllowNonFriendInvites == nil

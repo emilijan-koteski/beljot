@@ -495,3 +495,28 @@ func TestAvatarURL(t *testing.T) {
 	require.NotNil(t, large)
 	assert.Equal(t, "https://assets.example.com/avatars/33333333-3333-4333-8333-333333333333/256.webp", *large)
 }
+
+func TestGormUserRepository_ThemePreference_DefaultsToParchmentAndUpdates(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+
+	u := &User{
+		Email:              "theme@example.com",
+		Username:           "themeuser",
+		PasswordHash:       "hashedpassword",
+		LanguagePreference: "hr",
+	}
+	require.NoError(t, repo.Create(u))
+
+	reloaded, err := repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.Equal(t, ThemeParchment, reloaded.ThemePreference)
+
+	brass := ThemeBrass
+	require.NoError(t, repo.UpdatePreferences(u.ID, PreferencesUpdate{ThemePreference: &brass}))
+	reloaded, err = repo.FindByID(u.ID)
+	require.NoError(t, err)
+	assert.Equal(t, ThemeBrass, reloaded.ThemePreference)
+	assert.Equal(t, "hr", reloaded.LanguagePreference, "a theme update must not touch the language")
+	assert.Equal(t, CardDeckFrench, reloaded.CardDeckPreference)
+}

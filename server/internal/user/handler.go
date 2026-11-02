@@ -31,6 +31,7 @@ type ProfileResponse struct {
 	UsernameChangedAt     *time.Time             `json:"usernameChangedAt,omitempty"`
 	LanguagePreference    string                 `json:"languagePreference"`
 	CardDeckPreference    string                 `json:"cardDeckPreference"`
+	ThemePreference       string                 `json:"themePreference"`
 	SoundEnabled          bool                   `json:"soundEnabled"`
 	MusicEnabled          bool                   `json:"musicEnabled"`
 	SoundVolume           int                    `json:"soundVolume"`
@@ -87,6 +88,7 @@ type PublicProfileResponse struct {
 type UpdatePreferencesRequest struct {
 	LanguagePreference    *string `json:"languagePreference"`
 	CardDeckPreference    *string `json:"cardDeckPreference"`
+	ThemePreference       *string `json:"themePreference"`
 	SoundEnabled          *bool   `json:"soundEnabled"`
 	MusicEnabled          *bool   `json:"musicEnabled"`
 	SoundVolume           *int    `json:"soundVolume"`
@@ -111,6 +113,11 @@ const (
 	CardDeckCroatian = "croatian"
 )
 
+const (
+	ThemeParchment = "parchment"
+	ThemeBrass     = "brass"
+)
+
 // IsSupportedLanguage reports whether code is one of the registered UI languages.
 func IsSupportedLanguage(code string) bool {
 	_, ok := supportedLanguages[code]
@@ -121,6 +128,11 @@ func IsSupportedLanguage(code string) bool {
 func IsSupportedCardDeck(deck string) bool {
 	_, ok := supportedCardDecks[deck]
 	return ok
+}
+
+// IsSupportedTheme reports whether theme is one of the looks for the pages outside a match.
+func IsSupportedTheme(theme string) bool {
+	return theme == ThemeParchment || theme == ThemeBrass
 }
 
 const (
@@ -326,6 +338,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 				UsernameChangedAt:     u.UsernameChangedAt,
 				LanguagePreference:    u.LanguagePreference,
 				CardDeckPreference:    u.CardDeckPreference,
+				ThemePreference:       u.ThemePreference,
 				SoundEnabled:          u.SoundEnabled,
 				MusicEnabled:          u.MusicEnabled,
 				SoundVolume:           u.SoundVolume,
@@ -557,6 +570,9 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 	if req.CardDeckPreference != nil && !IsSupportedCardDeck(*req.CardDeckPreference) {
 		return apperr.ErrInvalidCardDeck
 	}
+	if req.ThemePreference != nil && !IsSupportedTheme(*req.ThemePreference) {
+		return apperr.ErrInvalidTheme
+	}
 	if req.SoundVolume != nil && !isValidAudioVolume(*req.SoundVolume) {
 		return apperr.ErrBadRequest
 	}
@@ -574,6 +590,9 @@ func (h *UserHandler) UpdatePreferences(c echo.Context) error {
 	}
 	if req.CardDeckPreference != nil {
 		data["cardDeckPreference"] = *req.CardDeckPreference
+	}
+	if req.ThemePreference != nil {
+		data["themePreference"] = *req.ThemePreference
 	}
 	if req.SoundEnabled != nil {
 		data["soundEnabled"] = *req.SoundEnabled

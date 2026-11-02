@@ -127,6 +127,7 @@ func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, erro
 			PasswordHash:          "",
 			LanguagePreference:    "en",
 			CardDeckPreference:    user.CardDeckFrench,
+			ThemePreference:       user.ThemeParchment,
 			AllowNonFriendInvites: true,
 			WalletBalance:         5000,
 			LoginStreakDays:       0,

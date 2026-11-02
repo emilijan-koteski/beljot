@@ -392,6 +392,9 @@ func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) 
 			if prefs.CardDeckPreference != nil {
 				u.CardDeckPreference = *prefs.CardDeckPreference
 			}
+			if prefs.ThemePreference != nil {
+				u.ThemePreference = *prefs.ThemePreference
+			}
 			if prefs.SoundEnabled != nil {
 				u.SoundEnabled = *prefs.SoundEnabled
 			}
@@ -538,6 +541,7 @@ func (m *mockUserRepo) addUser(username, email, lang string) *user.User {
 		Email:                 email,
 		LanguagePreference:    lang,
 		CardDeckPreference:    user.CardDeckFrench,
+		ThemePreference:       user.ThemeParchment,
 		SoundEnabled:          true,
 		MusicEnabled:          true,
 		SoundVolume:           70,
@@ -1049,6 +1053,7 @@ func TestGetProfile_PublicProjection_NeverLeaksPrivateFields(t *testing.T) {
 	assert.NotContains(t, body, "loginStreakDays", "login streak must never appear on a public profile")
 	assert.NotContains(t, body, "languagePreference", "language preference is private")
 	assert.NotContains(t, body, "cardDeckPreference", "card deck preference is private")
+	assert.NotContains(t, body, "themePreference", "theme preference is private")
 	assert.NotContains(t, body, "soundEnabled", "audio preferences are private")
 	assert.NotContains(t, body, "musicEnabled", "audio preferences are private")
 	assert.NotContains(t, body, "allowNonFriendInvites", "the invite preference is private")
@@ -1483,6 +1488,72 @@ func TestUpdatePreferences_InvalidCardDeck(t *testing.T) {
 			assert.Equal(t, "INVALID_CARD_DECK", errResp["error"]["code"])
 
 			assert.Equal(t, user.CardDeckFrench, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+func TestGetProfile_IncludesStoredTheme(t *testing.T) {
+	repo, e := setupUserHandler()
+	u := repo.addUser("brassuser", "brass@example.com", "en")
+	u.ThemePreference = user.ThemeBrass
+
+	token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doGetProfile(e, "1", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	var data user.ProfileResponse
+	require.NoError(t, json.Unmarshal(resp["data"], &data))
+
+	assert.Equal(t, user.ThemeBrass, data.ThemePreference)
+}
+
+func TestUpdatePreferences_ThemeOnly_WritesAndEchoes(t *testing.T) {
+	for _, theme := range []string{user.ThemeBrass, user.ThemeParchment} {
+		t.Run(theme, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "mk")
+			u.CardDeckPreference = user.CardDeckCroatian
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", `{"themePreference":"`+theme+`"}`, token)
+			require.Equal(t, http.StatusOK, rec.Code, "body: %s", rec.Body.String())
+
+			var resp map[string]map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+			assert.Equal(t, map[string]any{"themePreference": theme}, resp["data"])
+
+			assert.Equal(t, theme, repo.users[0].ThemePreference)
+			assert.Equal(t, "mk", repo.users[0].LanguagePreference)
+			assert.Equal(t, user.CardDeckCroatian, repo.users[0].CardDeckPreference)
+		})
+	}
+}
+
+func TestUpdatePreferences_InvalidTheme_WritesNothing(t *testing.T) {
+	for _, theme := range []string{"dark", "Brass", "light", ""} {
+		t.Run(theme, func(t *testing.T) {
+			repo, e := setupUserHandler()
+			u := repo.addUser("testuser", "test@example.com", "en")
+
+			token, err := auth.GenerateAccessToken(u.ID, testJWTSecret)
+			require.NoError(t, err)
+
+			rec := doUpdatePreferences(e, "1", `{"languagePreference":"sr","themePreference":"`+theme+`"}`, token)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+			var errResp map[string]map[string]string
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
+			assert.Equal(t, "INVALID_THEME", errResp["error"]["code"])
+
+			assert.Equal(t, user.ThemeParchment, repo.users[0].ThemePreference)
+			assert.Equal(t, "en", repo.users[0].LanguagePreference)
+			assert.Equal(t, 0, repo.updatePreferencesCalls)
 		})
 	}
 }
