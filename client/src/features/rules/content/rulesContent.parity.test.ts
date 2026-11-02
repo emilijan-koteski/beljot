@@ -9,18 +9,19 @@ import { visibleFor } from "./visibility";
 const LANGS: RulesLang[] = ["en", "mk", "hr", "sr"];
 const reference = RULES_CONTENT.en;
 
-const MARKER_CAPABLE: RuleBlock["kind"][] = ["p", "rule", "steps", "note"];
+const MARKER_CAPABLE: RuleBlock["kind"][] = ["p"];
+const ITEM_KINDS: RuleBlock["kind"][] = ["steps", "list"];
 
 /** A block or item's variant scope and marker presence, which must match across locales. */
 function scopeShape(s: VariantScope): string {
   return `${s.variant ?? "all"}/${s.otherVariantNote ? "marked" : "plain"}`;
 }
 
-/** The structural shape of a block, including per-item step scopes and tier order. */
+/** The structural shape of a block, including per-item scopes and whether a paragraph carries help. */
 function blockShape(b: RuleBlock): string {
-  if (b.kind === "steps")
-    return `steps:${b.items.length}:${scopeShape(b)}:[${b.items.map(scopeShape).join("|")}]`;
-  if (b.kind === "tiers") return `tiers:${b.items.map((i) => i.tier).join(",")}:${scopeShape(b)}`;
+  if (b.kind === "steps" || b.kind === "list")
+    return `${b.kind}:${b.items.length}:${scopeShape(b)}:[${b.items.map(scopeShape).join("|")}]`;
+  if (b.kind === "p") return `p:${b.help === undefined ? "plain" : "help"}:${scopeShape(b)}`;
   return `${b.kind}:${scopeShape(b)}`;
 }
 
@@ -30,11 +31,13 @@ function scopedVariants(blocks: RuleBlock[]): Set<Variant> {
 
 function stepItems(blocks: RuleBlock[]): { blockIndex: number; index: number; item: StepItem }[] {
   return blocks.flatMap((b, blockIndex) =>
-    b.kind === "steps" ? b.items.map((item, index) => ({ blockIndex, index, item })) : [],
+    b.kind === "steps" || b.kind === "list"
+      ? b.items.map((item, index) => ({ blockIndex, index, item }))
+      : [],
   );
 }
 
-/** Paths of every empty leaf string, skipping the optional card `note`. */
+/** Paths of every empty leaf string in a content tree. */
 function emptyStringPaths(value: unknown, prefix = ""): string[] {
   if (typeof value === "string") {
     return value.trim().length === 0 ? [prefix] : [];
@@ -44,7 +47,7 @@ function emptyStringPaths(value: unknown, prefix = ""): string[] {
   }
   if (value && typeof value === "object") {
     return Object.entries(value).flatMap(([k, v]) =>
-      k === "note" ? [] : emptyStringPaths(v, prefix ? `${prefix}.${k}` : k),
+      emptyStringPaths(v, prefix ? `${prefix}.${k}` : k),
     );
   }
   return [];
@@ -199,7 +202,7 @@ describe("rules content parity", () => {
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         section.blocks.forEach((block, blockIndex) => {
-          if (block.kind !== "steps") return;
+          if (!ITEM_KINDS.includes(block.kind) || !("items" in block)) return;
           const scoped = new Set(block.items.flatMap((it) => (it.variant ? [it.variant] : [])));
           if (scoped.size === 0) return;
           for (const variant of VARIANTS) {
@@ -217,7 +220,7 @@ describe("rules content parity", () => {
     for (const lang of LANGS) {
       for (const section of RULES_CONTENT[lang].sections) {
         section.blocks.forEach((block, blockIndex) => {
-          if (block.kind !== "steps") return;
+          if (!ITEM_KINDS.includes(block.kind) || !("items" in block)) return;
           const counts = VARIANTS.map((v) => visibleFor(block.items, v).length);
           expect(
             new Set(counts).size,
@@ -229,19 +232,17 @@ describe("rules content parity", () => {
   });
 
   it("has identical declaration ids and shared numbers across locales", () => {
-    const refDecls = reference.declarations.map((d) => ({
-      id: d.id,
-      pts: d.pts,
-      tier: d.tier,
-      kind: d.kind,
-    }));
-    for (const lang of LANGS) {
-      const decls = RULES_CONTENT[lang].declarations.map((d) => ({
+    const shape = (c: RulesContent) =>
+      c.declarations.map((d) => ({
         id: d.id,
         pts: d.pts,
-        tier: d.tier,
-        kind: d.kind,
+        cards: d.cards,
+        wins: d.wins,
+        hasSummary: d.summary !== undefined,
       }));
+    const refDecls = shape(reference);
+    for (const lang of LANGS) {
+      const decls = shape(RULES_CONTENT[lang]);
       expect(decls, `${lang} declarations`).toEqual(refDecls);
     }
   });

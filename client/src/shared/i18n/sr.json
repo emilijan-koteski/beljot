@@ -150,7 +150,6 @@
         "lede": "Čast pokazuje da li završavaš mečeve koje započneš.",
         "standing": "Trenutno si na {{score}}, <tierWord>{{tier}}</tierWord>.",
         "standingNew": "Odigraj 5 mečeva da vidiš svoj skor.",
-        "fullRules": "Sva pravila",
         "close": "Razumem",
         "facts": {
           "finish": "Završen meč je podiže, bez obzira na ishod.",

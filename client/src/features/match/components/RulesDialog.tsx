@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { Chapter } from "@/features/rules/components/Chapter";
-import { ChapterIndex } from "@/features/rules/components/ChapterIndex";
+import { ChapterNav } from "@/features/rules/components/ChapterNav";
 import { getRulesContent } from "@/features/rules/content/rulesContent";
 import { RulesProvider } from "@/features/rules/RulesContext";
 import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
@@ -110,10 +110,9 @@ export function RulesDialog({
             >
               <div className="flex h-full min-h-0 flex-col">
                 <div className="flex min-h-0 flex-1">
-                  <ChapterIndex
+                  <ChapterNav
                     activeId={activeId}
                     onJump={jump}
-                    title={ui.ovChapters}
                     testIdPrefix="rules-toc"
                     className="felt-controls border-brass-25 hidden w-50 shrink-0 border-r bg-black/30 px-2.5 py-3.5 md:flex"
                   />
@@ -176,10 +175,9 @@ export function RulesDialog({
                       {VARIANTS.map((v) => (
                         <TabsContent key={v} value={v}>
                           <RulesProvider value={{ content, variant: v, dense: true }}>
-                            {sections.map((sec, i) => (
+                            {sections.map((sec) => (
                               <Chapter
                                 key={sec.id}
-                                idx={i}
                                 section={sec}
                                 registerRef={(id, el) => {
                                   chapterRefs.current[id] = el;

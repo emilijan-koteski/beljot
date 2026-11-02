@@ -150,7 +150,6 @@
         "lede": "Honor shows whether you finish the matches you start.",
         "standing": "You're at {{score}}, <tierWord>{{tier}}</tierWord>.",
         "standingNew": "Finish 5 matches to see your score.",
-        "fullRules": "Full rules",
         "close": "Got it",
         "facts": {
           "finish": "Finishing a match raises it, win or lose.",

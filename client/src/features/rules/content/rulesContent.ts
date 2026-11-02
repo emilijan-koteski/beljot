@@ -5,18 +5,8 @@ import { type CardBase, DECLARATIONS_BASE, PLAIN_ROWS, TRUMP_ROWS } from "./shar
 import { sr } from "./sr";
 import type { CardRow, Declaration, RulesContent, RulesLang, RulesLangData } from "./types";
 
-function buildCards(
-  rows: CardBase[],
-  names: RulesLangData["cardNames"],
-  notes: Partial<Record<CardRow["rank"], string>>,
-): CardRow[] {
-  return rows.map((r) => ({
-    rank: r.rank,
-    name: names[r.rank],
-    pts: r.pts,
-    strength: r.strength,
-    note: notes[r.rank] ?? "",
-  }));
+function buildCards(rows: CardBase[], names: RulesLangData["cardNames"]): CardRow[] {
+  return rows.map((r) => ({ rank: r.rank, name: names[r.rank], pts: r.pts, strength: r.strength }));
 }
 
 function buildDeclarations(strings: RulesLangData["declarations"]): Declaration[] {
@@ -29,8 +19,8 @@ function buildDeclarations(strings: RulesLangData["declarations"]): Declaration[
 
 function build(data: RulesLangData): RulesContent {
   return {
-    cardsTrump: buildCards(TRUMP_ROWS, data.cardNames, data.trumpNotes),
-    cardsPlain: buildCards(PLAIN_ROWS, data.cardNames, data.plainNotes),
+    cardsTrump: buildCards(TRUMP_ROWS, data.cardNames),
+    cardsPlain: buildCards(PLAIN_ROWS, data.cardNames),
     declarations: buildDeclarations(data.declarations),
     sections: data.sections,
     ui: data.ui,

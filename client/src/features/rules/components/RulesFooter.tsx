@@ -7,8 +7,8 @@ import { useLobbyReturn } from "@/shared/hooks/useLobbyReturn";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 /**
- * "Ready for your first hand?" closer with a Play CTA back to the lobby. Signed-in players return to the
- * lobby root; guests push `/lobby` so the back button still returns them to the rules.
+ * "Ready to play?" closer with a Play CTA back to the lobby. Signed-in players return to the lobby root;
+ * guests push `/lobby` so the back button still returns them to the rules.
  */
 export function RulesFooter() {
   const { ui } = useRules();
@@ -23,14 +23,14 @@ export function RulesFooter() {
     }
   };
   return (
-    <footer className="bg-surface border-border mt-9 flex flex-wrap items-center gap-4.5 rounded-lg border px-6.5 py-6">
-      <div className="flex min-w-60 flex-1 flex-col gap-1">
-        <span className="text-ink text-lg font-semibold">{ui.footerTitle}</span>
-        <span className="text-ink-dim text-sm">{ui.footerBody}</span>
+    <footer className="bg-surface border-border flex items-center gap-4 rounded-xl border px-4 py-3.5 shadow-xs">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-ink text-base font-semibold">{ui.footerTitle}</span>
+        <span className="text-ink-mute text-xs">{ui.footerBody}</span>
       </div>
-      <Button size="cta" onClick={handlePlay} data-testid="rules-play-cta">
+      <Button onClick={handlePlay} data-testid="rules-play-cta">
         {ui.footerCta}
-        <ArrowRight data-icon="inline-end" strokeWidth={2.2} />
+        <ArrowRight data-icon="inline-end" />
       </Button>
     </footer>
   );

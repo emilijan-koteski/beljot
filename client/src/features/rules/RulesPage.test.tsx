@@ -4,8 +4,20 @@ import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/shared/i18n/i18n";
+import { mockViewportWidth } from "@/test-utils";
 
 import { RulesPage } from "./RulesPage";
+
+const CHAPTER_TITLES = [
+  "Deal and trump",
+  "Card values",
+  "Playing a trick",
+  "Declarations",
+  "Scoring",
+  "Room options",
+];
+
+let restoreViewport = () => {};
 
 function renderRules() {
   return render(
@@ -15,11 +27,11 @@ function renderRules() {
   );
 }
 
-/** Returns the first difference marker rendered on the page. */
-function firstDiffMarker(): HTMLElement {
-  const [marker] = screen.getAllByTestId("rules-diff-marker");
-  if (!marker) throw new Error("no difference marker rendered");
-  return marker;
+function stepNumbers(): string[] {
+  const timeline = screen.getByTestId("rules-timeline");
+  return within(timeline)
+    .getAllByTestId("rules-step-number")
+    .map((el) => el.textContent ?? "");
 }
 
 beforeEach(async () => {
@@ -30,253 +42,187 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  restoreViewport();
+  restoreViewport = () => {};
   await act(async () => {
     await i18n.changeLanguage("en");
   });
 });
 
 describe("RulesPage", () => {
-  it("renders the hero and all six chapter headings", () => {
+  it("renders the hero, the four facts and the six chapters", () => {
     renderRules();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Learn Belote in one sitting" }),
+      screen.getByRole("heading", { level: 1, name: "How to play Belote" }),
     ).toBeInTheDocument();
-    for (const title of [
-      "Race your team to 1001",
-      "Shuffle, deal, take trump",
-      "Trump plays by its own rules",
-      "When you can play what",
-      "Some hands carry points of their own",
-      "Counting up — and the catch",
-    ]) {
-      expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
-    }
+    const facts = screen.getByTestId("rules-facts");
+    expect(
+      within(facts)
+        .getAllByRole("definition")
+        .map((d) => d.textContent),
+    ).toEqual(["4", "32", "8", "1001"]);
+    expect(
+      within(facts)
+        .getAllByRole("term")
+        .map((d) => d.textContent),
+    ).toEqual(["players", "cards", "in hand", "to win"]);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(
+      CHAPTER_TITLES,
+    );
   });
 
-  it("renders the chapter index with section labels", () => {
+  it("leaves honor out, since it is about the app rather than the card game", () => {
     renderRules();
-    const toc = screen.getByTestId("rules-chapter-index");
-    expect(within(toc).getByTestId("toc-goal")).toHaveTextContent("The goal");
-    expect(within(toc).getByTestId("toc-scoring")).toHaveTextContent("Scoring");
+    expect(screen.queryByText(/honor/i)).not.toBeInTheDocument();
   });
 
-  it("renders both card ladders with trump Jack worth 20", () => {
+  it("pins chapter chips on a phone and jumps to the chapter a chip names", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    expect(screen.queryByTestId("rules-chapter-index")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("rules-chip-melds"));
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    expect(screen.getByTestId("rules-chip-melds")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("lists the chapters and the variant switch in a side column on a desktop", async () => {
+    restoreViewport = mockViewportWidth(1280);
+    const user = userEvent.setup();
+    renderRules();
+    expect(screen.queryByTestId("rules-chapter-chips")).not.toBeInTheDocument();
+    const nav = screen.getByTestId("rules-chapter-index");
+    expect(
+      within(nav)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Deal", "Cards", "Play", "Declarations", "Scoring", "Room options"]);
+
+    await user.click(within(nav).getByTestId("toc-scoring"));
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    expect(within(nav).getByTestId("toc-scoring")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("rules-variant")).toBeInTheDocument();
+  });
+
+  it("lists trump and the other suits side by side, strongest first", () => {
     renderRules();
     const trump = screen.getByTestId("ladder-trump");
-    expect(within(trump).getByText("Jack")).toBeInTheDocument();
-    expect(within(trump).getByText("20")).toBeInTheDocument();
-    expect(screen.getByTestId("ladder-plain")).toBeInTheDocument();
+    const plain = screen.getByTestId("ladder-plain");
+    expect(within(trump).getAllByRole("listitem")[0]).toHaveTextContent(/Jack.*20/);
+    expect(within(plain).getAllByRole("listitem")[0]).toHaveTextContent(/Ace.*11/);
+    expect(within(plain).getAllByRole("listitem")[4]).toHaveTextContent(/Jack.*2/);
   });
 
-  it("renders the declarations grid including Carré of Jacks at 200", () => {
+  it("lists every declaration with its points, and the all-trumps hand as a win", () => {
     renderRules();
-    const carreJ = screen.getByTestId("meld-carreJ");
-    expect(within(carreJ).getByText("Carré of Jacks")).toBeInTheDocument();
-    expect(within(carreJ).getByText("+200")).toBeInTheDocument();
+    expect(screen.getByTestId("meld-carreJ")).toHaveTextContent(/\+200.*Four Jacks/);
+    expect(screen.getByTestId("meld-kvarta")).toHaveTextContent(/\+50.*Quarte.*Four in a row/);
+    expect(screen.getByTestId("meld-bela")).toHaveTextContent(/Win.*Belote.*All eight trumps/);
   });
 
-  it("scrolls to a chapter when its index entry is clicked", async () => {
+  it("keeps the declaration tie-break behind a help marker", async () => {
     const user = userEvent.setup();
     renderRules();
-    await user.click(screen.getByTestId("toc-melds"));
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    await user.hover(screen.getByTestId("rules-help"));
+    expect(await screen.findByText(/four of a kind beats a run/)).toBeInTheDocument();
   });
 
-  const BITOLA_STEP = "Deal five each, then turn one up";
-  const CROATIA_STEP = "Deal all eight up front";
-  const BITOLA_RULE = "One card, one declaration";
-  const CROATIA_RULE = "One card can count more than once";
-  const SHARED_HEADING = "Trump plays by its own rules";
-  const SHARED_RULE = "Out of the suit? You must trump — over the top if you can";
-
-  it("opens on the Bitola tab and renders only its scoped blocks", () => {
+  it("opens on Bitola and numbers its deal steps from one", () => {
     renderRules();
-    expect(screen.getByTestId("rules-variant-bitola")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByText(BITOLA_STEP)).toBeInTheDocument();
-    expect(screen.getByText(BITOLA_RULE)).toBeInTheDocument();
-    expect(screen.queryByText(CROATIA_STEP)).not.toBeInTheDocument();
-    expect(screen.queryByText(CROATIA_RULE)).not.toBeInTheDocument();
+    expect(screen.getByText("Five cards each")).toBeInTheDocument();
+    expect(screen.queryByText("Eight cards each")).not.toBeInTheDocument();
+    expect(screen.getByText("One card, one declaration")).toBeInTheDocument();
+    expect(stepNumbers()).toEqual(["1", "2", "3", "4"]);
   });
 
-  it("swaps the scoped blocks on the Croatian tab and leaves shared chapters alone", async () => {
+  it("swaps the variant-scoped steps and rules on the Croatian tab", async () => {
     const user = userEvent.setup();
     renderRules();
-    expect(screen.getByRole("heading", { level: 2, name: SHARED_HEADING })).toBeInTheDocument();
-    expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
 
     await user.click(screen.getByTestId("rules-variant-croatia"));
 
-    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText(CROATIA_STEP)).toBeInTheDocument();
-    expect(screen.getByText(CROATIA_RULE)).toBeInTheDocument();
-    expect(screen.queryByText(BITOLA_STEP)).not.toBeInTheDocument();
-    expect(screen.queryByText(BITOLA_RULE)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: SHARED_HEADING })).toBeInTheDocument();
-    expect(screen.getByText(SHARED_RULE)).toBeInTheDocument();
+    expect(screen.getByText("Eight cards each")).toBeInTheDocument();
+    expect(screen.getByText("The dealer must choose")).toBeInTheDocument();
+    expect(screen.queryByText("Five cards each")).not.toBeInTheDocument();
+    expect(screen.getByText("A card can count twice")).toBeInTheDocument();
+    expect(screen.getByText("Belote always counts")).toBeInTheDocument();
+    expect(stepNumbers()).toEqual(["1", "2", "3", "4"]);
   });
 
-  it("describes the Croatian single round, forced dealer and post-trump reveal under that tab", async () => {
+  it("says what the other variant does behind each difference marker", async () => {
     const user = userEvent.setup();
     renderRules();
-    await user.click(screen.getByTestId("rules-variant-croatia"));
-    expect(screen.getByText("One round: name a suit, or say “dalje”")).toBeInTheDocument();
-    expect(screen.getByText("The dealer speaks last — “pod mus”")).toBeInTheDocument();
-    expect(screen.getByText("Your last two turn up")).toBeInTheDocument();
+    const step = screen.getByText("Five cards each");
     expect(
-      screen.getByText(/Only once trump is named do the two face-down cards/),
-    ).toBeInTheDocument();
+      within(screen.getByText("Belote always counts")).queryByTestId("rules-diff-marker"),
+    ).toBeNull();
+
+    await user.hover(within(step).getByTestId("rules-diff-marker"));
+
     expect(
-      screen.getByText(/Declaring gets a phase of its own, between bidding and the first trick/),
-    ).toBeInTheDocument();
-  });
-
-  it("states the shared Capot and tied-tiebreaker rules under both tabs", async () => {
-    const user = userEvent.setup();
-    renderRules();
-    for (const tab of ["rules-variant-bitola", "rules-variant-croatia"]) {
-      await user.click(screen.getByTestId(tab));
-      expect(screen.getByText("Take all eight tricks and it’s a capot")).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          /if the two totals are exactly equal, it goes to the team that took trump/,
-        ),
-      ).toBeInTheDocument();
-    }
-  });
-
-  it("names the all-eight hand after the trump suit, not any suit", () => {
-    renderRules();
-    const bela = screen.getByTestId("meld-bela");
-    expect(within(bela).getByText("Belote")).toBeInTheDocument();
-    expect(within(bela).getByText(/All eight cards of the trump suit/)).toBeInTheDocument();
-  });
-
-  /** The visible 01/02/… chips of the `basics` step list, in document order. */
-  function basicsStepNumbers(): string[] {
-    const basics = document.getElementById("basics");
-    if (!basics) throw new Error("basics chapter is not rendered");
-    return [...basics.querySelectorAll("ol > li > span.font-mono")].map(
-      (el) => el.textContent ?? "",
-    );
-  }
-
-  /** The step whose title is `title`, as the element that also holds its marker. */
-  function step(title: string) {
-    return screen.getByText(title);
-  }
-
-  it("numbers the visible steps gaplessly on both tabs", async () => {
-    const user = userEvent.setup();
-    renderRules();
-    expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
-    await user.click(screen.getByTestId("rules-variant-croatia"));
-    expect(basicsStepNumbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
-  });
-
-  it("authors the shared steps once, with no marker on them", async () => {
-    const user = userEvent.setup();
-    renderRules();
-    for (const shared of ["Take your seat", "Build the deck"]) {
-      expect(screen.getByText(shared)).toBeInTheDocument();
-      expect(within(step(shared)).queryByTestId("rules-diff-marker")).not.toBeInTheDocument();
-    }
-    await user.click(screen.getByTestId("rules-variant-croatia"));
-    for (const shared of ["Take your seat", "Build the deck"]) {
-      expect(screen.getByText(shared)).toBeInTheDocument();
-      expect(within(step(shared)).queryByTestId("rules-diff-marker")).not.toBeInTheDocument();
-    }
-  });
-
-  it("marks each divergent step individually, explaining that step's counterpart", async () => {
-    const user = userEvent.setup();
-    renderRules();
-
-    const bitolaDeal = within(step(BITOLA_STEP)).getByTestId("rules-diff-marker");
-    await user.hover(bitolaDeal);
-    expect(
-      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
-    ).toBeInTheDocument();
-    await user.unhover(bitolaDeal);
-
-    const bitolaRound1 = within(step("Round one: take that card, or pass")).getByTestId(
-      "rules-diff-marker",
-    );
-    await user.hover(bitolaRound1);
-    expect(
-      await screen.findByText(/In Croatian rules there is no card to take/),
-    ).toBeInTheDocument();
-    await user.unhover(bitolaRound1);
-
-    await user.click(screen.getByTestId("rules-variant-croatia"));
-    const croatiaDeal = within(step(CROATIA_STEP)).getByTestId("rules-diff-marker");
-    await user.hover(croatiaDeal);
-    expect(
-      await screen.findByText(/Bitola rules stop the deal at five cards each/),
-    ).toBeInTheDocument();
-  });
-
-  it("opens a difference marker on hover", async () => {
-    const user = userEvent.setup();
-    renderRules();
-    const marker = firstDiffMarker();
-    await user.hover(marker);
-    expect(
-      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+      await screen.findByText("Croatian: all eight cards are dealt, the last two face down."),
     ).toBeInTheDocument();
   });
 
   it("opens and dismisses a difference marker on tap", async () => {
     const user = userEvent.setup();
     renderRules();
-    const marker = firstDiffMarker();
+    const marker = within(screen.getByText("Five cards each")).getByTestId("rules-diff-marker");
+    const note = "Croatian: all eight cards are dealt, the last two face down.";
+
     await user.pointer({ keys: "[TouchA]", target: marker });
-    expect(
-      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(note)).toBeInTheDocument();
+
     await user.pointer({ keys: "[TouchA]", target: marker });
-    expect(
-      screen.queryByText(/Croatian rules deal all eight cards before anyone bids/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
   });
 
-  it("renders fully translated content when the language switches to Macedonian", async () => {
+  it("words the room options as the create-room form does, standard value first", () => {
+    renderRules();
+    expect(screen.getByTestId("rules-option-declarationsTransfer")).toHaveTextContent(
+      /Declarations on a fall.*To the winners · Voided/,
+    );
+    expect(screen.getByTestId("rules-option-matchEnd")).toHaveTextContent(
+      /Match end.*Finish the hand · Stop at target/,
+    );
+    expect(screen.getByTestId("rules-option-direction")).toHaveTextContent(
+      /To the right · To the left/,
+    );
+  });
+
+  it("renders translated chapters in Macedonian, Croatian and Serbian", async () => {
     renderRules();
     await act(async () => {
       await i18n.changeLanguage("mk");
     });
     expect(
-      screen.getByRole("heading", { level: 1, name: "Научи Бељот во неколку минути" }),
+      screen.getByRole("heading", { level: 1, name: "Како се игра Бељот" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Трка до 1001 поен со твојот партнер" }),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps the active variant tab across a locale switch", async () => {
-    const user = userEvent.setup();
-    renderRules();
-    await user.click(screen.getByTestId("rules-variant-croatia"));
-    await act(async () => {
-      await i18n.changeLanguage("hr");
-    });
-    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Podijeli svih osam odmah")).toBeInTheDocument();
-  });
-
-  it("renders Croatian and Serbian hero titles", async () => {
-    renderRules();
+    expect(screen.getByRole("heading", { level: 2, name: "Најави" })).toBeInTheDocument();
     await act(async () => {
       await i18n.changeLanguage("hr");
     });
     expect(
-      screen.getByRole("heading", { level: 1, name: "Nauči Belu u jednom sjedenju" }),
+      screen.getByRole("heading", { level: 2, name: "Dijeljenje i adut" }),
     ).toBeInTheDocument();
     await act(async () => {
       await i18n.changeLanguage("sr");
     });
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Nauči Belu u jednom sedenju" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Deljenje i adut" })).toBeInTheDocument();
+  });
+
+  it("keeps the chosen variant across a language switch", async () => {
+    const user = userEvent.setup();
+    renderRules();
+    await user.click(screen.getByTestId("rules-variant-croatia"));
+
+    await act(async () => {
+      await i18n.changeLanguage("hr");
+    });
+
+    expect(screen.getByTestId("rules-variant-croatia")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Po osam karata")).toBeInTheDocument();
   });
 });
