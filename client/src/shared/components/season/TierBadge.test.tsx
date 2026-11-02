@@ -19,7 +19,7 @@ describe("TierBadge", () => {
     render(<TierBadge tier="diamond" />);
     const style = screen.getByTestId("tier-badge").getAttribute("style") ?? "";
     expect(style).toContain(SEASON_TIER_COLOR.diamond);
-    expect(style).toContain("box-shadow");
+    expect(style).toContain("border");
   });
 
   it("renders every tier in the ladder without falling off the colour map", () => {
@@ -45,14 +45,9 @@ describe("TierBadge", () => {
     expect(screen.getByTestId("tier-badge").className).toContain("size-20");
   });
 
-  it("glows by default and drops the glow when asked (the rank-down dialog)", () => {
-    const { rerender } = render(<TierBadge tier="gold" />);
-    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").toContain("0 0 12px");
-    expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("true");
-
-    rerender(<TierBadge tier="gold" glow={false} />);
-    expect(screen.getByTestId("tier-badge").getAttribute("style") ?? "").not.toContain("0 0 12px");
-    expect(screen.getByTestId("tier-badge").getAttribute("data-glow")).toBe("false");
+  it("draws a flat badge with no glow", () => {
+    render(<TierBadge tier="gold" />);
+    expect(screen.getByTestId("tier-badge").style.boxShadow).toBe("");
   });
 
   it("takes a caller-supplied test id so each surface can name its own badge", () => {

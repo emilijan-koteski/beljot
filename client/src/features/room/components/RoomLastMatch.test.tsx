@@ -114,10 +114,12 @@ describe("RoomLastMatch", () => {
 });
 
 describe("LastMatchOutcome", () => {
-  it("tags a win, a loss, and nothing for an abandoned match", () => {
+  it("marks a win or a loss with a dot that names it, and nothing for an abandoned match", () => {
     const { rerender, container } = render(<LastMatchOutcome outcome="win" />);
+    expect(screen.getByTestId("last-match-outcome")).toHaveAttribute("data-outcome", "win");
     expect(screen.getByText("Win")).toBeInTheDocument();
     rerender(<LastMatchOutcome outcome="loss" />);
+    expect(screen.getByTestId("last-match-outcome")).toHaveAttribute("title", "Loss");
     expect(screen.getByText("Loss")).toBeInTheDocument();
     rerender(<LastMatchOutcome outcome="abandoned" />);
     expect(container).toBeEmptyDOMElement();

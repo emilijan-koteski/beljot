@@ -39,13 +39,11 @@ describe("RulesDialog (in-game)", () => {
 
     expect(screen.getByTestId("rules-dialog")).toBeInTheDocument();
     expect(screen.getByText("Belote rules")).toBeInTheDocument();
-    expect(screen.getByTestId("rules-toc-goal")).toHaveTextContent("The goal");
+    expect(screen.getByTestId("rules-toc-deal")).toHaveTextContent("Deal");
     expect(screen.getByTestId("rules-toc-scoring")).toHaveTextContent("Scoring");
-    expect(
-      screen.getByRole("heading", { name: "Trump plays by its own rules" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Card values" })).toBeInTheDocument();
     const carreJ = screen.getByTestId("meld-carreJ");
-    expect(within(carreJ).getByText("Carré of Jacks")).toBeInTheDocument();
+    expect(within(carreJ).getByText("Four Jacks")).toBeInTheDocument();
     expect(within(carreJ).getByText("+200")).toBeInTheDocument();
   });
 
@@ -71,8 +69,8 @@ describe("RulesDialog (in-game)", () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
-  const BITOLA_STEP = "Deal five each, then turn one up";
-  const CROATIA_STEP = "Deal all eight up front";
+  const BITOLA_STEP = "Five cards each";
+  const CROATIA_STEP = "Eight cards each";
 
   it("pre-selects the Croatian tab in a Croatian match", () => {
     render(<RulesDialog open onOpenChange={() => {}} variant="croatia" />);
@@ -109,7 +107,7 @@ describe("RulesDialog (in-game)", () => {
   it("swaps only the scoped blocks when the tab is switched by hand", async () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
-    const shared = "Trump plays by its own rules";
+    const shared = "Card values";
     expect(screen.getByRole("heading", { name: shared })).toBeInTheDocument();
 
     await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
@@ -174,24 +172,23 @@ describe("RulesDialog (in-game)", () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="bitola" />);
     const numbers = () =>
-      [...screen.getByTestId("rules-dialog").querySelectorAll("ol > li > span:first-child")]
-        .map((el) => el.textContent ?? "")
-        .filter((txt) => /^\d\d$/.test(txt))
-        .slice(0, 6);
-    expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+      within(within(screen.getByRole("tabpanel")).getByTestId("rules-timeline"))
+        .getAllByTestId("rules-step-number")
+        .map((el) => el.textContent ?? "");
+    expect(numbers()).toEqual(["1", "2", "3", "4"]);
     await user.click(screen.getByTestId("rules-dialog-variant-croatia"));
-    expect(numbers()).toEqual(["01", "02", "03", "04", "05", "06"]);
+    expect(numbers()).toEqual(["1", "2", "3", "4"]);
   });
 
   it("marks each divergent step individually in the overlay", async () => {
     const user = userEvent.setup();
     render(<RulesDialog open onOpenChange={() => {}} variant="croatia" />);
     expect(
-      within(screen.getByText("Take your seat")).queryByTestId("rules-diff-marker"),
+      within(screen.getByText("Belote always counts")).queryByTestId("rules-diff-marker"),
     ).not.toBeInTheDocument();
     await user.hover(within(screen.getByText(CROATIA_STEP)).getByTestId("rules-diff-marker"));
     expect(
-      await screen.findByText(/Bitola rules stop the deal at five cards each/),
+      await screen.findByText("Bitola: five cards each and one face-up trump candidate."),
     ).toBeInTheDocument();
   });
 
@@ -201,7 +198,7 @@ describe("RulesDialog (in-game)", () => {
     const marker = firstDiffMarker();
     await user.hover(marker);
     expect(
-      await screen.findByText(/Croatian rules deal all eight cards before anyone bids/),
+      await screen.findByText("Croatian: all eight cards are dealt, the last two face down."),
     ).toBeInTheDocument();
   });
 
@@ -211,9 +208,7 @@ describe("RulesDialog (in-game)", () => {
       await i18n.changeLanguage("mk");
     });
     expect(screen.getByText("Правила на Бељот")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Адутот игра по свои правила" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Вредност на картите" })).toBeInTheDocument();
   });
 
   it("caveats the scoring chapter on a stop-at-target table", () => {

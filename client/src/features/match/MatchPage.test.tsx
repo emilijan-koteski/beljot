@@ -1838,8 +1838,8 @@ describe("MatchPage", () => {
         "aria-selected",
         "true",
       );
-      expect(screen.getByText("Deal all eight up front")).toBeInTheDocument();
-      expect(screen.queryByText("Deal five each, then turn one up")).not.toBeInTheDocument();
+      expect(screen.getByText("Eight cards each")).toBeInTheDocument();
+      expect(screen.queryByText("Five cards each")).not.toBeInTheDocument();
     });
 
     it("opens the rules overlay on the Bitola tab in a Bitola match", () => {
@@ -1848,8 +1848,8 @@ describe("MatchPage", () => {
         "aria-selected",
         "true",
       );
-      expect(screen.getByText("Deal five each, then turn one up")).toBeInTheDocument();
-      expect(screen.queryByText("Deal all eight up front")).not.toBeInTheDocument();
+      expect(screen.getByText("Five cards each")).toBeInTheDocument();
+      expect(screen.queryByText("Eight cards each")).not.toBeInTheDocument();
     });
 
     it("notes the voided declarations on a table whose declarations do not transfer", () => {

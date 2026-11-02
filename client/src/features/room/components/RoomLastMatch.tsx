@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { MatchListItem } from "@/shared/api/matches";
 import { MatchPlayerActions } from "@/shared/components/matchStats/MatchPlayerActions";
 import { MatchStatsCard } from "@/shared/components/matchStats/MatchStatsCard";
-import { Badge } from "@/shared/components/ui/badge";
+import { cn } from "@/shared/lib/utils";
 
 interface RoomLastMatchProps {
   match: MatchListItem;
@@ -39,15 +39,25 @@ export function RoomLastMatch({ match, roomId, playersInRoom, compact }: RoomLas
   );
 }
 
-/** The Win or Loss tag on the Last match tab. */
+/** The win or loss dot on the Last match tab, small enough to keep the tab on one line; the word is for screen readers. */
 export function LastMatchOutcome({ outcome }: { outcome: MatchListItem["outcome"] }) {
   const { t } = useTranslation();
   if (outcome === "abandoned") return null;
+  const label =
+    outcome === "win"
+      ? t("profile.matchHistory.outcomeWin")
+      : t("profile.matchHistory.outcomeLoss");
   return (
-    <Badge size="sm" tone={outcome === "win" ? "accent" : "danger"}>
-      {outcome === "win"
-        ? t("profile.matchHistory.outcomeWin")
-        : t("profile.matchHistory.outcomeLoss")}
-    </Badge>
+    <span
+      title={label}
+      data-testid="last-match-outcome"
+      data-outcome={outcome}
+      className={cn(
+        "inline-block size-2 shrink-0 rounded-full",
+        outcome === "win" ? "bg-positive" : "bg-danger",
+      )}
+    >
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }

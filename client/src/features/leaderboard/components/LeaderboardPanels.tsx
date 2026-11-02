@@ -35,7 +35,7 @@ export function RankLadderPanel({ yours }: { yours: SeasonTier | null }) {
             )}
             data-tier={tier}
           >
-            <TierBadge tier={tier} size="sm" glow={false} />
+            <TierBadge tier={tier} size="sm" />
             <span className="text-sm font-semibold" style={{ color: SEASON_TIER_COLOR[tier] }}>
               {t(`season.tier.${tier}`)}
             </span>

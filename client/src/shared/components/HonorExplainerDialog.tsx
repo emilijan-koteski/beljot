@@ -1,6 +1,5 @@
 import { Clock, Flag, Info, LogOut, ShieldCheck } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
 
 import { HonorBandMeter } from "@/shared/components/HonorBandMeter";
 import { HonorShield } from "@/shared/components/HonorShield";
@@ -30,7 +29,6 @@ const FACTS = [
  */
 export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialogProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
 
   const isNew = honorIsNewPlayer(user?.isNewPlayer);
@@ -49,14 +47,6 @@ export function HonorExplainerDialog({ open, onOpenChange }: HonorExplainerDialo
         label: t("profile.honor.explainer.close"),
         onClick: close,
         testId: "honor-explainer-close",
-      }}
-      secondary={{
-        label: t("profile.honor.explainer.fullRules"),
-        onClick: () => {
-          close();
-          navigate("/rules#honour");
-        },
-        testId: "honor-explainer-rules-link",
       }}
       testId="honor-explainer"
     >

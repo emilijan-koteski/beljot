@@ -54,7 +54,7 @@ export function SeasonStandingCard({
       <section className={cn(CARD, "flex-col gap-3")} data-testid="leaderboard-standing-empty">
         {header}
         <div className="flex items-center gap-3">
-          <TierBadge tier="iron" size="md" glow={false} />
+          <TierBadge tier="iron" size="md" />
           <div className="flex min-w-0 flex-col">
             <span className="text-ink text-base font-semibold">
               {t("season.leaderboard.notOnBoard")}

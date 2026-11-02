@@ -1,4 +1,4 @@
-import type { DeclarationKind, Rank } from "./types";
+import type { Rank, Suit } from "./types";
 
 export type CardBase = { rank: Rank; pts: number; strength: number };
 
@@ -24,20 +24,25 @@ export const PLAIN_ROWS: CardBase[] = [
   { rank: "7", pts: 0, strength: 8 },
 ];
 
+export const TRUMP_SUIT: Suit = "C";
+export const PLAIN_SUIT: Suit = "H";
+
 type DeclarationBase = {
   id: string;
   pts: number;
-  tier: 0 | 1 | 2 | 3;
-  kind: DeclarationKind;
+  cards: Rank[];
+  suit: Suit;
+  set: boolean;
+  wins: boolean;
 };
 
 export const DECLARATIONS_BASE: DeclarationBase[] = [
-  { id: "belot", pts: 20, tier: 0, kind: "belot" },
-  { id: "terca", pts: 20, tier: 0, kind: "run" },
-  { id: "kvarta", pts: 50, tier: 1, kind: "run" },
-  { id: "kvinta", pts: 100, tier: 1, kind: "run" },
-  { id: "carre", pts: 100, tier: 1, kind: "set" },
-  { id: "carre9", pts: 150, tier: 2, kind: "set" },
-  { id: "carreJ", pts: 200, tier: 2, kind: "set" },
-  { id: "bela", pts: 1001, tier: 3, kind: "run" },
+  { id: "belot", pts: 20, cards: ["K", "Q"], suit: TRUMP_SUIT, set: false, wins: false },
+  { id: "terca", pts: 20, cards: ["7", "8", "9"], suit: "H", set: false, wins: false },
+  { id: "kvarta", pts: 50, cards: ["9", "10", "J", "Q"], suit: "S", set: false, wins: false },
+  { id: "kvinta", pts: 100, cards: ["10", "J", "Q", "K", "A"], suit: "D", set: false, wins: false },
+  { id: "carre", pts: 100, cards: ["A", "A", "A", "A"], suit: "S", set: true, wins: false },
+  { id: "carre9", pts: 150, cards: ["9", "9", "9", "9"], suit: "S", set: true, wins: false },
+  { id: "carreJ", pts: 200, cards: ["J", "J", "J", "J"], suit: "S", set: true, wins: false },
+  { id: "bela", pts: 1001, cards: [], suit: TRUMP_SUIT, set: false, wins: true },
 ];

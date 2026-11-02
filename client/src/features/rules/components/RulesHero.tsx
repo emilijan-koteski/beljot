@@ -1,40 +1,29 @@
-import type { Fact as FactData } from "@/features/rules/content/types";
 import { useRules } from "@/features/rules/RulesContext";
+import { Eyebrow } from "@/shared/components/ui/eyebrow";
 
-function Fact({ label, value, caption }: FactData) {
-  return (
-    <div className="bg-surface border-border flex min-w-35 flex-[1_1_140px] flex-col gap-0.5 rounded-lg border px-3.5 py-3">
-      <span className="text-brass-deep font-mono text-2xs font-bold tracking-caps uppercase">
-        {label}
-      </span>
-      <span className="text-ink text-3xl leading-tight font-bold tracking-tight tabular-nums">
-        {value}
-      </span>
-      <span className="text-ink-dim text-xs">{caption}</span>
-    </div>
-  );
-}
-
-/** Page intro: eyebrow, title, lede, and the quick-facts row. */
+/** Page intro: eyebrow, title, one line of intro and the four quick facts in one strip. */
 export function RulesHero() {
   const { ui } = useRules();
   return (
-    <header className="flex flex-col gap-4.5 pb-7">
-      <div className="text-brass-deep font-mono text-2xs font-semibold tracking-caps uppercase">
-        {ui.heroEyebrow}
-      </div>
-
-      <h1 className="text-ink m-0 text-5xl leading-none font-bold tracking-tight">
+    <header className="flex flex-col gap-3">
+      <Eyebrow>{ui.heroEyebrow}</Eyebrow>
+      <h1 className="text-ink m-0 text-3xl font-semibold tracking-tight md:text-4xl">
         {ui.heroTitle}
       </h1>
-
-      <p className="text-ink-dim m-0 max-w-160 text-lg leading-relaxed">{ui.heroIntro}</p>
-
-      <div className="flex flex-wrap gap-2.5 pt-1">
-        {ui.facts.map((f, i) => (
-          <Fact key={i} label={f.label} value={f.value} caption={f.caption} />
+      <p className="text-ink-dim m-0 max-w-140 text-sm leading-relaxed md:text-base">
+        {ui.heroIntro}
+      </p>
+      <dl
+        className="bg-surface border-border divide-border m-0 mt-1 grid grid-cols-4 divide-x rounded-xl border shadow-xs"
+        data-testid="rules-facts"
+      >
+        {ui.facts.map((f) => (
+          <div key={f.label} className="flex flex-col-reverse items-center gap-0.5 py-2.5">
+            <dt className="text-ink-mute text-2xs">{f.label}</dt>
+            <dd className="text-ink m-0 text-xl leading-none font-bold tabular-nums">{f.value}</dd>
+          </div>
         ))}
-      </div>
+      </dl>
     </header>
   );
 }

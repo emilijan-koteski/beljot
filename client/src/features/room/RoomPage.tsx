@@ -875,8 +875,8 @@ export function RoomPage() {
             {
               value: "last",
               label: (
-                <span className="inline-flex items-center gap-1.5">
-                  {t("room.lastMatch.title")}
+                <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
+                  <span className="truncate">{t("room.lastMatch.title")}</span>
                   <LastMatchOutcome outcome={lastMatch.outcome} />
                 </span>
               ),

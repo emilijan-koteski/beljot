@@ -116,7 +116,7 @@ export function ProfileHero({
     const tier = normalizeSeasonTier(seasonRank.tier, sp);
     rankChip = (
       <Pill style={{ borderColor: SEASON_TIER_LINE[tier] }} testId="profile-hero-rank">
-        <TierBadge tier={tier} size="sm" glow={false} className="-ml-1.5 size-5 [&>svg]:size-3" />
+        <TierBadge tier={tier} size="sm" className="-ml-1.5 size-5 [&>svg]:size-3" />
         <span style={{ color: SEASON_TIER_COLOR[tier] }}>
           {seasonRankLabel(t, tier, normalizeSeasonDivision(tier, seasonRank.division))}
         </span>
