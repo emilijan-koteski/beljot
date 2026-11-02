@@ -61,8 +61,9 @@ describe("TrickArea", () => {
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
 
     const trickArea = screen.getByTestId("trick-area");
-    const glowEl = trickArea.querySelector('[class*="shadow-[0_0_24px_var(--color-accent)]"]');
+    const glowEl = trickArea.querySelector('[data-winner="true"]');
     expect(glowEl).toBeInTheDocument();
+    expect(glowEl?.className).toContain("var(--accent-light)");
   });
 
   it("filters out cards present in suppressedCardIds (overlay paints them)", () => {
@@ -106,9 +107,9 @@ describe("TrickArea", () => {
     );
 
     const resolved = screen.getByTestId("trick-slot-card-1-resolved");
-    expect(resolved.className).toContain("shadow-");
+    expect(resolved).toHaveAttribute("data-winner", "true");
     const live = screen.getByTestId("trick-slot-card-1");
-    expect(live.className).not.toContain("shadow-");
+    expect(live).not.toHaveAttribute("data-winner");
   });
 
   it("suppresses a live card mid-flight without hiding the snapshot card at its compass", () => {
