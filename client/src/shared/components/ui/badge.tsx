@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-type BadgeTone = "neutral" | "accent" | "brass" | "bot" | "teamA" | "teamB" | "danger";
+type BadgeTone = "neutral" | "accent" | "positive" | "brass" | "bot" | "teamA" | "teamB" | "danger";
 
 type BadgeSize = "sm" | "md" | "lg";
 
@@ -17,6 +17,7 @@ type BadgeProps = Omit<React.ComponentProps<"span">, "children"> & {
 const TONE_CLASS: Record<BadgeTone, string> = {
   neutral: "bg-surface-sunken text-ink-dim",
   accent: "bg-accent-soft text-accent-deep",
+  positive: "bg-positive-soft text-positive-deep",
   brass: "bg-brass-soft text-brass-deep",
   bot: "bg-bot-soft text-bot-deep",
   teamA: "bg-(--team-a-tint) text-team-a",

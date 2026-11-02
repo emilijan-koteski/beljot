@@ -53,7 +53,7 @@ function FriendRow({
         <span className="text-ink truncate text-sm font-semibold">{friend.username}</span>
         <span className="text-ink-mute inline-flex items-center gap-1.5 text-2xs">
           <span
-            className={cn("size-1.5 rounded-full", online ? "bg-accent" : "bg-faint")}
+            className={cn("size-1.5 rounded-full", online ? "bg-positive" : "bg-faint")}
             aria-hidden="true"
           />
           {online ? t("friends.online") : t("friends.offline")}

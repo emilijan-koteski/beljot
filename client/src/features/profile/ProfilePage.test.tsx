@@ -90,6 +90,7 @@ function profileFixture(overrides: Partial<ProfileResponse> = {}): ProfileRespon
     avatarLargeUrl: null,
     languagePreference: "en",
     cardDeckPreference: "french",
+    themePreference: "parchment",
     soundEnabled: true,
     musicEnabled: true,
     soundVolume: 70,

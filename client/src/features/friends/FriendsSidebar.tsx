@@ -14,7 +14,7 @@ export function FriendsSidebar() {
     <Panel
       icon={<Users aria-hidden="true" />}
       title={t("friends.list.heading")}
-      aside={<span className="text-accent">{t("friends.onlineCount", { count: online })}</span>}
+      aside={<span className="text-positive">{t("friends.onlineCount", { count: online })}</span>}
       testId="friends-sidebar"
     >
       <FriendsPanel />

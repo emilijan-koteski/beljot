@@ -1508,6 +1508,10 @@
     },
     "language": {
       "label": "Jezik"
+    },
+    "theme": {
+      "label": "Mesing tema",
+      "hint": "Tamna čoja i mesing na svim stranama van meča."
     }
   }
 }

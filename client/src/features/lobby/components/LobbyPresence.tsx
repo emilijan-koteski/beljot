@@ -13,7 +13,7 @@ export function LobbyCounts({ stats }: { stats: LobbyStats | undefined }) {
       data-testid="lobby-counts"
     >
       <span
-        className="bg-accent mr-1.5 inline-block size-1.5 rounded-full align-middle"
+        className="bg-positive mr-1.5 inline-block size-1.5 rounded-full align-middle"
         aria-hidden="true"
       />
       {t("lobby.stats.line", { online: stats?.online ?? "—", playing: stats?.inMatch ?? "—" })}
@@ -42,7 +42,7 @@ export function PresenceLine({
       >
         <Users className="text-ink-dim size-3.5" aria-hidden="true" />
         {t("friends.list.heading")}
-        <span className="text-accent">{t("friends.onlineCount", { count: online })}</span>
+        <span className="text-positive">{t("friends.onlineCount", { count: online })}</span>
         <ChevronRight className="text-ink-mute size-3.5" aria-hidden="true" />
       </button>
       <LobbyCounts stats={stats} />

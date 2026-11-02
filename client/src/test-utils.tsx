@@ -19,6 +19,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     email: "test@example.com",
     languagePreference: "en",
     cardDeckPreference: "french",
+    themePreference: "parchment",
     soundEnabled: true,
     musicEnabled: true,
     soundVolume: 70,

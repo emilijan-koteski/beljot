@@ -70,7 +70,7 @@ export function LeaderboardTableHeader({ showRank = false }: { showRank?: boolea
 export function SeasonRecord({ won, played }: { won: number; played: number }) {
   return (
     <span data-testid="leaderboard-record" className="tabular-nums">
-      <span className="text-accent-deep font-semibold">{won}</span>
+      <span className="text-positive-deep font-semibold">{won}</span>
       <span className="text-ink-mute">–</span>
       <span className="text-danger/80 font-semibold">{played - won}</span>
     </span>

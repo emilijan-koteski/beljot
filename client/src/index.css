@@ -108,6 +108,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
 
+  /* Positive (wins, online, ready) — the accent everywhere but brass mode */
+  --color-positive: var(--positive);
+  --color-positive-deep: var(--positive-deep);
+  --color-positive-soft: var(--positive-soft);
+
   /* Brass (chrome edge) */
   --color-brass: var(--brass);
   --color-brass-deep: var(--brass-deep);
@@ -331,6 +336,97 @@
   --chat-shadow-fab: var(--shadow-md);
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Brass mode — the player's dark theme for every page outside a match,
+   chosen in Settings and stored per account (users.theme_preference).
+   `useThemeSync` puts `.brass-mode` on <html>, so portalled dialogs,
+   popovers and toasts follow it too; index.html paints it from a
+   localStorage mirror before the session restores.
+
+   It re-roots the parchment tokens to the felt palette under the SAME
+   names, as `.felt-surface` does for the landing, and lifts the honour and
+   rank ramps the way `.game-table` does, so every shared component themes
+   itself with no fork. Brass is the action colour here, as it is in
+   `.felt-controls` and `.chat-dock-match`: the felt lime is the table's
+   turn signal, so off the table it is kept for `--positive` alone (a win,
+   a player online, the grandmaster tier).
+
+   `:root.brass-mode` outranks every `:root` block whatever its place in
+   this sheet. The table keeps its own `.game-table` scope, so nothing in a
+   round changes.
+   ────────────────────────────────────────────────────────────────────── */
+:root.brass-mode {
+  color-scheme: dark;
+
+  --bg: #0a1812;
+  --surface: #112a1d;
+  --surface-2: #16382a;
+  --surface-3: #0e2618;
+  --border: var(--brass-25);
+  --faint: rgba(245, 242, 232, 0.35);
+
+  --ink: var(--ink-light);
+  --ink-dim: #c8d5cd;
+  --ink-mute: color-mix(in srgb, var(--ink-light) 65%, transparent);
+
+  --accent: var(--brass);
+  --accent-deep: var(--brass-deep);
+  --accent-soft: var(--brass-soft);
+  --accent-ink: var(--brass-ink);
+  --accent-glow: var(--brass-40);
+
+  --positive: var(--accent-light);
+  --positive-deep: var(--accent-light);
+  --positive-soft: color-mix(in srgb, var(--accent-light) 16%, transparent);
+
+  /* Lighter than the felt table's #9c7d4e: here brass-deep is small text
+     (eyebrows, chevrons, the warning tone) and the primary hover, so it
+     needs 4.5:1 on --surface. */
+  --brass-deep: #b8956a;
+  --danger: var(--danger-light);
+  --bot-deep: #8ecbee;
+  --bot-soft: color-mix(in srgb, var(--bot) 22%, transparent);
+  --team-a: #c49a2c;
+  --team-b: #9aa3ae;
+
+  --h5: #58c3b1;
+  --h4: #7fd39b;
+  --h3: #c6c96e;
+  --h2: #e0a05a;
+  --h1: var(--danger);
+
+  --rt1: #93999e;
+  --rt2: #ca8e79;
+  --rt3: #9db4d0;
+  --rt4: var(--team-a-fill);
+  --rt5: #5fd4cc;
+  --rt6: #6ba8f5;
+  --rt7: #b98ce8;
+  --rt8: var(--positive);
+
+  --tier-soft: 16%;
+  --tier-line: 45%;
+
+  --whisper-ink: #f2b8d4;
+  --whisper-badge-ink: #3d0f26;
+
+  --chat-shadow-panel: var(--shadow-felt-xl), inset 0 0 0 1px var(--brass-10);
+  --chat-shadow-fab: var(--shadow-felt-md);
+}
+
+/* Positive — the colour of a good result (a win, a player online, a full
+   table). It IS the scope's accent, re-resolved per scope like the team
+   companions below; only brass mode splits the two, because there the
+   accent turns brass and a win must still read green. */
+:root,
+.parchment-inset,
+.game-table,
+.felt-surface {
+  --positive: var(--accent);
+  --positive-deep: var(--accent-deep);
+  --positive-soft: var(--accent-soft);
+}
+
 /* Team companions — resolved per scope like the tier ones below. */
 :root,
 .parchment-inset,
@@ -412,6 +508,14 @@
   body:not(.no-halos):not(.game-table) {
     background:
       radial-gradient(ellipse 90% 50% at 50% -15%, rgba(25, 101, 54, 0.07), transparent 70%),
+      radial-gradient(ellipse 70% 40% at 50% 115%, var(--brass-10), transparent 70%), var(--bg);
+    background-attachment: fixed;
+  }
+
+  /* Brass mode lights the top of the page with the felt scene green. */
+  :root.brass-mode body:not(.no-halos):not(.game-table) {
+    background:
+      radial-gradient(ellipse 90% 50% at 50% -15%, rgb(26 90 58 / 0.55), transparent 70%),
       radial-gradient(ellipse 70% 40% at 50% 115%, var(--brass-10), transparent 70%), var(--bg);
     background-attachment: fixed;
   }

@@ -15,6 +15,7 @@ import {
   ssoLogin,
 } from "@/shared/api/auth";
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { ThemePreference } from "@/shared/types/apiTypes";
 import type { CardDeck } from "@/shared/types/matchTypes";
 
 function setAuthState(res: {
@@ -24,6 +25,7 @@ function setAuthState(res: {
   email: string;
   languagePreference: string;
   cardDeckPreference: CardDeck;
+  themePreference: ThemePreference;
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;
@@ -46,6 +48,7 @@ function setAuthState(res: {
     email: res.email,
     languagePreference: res.languagePreference,
     cardDeckPreference: res.cardDeckPreference,
+    themePreference: res.themePreference,
     soundEnabled: res.soundEnabled,
     musicEnabled: res.musicEnabled,
     soundVolume: res.soundVolume,

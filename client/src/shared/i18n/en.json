@@ -1508,6 +1508,10 @@
     },
     "language": {
       "label": "Language"
+    },
+    "theme": {
+      "label": "Brass mode",
+      "hint": "Dark felt and brass on every page outside a match."
     }
   }
 }

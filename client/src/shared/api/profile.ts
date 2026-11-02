@@ -1,5 +1,5 @@
 import { axiosClient } from "@/shared/api/axiosClient";
-import type { SeasonRank } from "@/shared/types/apiTypes";
+import type { SeasonRank, ThemePreference } from "@/shared/types/apiTypes";
 import type { CardDeck } from "@/shared/types/matchTypes";
 
 export interface ProfileResponse {
@@ -10,6 +10,7 @@ export interface ProfileResponse {
   usernameChangedAt?: string | null;
   languagePreference: string;
   cardDeckPreference: CardDeck;
+  themePreference: ThemePreference;
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;
@@ -66,6 +67,7 @@ export interface PublicProfileResponse {
 interface UpdatePreferencesRequest {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
+  themePreference?: ThemePreference;
   soundEnabled?: boolean;
   musicEnabled?: boolean;
   soundVolume?: number;
@@ -77,6 +79,7 @@ interface UpdatePreferencesRequest {
 interface UpdatePreferencesResponse {
   languagePreference?: string;
   cardDeckPreference?: CardDeck;
+  themePreference?: ThemePreference;
   soundEnabled?: boolean;
   musicEnabled?: boolean;
   soundVolume?: number;

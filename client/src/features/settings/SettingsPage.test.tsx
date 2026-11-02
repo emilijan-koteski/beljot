@@ -46,6 +46,7 @@ function profile(overrides: Partial<ProfileResponse> = {}): ProfileResponse {
     usernameChangedAt: null,
     languagePreference: "en",
     cardDeckPreference: "french",
+    themePreference: "parchment",
     soundEnabled: true,
     musicEnabled: false,
     soundVolume: 70,
@@ -153,6 +154,19 @@ describe("SettingsPage", () => {
 
     await waitFor(() => expect(i18n.language).toBe("mk"));
     expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { languagePreference: "mk" });
+  });
+
+  it("turns brass mode on by its name and saves it to the account", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const toggle = screen.getByRole("switch", { name: "Brass mode" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(useAuthStore.getState().user?.themePreference).toBe("brass");
+    expect(mockUpdatePreferences).toHaveBeenCalledWith(7, { themePreference: "brass" });
   });
 
   it("logs out and lands on the landing page", async () => {

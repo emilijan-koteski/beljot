@@ -37,7 +37,7 @@ const TREND_ICON: Record<HonorTrendDirection, typeof TrendingUp> = {
 };
 
 const TREND_COLOR: Record<HonorTrendDirection, string> = {
-  up: "var(--accent)",
+  up: "var(--positive)",
   flat: "var(--ink-dim)",
   down: "var(--danger)",
 };

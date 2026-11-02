@@ -2,6 +2,7 @@ import type { AxiosError, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 import { useAuthStore } from "@/shared/stores/authStore";
+import type { ThemePreference } from "@/shared/types/apiTypes";
 import type { CardDeck } from "@/shared/types/matchTypes";
 
 const BASE_URL = "/api/v1";
@@ -96,6 +97,7 @@ async function doRefresh(): Promise<string> {
         email: string;
         languagePreference: string;
         cardDeckPreference: CardDeck;
+        themePreference: ThemePreference;
         soundEnabled: boolean;
         musicEnabled: boolean;
         soundVolume: number;
@@ -121,6 +123,7 @@ async function doRefresh(): Promise<string> {
         email: r.email,
         languagePreference: r.languagePreference,
         cardDeckPreference: r.cardDeckPreference,
+        themePreference: r.themePreference,
         soundEnabled: r.soundEnabled,
         musicEnabled: r.musicEnabled,
         soundVolume: r.soundVolume,

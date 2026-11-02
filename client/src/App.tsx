@@ -32,6 +32,7 @@ import { PublicContentLayout } from "@/shared/components/PublicContentLayout";
 import { Toaster } from "@/shared/components/ui/sonner";
 import { useAuthInit } from "@/shared/hooks/useAuth";
 import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
+import { useThemeSync } from "@/shared/hooks/useThemeSync";
 import { useTokenRefresh } from "@/shared/hooks/useTokenRefresh";
 import { useVersionCheck } from "@/shared/hooks/useVersionCheck";
 import { QueryProvider } from "@/shared/providers/QueryProvider";
@@ -50,6 +51,7 @@ function AppShell() {
   useAuthInit();
   useTokenRefresh();
   useVersionCheck();
+  useThemeSync();
 
   const isLoading = useAuthStore((s) => s.isLoading);
 

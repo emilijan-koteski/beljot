@@ -50,7 +50,7 @@ export function WinRateRing({ rate }: WinRateRingProps) {
           cy={SIZE / 2}
           r={r}
           fill="none"
-          stroke="var(--accent)"
+          stroke="var(--positive)"
           strokeWidth={STROKE}
           strokeLinecap="round"
           strokeDasharray={`${filled} ${circumference}`}

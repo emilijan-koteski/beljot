@@ -40,8 +40,8 @@ function formatDuration(
 
 function OutcomeChip({ outcome }: { outcome: MatchOutcome }) {
   const { t } = useTranslation();
-  const cfg: Record<MatchOutcome, { tone: "accent" | "danger" | "brass"; labelKey: string }> = {
-    win: { tone: "accent", labelKey: "profile.matchHistory.outcomeWin" },
+  const cfg: Record<MatchOutcome, { tone: "positive" | "danger" | "brass"; labelKey: string }> = {
+    win: { tone: "positive", labelKey: "profile.matchHistory.outcomeWin" },
     loss: { tone: "danger", labelKey: "profile.matchHistory.outcomeLoss" },
     abandoned: { tone: "brass", labelKey: "profile.matchHistory.outcomeAbandoned" },
   };
