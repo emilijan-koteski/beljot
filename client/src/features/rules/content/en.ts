@@ -191,9 +191,9 @@ export const en: RulesLangData = {
     },
     {
       id: "options",
-      label: "Room options",
-      title: "Room options",
-      lede: "The host can change these when creating a room.",
+      label: "House rules",
+      title: "House rules",
+      lede: "Tweaks a host can choose when creating a room.",
       blocks: [{ kind: "options" }],
     },
   ],

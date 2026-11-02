@@ -191,9 +191,9 @@ export const sr: RulesLangData = {
     },
     {
       id: "options",
-      label: "Opcije sobe",
-      title: "Opcije sobe",
-      lede: "Domaćin ih može promeniti kad pravi sobu.",
+      label: "Kućna pravila",
+      title: "Kućna pravila",
+      lede: "Izmene koje domaćin može da izabere kad pravi sobu.",
       blocks: [{ kind: "options" }],
     },
   ],

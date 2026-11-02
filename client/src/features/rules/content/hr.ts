@@ -192,9 +192,9 @@ export const hr: RulesLangData = {
     },
     {
       id: "options",
-      label: "Opcije sobe",
-      title: "Opcije sobe",
-      lede: "Domaćin ih može promijeniti kad stvara sobu.",
+      label: "Kućna pravila",
+      title: "Kućna pravila",
+      lede: "Izmjene koje domaćin može odabrati kad stvara sobu.",
       blocks: [{ kind: "options" }],
     },
   ],

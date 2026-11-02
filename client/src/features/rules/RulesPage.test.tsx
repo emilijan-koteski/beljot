@@ -14,7 +14,7 @@ const CHAPTER_TITLES = [
   "Playing a trick",
   "Declarations",
   "Scoring",
-  "Room options",
+  "House rules",
 ];
 
 let restoreViewport = () => {};
@@ -97,7 +97,7 @@ describe("RulesPage", () => {
       within(nav)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["Deal", "Cards", "Play", "Declarations", "Scoring", "Room options"]);
+    ).toEqual(["Deal", "Cards", "Play", "Declarations", "Scoring", "House rules"]);
 
     await user.click(within(nav).getByTestId("toc-scoring"));
 
@@ -179,7 +179,7 @@ describe("RulesPage", () => {
     expect(screen.queryByText(note)).not.toBeInTheDocument();
   });
 
-  it("words the room options as the create-room form does, standard value first", () => {
+  it("words the house rules as the create-room form does, standard value first", () => {
     renderRules();
     expect(screen.getByTestId("rules-option-declarationsTransfer")).toHaveTextContent(
       /Declarations on a fall.*To the winners · Voided/,
