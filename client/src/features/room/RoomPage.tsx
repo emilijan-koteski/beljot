@@ -788,12 +788,12 @@ export function RoomPage() {
     <div
       className={cn(
         "bg-surface-elevated flex size-20 flex-col items-center justify-center rounded-full border shadow-sm",
-        allSeated ? "border-accent" : "border-brass/50",
+        allSeated ? "border-positive" : "border-brass/50",
       )}
       data-testid="table-center"
     >
       {allSeated ? (
-        <Check className="text-accent size-6" aria-hidden="true" />
+        <Check className="text-positive size-6" aria-hidden="true" />
       ) : (
         <span className="text-ink text-xl font-bold tabular-nums" data-testid="seated-count">
           {seatedCount}

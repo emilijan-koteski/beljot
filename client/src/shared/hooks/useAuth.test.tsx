@@ -40,6 +40,7 @@ const USER = {
   email: "a@b.c",
   languagePreference: "mk",
   cardDeckPreference: "french" as const,
+  themePreference: "parchment" as const,
   soundEnabled: true,
   musicEnabled: true,
   soundVolume: 70,

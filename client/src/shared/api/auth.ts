@@ -1,6 +1,7 @@
 import type { AxiosError } from "axios";
 
 import { axiosPublic, FetchError } from "@/shared/api/axiosClient";
+import type { ThemePreference } from "@/shared/types/apiTypes";
 import type { CardDeck } from "@/shared/types/matchTypes";
 
 export interface RegisterRequest {
@@ -17,6 +18,7 @@ interface RegisterResponse {
   email: string;
   languagePreference: string;
   cardDeckPreference: CardDeck;
+  themePreference: ThemePreference;
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;

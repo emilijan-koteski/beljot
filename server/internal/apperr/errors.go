@@ -50,6 +50,7 @@ var (
 	ErrUserNotFound          = NewAppError("USER_NOT_FOUND", "user not found", http.StatusNotFound)
 	ErrInvalidLanguage       = NewAppError("INVALID_LANGUAGE", "language must be one of: en, sr, mk, hr", http.StatusBadRequest)
 	ErrInvalidCardDeck       = NewAppError("INVALID_CARD_DECK", "card deck must be one of: french, croatian", http.StatusBadRequest)
+	ErrInvalidTheme          = NewAppError("INVALID_THEME", "theme must be one of: parchment, brass", http.StatusBadRequest)
 	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
 	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
 

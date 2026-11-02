@@ -2,11 +2,14 @@ import { Gamepad2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Segmented } from "@/shared/components/ui/segmented";
+import { Switch } from "@/shared/components/ui/switch";
 import {
   LANGUAGE_OPTIONS,
   type LanguageCode,
   useChangeLanguage,
 } from "@/shared/hooks/useChangeLanguage";
+import { persistTheme } from "@/shared/lib/themePreference";
+import { useAuthStore } from "@/shared/stores/authStore";
 
 import { CardDeckRow } from "./CardDeckRow";
 import { SettingsGroup, SettingsRow } from "./SettingsGroup";
@@ -42,7 +45,30 @@ function LanguageRow({ wide }: { wide: boolean }) {
   );
 }
 
-/** The Game group of Settings: language and card deck; `wide` lines their controls up on the right. */
+/** The brass mode switch: the dark theme for every page outside a match, saved optimistically to the account. */
+function ThemeRow() {
+  const { t } = useTranslation();
+  const brass = useAuthStore((s) => s.user?.themePreference === "brass");
+
+  return (
+    <SettingsRow
+      asLabel
+      label={t("settings.theme.label")}
+      hint={t("settings.theme.hint")}
+      control={
+        <Switch
+          checked={brass}
+          onCheckedChange={(checked) =>
+            void persistTheme(checked ? "brass" : "parchment", checked ? "parchment" : "brass")
+          }
+          data-testid="settings-brass-mode"
+        />
+      }
+    />
+  );
+}
+
+/** The Game group of Settings: brass mode, language and card deck; `wide` lines their controls up on the right. */
 export function GameSection({ wide = false }: { wide?: boolean }) {
   const { t } = useTranslation();
   return (
@@ -52,6 +78,7 @@ export function GameSection({ wide = false }: { wide?: boolean }) {
       icon={<Gamepad2 />}
       testId="settings-game"
     >
+      <ThemeRow />
       <LanguageRow wide={wide} />
       <CardDeckRow wide={wide} />
     </SettingsGroup>

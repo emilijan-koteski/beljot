@@ -18,6 +18,15 @@
       rel="stylesheet"
     />
     <title>Beljot.online</title>
+    <!-- Paints the signed-in player's brass mode before the session restores;
+         useThemeSync takes over (and clears it on sign-out) once it has. -->
+    <script>
+      try {
+        if (localStorage.getItem("beljot.theme") === "brass") {
+          document.documentElement.classList.add("brass-mode");
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

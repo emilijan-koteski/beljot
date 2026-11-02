@@ -1,5 +1,8 @@
 import type { CardDeck, MatchMode, Variant } from "./matchTypes";
 
+/** The look of every page outside a match: the light parchment default or the dark brass mode. */
+export type ThemePreference = "parchment" | "brass";
+
 /** The signed-in user's own account; numeric and boolean fields are real Go zero values, so compare explicitly, never by truthiness. */
 export interface User {
   id: number;
@@ -7,6 +10,7 @@ export interface User {
   email: string;
   languagePreference: string;
   cardDeckPreference: CardDeck;
+  themePreference: ThemePreference;
   soundEnabled: boolean;
   musicEnabled: boolean;
   soundVolume: number;

@@ -34,6 +34,7 @@ type RegisterResponseData struct {
 	Email                 string    `json:"email"`
 	LanguagePreference    string    `json:"languagePreference"`
 	CardDeckPreference    string    `json:"cardDeckPreference"`
+	ThemePreference       string    `json:"themePreference"`
 	SoundEnabled          bool      `json:"soundEnabled"`
 	MusicEnabled          bool      `json:"musicEnabled"`
 	SoundVolume           int       `json:"soundVolume"`
@@ -162,6 +163,7 @@ func authResponseData(u *user.User, accessToken string) RegisterResponseData {
 		Email:                 u.Email,
 		LanguagePreference:    u.LanguagePreference,
 		CardDeckPreference:    u.CardDeckPreference,
+		ThemePreference:       u.ThemePreference,
 		SoundEnabled:          u.SoundEnabled,
 		MusicEnabled:          u.MusicEnabled,
 		SoundVolume:           u.SoundVolume,
@@ -231,6 +233,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		PasswordHash:          hash,
 		LanguagePreference:    lang,
 		CardDeckPreference:    deck,
+		ThemePreference:       user.ThemeParchment,
 		AllowNonFriendInvites: true,
 		WalletBalance:         5000,
 		LoginStreakDays:       0,

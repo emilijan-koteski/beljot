@@ -113,6 +113,9 @@ func (m *mockUserRepo) UpdatePreferences(id uint, prefs user.PreferencesUpdate) 
 			if prefs.CardDeckPreference != nil {
 				u.CardDeckPreference = *prefs.CardDeckPreference
 			}
+			if prefs.ThemePreference != nil {
+				u.ThemePreference = *prefs.ThemePreference
+			}
 			if prefs.SoundEnabled != nil {
 				u.SoundEnabled = *prefs.SoundEnabled
 			}
@@ -498,11 +501,13 @@ func TestRegister_CardDeckPreference(t *testing.T) {
 
 			assert.Equal(t, tc.expectedLang, data.LanguagePreference)
 			assert.Equal(t, tc.expectedDeck, data.CardDeckPreference)
+			assert.Equal(t, user.ThemeParchment, data.ThemePreference)
 
 			repo, ok := handler.userRepo.(*mockUserRepo)
 			require.True(t, ok)
 			require.Len(t, repo.users, 1)
 			assert.Equal(t, tc.expectedDeck, repo.users[0].CardDeckPreference)
+			assert.Equal(t, user.ThemeParchment, repo.users[0].ThemePreference)
 		})
 	}
 }

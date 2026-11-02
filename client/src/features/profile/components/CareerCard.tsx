@@ -55,7 +55,7 @@ function OutcomeSplit({
       aria-hidden="true"
       data-testid="profile-outcome-split"
     >
-      <span className="bg-accent" style={{ width: share(wins) }} />
+      <span className="bg-positive" style={{ width: share(wins) }} />
       <span className="bg-danger/70" style={{ width: share(losses) }} />
       <span className="bg-ink-mute/50" style={{ width: share(abandoned) }} />
     </span>
@@ -73,7 +73,7 @@ function StreakLine({ streak, subjectIsSelf }: { streak: CareerStreak; subjectIs
     <div
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-3 py-2",
-        hot ? "bg-accent-soft text-accent-deep" : "bg-surface-sunken text-ink-dim",
+        hot ? "bg-positive-soft text-positive-deep" : "bg-surface-sunken text-ink-dim",
       )}
       data-testid="profile-streak"
       data-streak-kind={streak.kind}
@@ -139,7 +139,7 @@ export function CareerCard({
                 testId="profile-stat-wins"
                 label={t("profile.stats.wins")}
                 value={wins}
-                className="text-accent-deep"
+                className="text-positive-deep"
               />
               <Count
                 testId="profile-stat-losses"
