@@ -1083,6 +1083,7 @@
       "honorNoteOther": "If time runs out, it counts as abandoning and costs honor.",
       "honorNoteSelf": "Stay on this page. If time runs out, you abandon the match and lose honor.",
       "matchAbandoned": "{{player}} abandoned the match",
+      "missedTurns": "Three missed turns in a row",
       "matchAbandonedScores": "Final: Us {{us}} : Them {{them}}",
       "abandonCountsWin": "Counts as a win",
       "abandonCountsLoss": "Counts as a loss",

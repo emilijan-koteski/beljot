@@ -185,6 +185,7 @@ export const MatchEndPayloadSchema = z.strictObject({
 
 export const MatchAbandonedPayloadSchema = z.strictObject({
   abandonedByPlayer: z.number(),
+  reason: z.union([z.literal("disconnect"), z.literal("missed_turns")]),
   teamAFinalScore: z.number(),
   teamBFinalScore: z.number(),
   matchDurationSec: z.number(),

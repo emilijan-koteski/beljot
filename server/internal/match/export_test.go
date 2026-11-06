@@ -257,6 +257,21 @@ func (m *Manager) TriggerTimerExpiryForTest(roomID uint, expectedSeat int, fireA
 	lm.mu.Unlock()
 }
 
+// ExpireTurnForTest runs the per-move timer expiry for the seat on the clock, synchronously.
+func (m *Manager) ExpireTurnForTest(roomID uint) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.mu.Lock()
+	gen := lm.timerGeneration
+	seat := lm.gameState.ActivePlayerSeat
+	lm.mu.Unlock()
+	m.handleTimerExpiry(lm, gen, seat)
+}
+
 // SetBotSearchForTest enables or disables the bot card search with the given settings.
 func (m *Manager) SetBotSearchForTest(s BotSearchSettings) {
 	m.SetBotSearch(s)

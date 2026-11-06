@@ -583,6 +583,7 @@ describe("MatchPage", () => {
     act(() => {
       useMatchStore.getState().setMatchAbandonedData({
         abandonedByPlayer: 2,
+        reason: "disconnect",
         teamAFinalScore: 450,
         teamBFinalScore: 380,
         matchDurationSec: 600,
@@ -3086,6 +3087,7 @@ describe("MatchPage", () => {
         });
         useMatchStore.getState().setMatchAbandonedData({
           abandonedByPlayer: abandoner,
+          reason: "disconnect",
           teamAFinalScore: 300,
           teamBFinalScore: 200,
           matchDurationSec: 200,
@@ -3100,6 +3102,7 @@ describe("MatchPage", () => {
         useMatchStore.getState().setMatchState(mockMatchState);
         useMatchStore.getState().setMatchAbandonedData({
           abandonedByPlayer: 0,
+          reason: "disconnect",
           teamAFinalScore: 300,
           teamBFinalScore: 200,
           matchDurationSec: 200,

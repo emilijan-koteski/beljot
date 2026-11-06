@@ -51,6 +51,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
   - Belote follows the declarations, and a Capot obeys the rule just like a fall. A room with declarations off always stores the rule as on.
 - If both teams cross the target in the same hand, the higher total wins; an exact tie goes to the taker's team (`determineMatchWinner`).
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
+- Three per-move timer expiries in a row for one human seat forfeit the match exactly like a disconnect (`missed_turns.go`). A move of their own resets the count; the Croatian declaration window and the hand-complete pause do not count.
 
 ## Wire and state
 

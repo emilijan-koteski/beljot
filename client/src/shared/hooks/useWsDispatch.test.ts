@@ -2462,6 +2462,7 @@ describe("useWsDispatch - season points", () => {
       type: "event:match_abandoned",
       payload: {
         abandonedByPlayer: 1,
+        reason: "disconnect",
         teamAFinalScore: 300,
         teamBFinalScore: 200,
         matchDurationSec: 400,
@@ -2495,6 +2496,7 @@ describe("useWsDispatch - season points", () => {
       type: "event:match_abandoned",
       payload: {
         abandonedByPlayer: 1,
+        reason: "disconnect",
         teamAFinalScore: 300,
         teamBFinalScore: 200,
         matchDurationSec: 400,

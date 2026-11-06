@@ -259,8 +259,11 @@ export interface PlayerReconnectedPayload {
   playerSeat: number;
 }
 
+export type AbandonReason = "disconnect" | "missed_turns";
+
 export interface MatchAbandonedPayload {
   abandonedByPlayer: number;
+  reason: AbandonReason;
   teamAFinalScore: number;
   teamBFinalScore: number;
   matchDurationSec: number;

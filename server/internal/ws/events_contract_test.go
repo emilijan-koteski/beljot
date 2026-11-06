@@ -158,6 +158,7 @@ func TestEventsJSONContract(t *testing.T) {
 			name: "MatchAbandonedPayload",
 			sample: ws.MatchAbandonedPayload{
 				AbandonedByPlayer: 2,
+				Reason:            ws.AbandonReasonMissedTurns,
 				TeamAFinalScore:   420,
 				TeamBFinalScore:   380,
 				MatchDurationSec:  600,

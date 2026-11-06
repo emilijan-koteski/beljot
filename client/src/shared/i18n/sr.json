@@ -1083,6 +1083,7 @@
       "honorNoteOther": "Ako vreme istekne, to je napuštanje meča i gubi se čast.",
       "honorNoteSelf": "Ostani na ovoj stranici. Ako vreme istekne, napuštaš meč i gubiš čast.",
       "matchAbandoned": "{{player}} · meč napušten",
+      "missedTurns": "Tri propuštena poteza zaredom",
       "matchAbandonedScores": "Rezultat: Mi {{us}} : Oni {{them}}",
       "abandonCountsWin": "Računa se kao pobeda",
       "abandonCountsLoss": "Računa se kao poraz",

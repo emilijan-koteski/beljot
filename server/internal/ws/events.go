@@ -182,12 +182,21 @@ type PlayerReconnectedPayload struct {
 	PlayerSeat int `json:"playerSeat"`
 }
 
+// AbandonReason says why a seat forfeited the match in event:match_abandoned.
+type AbandonReason string
+
+const (
+	AbandonReasonDisconnect  AbandonReason = "disconnect"
+	AbandonReasonMissedTurns AbandonReason = "missed_turns"
+)
+
 // MatchAbandonedPayload is the typed payload for EventMatchAbandoned events.
 type MatchAbandonedPayload struct {
-	AbandonedByPlayer int `json:"abandonedByPlayer"`
-	TeamAFinalScore   int `json:"teamAFinalScore"`
-	TeamBFinalScore   int `json:"teamBFinalScore"`
-	MatchDurationSec  int `json:"matchDurationSec"`
+	AbandonedByPlayer int           `json:"abandonedByPlayer"`
+	Reason            AbandonReason `json:"reason"`
+	TeamAFinalScore   int           `json:"teamAFinalScore"`
+	TeamBFinalScore   int           `json:"teamBFinalScore"`
+	MatchDurationSec  int           `json:"matchDurationSec"`
 }
 
 // OutcomeReason is the typed outcome discriminator carried in event:match_end.
