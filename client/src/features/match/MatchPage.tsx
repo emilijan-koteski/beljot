@@ -726,7 +726,6 @@ export function MatchPage() {
       "error:illegal_play": "match.errors.illegalPlay",
       "error:pause_exhausted": "match.errors.pauseExhausted",
       "error:no_active_pause": "match.errors.noActivePause",
-      "error:pause_extend_used": "match.errors.pauseExtendUsed",
       "error:not_room_owner": "match.errors.notRoomOwner",
       "error:must_pick_trump": "match.errors.mustPickTrump",
     };
@@ -1442,6 +1441,7 @@ export function MatchPage() {
       {isPaused && (
         <PauseOverlay
           pausedPlayers={matchState.pausedPlayers}
+          pauseUsed={matchState.pauseUsed}
           pauseExtended={matchState.pauseExtended}
           pauseExpiresAt={matchState.pauseExpiresAt}
           pauseTotalSec={matchState.pauseTotalSec}

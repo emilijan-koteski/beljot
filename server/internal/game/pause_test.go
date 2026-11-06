@@ -229,7 +229,7 @@ func TestExtendPause(t *testing.T) {
 		assertState func(t *testing.T, gs *game.GameState)
 	}{
 		{
-			name: "any player can extend the pause once and then holds it",
+			name: "adding time spends the player's one pause and makes them a holder",
 			setup: func() *game.GameState {
 				return testfixtures.NewGamePaused(0)
 			},
@@ -237,30 +237,52 @@ func TestExtendPause(t *testing.T) {
 			assertState: func(t *testing.T, gs *game.GameState) {
 				assert.Equal(t, game.PhasePaused, gs.Phase)
 				assert.True(t, gs.PauseExtended[2])
+				assert.True(t, gs.PauseUsed[2], "adding time burns the player's pause")
 				assert.True(t, gs.PausedPlayers[2], "the extender holds the pause too")
 				assert.True(t, gs.PausedPlayers[0])
 			},
 		},
 		{
-			name: "the player who paused can extend their own pause",
+			name: "the player who paused cannot add time, having spent their pause",
 			setup: func() *game.GameState {
 				return testfixtures.NewGamePaused(0)
 			},
-			action: game.Action{Type: game.ActionExtendPause, PlayerSeat: 0},
-			assertState: func(t *testing.T, gs *game.GameState) {
-				assert.True(t, gs.PauseExtended[0])
-			},
+			action:  game.Action{Type: game.ActionExtendPause, PlayerSeat: 0},
+			wantErr: apperr.ErrPauseExhausted,
 		},
 		{
 			name: "a second extension by the same player is refused",
 			setup: func() *game.GameState {
 				gs := testfixtures.NewGamePaused(0)
 				gs.PauseExtended[1] = true
+				gs.PauseUsed[1] = true
 				gs.PausedPlayers[1] = true
 				return gs
 			},
 			action:  game.Action{Type: game.ActionExtendPause, PlayerSeat: 1},
-			wantErr: apperr.ErrPauseExtendUsed,
+			wantErr: apperr.ErrPauseExhausted,
+		},
+		{
+			name: "a player who paused earlier in the match cannot add time later",
+			setup: func() *game.GameState {
+				gs := testfixtures.NewGamePaused(0)
+				gs.PauseUsed[3] = true
+				return gs
+			},
+			action:  game.Action{Type: game.ActionExtendPause, PlayerSeat: 3},
+			wantErr: apperr.ErrPauseExhausted,
+		},
+		{
+			name: "a pause sent while already paused adds time like an extension",
+			setup: func() *game.GameState {
+				return testfixtures.NewGamePaused(0)
+			},
+			action: game.Action{Type: game.ActionPause, PlayerSeat: 1},
+			assertState: func(t *testing.T, gs *game.GameState) {
+				assert.True(t, gs.PauseExtended[1])
+				assert.True(t, gs.PauseUsed[1])
+				assert.True(t, gs.PausedPlayers[1])
+			},
 		},
 		{
 			name: "extending outside a pause is refused",
@@ -275,6 +297,7 @@ func TestExtendPause(t *testing.T) {
 			setup: func() *game.GameState {
 				gs := testfixtures.NewGamePaused(0)
 				gs.PauseExtended[3] = true
+				gs.PauseUsed[3] = true
 				gs.PausedPlayers[3] = true
 				return gs
 			},

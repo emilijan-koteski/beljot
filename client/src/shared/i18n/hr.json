@@ -937,8 +937,7 @@
       "pauseExhausted": "Pauza je već iskorištena",
       "noActivePause": "Nemaš aktivnu pauzu",
       "notRoomOwner": "Samo domaćin može ovo učiniti",
-      "mustPickTrump": "Ovdje ne možeš dalje. Odaberi boju.",
-      "pauseExtendUsed": "Produženje ove pauze je već iskorišteno"
+      "mustPickTrump": "Ovdje ne možeš dalje. Odaberi boju."
     },
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",

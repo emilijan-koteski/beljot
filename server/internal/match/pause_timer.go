@@ -79,3 +79,15 @@ func (m *Manager) handlePauseTimeout(session *LiveMatch, generation uint64) {
 	m.broadcastState(playerIDs, newState)
 	m.maybeScheduleBotAction(session)
 }
+
+// broadcastPauseExtended tells the table who added time to the pause and when it now ends.
+func (m *Manager) broadcastPauseExtended(userIDs []uint, gs *game.GameState, seat int) {
+	if gs.PauseExpiresAt == nil {
+		return
+	}
+	extended := ws.PauseExtendedPayload{
+		ExtendedBy:     seat,
+		PauseExpiresAt: gs.PauseExpiresAt.UTC().Format(time.RFC3339Nano),
+	}
+	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPauseExtended, extended))
+}

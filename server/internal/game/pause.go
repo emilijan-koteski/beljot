@@ -2,8 +2,8 @@ package game
 
 import "github.com/emilijan/beljot/server/internal/apperr"
 
-// handlePause processes a pause action, one per player per match. A pause from play or bidding starts a
-// fresh pause with no extensions; a pause sent while already paused only adds the seat as a holder.
+// handlePause spends the player's one pause of the match. From play or bidding it starts a fresh pause;
+// sent while already paused it adds time instead, exactly like an extension.
 func handlePause(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhasePlaying && state.Phase != PhaseBidding &&
 		state.Phase != PhasePaused {
@@ -21,7 +21,9 @@ func handlePause(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 
-	if state.Phase != PhasePaused {
+	if state.Phase == PhasePaused {
+		newState.PauseExtended[seat] = true
+	} else {
 		newState.PreviousPhase = state.Phase
 		newState.PauseExtended = [4]bool{}
 	}
@@ -33,8 +35,8 @@ func handlePause(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
-// handleExtendPause lets each player add time to the current pause once, which also makes them a holder:
-// the pause then lasts until every holder resumes or the time runs out.
+// handleExtendPause adds time to the current pause and spends the player's one pause of the match on it.
+// The player becomes a holder: the pause lasts until every holder resumes or the time runs out.
 func handleExtendPause(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhasePaused {
 		return nil, apperr.ErrNotPaused
@@ -45,12 +47,13 @@ func handleExtendPause(state *GameState, action Action) (*GameState, error) {
 		return nil, apperr.ErrBadRequest
 	}
 
-	if state.PauseExtended[seat] {
-		return nil, apperr.ErrPauseExtendUsed
+	if state.PauseUsed[seat] {
+		return nil, apperr.ErrPauseExhausted
 	}
 
 	newState := cloneGameState(state)
 	newState.PauseExtended[seat] = true
+	newState.PauseUsed[seat] = true
 	newState.PausedPlayers[seat] = true
 
 	return newState, nil

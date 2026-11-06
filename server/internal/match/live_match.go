@@ -427,7 +427,8 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 			expiry := time.Now().Add(pauseWindow(session))
 			newState.PauseExpiresAt = &expiry
 			newState.PauseTotalSec = pauseWindowSec(session)
-		} else if action.Type == game.ActionExtendPause && newState.PauseExpiresAt != nil {
+		} else if newState.PauseExtended[action.PlayerSeat] && !oldState.PauseExtended[action.PlayerSeat] &&
+			newState.PauseExpiresAt != nil {
 			expiry := newState.PauseExpiresAt.Add(pauseWindow(session))
 			newState.PauseExpiresAt = &expiry
 			newState.PauseTotalSec += pauseWindowSec(session)
@@ -824,11 +825,15 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPause:
-		paused := ws.MatchPausedPayload{
-			PausedBy:      action.PlayerSeat,
-			PausedPlayers: newState.PausedPlayers,
+		if oldState.Phase == game.PhasePaused {
+			m.broadcastPauseExtended(userIDs, newState, action.PlayerSeat)
+		} else {
+			paused := ws.MatchPausedPayload{
+				PausedBy:      action.PlayerSeat,
+				PausedPlayers: newState.PausedPlayers,
+			}
+			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchPaused, paused))
 		}
-		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchPaused, paused))
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderRequest:
@@ -873,13 +878,7 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionExtendPause:
-		if newState.PauseExpiresAt != nil {
-			extended := ws.PauseExtendedPayload{
-				ExtendedBy:     action.PlayerSeat,
-				PauseExpiresAt: newState.PauseExpiresAt.UTC().Format(time.RFC3339Nano),
-			}
-			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPauseExtended, extended))
-		}
+		m.broadcastPauseExtended(userIDs, newState, action.PlayerSeat)
 		m.broadcastState(playerIDs, newState)
 
 	default:
@@ -1091,8 +1090,6 @@ func (m *Manager) sendGameError(userID uint, err error) {
 		eventType = ws.ErrorPauseExhausted
 	case errors.Is(err, apperr.ErrNoActivePause):
 		eventType = ws.ErrorNoActivePause
-	case errors.Is(err, apperr.ErrPauseExtendUsed):
-		eventType = ws.ErrorPauseExtendUsed
 	case errors.Is(err, apperr.ErrNotRoomOwner):
 		eventType = ws.ErrorNotRoomOwner
 	case errors.Is(err, apperr.ErrPlayerDisconnected):

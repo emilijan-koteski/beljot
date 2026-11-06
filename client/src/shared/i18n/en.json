@@ -937,8 +937,7 @@
       "pauseExhausted": "You've already used your pause",
       "noActivePause": "You don't have an active pause",
       "notRoomOwner": "Only the host can do this",
-      "mustPickTrump": "You can't pass here. Choose a suit.",
-      "pauseExtendUsed": "You've already added time to this pause"
+      "mustPickTrump": "You can't pass here. Choose a suit."
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",

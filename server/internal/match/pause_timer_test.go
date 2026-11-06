@@ -48,20 +48,23 @@ func TestPause_RunsForTheReconnectWindow(t *testing.T) {
 	assert.Equal(t, 120, gs.PauseTotalSec)
 }
 
-func TestExtendPause_AddsOneMoreWindowPerPlayer(t *testing.T) {
+func TestExtendPause_AddsOneWindowPerUnspentPause(t *testing.T) {
 	mgr := startPauseMatch(t, 1102, 120)
 	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
 	before := *mgr.GetStateSnapshot(1102).PauseExpiresAt
 
 	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2}))
-	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 1}))
-	err := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2})
+	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 3}))
+	errPauser := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 1})
+	errTwice := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2})
 
-	assert.ErrorIs(t, err, apperr.ErrPauseExtendUsed)
+	assert.ErrorIs(t, errPauser, apperr.ErrPauseExhausted, "pausing spent seat 1's one move")
+	assert.ErrorIs(t, errTwice, apperr.ErrPauseExhausted)
 	gs := mgr.GetStateSnapshot(1102)
-	assert.Equal(t, before.Add(240*time.Second), *gs.PauseExpiresAt)
+	assert.Equal(t, before.Add(240*time.Second), *gs.PauseExpiresAt, "seat 2 and seat 3 each added a window")
 	assert.Equal(t, 360, gs.PauseTotalSec)
-	assert.Equal(t, [4]bool{false, true, true, false}, gs.PauseExtended)
+	assert.Equal(t, [4]bool{false, false, true, true}, gs.PauseExtended)
+	assert.Equal(t, [4]bool{false, true, true, true}, gs.PauseUsed)
 }
 
 func TestPause_ResumesWhenTheTimeRunsOut(t *testing.T) {

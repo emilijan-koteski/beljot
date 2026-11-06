@@ -14,6 +14,7 @@ type Seats<T> = [T, T, T, T];
 
 interface PauseOverlayProps {
   pausedPlayers: Seats<boolean>;
+  pauseUsed: Seats<boolean>;
   pauseExtended: Seats<boolean>;
   pauseExpiresAt: string | null;
   pauseTotalSec: number;
@@ -33,11 +34,12 @@ function pauseWindowSec(totalSec: number, extended: Seats<boolean>): number {
 }
 
 /**
- * The pause overlay: a countdown to the automatic resume, who holds the pause, a once-per-pause button to add
- * time, and Resume for a player holding it. Play resumes when every holder resumes or the time runs out.
+ * The pause overlay: a countdown to the automatic resume, who holds the pause, a button to add time for a
+ * player who has not spent their one pause yet, and Resume for a holder. Play resumes when all holders resume.
  */
 export function PauseOverlay({
   pausedPlayers,
+  pauseUsed,
   pauseExtended,
   pauseExpiresAt,
   pauseTotalSec,
@@ -48,7 +50,7 @@ export function PauseOverlay({
 }: PauseOverlayProps) {
   const { t } = useTranslation();
   const holding = pausedPlayers[myPlayerSeat] === true;
-  const canExtend = pauseExtended[myPlayerSeat] === false;
+  const canExtend = pauseUsed[myPlayerSeat] === false;
   const minutes = Math.round(pauseWindowSec(pauseTotalSec, pauseExtended) / SECONDS_PER_MINUTE);
 
   return (

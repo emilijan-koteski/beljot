@@ -90,6 +90,7 @@ const NONE: [boolean, boolean, boolean, boolean] = [false, false, false, false];
 function renderOverlay(overrides: Partial<PauseOverlayProps> = {}) {
   const props: PauseOverlayProps = {
     pausedPlayers: [true, false, false, false],
+    pauseUsed: [true, false, false, false],
     pauseExtended: NONE,
     pauseExpiresAt: new Date(Date.now() + 90_000).toISOString(),
     pauseTotalSec: 120,
@@ -128,15 +129,25 @@ describe("PauseOverlay", () => {
     expect(props.onResume).toHaveBeenCalledTimes(1);
   });
 
-  it("lets any player add time once per pause", () => {
+  it("lets a player with an unspent pause add time", () => {
     const props = renderOverlay({ myPlayerSeat: 1 });
     fireEvent.click(screen.getByRole("button", { name: "Add 2 min" }));
     expect(props.onExtend).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the add-time button once the player has used it", () => {
-    renderOverlay({ myPlayerSeat: 1, pauseExtended: [false, true, false, false] });
+  it("hides the add-time button once the player has spent their pause", () => {
+    renderOverlay({
+      myPlayerSeat: 1,
+      pauseUsed: [true, true, false, false],
+      pauseExtended: [false, true, false, false],
+    });
     expect(screen.queryByTestId("pause-extend-button")).not.toBeInTheDocument();
+  });
+
+  it("gives the player who paused only Resume, since pausing spent their move", () => {
+    renderOverlay();
+    expect(screen.queryByTestId("pause-extend-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pause-resume-button")).toBeInTheDocument();
   });
 
   it("asks a player who holds no pause to wait, with no way to resume for others", () => {
@@ -148,7 +159,8 @@ describe("PauseOverlay", () => {
 
   it("names the extension in whole minutes of one pause window", () => {
     renderOverlay({
-      pauseExtended: [true, true, false, false],
+      pauseUsed: [true, true, true, false],
+      pauseExtended: [false, true, true, false],
       pauseTotalSec: 360,
       myPlayerSeat: 3,
     });
