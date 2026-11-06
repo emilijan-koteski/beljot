@@ -24,7 +24,6 @@ interface PauseOverlayProps {
   onPause: () => void;
 }
 
-const SECONDS_PER_MINUTE = 60;
 const FALLBACK_WINDOW_SEC = 120;
 
 /** The end of the running pause that ends last, when play resumes if nobody resumes early. */
@@ -70,7 +69,6 @@ export function PauseOverlay({
   const holding = pausedPlayers[myPlayerSeat] === true;
   const canPause = pauseUsed[myPlayerSeat] === false;
   const windowSec = pauseWindowSec > 0 ? pauseWindowSec : FALLBACK_WINDOW_SEC;
-  const minutes = Math.round(windowSec / SECONDS_PER_MINUTE);
   const resumesAt = latestExpiry(pausedPlayers, playerPauseExpiresAt);
 
   return (
@@ -141,7 +139,7 @@ export function PauseOverlay({
             )}
             {canPause && (
               <ClassicButton onClick={onPause} data-testid="pause-own-button">
-                {t("match.pause.pauseButton", { minutes })}
+                {t("match.pause.pauseButton")}
               </ClassicButton>
             )}
             {holding && (

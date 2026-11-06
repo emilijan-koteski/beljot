@@ -5,14 +5,14 @@ import { PauseOverlay } from "./PauseOverlay";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: { minutes?: number }) => {
+    t: (key: string) => {
       const translations: Record<string, string> = {
         "match.pause.title": "Match paused",
         "match.pause.resume": "Resume",
         "match.pause.waitingToResume": "Waiting to resume…",
         "match.pause.pausedNow": "Paused",
         "match.pause.countdownLabel": "Until play resumes",
-        "match.pause.pauseButton": `Pause ${opts?.minutes ?? "?"} min`,
+        "match.pause.pauseButton": "Pause",
       };
       return translations[key] ?? key;
     },
@@ -139,7 +139,7 @@ describe("PauseOverlay", () => {
 
   it("lets a player with an unspent pause start their own", () => {
     const props = renderOverlay({ myPlayerSeat: 1 });
-    fireEvent.click(screen.getByRole("button", { name: "Pause 2 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     expect(props.onPause).toHaveBeenCalledTimes(1);
   });
 

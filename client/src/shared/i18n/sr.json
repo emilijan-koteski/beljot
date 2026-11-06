@@ -1071,7 +1071,7 @@
       "pausedNow": "Pauzira",
       "countdownLabel": "Do nastavka igre",
       "timedOutToast": "Vreme je isteklo. Igra se nastavlja.",
-      "pauseButton": "Pauza {{minutes}} min"
+      "pauseButton": "Pauza"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} · veza prekinuta",

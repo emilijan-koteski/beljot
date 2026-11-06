@@ -1071,7 +1071,7 @@
       "pausedNow": "Paused",
       "countdownLabel": "Until play resumes",
       "timedOutToast": "Time's up. Play resumes.",
-      "pauseButton": "Pause {{minutes}} min"
+      "pauseButton": "Pause"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} disconnected",
