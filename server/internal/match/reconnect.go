@@ -112,6 +112,7 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		if !anyPaused && gs.Phase == game.PhasePaused {
 			gs.Phase = gs.PreviousPhase
 			gs.PreviousPhase = ""
+			game.ClearPause(gs)
 			pauseWasAutoCleared = true
 		}
 	}
@@ -304,12 +305,18 @@ func (m *Manager) HandleReconnect(userID uint) {
 	if allConnected {
 		gs.Phase = gs.PreviousPhase
 		gs.PreviousPhase = ""
+		if hasActivePause(gs.PausedPlayers) && gs.PauseExpiresAt != nil &&
+			!time.Now().Before(*gs.PauseExpiresAt) {
+			game.ClearPause(gs)
+		}
 		if hasActivePause(gs.PausedPlayers) {
 			gs.PreviousPhase = gs.Phase
 			gs.Phase = game.PhasePaused
 			if gs.PreviousPhase == game.PhaseDeclaring {
 				session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
 			}
+			session.cancelTurnTimer()
+			m.armPauseTimerLocked(session, gs)
 		} else if session.timerStyle == "per-move" &&
 			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding) {
 			const minResumeMs int64 = 3000

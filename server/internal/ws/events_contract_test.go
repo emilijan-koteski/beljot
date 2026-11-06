@@ -210,10 +210,18 @@ func TestEventsJSONContract(t *testing.T) {
 		{
 			name: "MatchResumedPayload",
 			sample: ws.MatchResumedPayload{
-				ResumedBy:     1,
-				OwnerOverride: false,
+				ResumedBy: -1,
+				TimedOut:  true,
 			},
 			goldenFile: "match_resumed.json",
+		},
+		{
+			name: "PauseExtendedPayload",
+			sample: ws.PauseExtendedPayload{
+				ExtendedBy:     2,
+				PauseExpiresAt: "2026-04-21T14:22:00Z",
+			},
+			goldenFile: "pause_extended.json",
 		},
 		{
 			name: "AutoActionPayload",

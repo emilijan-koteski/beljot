@@ -111,10 +111,13 @@ type GameState struct {
 	TurnExpiresAt    *time.Time `json:"turnExpiresAt"`
 	TimerDurationSec int        `json:"timerDurationSec"`
 
-	PreviousPhase     Phase   `json:"previousPhase"`
-	PausedPlayers     [4]bool `json:"pausedPlayers"`
-	PauseUsed         [4]bool `json:"pauseUsed"`
-	TurnTimeRemaining int64   `json:"turnTimeRemaining"`
+	PreviousPhase     Phase      `json:"previousPhase"`
+	PausedPlayers     [4]bool    `json:"pausedPlayers"`
+	PauseUsed         [4]bool    `json:"pauseUsed"`
+	PauseExtended     [4]bool    `json:"pauseExtended"`
+	PauseExpiresAt    *time.Time `json:"pauseExpiresAt"`
+	PauseTotalSec     int        `json:"pauseTotalSec"`
+	TurnTimeRemaining int64      `json:"turnTimeRemaining"`
 
 	SurrenderProposerSeat *int    `json:"surrenderProposerSeat"`
 	SurrenderUsed         [4]bool `json:"surrenderUsed"`

@@ -130,6 +130,14 @@
     false,
     false
   ],
+  "pauseExtended": [
+    false,
+    false,
+    false,
+    false
+  ],
+  "pauseExpiresAt": null,
+  "pauseTotalSec": 0,
   "turnTimeRemaining": 0,
   "surrenderProposerSeat": null,
   "surrenderUsed": [

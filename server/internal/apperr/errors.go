@@ -127,6 +127,7 @@ var (
 	ErrPauseExhausted          = NewAppError("PAUSE_EXHAUSTED", "player has already used their pause", http.StatusConflict)
 	ErrNotPaused               = NewAppError("NOT_PAUSED", "game is not paused", http.StatusConflict)
 	ErrNoActivePause           = NewAppError("NO_ACTIVE_PAUSE", "player does not have an active pause to clear", http.StatusConflict)
+	ErrPauseExtendUsed         = NewAppError("PAUSE_EXTEND_USED", "player has already added time to this pause", http.StatusConflict)
 	ErrPlayerDisconnected      = NewAppError("PLAYER_DISCONNECTED", "player is disconnected", http.StatusConflict)
 	ErrInvalidBid              = NewAppError("INVALID_BID", "invalid bid action", http.StatusBadRequest)
 	ErrMustPickTrump           = NewAppError("MUST_PICK_TRUMP", "you must name a trump suit", http.StatusBadRequest)

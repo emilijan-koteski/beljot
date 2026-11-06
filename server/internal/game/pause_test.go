@@ -3,6 +3,7 @@ package game_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/game"
@@ -181,22 +182,20 @@ func TestUnpause(t *testing.T) {
 			wantErr: apperr.ErrNotPaused,
 		},
 		{
-			name: "owner_unpause by non-owner returns ErrNotRoomOwner",
+			name: "the host cannot resume a pause they do not hold",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(0, 2)
+				return testfixtures.NewGamePausedWithOwner(1, 0)
 			},
-			action:  game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
-			wantErr: apperr.ErrNotRoomOwner,
+			action:  game.Action{Type: game.ActionUnpause, PlayerSeat: 0},
+			wantErr: apperr.ErrNoActivePause,
 		},
 		{
-			name: "owner_unpause when not paused returns ErrNotPaused",
+			name: "the retired owner_unpause action is refused",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGameMidPlay(1)
-				gs.OwnerSeat = 0
-				return gs
+				return testfixtures.NewGamePausedWithOwner(1, 0)
 			},
-			action:  game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
-			wantErr: apperr.ErrNotPaused,
+			action:  game.Action{Type: "owner_unpause", PlayerSeat: 0},
+			wantErr: apperr.ErrGamePaused,
 		},
 	}
 
@@ -221,7 +220,7 @@ func TestUnpause(t *testing.T) {
 	}
 }
 
-func TestOwnerUnpause(t *testing.T) {
+func TestExtendPause(t *testing.T) {
 	tests := []struct {
 		name        string
 		setup       func() *game.GameState
@@ -230,71 +229,59 @@ func TestOwnerUnpause(t *testing.T) {
 		assertState func(t *testing.T, gs *game.GameState)
 	}{
 		{
-			name: "owner clears single pause",
+			name: "any player can extend the pause once and then holds it",
 			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(1, 0)
+				return testfixtures.NewGamePaused(0)
 			},
-			action: game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
+			action: game.Action{Type: game.ActionExtendPause, PlayerSeat: 2},
 			assertState: func(t *testing.T, gs *game.GameState) {
-				assert.Equal(t, game.PhasePlaying, gs.Phase)
-				assert.Equal(t, game.Phase(""), gs.PreviousPhase)
-				assert.False(t, gs.PausedPlayers[0])
-				assert.False(t, gs.PausedPlayers[1])
+				assert.Equal(t, game.PhasePaused, gs.Phase)
+				assert.True(t, gs.PauseExtended[2])
+				assert.True(t, gs.PausedPlayers[2], "the extender holds the pause too")
+				assert.True(t, gs.PausedPlayers[0])
 			},
 		},
 		{
-			name: "owner clears stacked pauses from multiple players",
+			name: "the player who paused can extend their own pause",
 			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(0, 2)
+				return testfixtures.NewGamePaused(0)
+			},
+			action: game.Action{Type: game.ActionExtendPause, PlayerSeat: 0},
+			assertState: func(t *testing.T, gs *game.GameState) {
+				assert.True(t, gs.PauseExtended[0])
+			},
+		},
+		{
+			name: "a second extension by the same player is refused",
+			setup: func() *game.GameState {
+				gs := testfixtures.NewGamePaused(0)
+				gs.PauseExtended[1] = true
 				gs.PausedPlayers[1] = true
-				gs.PauseUsed[1] = true
+				return gs
+			},
+			action:  game.Action{Type: game.ActionExtendPause, PlayerSeat: 1},
+			wantErr: apperr.ErrPauseExtendUsed,
+		},
+		{
+			name: "extending outside a pause is refused",
+			setup: func() *game.GameState {
+				return testfixtures.NewGameMidPlay(1)
+			},
+			action:  game.Action{Type: game.ActionExtendPause, PlayerSeat: 0},
+			wantErr: apperr.ErrNotPaused,
+		},
+		{
+			name: "extending does not resume when the pauser releases first",
+			setup: func() *game.GameState {
+				gs := testfixtures.NewGamePaused(0)
+				gs.PauseExtended[3] = true
 				gs.PausedPlayers[3] = true
-				gs.PauseUsed[3] = true
-				return gs
-			},
-			action: game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 2},
-			assertState: func(t *testing.T, gs *game.GameState) {
-				assert.Equal(t, game.PhasePlaying, gs.Phase)
-				for i := 0; i < 4; i++ {
-					assert.False(t, gs.PausedPlayers[i], "seat %d should be unpaused", i)
-				}
-			},
-		},
-		{
-			name: "non-owner rejected",
-			setup: func() *game.GameState {
-				return testfixtures.NewGamePausedWithOwner(0, 2)
-			},
-			action:  game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 1},
-			wantErr: apperr.ErrNotRoomOwner,
-		},
-		{
-			name: "owner who did not pause can still override",
-			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(1, 0)
-				assert.False(t, gs.PausedPlayers[0])
-				assert.False(t, gs.PauseUsed[0])
-				return gs
-			},
-			action: game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
-			assertState: func(t *testing.T, gs *game.GameState) {
-				assert.Equal(t, game.PhasePlaying, gs.Phase)
-				assert.False(t, gs.PausedPlayers[1])
-			},
-		},
-		{
-			name: "owner with active pause can use regular unpause for own pause only",
-			setup: func() *game.GameState {
-				gs := testfixtures.NewGamePausedWithOwner(0, 0)
-				gs.PausedPlayers[1] = true
-				gs.PauseUsed[1] = true
 				return gs
 			},
 			action: game.Action{Type: game.ActionUnpause, PlayerSeat: 0},
 			assertState: func(t *testing.T, gs *game.GameState) {
-				assert.Equal(t, game.PhasePaused, gs.Phase, "should still be paused because seat 1 has active pause")
-				assert.False(t, gs.PausedPlayers[0], "owner's pause cleared")
-				assert.True(t, gs.PausedPlayers[1], "seat 1 pause still active")
+				assert.Equal(t, game.PhasePaused, gs.Phase, "seat 3 still holds the pause it extended")
+				assert.False(t, gs.PausedPlayers[0])
 			},
 		},
 	}
@@ -318,6 +305,56 @@ func TestOwnerUnpause(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewPauseStartsWithNoExtensions(t *testing.T) {
+	state := testfixtures.NewGameMidPlay(1)
+	state.PauseExtended = [4]bool{true, false, true, false}
+
+	newState, err := game.ApplyAction(state, game.Action{Type: game.ActionPause, PlayerSeat: 3})
+
+	require.NoError(t, err)
+	assert.Equal(t, [4]bool{}, newState.PauseExtended)
+}
+
+func TestExpirePause(t *testing.T) {
+	state := testfixtures.NewGamePaused(0)
+	state.PausedPlayers[2] = true
+	state.PauseExtended[2] = true
+	expiry := time.Now()
+	state.PauseExpiresAt = &expiry
+	state.PauseTotalSec = 240
+
+	newState, err := game.ExpirePause(state)
+
+	require.NoError(t, err)
+	assert.Equal(t, game.PhasePlaying, newState.Phase)
+	assert.Equal(t, game.Phase(""), newState.PreviousPhase)
+	assert.Equal(t, [4]bool{}, newState.PausedPlayers, "every hold ends with the time")
+	assert.Equal(t, [4]bool{}, newState.PauseExtended)
+	assert.Nil(t, newState.PauseExpiresAt)
+	assert.Zero(t, newState.PauseTotalSec)
+	assert.True(t, newState.PauseUsed[0], "the pause stays used for the rest of the match")
+	assert.Equal(t, game.PhasePaused, state.Phase, "the original state is not mutated")
+}
+
+func TestExpirePauseOutsideAPauseIsRefused(t *testing.T) {
+	_, err := game.ExpirePause(testfixtures.NewGameMidPlay(1))
+	assert.ErrorIs(t, err, apperr.ErrNotPaused)
+}
+
+func TestLastUnpauseClearsThePauseClock(t *testing.T) {
+	state := testfixtures.NewGamePaused(0)
+	expiry := time.Now().Add(time.Minute)
+	state.PauseExpiresAt = &expiry
+	state.PauseTotalSec = 120
+
+	newState, err := game.ApplyAction(state, game.Action{Type: game.ActionUnpause, PlayerSeat: 0})
+
+	require.NoError(t, err)
+	assert.Equal(t, game.PhasePlaying, newState.Phase)
+	assert.Nil(t, newState.PauseExpiresAt)
+	assert.Zero(t, newState.PauseTotalSec)
 }
 
 func TestActionsBlockedWhilePaused(t *testing.T) {

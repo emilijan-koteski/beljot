@@ -212,7 +212,7 @@ const (
 	ActionContinue      = "continue"
 	ActionPause         = "pause"
 	ActionUnpause       = "unpause"
-	ActionOwnerUnpause  = "owner_unpause"
+	ActionExtendPause   = "extend_pause"
 
 	ActionSurrenderRequest = "surrender_request"
 	ActionSurrenderAccept  = "surrender_accept"

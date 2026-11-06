@@ -35,8 +35,8 @@ func applyAction(state *GameState, action Action) (*GameState, error) {
 	if action.Type == ActionUnpause {
 		return handleUnpause(state, action)
 	}
-	if action.Type == ActionOwnerUnpause {
-		return handleOwnerUnpause(state, action)
+	if action.Type == ActionExtendPause {
+		return handleExtendPause(state, action)
 	}
 
 	if action.Type == ActionSurrenderRequest {
