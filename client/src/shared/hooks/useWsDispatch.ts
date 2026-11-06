@@ -436,8 +436,8 @@ function dispatchGameEvent(message: WsMessage): void {
 
   if (type === EVENT_MATCH_RESUMED) {
     const payload = message.payload as MatchResumedPayload;
-    if (payload.ownerOverride) {
-      toast.info(i18n.t("match.pause.ownerResumedToast"), { duration: 3000 });
+    if (payload.timedOut === true) {
+      toast.info(i18n.t("match.pause.timedOutToast"), { duration: 3000 });
     }
     return;
   }

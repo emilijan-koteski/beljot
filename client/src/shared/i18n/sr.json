@@ -1067,13 +1067,11 @@
       "title": "Meč pauziran",
       "waitingToResume": "Čeka se nastavak…",
       "resume": "Nastavi",
-      "pauseButton": "Pauza",
       "pauseUsed": "Pauza iskorišćena",
-      "pausedNow": "pauzira sada",
-      "pauseAvailable": "pauza dostupna",
-      "pauseUsedRow": "pauza iskorišćena",
-      "resumeAll": "Nastavi sve",
-      "ownerResumedToast": "Domaćin je nastavio igru"
+      "pausedNow": "Pauzira",
+      "countdownLabel": "Do nastavka igre",
+      "timedOutToast": "Vreme je isteklo. Igra se nastavlja.",
+      "pauseButton": "Pauza"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} · veza prekinuta",

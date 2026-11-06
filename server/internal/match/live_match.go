@@ -399,7 +399,9 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 			session.turnTimer = time.AfterFunc(remaining, func() {
 				m.handleDeclarationTimeout(session, gen)
 			})
-		} else if oldState.Phase != game.PhasePaused && session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
+		} else if oldState.Phase == game.PhasePaused {
+			m.armPauseTimerLocked(session, oldState)
+		} else if session.timerStyle == "per-move" && oldState.TurnExpiresAt != nil {
 			m.armTurnTimerLocked(session, time.Until(*oldState.TurnExpiresAt), oldState.ActivePlayerSeat)
 		}
 		session.mu.Unlock()
@@ -413,32 +415,24 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 
 	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
 
-	if action.Type == game.ActionPause && newState.Phase == game.PhasePaused {
-		if oldState.TurnExpiresAt != nil {
-			remaining := time.Until(*oldState.TurnExpiresAt)
-			if remaining > 0 {
-				newState.TurnTimeRemaining = remaining.Milliseconds()
+	if newState.Phase == game.PhasePaused {
+		if oldState.Phase != game.PhasePaused {
+			if oldState.TurnExpiresAt != nil {
+				remaining := time.Until(*oldState.TurnExpiresAt)
+				if remaining > 0 {
+					newState.TurnTimeRemaining = remaining.Milliseconds()
+				}
 			}
+			newState.TurnExpiresAt = nil
 		}
-		newState.TurnExpiresAt = nil
-	} else if (action.Type == game.ActionUnpause || action.Type == game.ActionOwnerUnpause) &&
-		newState.Phase != game.PhasePaused && newState.Phase != game.PhaseDeclaring {
-		if session.timerStyle == "per-move" {
-			const minResumeMs int64 = 3000
-			remaining := time.Duration(newState.TurnTimeRemaining) * time.Millisecond
-			if newState.TurnTimeRemaining > 0 && newState.TurnTimeRemaining < minResumeMs {
-				remaining = time.Duration(minResumeMs) * time.Millisecond
-			} else if newState.TurnTimeRemaining <= 0 {
-				remaining = time.Duration(minResumeMs) * time.Millisecond
-			}
-			expiry := time.Now().Add(remaining)
-			newState.TurnExpiresAt = &expiry
-			newState.TurnTimeRemaining = 0
-			session.cancelTurnTimer()
-			m.armTurnTimerLocked(session, remaining, newState.ActivePlayerSeat)
-		} else {
-			newState.TurnTimeRemaining = 0
+		if action.Type == game.ActionPause {
+			expiry := time.Now().Add(pauseWindow(session))
+			newState.PlayerPauseExpiresAt[action.PlayerSeat] = &expiry
+			newState.PauseWindowSec = pauseWindowSec(session)
 		}
+		m.armPauseTimerLocked(session, newState)
+	} else if action.Type == game.ActionUnpause && newState.Phase != game.PhaseDeclaring {
+		m.resumeTurnTimerLocked(session, newState)
 	} else if newState.Phase == game.PhaseDeclaring {
 		newState.TurnExpiresAt = nil
 		if oldState.Phase != game.PhaseDeclaring {
@@ -869,12 +863,9 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		}
 		m.broadcastState(playerIDs, newState)
 
-	case game.ActionUnpause, game.ActionOwnerUnpause:
-		resumed := ws.MatchResumedPayload{
-			ResumedBy:     action.PlayerSeat,
-			OwnerOverride: action.Type == game.ActionOwnerUnpause,
-		}
+	case game.ActionUnpause:
 		if newState.Phase != game.PhasePaused {
+			resumed := ws.MatchResumedPayload{ResumedBy: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchResumed, resumed))
 		}
 		m.broadcastState(playerIDs, newState)

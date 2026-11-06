@@ -57,7 +57,6 @@ export type ActionType =
   | "decline_belot"
   | "pause"
   | "unpause"
-  | "owner_unpause"
   | "surrender_request"
   | "surrender_accept"
   | "surrender_decline";
@@ -167,6 +166,8 @@ export interface MatchState {
   previousPhase: Phase;
   pausedPlayers: [boolean, boolean, boolean, boolean];
   pauseUsed: [boolean, boolean, boolean, boolean];
+  playerPauseExpiresAt: [string | null, string | null, string | null, string | null];
+  pauseWindowSec: number;
   turnTimeRemaining: number;
   surrenderProposerSeat: number | null;
   surrenderUsed: [boolean, boolean, boolean, boolean];

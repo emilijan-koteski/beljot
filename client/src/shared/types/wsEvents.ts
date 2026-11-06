@@ -36,7 +36,6 @@ export const ACTION_DECLINE_BELOT = "action:decline_belot" as const;
 export const ACTION_CONTINUE = "action:continue" as const;
 export const ACTION_PAUSE = "action:pause" as const;
 export const ACTION_UNPAUSE = "action:unpause" as const;
-export const ACTION_OWNER_UNPAUSE = "action:owner_unpause" as const;
 
 export const ACTION_SURRENDER_REQUEST = "action:surrender_request" as const;
 export const ACTION_SURRENDER_ACCEPT = "action:surrender_accept" as const;
@@ -171,9 +170,10 @@ export interface MatchPausedPayload {
   pausedPlayers: [boolean, boolean, boolean, boolean];
 }
 
+/** When the last running pause runs out it arrives with `timedOut` true and `resumedBy` -1. */
 export interface MatchResumedPayload {
   resumedBy: number;
-  ownerOverride: boolean;
+  timedOut: boolean;
 }
 
 /**

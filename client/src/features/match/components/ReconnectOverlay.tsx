@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSfxOnce } from "@/shared/audio/useSfxOnce";
-import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
 import { useAuthStore } from "@/shared/stores/authStore";
@@ -11,14 +10,9 @@ import type { TeamString } from "@/shared/types/matchTypes";
 import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
 
 import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
-import {
-  isCountdownUrgent,
-  TIMER_RING_INK,
-  URGENT_FRACTION,
-  useRingDrain,
-  useTurnCountdown,
-} from "../lib/turnCountdown";
+import { formatCountdown, isCountdownUrgent, useTurnCountdown } from "../lib/turnCountdown";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { CountdownRing } from "./overlay/CountdownRing";
 import { FinalScore } from "./overlay/FinalScore";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 import { ResultHeading } from "./overlay/ResultHeading";
@@ -44,11 +38,6 @@ interface ReconnectOverlayProps {
 
 const RECONNECT_TOTAL_SECONDS_DEFAULT = 120;
 const RING_DANGER = "var(--danger-light)";
-const RING_SIZE = 132;
-const RING_STROKE_INSET = 4;
-const RING_RADIUS = (RING_SIZE - RING_STROKE_INSET) / 2;
-const RING_CIRC = 2 * Math.PI * RING_RADIUS;
-const FELT_DARK = "var(--felt-shadow)";
 
 /**
  * Returns the viewer's win or loss for an abandoned match, based on whether they share the abandoner's team.
@@ -74,13 +63,6 @@ function abandonResult(
   return viewerSeat % 2 === abandonerSeat % 2 ? "loss" : "win";
 }
 
-function formatCountdown(totalSeconds: number): string {
-  if (totalSeconds <= 0) return "0:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
 export function ReconnectOverlay({
   disconnectedPlayerName,
   disconnectedPlayers,
@@ -103,8 +85,6 @@ export function ReconnectOverlay({
     viewerUsername !== undefined && chipPlayers.some((p) => p.name === viewerUsername);
 
   const remainingSeconds = useTurnCountdown(reconnectExpiresAt);
-  const prefersReducedMotion = useReducedMotion();
-  const ringDrain = useRingDrain(reconnectExpiresAt, totalSeconds, RING_CIRC);
 
   const result = abandonedData ? abandonResult(abandonedData, viewerSeat) : null;
   useSfxOnce(result === "loss" ? "matchLose" : "matchWin", result !== null ? soundKey : null);
@@ -231,13 +211,6 @@ export function ReconnectOverlay({
     );
   }
 
-  const pct = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
-  const isUrgent = pct <= URGENT_FRACTION;
-  const ringColor = isUrgent ? RING_DANGER : TIMER_RING_INK;
-  const ringSize = RING_SIZE;
-  const ringRadius = RING_RADIUS;
-  const ringCirc = RING_CIRC;
-
   return (
     <div
       className="fixed inset-0"
@@ -269,56 +242,11 @@ export function ReconnectOverlay({
               ))}
             </div>
 
-            <div className="relative" style={{ width: ringSize, height: ringSize }}>
-              <svg
-                width={ringSize}
-                height={ringSize}
-                viewBox={`0 0 ${ringSize} ${ringSize}`}
-                aria-hidden
-                style={{ transform: "rotate(-90deg)" }}
-              >
-                <circle
-                  cx={ringSize / 2}
-                  cy={ringSize / 2}
-                  r={ringRadius}
-                  fill={FELT_DARK}
-                  stroke="var(--sheen-10)"
-                  strokeWidth={2}
-                />
-                <circle
-                  key={reconnectExpiresAt}
-                  cx={ringSize / 2}
-                  cy={ringSize / 2}
-                  r={ringRadius}
-                  fill="none"
-                  stroke={ringColor}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeDasharray={ringCirc}
-                  style={{
-                    transition: `stroke ${MOTION.RING_COLOR_FLIP}ms ease-out`,
-                    strokeDashoffset: ringCirc * (1 - pct),
-                    ...(prefersReducedMotion ? undefined : ringDrain),
-                  }}
-                />
-              </svg>
-              <div
-                className="absolute inset-0 flex items-center justify-center"
-                style={{ pointerEvents: "none" }}
-              >
-                <span
-                  className="font-semibold tabular-nums"
-                  style={{
-                    fontSize: 36,
-                    color: isUrgent ? RING_DANGER : "var(--ink-light)",
-                    transition: `color ${MOTION.RING_COLOR_FLIP}ms ease-out`,
-                  }}
-                  data-testid="reconnect-countdown"
-                >
-                  {formatCountdown(remainingSeconds)}
-                </span>
-              </div>
-            </div>
+            <CountdownRing
+              expiresAt={reconnectExpiresAt}
+              totalSeconds={totalSeconds}
+              testId="reconnect-countdown"
+            />
 
             <p
               className="text-2xs uppercase tracking-caps"

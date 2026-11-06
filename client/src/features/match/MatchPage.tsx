@@ -36,7 +36,6 @@ import {
   ACTION_DECLARE,
   ACTION_DECLINE_BELOT,
   ACTION_EMOTE,
-  ACTION_OWNER_UNPAUSE,
   ACTION_PASS_TRUMP,
   ACTION_PAUSE,
   ACTION_PICK_TRUMP,
@@ -899,10 +898,6 @@ export function MatchPage() {
     sendMessage(ACTION_UNPAUSE, {});
   }, [sendMessage]);
 
-  const handleOwnerUnpause = useCallback(() => {
-    sendMessage(ACTION_OWNER_UNPAUSE, {});
-  }, [sendMessage]);
-
   const handleSendEmote = useCallback(
     (emote: EmoteID) => {
       sendMessage(ACTION_EMOTE, { emote });
@@ -1075,7 +1070,6 @@ export function MatchPage() {
   const matchStake =
     roomBuyIn !== null ? matchState.players.filter((p) => !p.isBot).length * roomBuyIn : 0;
 
-  const isRoomOwner = myPlayerSeat !== null && matchState.ownerSeat === myPlayerSeat;
   const isPaused = matchState.phase === "paused";
 
   const isTurnPhase =
@@ -1443,12 +1437,12 @@ export function MatchPage() {
         <PauseOverlay
           pausedPlayers={matchState.pausedPlayers}
           pauseUsed={matchState.pauseUsed}
+          playerPauseExpiresAt={matchState.playerPauseExpiresAt}
+          pauseWindowSec={matchState.pauseWindowSec}
           players={matchState.players}
           myPlayerSeat={myPlayerSeat}
-          isRoomOwner={isRoomOwner}
           onResume={handleUnpause}
           onPause={handlePause}
-          onOwnerResume={handleOwnerUnpause}
         />
       )}
 

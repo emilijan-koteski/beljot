@@ -102,6 +102,7 @@ func (m *Manager) HandleDisconnect(userID uint) {
 
 	if gs.PausedPlayers[seat] {
 		gs.PausedPlayers[seat] = false
+		gs.PlayerPauseExpiresAt[seat] = nil
 		anyPaused := false
 		for _, p := range gs.PausedPlayers {
 			if p {
@@ -112,6 +113,7 @@ func (m *Manager) HandleDisconnect(userID uint) {
 		if !anyPaused && gs.Phase == game.PhasePaused {
 			gs.Phase = gs.PreviousPhase
 			gs.PreviousPhase = ""
+			game.ClearPause(gs)
 			pauseWasAutoCleared = true
 		}
 	}
@@ -304,12 +306,15 @@ func (m *Manager) HandleReconnect(userID uint) {
 	if allConnected {
 		gs.Phase = gs.PreviousPhase
 		gs.PreviousPhase = ""
+		dropRunOutPausesLocked(gs, time.Now())
 		if hasActivePause(gs.PausedPlayers) {
 			gs.PreviousPhase = gs.Phase
 			gs.Phase = game.PhasePaused
 			if gs.PreviousPhase == game.PhaseDeclaring {
 				session.declarationExpiresAt = time.Now().Add(declarationAutoClose)
 			}
+			session.cancelTurnTimer()
+			m.armPauseTimerLocked(session, gs)
 		} else if session.timerStyle == "per-move" &&
 			(gs.Phase == game.PhasePlaying || gs.Phase == game.PhaseBidding) {
 			const minResumeMs int64 = 3000
@@ -551,4 +556,16 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	}
 
 	m.RemoveSession(roomID)
+}
+
+// dropRunOutPausesLocked ends, without resuming, every pause that ran out while a player was away.
+// Must be called under session.mu.Lock().
+func dropRunOutPausesLocked(gs *game.GameState, now time.Time) {
+	for seat, held := range gs.PausedPlayers {
+		expiry := gs.PlayerPauseExpiresAt[seat]
+		if held && expiry != nil && !now.Before(*expiry) {
+			gs.PausedPlayers[seat] = false
+			gs.PlayerPauseExpiresAt[seat] = nil
+		}
+	}
 }

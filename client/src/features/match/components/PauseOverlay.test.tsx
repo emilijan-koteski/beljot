@@ -7,12 +7,12 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
-        "match.pause.title": "Game Paused",
+        "match.pause.title": "Match paused",
         "match.pause.resume": "Resume",
+        "match.pause.waitingToResume": "Waiting to resume…",
+        "match.pause.pausedNow": "Paused",
+        "match.pause.countdownLabel": "Until play resumes",
         "match.pause.pauseButton": "Pause",
-        "match.pause.waitingToResume": "Waiting to resume...",
-        "match.pause.resumeAll": "Resume all",
-        "match.pause.pausedNow": "paused now",
       };
       return translations[key] ?? key;
     },
@@ -84,219 +84,81 @@ const mockPlayers = [
 
 type PauseOverlayProps = Parameters<typeof PauseOverlay>[0];
 
+const NO_CLOCKS: [string | null, string | null, string | null, string | null] = [
+  null,
+  null,
+  null,
+  null,
+];
+
+function inSeconds(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+function renderOverlay(overrides: Partial<PauseOverlayProps> = {}) {
+  const props: PauseOverlayProps = {
+    pausedPlayers: [true, false, false, false],
+    pauseUsed: [true, false, false, false],
+    playerPauseExpiresAt: [inSeconds(90), null, null, null],
+    pauseWindowSec: 120,
+    players: mockPlayers,
+    myPlayerSeat: 0,
+    onResume: vi.fn(),
+    onPause: vi.fn(),
+    ...overrides,
+  };
+  render(<PauseOverlay {...props} />);
+  return props;
+}
+
 describe("PauseOverlay", () => {
-  it("marks the pausing player in their row, with no subtitle repeating it", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("pause-player-0")).toHaveTextContent("Alice");
-    expect(screen.getByTestId("pause-player-0")).toHaveTextContent("paused now");
-    expect(screen.getByText("Game Paused")).toBeInTheDocument();
-    expect(screen.queryByText(/paused the game/)).not.toBeInTheDocument();
+  it("counts down to when play resumes", () => {
+    renderOverlay();
+    expect(screen.getByTestId("pause-countdown")).toHaveTextContent(/^1:(29|30)$/);
+    expect(screen.getByText("Until play resumes")).toBeInTheDocument();
   });
 
-  it("shows Resume button for player who paused", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={0}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("pause-resume-button")).toBeInTheDocument();
+  it("gives each running pause its own clock, and the ring the one that ends last", () => {
+    renderOverlay({
+      pausedPlayers: [true, false, true, false],
+      pauseUsed: [true, false, true, false],
+      playerPauseExpiresAt: [inSeconds(30), null, inSeconds(110), null],
+    });
+    expect(screen.getByTestId("pause-player-0-countdown")).toHaveTextContent(/^0:(29|30)$/);
+    expect(screen.getByTestId("pause-player-2-countdown")).toHaveTextContent(/^1:(49|50)$/);
+    expect(screen.getByTestId("pause-countdown")).toHaveTextContent(/^1:(49|50)$/);
+    expect(screen.getByTestId("pause-player-1")).toHaveAttribute("data-holding", "false");
+    expect(screen.queryByTestId("pause-player-1-countdown")).not.toBeInTheDocument();
   });
 
-  it("shows Pause button for player who can stack their pause", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={2}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId("pause-resume-button")).not.toBeInTheDocument();
-    expect(screen.getByTestId("pause-stack-button")).toBeInTheDocument();
-  });
-
-  it("shows waiting message for player who already used their pause", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, true, false]}
-        players={mockPlayers}
-        myPlayerSeat={2}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId("pause-resume-button")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("pause-stack-button")).not.toBeInTheDocument();
-    expect(screen.getByTestId("pause-waiting")).toBeInTheDocument();
-  });
-
-  it("fires onResume on Resume button click", () => {
-    const onResume = vi.fn();
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={0}
-        isRoomOwner={false}
-        onResume={onResume}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
+  it("lets a player end their own pause", () => {
+    const props = renderOverlay();
     fireEvent.click(screen.getByTestId("pause-resume-button"));
-    expect(onResume).toHaveBeenCalledOnce();
+    expect(props.onResume).toHaveBeenCalledTimes(1);
   });
 
-  it("fires onPause on stack Pause button click", () => {
-    const onPause = vi.fn();
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={onPause}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByTestId("pause-stack-button"));
-    expect(onPause).toHaveBeenCalledOnce();
+  it("lets a player with an unspent pause start their own", () => {
+    const props = renderOverlay({ myPlayerSeat: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(props.onPause).toHaveBeenCalledTimes(1);
   });
 
-  it("shows multiple paused players", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, true, false]}
-        pauseUsed={[true, false, true, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("pause-player-0")).toBeInTheDocument();
-    expect(screen.getByTestId("pause-player-2")).toBeInTheDocument();
-  });
-
-  it("shows Resume all button for room owner", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={true}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId("pause-owner-resume-button")).toBeInTheDocument();
-    expect(screen.getByText("Resume all")).toBeInTheDocument();
-  });
-
-  it("does not show Resume all button for non-owner", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={false}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId("pause-owner-resume-button")).not.toBeInTheDocument();
-  });
-
-  it("fires onOwnerResume on Resume all button click", () => {
-    const onOwnerResume = vi.fn();
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={1}
-        isRoomOwner={true}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={onOwnerResume}
-      />,
-    );
-    fireEvent.click(screen.getByTestId("pause-owner-resume-button"));
-    expect(onOwnerResume).toHaveBeenCalledOnce();
-  });
-
-  it("owner with active pause sees both Resume and Resume all buttons", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={0}
-        isRoomOwner={true}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
+  it("offers no second pause to a player who already used theirs", () => {
+    renderOverlay();
+    expect(screen.queryByTestId("pause-own-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("pause-resume-button")).toBeInTheDocument();
-    expect(screen.getByTestId("pause-owner-resume-button")).toBeInTheDocument();
   });
-});
 
-describe("PauseOverlay action row", () => {
-  it("puts the player control before the owner override in one footer row", () => {
-    render(
-      <PauseOverlay
-        pausedPlayers={[true, false, false, false]}
-        pauseUsed={[true, false, false, false]}
-        players={mockPlayers}
-        myPlayerSeat={0}
-        isRoomOwner={true}
-        onResume={vi.fn()}
-        onPause={vi.fn()}
-        onOwnerResume={vi.fn()}
-      />,
-    );
+  it("gives a player whose pause is over no way to end someone else's", () => {
+    renderOverlay({ myPlayerSeat: 2, pauseUsed: [true, false, true, false] });
+    expect(screen.getByTestId("pause-waiting")).toHaveTextContent("Waiting to resume…");
+    expect(screen.queryByTestId("pause-resume-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pause-own-button")).not.toBeInTheDocument();
+    expect(screen.queryByText(/resume all/i)).not.toBeInTheDocument();
+  });
 
-    const resume = screen.getByTestId("pause-resume-button");
-    const ownerResume = screen.getByTestId("pause-owner-resume-button");
-    expect(resume.compareDocumentPosition(ownerResume)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-
-    expect(screen.getByTestId("pause-actions")).toBe(resume.parentElement);
-    expect(screen.getByTestId("pause-actions")).toBe(ownerResume.parentElement);
+  it("hides the ring when no pause clock is known", () => {
+    renderOverlay({ playerPauseExpiresAt: NO_CLOCKS });
+    expect(screen.queryByTestId("pause-countdown")).not.toBeInTheDocument();
   });
 });

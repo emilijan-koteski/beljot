@@ -1067,13 +1067,11 @@
       "title": "Match paused",
       "waitingToResume": "Waiting to resume…",
       "resume": "Resume",
-      "pauseButton": "Pause",
       "pauseUsed": "Pause used",
-      "pausedNow": "paused now",
-      "pauseAvailable": "pause available",
-      "pauseUsedRow": "pause used",
-      "resumeAll": "Resume all",
-      "ownerResumedToast": "The host resumed the game"
+      "pausedNow": "Paused",
+      "countdownLabel": "Until play resumes",
+      "timedOutToast": "Time's up. Play resumes.",
+      "pauseButton": "Pause"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} disconnected",

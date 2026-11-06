@@ -131,6 +131,8 @@ const minimalMatchState: MatchState = {
   ownerSeat: -1,
   pausedPlayers: [false, false, false, false],
   pauseUsed: [false, false, false, false],
+  playerPauseExpiresAt: [null, null, null, null],
+  pauseWindowSec: 120,
   surrenderProposerSeat: null,
   surrenderUsed: [false, false, false, false],
   previousPhase: "",

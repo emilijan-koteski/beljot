@@ -36,10 +36,6 @@ func TestDisconnectedPhaseRejectsAllActions(t *testing.T) {
 			action: game.Action{Type: game.ActionUnpause, PlayerSeat: 0},
 		},
 		{
-			name:   "owner unpause rejected during disconnect",
-			action: game.Action{Type: game.ActionOwnerUnpause, PlayerSeat: 0},
-		},
-		{
 			name:   "declare rejected during disconnect",
 			action: game.Action{Type: game.ActionDeclare, PlayerSeat: 1},
 		},

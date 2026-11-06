@@ -1067,13 +1067,11 @@
       "title": "Мечот е паузиран",
       "waitingToResume": "Се чека продолжување…",
       "resume": "Продолжи",
-      "pauseButton": "Пауза",
       "pauseUsed": "Паузата е искористена",
-      "pausedNow": "паузира сега",
-      "pauseAvailable": "пауза достапна",
-      "pauseUsedRow": "паузата е искористена",
-      "resumeAll": "Продолжи за сите",
-      "ownerResumedToast": "Домаќинот ја продолжи играта"
+      "pausedNow": "Паузира",
+      "countdownLabel": "До продолжување на играта",
+      "timedOutToast": "Времето истече. Играта продолжува.",
+      "pauseButton": "Пауза"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} ја прекина врската",

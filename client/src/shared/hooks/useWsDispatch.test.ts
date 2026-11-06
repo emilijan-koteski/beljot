@@ -134,6 +134,8 @@ const mockMatchState: MatchState = {
   previousPhase: "" as const,
   pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+  playerPauseExpiresAt: [null, null, null, null],
+  pauseWindowSec: 120,
   surrenderProposerSeat: null,
   surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   turnTimeRemaining: 0,
@@ -1588,6 +1590,20 @@ describe("useWsDispatch", () => {
       payload: { playerSeat: 0, type: "timeout" },
     });
     expect(toast.info).toHaveBeenCalledWith("Alice timed out", expect.anything());
+  });
+
+  it("toasts that play resumes when a pause runs out", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:match_resumed", payload: { resumedBy: -1, timedOut: true } });
+    expect(toast.info).toHaveBeenCalledWith("Time's up. Play resumes.", expect.anything());
+  });
+
+  it("stays quiet when a player resumes the pause themselves", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:match_resumed", payload: { resumedBy: 1, timedOut: false } });
+    expect(toast.info).not.toHaveBeenCalled();
   });
 
   it("ignores event:auto_action when matchState is null", () => {

@@ -116,6 +116,13 @@ export const EventMatchStateSchema = z.strictObject({
   previousPhase: z.string(),
   pausedPlayers: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
   pauseUsed: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
+  playerPauseExpiresAt: z.tuple([
+    z.string().nullable(),
+    z.string().nullable(),
+    z.string().nullable(),
+    z.string().nullable(),
+  ]),
+  pauseWindowSec: z.number(),
   turnTimeRemaining: z.number(),
   surrenderProposerSeat: z.number().nullable(),
   surrenderUsed: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
@@ -219,7 +226,7 @@ export const MatchPausedPayloadSchema = z.strictObject({
 
 export const MatchResumedPayloadSchema = z.strictObject({
   resumedBy: z.number(),
-  ownerOverride: z.boolean(),
+  timedOut: z.boolean(),
 });
 
 export const AutoActionPayloadSchema = z.strictObject({

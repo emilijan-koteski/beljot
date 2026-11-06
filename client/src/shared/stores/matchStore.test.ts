@@ -105,6 +105,8 @@ const mockMatchState: MatchState = {
   previousPhase: "" as const,
   pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+  playerPauseExpiresAt: [null, null, null, null],
+  pauseWindowSec: 120,
   surrenderProposerSeat: null,
   surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   turnTimeRemaining: 0,

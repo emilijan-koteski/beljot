@@ -130,6 +130,13 @@
     false,
     false
   ],
+  "playerPauseExpiresAt": [
+    null,
+    null,
+    null,
+    null
+  ],
+  "pauseWindowSec": 0,
   "turnTimeRemaining": 0,
   "surrenderProposerSeat": null,
   "surrenderUsed": [

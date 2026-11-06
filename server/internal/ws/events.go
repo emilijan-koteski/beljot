@@ -13,7 +13,6 @@ const ActionAnnounceBelot = "action:announce_belot"
 const ActionDeclineBelot = "action:decline_belot"
 const ActionPause = "action:pause"
 const ActionUnpause = "action:unpause"
-const ActionOwnerUnpause = "action:owner_unpause"
 
 const ActionSurrenderRequest = "action:surrender_request"
 const ActionSurrenderAccept = "action:surrender_accept"
@@ -143,9 +142,10 @@ type MatchPausedPayload struct {
 }
 
 // MatchResumedPayload is the typed payload for EventMatchResumed events.
+// When the last running pause runs out it reports TimedOut with ResumedBy -1, since no player resumed it.
 type MatchResumedPayload struct {
-	ResumedBy     int  `json:"resumedBy"`
-	OwnerOverride bool `json:"ownerOverride"`
+	ResumedBy int  `json:"resumedBy"`
+	TimedOut  bool `json:"timedOut"`
 }
 
 // AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry; the other seats get "timeout"
