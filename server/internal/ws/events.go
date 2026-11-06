@@ -166,6 +166,13 @@ type AutoActionPayload struct {
 	Type       AutoActionType `json:"type"`
 }
 
+const EventMissedTurnWarning = "event:missed_turn_warning"
+
+// MissedTurnWarningPayload goes only to a player whose next missed turn forfeits the match.
+type MissedTurnWarningPayload struct {
+	MissedTurns int `json:"missedTurns"`
+}
+
 const EventPlayerDisconnected = "event:player_disconnected"
 const EventPlayerReconnected = "event:player_reconnected"
 const EventMatchAbandoned = "event:match_abandoned"

@@ -1,6 +1,9 @@
 package match
 
-import "github.com/emilijan/beljot/server/internal/game"
+import (
+	"github.com/emilijan/beljot/server/internal/game"
+	"github.com/emilijan/beljot/server/internal/ws"
+)
 
 const missedTurnsForfeit = 3
 
@@ -22,6 +25,16 @@ func (s *LiveMatch) missTurn(seat int) bool {
 	}
 	s.missedTurns[seat]++
 	return s.missedTurns[seat] >= missedTurnsForfeit
+}
+
+// onLastWarning reports whether the seat's next missed turn forfeits the match. Call under session.mu.
+func (s *LiveMatch) onLastWarning(seat int) bool {
+	return seat >= 0 && seat < 4 && s.missedTurns[seat] == missedTurnsForfeit-1
+}
+
+// sendMissedTurnWarning tells only that player their next missed turn forfeits the match.
+func (m *Manager) sendMissedTurnWarning(userID uint, missedTurns int) {
+	m.hub.SendToUser(userID, buildMessage(ws.EventMissedTurnWarning, ws.MissedTurnWarningPayload{MissedTurns: missedTurns}))
 }
 
 // resetMissedTurns clears the acting seat's run of missed turns when it makes a move itself.

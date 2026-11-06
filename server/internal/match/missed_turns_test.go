@@ -76,6 +76,35 @@ func (tbl *missedTurnsTable) abandoned(t *testing.T) *ws.MatchAbandonedPayload {
 	return nil
 }
 
+func (tbl *missedTurnsTable) warnings() []hubCall {
+	var out []hubCall
+	for _, call := range tbl.hub.snapshot() {
+		if containsType(call.msg, ws.EventMissedTurnWarning) {
+			out = append(out, call)
+		}
+	}
+	return out
+}
+
+func TestMissedTurns_TheSecondInARowWarnsOnlyThatPlayer(t *testing.T) {
+	tbl := startMissedTurnsTable(t, 1206, defaultPlayers())
+	seat := tbl.activeSeat(t)
+
+	tbl.missTurnOf(t, seat)
+	require.Empty(t, tbl.warnings(), "one missed turn gets no warning")
+	tbl.missTurnOf(t, seat)
+
+	warnings := tbl.warnings()
+	require.Len(t, warnings, 1)
+	assert.Equal(t, []uint{defaultPlayers()[seat].UserID}, warnings[0].userIDs, "only the player who missed is warned")
+	var env struct {
+		Payload ws.MissedTurnWarningPayload `json:"payload"`
+	}
+	require.NoError(t, json.Unmarshal(warnings[0].msg, &env))
+	assert.Equal(t, 2, env.Payload.MissedTurns)
+	assert.NotNil(t, tbl.mgr.GetStateSnapshot(tbl.roomID), "a warning is not a forfeit")
+}
+
 func TestMissedTurns_TheThirdInARowForfeitsLikeADisconnect(t *testing.T) {
 	tbl := startMissedTurnsTable(t, 1201, defaultPlayers())
 	seat := tbl.activeSeat(t)
@@ -115,6 +144,7 @@ func TestMissedTurns_AMoveOfYourOwnStartsTheCountAgain(t *testing.T) {
 	tbl.missTurnOf(t, seat)
 	tbl.missTurnOf(t, seat)
 
+	assert.Len(t, tbl.warnings(), 2, "each fresh run of two is warned again")
 	assert.Nil(t, tbl.abandoned(t), "four missed turns, but never three in a row")
 	assert.NotNil(t, tbl.mgr.GetStateSnapshot(tbl.roomID))
 }
@@ -147,6 +177,7 @@ func TestMissedTurns_ABotNeverForfeits(t *testing.T) {
 		tbl.missTurnOf(t, botSeat)
 	}
 
+	assert.Empty(t, tbl.warnings())
 	assert.Nil(t, tbl.abandoned(t))
 	assert.NotNil(t, tbl.mgr.GetStateSnapshot(tbl.roomID))
 }

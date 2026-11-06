@@ -1123,6 +1123,7 @@ describe("MatchPage", () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith("action:pause", {});
     expect(screen.queryByText(/resume all/i)).not.toBeInTheDocument();
+    expect(toastMock.dismiss).not.toHaveBeenCalledWith("missed-turn-warning");
   });
 
   it("hides declarationReveal while the table is paused (AC3)", () => {
@@ -1570,6 +1571,7 @@ describe("MatchPage", () => {
       expect(audioEngine.playSfx).toHaveBeenCalledWith("cardPlay");
 
       expect(mockSendMessage).toHaveBeenCalledWith("action:play_card", { cardId: "KS" });
+      expect(toastMock.dismiss).toHaveBeenCalledWith("missed-turn-warning");
       expect(mockSendMessage).not.toHaveBeenCalledWith("action:announce_belot", {});
 
       act(() => {

@@ -945,7 +945,8 @@
       "autoPickedTrump": "{{player}} timed out · trump chosen",
       "autoSkippedDeclare": "You timed out · declarations skipped",
       "autoSkippedBelot": "You timed out · Belote skipped",
-      "timedOut": "{{player}} timed out"
+      "timedOut": "{{player}} timed out",
+      "lastWarning": "Miss your next turn and you abandon the match"
     },
     "score": {
       "heading": "Scoreboard",

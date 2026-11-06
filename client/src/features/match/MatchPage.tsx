@@ -86,7 +86,7 @@ import { UrgentTick } from "./components/UrgentTick";
 import { Wordmark } from "./components/Wordmark";
 import { detectDeclarations } from "./lib/declarations";
 import { isBelotEligible, legalCardIds } from "./lib/legalCards";
-import { showMatchError, useFeltToasts } from "./lib/matchToast";
+import { clearMissedTurnWarningOnMove, showMatchError, useFeltToasts } from "./lib/matchToast";
 import { seatTeam } from "./lib/tableTheme";
 import { compassOffset, SLOT_POSITIONS } from "./lib/trickLayout";
 import { useDealController } from "./lib/useDealController";
@@ -207,7 +207,14 @@ export function MatchPage() {
       ? parsedRoomId
       : null;
 
-  const sendMessage = useWsSendMessage();
+  const sendWs = useWsSendMessage();
+  const sendMessage = useCallback(
+    (type: string, payload: unknown) => {
+      clearMissedTurnWarningOnMove(type);
+      sendWs(type, payload);
+    },
+    [sendWs],
+  );
 
   const user = useAuthStore((s) => s.user);
   const setRoomEjection = useRoomStore((s) => s.setRoomEjection);

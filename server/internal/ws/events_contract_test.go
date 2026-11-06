@@ -166,6 +166,11 @@ func TestEventsJSONContract(t *testing.T) {
 			goldenFile: "match_abandoned.json",
 		},
 		{
+			name:       "MissedTurnWarningPayload",
+			sample:     ws.MissedTurnWarningPayload{MissedTurns: 2},
+			goldenFile: "missed_turn_warning.json",
+		},
+		{
 			name: "TrumpSelectedPayload",
 			sample: ws.TrumpSelectedPayload{
 				PlayerSeat: 1,

@@ -7,6 +7,7 @@ vi.mock("sonner", () => ({
     warning: vi.fn(),
     success: vi.fn(),
     error: vi.fn(),
+    dismiss: vi.fn(),
   },
 }));
 
@@ -1580,6 +1581,41 @@ describe("useWsDispatch", () => {
 
     expect(tSpy).toHaveBeenCalledWith("match.timer.autoPickedTrump", { player: "Alice" });
     expect(tSpy).not.toHaveBeenCalledWith("match.timer.autoPassed", expect.anything());
+  });
+
+  it("warns the player whose next missed turn abandons the match, until they move", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:missed_turn_warning", payload: { missedTurns: 2 } });
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Miss your next turn and you abandon the match",
+      expect.objectContaining({ id: "missed-turn-warning", duration: Infinity }),
+    );
+  });
+
+  it("ignores a malformed missed-turn warning", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({ type: "event:missed_turn_warning", payload: {} });
+    expect(toast.warning).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("clears the missed-turn warning when the match ends or is abandoned", () => {
+    useMatchStore.getState().setMatchState(mockMatchState);
+    const { result } = renderHook(() => useWsDispatch());
+    result.current({
+      type: "event:match_abandoned",
+      payload: {
+        abandonedByPlayer: 1,
+        reason: "missed_turns",
+        teamAFinalScore: 300,
+        teamBFinalScore: 200,
+        matchDurationSec: 400,
+      },
+    });
+    expect(toast.dismiss).toHaveBeenCalledWith("missed-turn-warning");
   });
 
   it("toasts only the timeout for another seat's private skip", () => {

@@ -13,6 +13,7 @@ import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
 import matchPausedGolden from "../../../../server/internal/ws/testdata/events/match_paused.json";
 import matchResumedGolden from "../../../../server/internal/ws/testdata/events/match_resumed.json";
+import missedTurnWarningGolden from "../../../../server/internal/ws/testdata/events/missed_turn_warning.json";
 import phasesGolden from "../../../../server/internal/ws/testdata/events/phases.json";
 import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events/player_declared.json";
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
@@ -38,6 +39,7 @@ import {
   MatchEndPayloadSchema,
   MatchPausedPayloadSchema,
   MatchResumedPayloadSchema,
+  MissedTurnWarningPayloadSchema,
   PlayerDeclaredPayloadSchema,
   PlayerDisconnectedPayloadSchema,
   PlayerReconnectedPayloadSchema,
@@ -64,6 +66,7 @@ const cases = [
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
   ["AutoActionPayload (pick_trump)", AutoActionPayloadSchema, autoActionPickTrumpGolden],
+  ["MissedTurnWarningPayload", MissedTurnWarningPayloadSchema, missedTurnWarningGolden],
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],
   ["XpAwardedPayload", XpAwardedPayloadSchema, xpAwardedGolden],
   ["HonorUpdatedPayload", HonorUpdatedPayloadSchema, honorUpdatedGolden],

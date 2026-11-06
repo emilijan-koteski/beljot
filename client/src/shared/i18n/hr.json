@@ -945,7 +945,8 @@
       "autoPickedTrump": "{{player}} · vrijeme isteklo, adut odabran",
       "autoSkippedDeclare": "Isteklo ti je vrijeme · zvanja preskočena",
       "autoSkippedBelot": "Isteklo ti je vrijeme · Bela preskočena",
-      "timedOut": "{{player}} · vrijeme isteklo"
+      "timedOut": "{{player}} · vrijeme isteklo",
+      "lastWarning": "Ako propustiš sljedeći potez, napuštaš meč"
     },
     "score": {
       "heading": "Rezultat",

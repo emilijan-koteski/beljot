@@ -1447,10 +1447,15 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	session.gameState = finalState
 	playerIDs := session.playerIDs
 	startedAt := session.startedAt
+	lastWarning := session.onLastWarning(expectedSeat)
+	missedTurns := session.missedTurns[expectedSeat]
 	session.mu.Unlock()
 
 	if autoType, ok := autoActionTypeFor(action.Type); ok {
 		m.sendAutoAction(playerIDs, expectedSeat, autoType)
+	}
+	if lastWarning {
+		m.sendMissedTurnWarning(playerIDs[expectedSeat], missedTurns)
 	}
 
 	for _, step := range steps {

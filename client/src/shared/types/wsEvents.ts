@@ -79,6 +79,7 @@ export const EVENT_BELOT_ANNOUNCED = "event:belot_announced" as const;
 export const EVENT_MATCH_PAUSED = "event:match_paused" as const;
 export const EVENT_MATCH_RESUMED = "event:match_resumed" as const;
 export const EVENT_AUTO_ACTION = "event:auto_action" as const;
+export const EVENT_MISSED_TURN_WARNING = "event:missed_turn_warning" as const;
 
 export interface MatchStatePayload {
   [key: string]: unknown;
@@ -187,6 +188,10 @@ export type AutoActionType =
 export interface AutoActionPayload {
   playerSeat: number;
   type: AutoActionType;
+}
+
+export interface MissedTurnWarningPayload {
+  missedTurns: number;
 }
 
 export const EVENT_COIN_SETTLEMENT = "event:coin_settlement" as const;
