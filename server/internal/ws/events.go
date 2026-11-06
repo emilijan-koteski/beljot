@@ -13,7 +13,6 @@ const ActionAnnounceBelot = "action:announce_belot"
 const ActionDeclineBelot = "action:decline_belot"
 const ActionPause = "action:pause"
 const ActionUnpause = "action:unpause"
-const ActionExtendPause = "action:extend_pause"
 
 const ActionSurrenderRequest = "action:surrender_request"
 const ActionSurrenderAccept = "action:surrender_accept"
@@ -30,7 +29,6 @@ const EventPlayerDeclared = "event:player_declared"
 const EventBelotAnnounced = "event:belot_announced"
 const EventMatchPaused = "event:match_paused"
 const EventMatchResumed = "event:match_resumed"
-const EventPauseExtended = "event:pause_extended"
 const EventAutoAction = "event:auto_action"
 
 const EventCoinSettlement = "event:coin_settlement"
@@ -144,16 +142,10 @@ type MatchPausedPayload struct {
 }
 
 // MatchResumedPayload is the typed payload for EventMatchResumed events.
-// A pause that ran out reports TimedOut with ResumedBy -1, since no player resumed it.
+// When the last running pause runs out it reports TimedOut with ResumedBy -1, since no player resumed it.
 type MatchResumedPayload struct {
 	ResumedBy int  `json:"resumedBy"`
 	TimedOut  bool `json:"timedOut"`
-}
-
-// PauseExtendedPayload is the typed payload for EventPauseExtended: who added time and the new end.
-type PauseExtendedPayload struct {
-	ExtendedBy     int    `json:"extendedBy"`
-	PauseExpiresAt string `json:"pauseExpiresAt"`
 }
 
 // AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry; the other seats get "timeout"

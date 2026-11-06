@@ -1,9 +1,13 @@
 package game
 
-import "github.com/emilijan/beljot/server/internal/apperr"
+import (
+	"time"
 
-// handlePause spends the player's one pause of the match. From play or bidding it starts a fresh pause;
-// sent while already paused it adds time instead, exactly like an extension.
+	"github.com/emilijan/beljot/server/internal/apperr"
+)
+
+// handlePause starts the player's own pause, one per match. A pause sent while already paused runs
+// alongside the others on its own clock; the match stays paused while any player's pause is running.
 func handlePause(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhasePlaying && state.Phase != PhaseBidding &&
 		state.Phase != PhasePaused {
@@ -21,11 +25,8 @@ func handlePause(state *GameState, action Action) (*GameState, error) {
 
 	newState := cloneGameState(state)
 
-	if state.Phase == PhasePaused {
-		newState.PauseExtended[seat] = true
-	} else {
+	if state.Phase != PhasePaused {
 		newState.PreviousPhase = state.Phase
-		newState.PauseExtended = [4]bool{}
 	}
 
 	newState.PausedPlayers[seat] = true
@@ -35,32 +36,8 @@ func handlePause(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
-// handleExtendPause adds time to the current pause and spends the player's one pause of the match on it.
-// The player becomes a holder: the pause lasts until every holder resumes or the time runs out.
-func handleExtendPause(state *GameState, action Action) (*GameState, error) {
-	if state.Phase != PhasePaused {
-		return nil, apperr.ErrNotPaused
-	}
-
-	seat := action.PlayerSeat
-	if seat < 0 || seat > 3 {
-		return nil, apperr.ErrBadRequest
-	}
-
-	if state.PauseUsed[seat] {
-		return nil, apperr.ErrPauseExhausted
-	}
-
-	newState := cloneGameState(state)
-	newState.PauseExtended[seat] = true
-	newState.PauseUsed[seat] = true
-	newState.PausedPlayers[seat] = true
-
-	return newState, nil
-}
-
-// handleUnpause clears the acting player's own hold on the pause.
-// The game resumes to PreviousPhase only when no holder is left.
+// handleUnpause ends the acting player's own pause; nobody can end another player's.
+// The game resumes to PreviousPhase only when no player's pause is still running.
 func handleUnpause(state *GameState, action Action) (*GameState, error) {
 	if state.Phase != PhasePaused {
 		return nil, apperr.ErrNotPaused
@@ -75,40 +52,41 @@ func handleUnpause(state *GameState, action Action) (*GameState, error) {
 		return nil, apperr.ErrNoActivePause
 	}
 
-	newState := cloneGameState(state)
-	newState.PausedPlayers[seat] = false
-
-	if !anyPauseHolder(newState.PausedPlayers) {
-		resumeFromPause(newState)
-	}
-
-	return newState, nil
+	return endSeatPause(state, seat), nil
 }
 
-// ExpirePause ends a pause whose time has run out, whoever still holds it.
+// ExpireSeatPause ends one player's pause whose time ran out, resuming play if it was the last one running.
 // The session layer calls it from the pause timer; it is not an action a player can send.
-func ExpirePause(state *GameState) (*GameState, error) {
+func ExpireSeatPause(state *GameState, seat int) (*GameState, error) {
 	if state.Phase != PhasePaused {
 		return nil, apperr.ErrNotPaused
 	}
-	newState := cloneGameState(state)
-	resumeFromPause(newState)
-	return newState, nil
+	if seat < 0 || seat > 3 {
+		return nil, apperr.ErrBadRequest
+	}
+	if !state.PausedPlayers[seat] {
+		return nil, apperr.ErrNoActivePause
+	}
+	return endSeatPause(state, seat), nil
 }
 
-// ClearPause drops every hold and the pause clock without touching the phase, for a pause that ran out
-// while the match was waiting on a disconnected player.
+// ClearPause drops every running pause without touching the phase, for pauses that ended while the match
+// was waiting on a disconnected player.
 func ClearPause(state *GameState) {
 	state.PausedPlayers = [4]bool{}
-	state.PauseExtended = [4]bool{}
-	state.PauseExpiresAt = nil
-	state.PauseTotalSec = 0
+	state.PlayerPauseExpiresAt = [4]*time.Time{}
 }
 
-func resumeFromPause(state *GameState) {
-	ClearPause(state)
-	state.Phase = state.PreviousPhase
-	state.PreviousPhase = ""
+func endSeatPause(state *GameState, seat int) *GameState {
+	newState := cloneGameState(state)
+	newState.PausedPlayers[seat] = false
+	newState.PlayerPauseExpiresAt[seat] = nil
+	if !anyPauseHolder(newState.PausedPlayers) {
+		ClearPause(newState)
+		newState.Phase = newState.PreviousPhase
+		newState.PreviousPhase = ""
+	}
+	return newState
 }
 
 func anyPauseHolder(holders [4]bool) bool {

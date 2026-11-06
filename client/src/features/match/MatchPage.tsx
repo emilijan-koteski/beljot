@@ -36,7 +36,6 @@ import {
   ACTION_DECLARE,
   ACTION_DECLINE_BELOT,
   ACTION_EMOTE,
-  ACTION_EXTEND_PAUSE,
   ACTION_PASS_TRUMP,
   ACTION_PAUSE,
   ACTION_PICK_TRUMP,
@@ -899,10 +898,6 @@ export function MatchPage() {
     sendMessage(ACTION_UNPAUSE, {});
   }, [sendMessage]);
 
-  const handleExtendPause = useCallback(() => {
-    sendMessage(ACTION_EXTEND_PAUSE, {});
-  }, [sendMessage]);
-
   const handleSendEmote = useCallback(
     (emote: EmoteID) => {
       sendMessage(ACTION_EMOTE, { emote });
@@ -1442,13 +1437,12 @@ export function MatchPage() {
         <PauseOverlay
           pausedPlayers={matchState.pausedPlayers}
           pauseUsed={matchState.pauseUsed}
-          pauseExtended={matchState.pauseExtended}
-          pauseExpiresAt={matchState.pauseExpiresAt}
-          pauseTotalSec={matchState.pauseTotalSec}
+          playerPauseExpiresAt={matchState.playerPauseExpiresAt}
+          pauseWindowSec={matchState.pauseWindowSec}
           players={matchState.players}
           myPlayerSeat={myPlayerSeat}
           onResume={handleUnpause}
-          onExtend={handleExtendPause}
+          onPause={handlePause}
         />
       )}
 

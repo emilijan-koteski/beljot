@@ -37,7 +37,6 @@ import type {
   MatchEndPayload,
   MatchResumedPayload,
   MatchStartedPayload,
-  PauseExtendedPayload,
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerJoinedPayload,
@@ -88,7 +87,6 @@ import {
   EVENT_MATCH_PAUSED,
   EVENT_MATCH_RESUMED,
   EVENT_MATCH_STATE,
-  EVENT_PAUSE_EXTENDED,
   EVENT_PLAYER_DECLARED,
   EVENT_PLAYER_DISCONNECTED,
   EVENT_PLAYER_RECONNECTED,
@@ -441,15 +439,6 @@ function dispatchGameEvent(message: WsMessage): void {
     if (payload.timedOut === true) {
       toast.info(i18n.t("match.pause.timedOutToast"), { duration: 3000 });
     }
-    return;
-  }
-
-  if (type === EVENT_PAUSE_EXTENDED) {
-    const payload = message.payload as PauseExtendedPayload;
-    const seat = payload?.extendedBy;
-    if (typeof seat !== "number" || !Number.isInteger(seat) || seat < 0 || seat > 3) return;
-    const playerName = store.matchState?.players[seat]?.username ?? `Player ${seat + 1}`;
-    toast.info(i18n.t("match.pause.extendedToast", { player: playerName }), { duration: 3000 });
     return;
   }
 

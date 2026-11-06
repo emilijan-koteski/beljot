@@ -424,14 +424,11 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 				}
 			}
 			newState.TurnExpiresAt = nil
+		}
+		if action.Type == game.ActionPause {
 			expiry := time.Now().Add(pauseWindow(session))
-			newState.PauseExpiresAt = &expiry
-			newState.PauseTotalSec = pauseWindowSec(session)
-		} else if newState.PauseExtended[action.PlayerSeat] && !oldState.PauseExtended[action.PlayerSeat] &&
-			newState.PauseExpiresAt != nil {
-			expiry := newState.PauseExpiresAt.Add(pauseWindow(session))
-			newState.PauseExpiresAt = &expiry
-			newState.PauseTotalSec += pauseWindowSec(session)
+			newState.PlayerPauseExpiresAt[action.PlayerSeat] = &expiry
+			newState.PauseWindowSec = pauseWindowSec(session)
 		}
 		m.armPauseTimerLocked(session, newState)
 	} else if action.Type == game.ActionUnpause && newState.Phase != game.PhaseDeclaring {
@@ -825,15 +822,11 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionPause:
-		if oldState.Phase == game.PhasePaused {
-			m.broadcastPauseExtended(userIDs, newState, action.PlayerSeat)
-		} else {
-			paused := ws.MatchPausedPayload{
-				PausedBy:      action.PlayerSeat,
-				PausedPlayers: newState.PausedPlayers,
-			}
-			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchPaused, paused))
+		paused := ws.MatchPausedPayload{
+			PausedBy:      action.PlayerSeat,
+			PausedPlayers: newState.PausedPlayers,
 		}
+		m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchPaused, paused))
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionSurrenderRequest:
@@ -875,10 +868,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			resumed := ws.MatchResumedPayload{ResumedBy: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventMatchResumed, resumed))
 		}
-		m.broadcastState(playerIDs, newState)
-
-	case game.ActionExtendPause:
-		m.broadcastPauseExtended(userIDs, newState, action.PlayerSeat)
 		m.broadcastState(playerIDs, newState)
 
 	default:

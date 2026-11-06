@@ -83,10 +83,9 @@ describe("gameTypes", () => {
         "decline_belot",
         "pause",
         "unpause",
-        "extend_pause",
       ];
 
-      expect(actions).toHaveLength(10);
+      expect(actions).toHaveLength(9);
     });
   });
 
@@ -193,9 +192,8 @@ describe("gameTypes", () => {
         previousPhase: "" as const,
         pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
         pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
-        pauseExtended: [false, false, false, false] as [boolean, boolean, boolean, boolean],
-        pauseExpiresAt: null,
-        pauseTotalSec: 0,
+        playerPauseExpiresAt: [null, null, null, null],
+        pauseWindowSec: 120,
         surrenderProposerSeat: null,
         surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
         turnTimeRemaining: 0,

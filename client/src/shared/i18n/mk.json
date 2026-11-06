@@ -1070,10 +1070,8 @@
       "pauseUsed": "Паузата е искористена",
       "pausedNow": "Паузира",
       "countdownLabel": "До продолжување на играта",
-      "extend": "Додај {{minutes}} мин",
-      "extendedRow": "+{{minutes}} мин",
       "timedOutToast": "Времето истече. Играта продолжува.",
-      "extendedToast": "{{player}}: паузата е продолжена"
+      "pauseButton": "Пауза {{minutes}} мин"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} ја прекина врската",

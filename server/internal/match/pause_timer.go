@@ -9,7 +9,7 @@ import (
 
 const defaultPauseWindowSec = 120
 
-// pauseWindowSec is how long a pause, and each extension of it, lasts: the match's reconnect window.
+// pauseWindowSec is how long each player's pause lasts: the match's reconnect window.
 func pauseWindowSec(session *LiveMatch) int {
 	if session.reconnectWindowSec > 0 {
 		return session.reconnectWindowSec
@@ -21,17 +21,30 @@ func pauseWindow(session *LiveMatch) time.Duration {
 	return time.Duration(pauseWindowSec(session)) * time.Second
 }
 
-// armPauseTimerLocked schedules the end of the current pause at its absolute expiry.
+// earliestPauseExpiry returns the end of the running pause that runs out first, or nil when none is running.
+func earliestPauseExpiry(gs *game.GameState) *time.Time {
+	var earliest *time.Time
+	for seat, held := range gs.PausedPlayers {
+		expiry := gs.PlayerPauseExpiresAt[seat]
+		if held && expiry != nil && (earliest == nil || expiry.Before(*earliest)) {
+			earliest = expiry
+		}
+	}
+	return earliest
+}
+
+// armPauseTimerLocked schedules the end of whichever running pause runs out first.
 // Must be called under session.mu.Lock().
 func (m *Manager) armPauseTimerLocked(session *LiveMatch, gs *game.GameState) {
-	if gs.PauseExpiresAt == nil {
+	expiry := earliestPauseExpiry(gs)
+	if expiry == nil {
 		return
 	}
 	if session.turnTimer != nil {
 		session.turnTimer.Stop()
 	}
 	gen := session.timerGeneration
-	session.turnTimer = time.AfterFunc(max(time.Until(*gs.PauseExpiresAt), 0)+expiryGrace, func() {
+	session.turnTimer = time.AfterFunc(max(time.Until(*expiry), 0)+expiryGrace, func() {
 		m.handlePauseTimeout(session, gen)
 	})
 }
@@ -52,7 +65,27 @@ func (m *Manager) resumeTurnTimerLocked(session *LiveMatch, gs *game.GameState) 
 	m.armTurnTimerLocked(session, remaining, gs.ActivePlayerSeat)
 }
 
-// handlePauseTimeout ends a pause whose time ran out, ignoring callbacks from stale timer generations.
+// expireRunOutPauses ends every running pause whose time has passed by now.
+func expireRunOutPauses(gs *game.GameState, now time.Time) *game.GameState {
+	for seat, held := range gs.PausedPlayers {
+		expiry := gs.PlayerPauseExpiresAt[seat]
+		if !held || expiry == nil || now.Before(*expiry) {
+			continue
+		}
+		next, err := game.ExpireSeatPause(gs, seat)
+		if err != nil {
+			continue
+		}
+		gs = next
+		if gs.Phase != game.PhasePaused {
+			break
+		}
+	}
+	return gs
+}
+
+// handlePauseTimeout ends the pauses that ran out, ignoring callbacks from stale timer generations.
+// Play resumes only when no player's pause is left running.
 func (m *Manager) handlePauseTimeout(session *LiveMatch, generation uint64) {
 	session.mu.Lock()
 	if session.closed || session.timerGeneration != generation {
@@ -64,30 +97,28 @@ func (m *Manager) handlePauseTimeout(session *LiveMatch, generation uint64) {
 		session.mu.Unlock()
 		return
 	}
-	newState, err := game.ExpirePause(oldState)
-	if err != nil {
+	newState := expireRunOutPauses(oldState, time.Now())
+	if newState == oldState {
+		m.armPauseTimerLocked(session, oldState)
 		session.mu.Unlock()
 		return
 	}
-	m.resumeTurnTimerLocked(session, newState)
+	resumed := newState.Phase != game.PhasePaused
+	if resumed {
+		m.resumeTurnTimerLocked(session, newState)
+	} else {
+		m.armPauseTimerLocked(session, newState)
+	}
 	session.gameState = newState
 	playerIDs := session.playerIDs
 	session.mu.Unlock()
 
-	resumed := ws.MatchResumedPayload{ResumedBy: -1, TimedOut: true}
-	m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventMatchResumed, resumed))
+	if resumed {
+		payload := ws.MatchResumedPayload{ResumedBy: -1, TimedOut: true}
+		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), buildMessage(ws.EventMatchResumed, payload))
+	}
 	m.broadcastState(playerIDs, newState)
-	m.maybeScheduleBotAction(session)
-}
-
-// broadcastPauseExtended tells the table who added time to the pause and when it now ends.
-func (m *Manager) broadcastPauseExtended(userIDs []uint, gs *game.GameState, seat int) {
-	if gs.PauseExpiresAt == nil {
-		return
+	if resumed {
+		m.maybeScheduleBotAction(session)
 	}
-	extended := ws.PauseExtendedPayload{
-		ExtendedBy:     seat,
-		PauseExpiresAt: gs.PauseExpiresAt.UTC().Format(time.RFC3339Nano),
-	}
-	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPauseExtended, extended))
 }

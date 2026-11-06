@@ -1070,10 +1070,8 @@
       "pauseUsed": "Pauza iskorišćena",
       "pausedNow": "Pauzira",
       "countdownLabel": "Do nastavka igre",
-      "extend": "Dodaj {{minutes}} min",
-      "extendedRow": "+{{minutes}} min",
       "timedOutToast": "Vreme je isteklo. Igra se nastavlja.",
-      "extendedToast": "{{player}}: pauza je produžena"
+      "pauseButton": "Pauza {{minutes}} min"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} · veza prekinuta",

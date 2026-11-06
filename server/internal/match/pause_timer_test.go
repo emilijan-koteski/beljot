@@ -43,65 +43,76 @@ func TestPause_RunsForTheReconnectWindow(t *testing.T) {
 
 	gs := mgr.GetStateSnapshot(1101)
 	require.Equal(t, game.PhasePaused, gs.Phase)
-	require.NotNil(t, gs.PauseExpiresAt)
-	assert.WithinDuration(t, time.Now().Add(120*time.Second), *gs.PauseExpiresAt, 2*time.Second)
-	assert.Equal(t, 120, gs.PauseTotalSec)
+	require.NotNil(t, gs.PlayerPauseExpiresAt[1])
+	assert.WithinDuration(t, time.Now().Add(120*time.Second), *gs.PlayerPauseExpiresAt[1], 2*time.Second)
+	assert.Equal(t, 120, gs.PauseWindowSec)
 }
 
-func TestExtendPause_AddsOneWindowPerUnspentPause(t *testing.T) {
+func TestPause_ASecondPauseRunsItsOwnClock(t *testing.T) {
 	mgr := startPauseMatch(t, 1102, 120)
 	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
-	before := *mgr.GetStateSnapshot(1102).PauseExpiresAt
+	first := *mgr.GetStateSnapshot(1102).PlayerPauseExpiresAt[1]
+	time.Sleep(20 * time.Millisecond)
 
-	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2}))
-	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 3}))
-	errPauser := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 1})
-	errTwice := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2})
+	require.NoError(t, mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 2}))
+	err := mgr.ApplyActionForTest(1102, game.Action{Type: game.ActionPause, PlayerSeat: 1})
 
-	assert.ErrorIs(t, errPauser, apperr.ErrPauseExhausted, "pausing spent seat 1's one move")
-	assert.ErrorIs(t, errTwice, apperr.ErrPauseExhausted)
+	assert.ErrorIs(t, err, apperr.ErrPauseExhausted, "one pause per player per match")
 	gs := mgr.GetStateSnapshot(1102)
-	assert.Equal(t, before.Add(240*time.Second), *gs.PauseExpiresAt, "seat 2 and seat 3 each added a window")
-	assert.Equal(t, 360, gs.PauseTotalSec)
-	assert.Equal(t, [4]bool{false, false, true, true}, gs.PauseExtended)
-	assert.Equal(t, [4]bool{false, true, true, true}, gs.PauseUsed)
+	assert.Equal(t, first, *gs.PlayerPauseExpiresAt[1], "the first pause keeps its own end")
+	require.NotNil(t, gs.PlayerPauseExpiresAt[2])
+	assert.True(t, gs.PlayerPauseExpiresAt[2].After(first), "the second pause starts its own two minutes")
 }
 
-func TestPause_ResumesWhenTheTimeRunsOut(t *testing.T) {
-	mgr := startPauseMatch(t, 1103, 1)
+func TestPause_ResumingYourOwnLeavesTheOtherRunning(t *testing.T) {
+	mgr := startPauseMatch(t, 1103, 120)
 	require.NoError(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
-	require.NoError(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionExtendPause, PlayerSeat: 3}))
+	require.NoError(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionPause, PlayerSeat: 2}))
 
-	gs := waitForPhaseNot(t, mgr, 1103, game.PhasePaused, 4*time.Second)
+	require.NoError(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionUnpause, PlayerSeat: 1}))
+	gs := mgr.GetStateSnapshot(1103)
+	assert.Equal(t, game.PhasePaused, gs.Phase, "seat 2's pause is still running")
+	assert.Nil(t, gs.PlayerPauseExpiresAt[1])
+	assert.NotNil(t, gs.PlayerPauseExpiresAt[2])
+	assert.ErrorIs(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionUnpause, PlayerSeat: 1}), apperr.ErrNoActivePause)
 
+	require.NoError(t, mgr.ApplyActionForTest(1103, game.Action{Type: game.ActionUnpause, PlayerSeat: 2}))
+	resumed := mgr.GetStateSnapshot(1103)
+	assert.Equal(t, game.PhaseBidding, resumed.Phase)
+	assert.Equal(t, [4]*time.Time{}, resumed.PlayerPauseExpiresAt)
+}
+
+func TestPause_EachPauseRunsOutOnItsOwn(t *testing.T) {
+	mgr := startPauseMatch(t, 1104, 1)
+	require.NoError(t, mgr.ApplyActionForTest(1104, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
+	time.Sleep(600 * time.Millisecond)
+	require.NoError(t, mgr.ApplyActionForTest(1104, game.Action{Type: game.ActionPause, PlayerSeat: 3}))
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && mgr.GetStateSnapshot(1104).PausedPlayers[1] {
+		time.Sleep(20 * time.Millisecond)
+	}
+	mid := mgr.GetStateSnapshot(1104)
+	require.False(t, mid.PausedPlayers[1], "seat 1's pause ran out")
+	if mid.Phase == game.PhasePaused {
+		assert.True(t, mid.PausedPlayers[3], "seat 3's later pause keeps the match paused")
+	}
+
+	gs := waitForPhaseNot(t, mgr, 1104, game.PhasePaused, 4*time.Second)
 	assert.Equal(t, game.PhaseBidding, gs.Phase)
-	assert.Equal(t, [4]bool{}, gs.PausedPlayers, "every hold ends with the time")
-	assert.Nil(t, gs.PauseExpiresAt)
-	assert.True(t, gs.PauseUsed[1], "the pause stays used for the rest of the match")
+	assert.Equal(t, [4]bool{}, gs.PausedPlayers)
+	assert.True(t, gs.PauseUsed[1])
+	assert.True(t, gs.PauseUsed[3])
 }
 
 func TestPause_KeepsItsClockThroughARejectedAction(t *testing.T) {
-	mgr := startPauseMatch(t, 1104, 1)
-	require.NoError(t, mgr.ApplyActionForTest(1104, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
+	mgr := startPauseMatch(t, 1105, 1)
+	require.NoError(t, mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
 
-	err := mgr.ApplyActionForTest(1104, game.Action{Type: game.ActionPassTrump, PlayerSeat: 0})
+	err := mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionPassTrump, PlayerSeat: 0})
 	require.ErrorIs(t, err, apperr.ErrGamePaused)
 
-	waitForPhaseNot(t, mgr, 1104, game.PhasePaused, 4*time.Second)
-}
-
-func TestPause_StaysUntilEveryHolderResumes(t *testing.T) {
-	mgr := startPauseMatch(t, 1105, 120)
-	require.NoError(t, mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
-	require.NoError(t, mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionExtendPause, PlayerSeat: 2}))
-
-	require.NoError(t, mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionUnpause, PlayerSeat: 1}))
-	assert.Equal(t, game.PhasePaused, mgr.GetStateSnapshot(1105).Phase, "seat 2 still holds the pause it extended")
-
-	require.NoError(t, mgr.ApplyActionForTest(1105, game.Action{Type: game.ActionUnpause, PlayerSeat: 2}))
-	gs := mgr.GetStateSnapshot(1105)
-	assert.Equal(t, game.PhaseBidding, gs.Phase)
-	assert.Nil(t, gs.PauseExpiresAt)
+	waitForPhaseNot(t, mgr, 1105, game.PhasePaused, 4*time.Second)
 }
 
 func TestPause_TheHostCannotResumeForEveryone(t *testing.T) {
@@ -121,25 +132,39 @@ func TestPause_ThatRanOutDuringADisconnectDoesNotReturnOnReconnect(t *testing.T)
 
 	gs := mgr.GetStateSnapshot(1107)
 	past := time.Now().Add(-time.Second)
-	gs.PauseExpiresAt = &past
+	gs.PlayerPauseExpiresAt[0] = &past
 	mgr.SetGameStateForTest(1107, gs)
 	mgr.HandleReconnect(20)
 
 	resumed := mgr.GetStateSnapshot(1107)
 	assert.Equal(t, game.PhaseBidding, resumed.Phase)
 	assert.Equal(t, [4]bool{}, resumed.PausedPlayers)
-	assert.Nil(t, resumed.PauseExpiresAt)
+	assert.Nil(t, resumed.PlayerPauseExpiresAt[0])
 }
 
 func TestPause_StillRunningAfterAReconnectReturns(t *testing.T) {
 	mgr := startPauseMatch(t, 1108, 120)
 	require.NoError(t, mgr.ApplyActionForTest(1108, game.Action{Type: game.ActionPause, PlayerSeat: 0}))
-	expiry := *mgr.GetStateSnapshot(1108).PauseExpiresAt
+	expiry := *mgr.GetStateSnapshot(1108).PlayerPauseExpiresAt[0]
 
 	mgr.HandleDisconnect(20)
 	mgr.HandleReconnect(20)
 
 	gs := mgr.GetStateSnapshot(1108)
 	assert.Equal(t, game.PhasePaused, gs.Phase)
-	assert.Equal(t, expiry, *gs.PauseExpiresAt, "the pause clock keeps its original end")
+	assert.Equal(t, expiry, *gs.PlayerPauseExpiresAt[0], "the pause clock keeps its original end")
+}
+
+func TestPause_APausersDisconnectEndsOnlyTheirPause(t *testing.T) {
+	mgr := startPauseMatch(t, 1109, 120)
+	require.NoError(t, mgr.ApplyActionForTest(1109, game.Action{Type: game.ActionPause, PlayerSeat: 0}))
+	require.NoError(t, mgr.ApplyActionForTest(1109, game.Action{Type: game.ActionPause, PlayerSeat: 1}))
+
+	mgr.HandleDisconnect(20)
+	mgr.HandleReconnect(20)
+
+	gs := mgr.GetStateSnapshot(1109)
+	assert.Equal(t, game.PhasePaused, gs.Phase, "seat 0's pause is still running")
+	assert.Equal(t, [4]bool{true, false, false, false}, gs.PausedPlayers)
+	assert.Nil(t, gs.PlayerPauseExpiresAt[1])
 }

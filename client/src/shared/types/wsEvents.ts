@@ -36,7 +36,6 @@ export const ACTION_DECLINE_BELOT = "action:decline_belot" as const;
 export const ACTION_CONTINUE = "action:continue" as const;
 export const ACTION_PAUSE = "action:pause" as const;
 export const ACTION_UNPAUSE = "action:unpause" as const;
-export const ACTION_EXTEND_PAUSE = "action:extend_pause" as const;
 
 export const ACTION_SURRENDER_REQUEST = "action:surrender_request" as const;
 export const ACTION_SURRENDER_ACCEPT = "action:surrender_accept" as const;
@@ -79,7 +78,6 @@ export const EVENT_PLAYER_DECLARED = "event:player_declared" as const;
 export const EVENT_BELOT_ANNOUNCED = "event:belot_announced" as const;
 export const EVENT_MATCH_PAUSED = "event:match_paused" as const;
 export const EVENT_MATCH_RESUMED = "event:match_resumed" as const;
-export const EVENT_PAUSE_EXTENDED = "event:pause_extended" as const;
 export const EVENT_AUTO_ACTION = "event:auto_action" as const;
 
 export interface MatchStatePayload {
@@ -172,16 +170,10 @@ export interface MatchPausedPayload {
   pausedPlayers: [boolean, boolean, boolean, boolean];
 }
 
-/** A pause that ran out arrives with `timedOut` true and `resumedBy` -1, since no player resumed it. */
+/** When the last running pause runs out it arrives with `timedOut` true and `resumedBy` -1. */
 export interface MatchResumedPayload {
   resumedBy: number;
   timedOut: boolean;
-}
-
-/** Who added time to the pause, and its new absolute end. */
-export interface PauseExtendedPayload {
-  extendedBy: number;
-  pauseExpiresAt: string;
 }
 
 /**

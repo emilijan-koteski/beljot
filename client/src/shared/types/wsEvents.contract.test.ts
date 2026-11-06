@@ -13,7 +13,6 @@ import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events
 import matchEndGolden from "../../../../server/internal/ws/testdata/events/match_end.json";
 import matchPausedGolden from "../../../../server/internal/ws/testdata/events/match_paused.json";
 import matchResumedGolden from "../../../../server/internal/ws/testdata/events/match_resumed.json";
-import pauseExtendedGolden from "../../../../server/internal/ws/testdata/events/pause_extended.json";
 import phasesGolden from "../../../../server/internal/ws/testdata/events/phases.json";
 import playerDeclaredGolden from "../../../../server/internal/ws/testdata/events/player_declared.json";
 import playerDisconnectedGolden from "../../../../server/internal/ws/testdata/events/player_disconnected.json";
@@ -39,7 +38,6 @@ import {
   MatchEndPayloadSchema,
   MatchPausedPayloadSchema,
   MatchResumedPayloadSchema,
-  PauseExtendedPayloadSchema,
   PlayerDeclaredPayloadSchema,
   PlayerDisconnectedPayloadSchema,
   PlayerReconnectedPayloadSchema,
@@ -64,7 +62,6 @@ const cases = [
   ["BelotAnnouncedPayload", BelotAnnouncedPayloadSchema, belotAnnouncedGolden],
   ["MatchPausedPayload", MatchPausedPayloadSchema, matchPausedGolden],
   ["MatchResumedPayload", MatchResumedPayloadSchema, matchResumedGolden],
-  ["PauseExtendedPayload", PauseExtendedPayloadSchema, pauseExtendedGolden],
   ["AutoActionPayload", AutoActionPayloadSchema, autoActionGolden],
   ["AutoActionPayload (pick_trump)", AutoActionPayloadSchema, autoActionPickTrumpGolden],
   ["CoinSettlementPayload", CoinSettlementPayloadSchema, coinSettlementGolden],

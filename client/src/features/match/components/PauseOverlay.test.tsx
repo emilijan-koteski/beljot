@@ -12,8 +12,7 @@ vi.mock("react-i18next", () => ({
         "match.pause.waitingToResume": "Waiting to resume…",
         "match.pause.pausedNow": "Paused",
         "match.pause.countdownLabel": "Until play resumes",
-        "match.pause.extend": `Add ${opts?.minutes ?? "?"} min`,
-        "match.pause.extendedRow": `+${opts?.minutes ?? "?"} min`,
+        "match.pause.pauseButton": `Pause ${opts?.minutes ?? "?"} min`,
       };
       return translations[key] ?? key;
     },
@@ -85,19 +84,27 @@ const mockPlayers = [
 
 type PauseOverlayProps = Parameters<typeof PauseOverlay>[0];
 
-const NONE: [boolean, boolean, boolean, boolean] = [false, false, false, false];
+const NO_CLOCKS: [string | null, string | null, string | null, string | null] = [
+  null,
+  null,
+  null,
+  null,
+];
+
+function inSeconds(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString();
+}
 
 function renderOverlay(overrides: Partial<PauseOverlayProps> = {}) {
   const props: PauseOverlayProps = {
     pausedPlayers: [true, false, false, false],
     pauseUsed: [true, false, false, false],
-    pauseExtended: NONE,
-    pauseExpiresAt: new Date(Date.now() + 90_000).toISOString(),
-    pauseTotalSec: 120,
+    playerPauseExpiresAt: [inSeconds(90), null, null, null],
+    pauseWindowSec: 120,
     players: mockPlayers,
     myPlayerSeat: 0,
     onResume: vi.fn(),
-    onExtend: vi.fn(),
+    onPause: vi.fn(),
     ...overrides,
   };
   render(<PauseOverlay {...props} />);
@@ -105,65 +112,53 @@ function renderOverlay(overrides: Partial<PauseOverlayProps> = {}) {
 }
 
 describe("PauseOverlay", () => {
-  it("counts down to the automatic resume", () => {
+  it("counts down to when play resumes", () => {
     renderOverlay();
     expect(screen.getByTestId("pause-countdown")).toHaveTextContent(/^1:(29|30)$/);
     expect(screen.getByText("Until play resumes")).toBeInTheDocument();
   });
 
-  it("marks who holds the pause and who added time", () => {
+  it("gives each running pause its own clock, and the ring the one that ends last", () => {
     renderOverlay({
       pausedPlayers: [true, false, true, false],
-      pauseExtended: [false, false, true, false],
-      pauseTotalSec: 240,
+      pauseUsed: [true, false, true, false],
+      playerPauseExpiresAt: [inSeconds(30), null, inSeconds(110), null],
     });
-    expect(screen.getByTestId("pause-player-0")).toHaveAttribute("data-holding", "true");
+    expect(screen.getByTestId("pause-player-0-countdown")).toHaveTextContent(/^0:(29|30)$/);
+    expect(screen.getByTestId("pause-player-2-countdown")).toHaveTextContent(/^1:(49|50)$/);
+    expect(screen.getByTestId("pause-countdown")).toHaveTextContent(/^1:(49|50)$/);
     expect(screen.getByTestId("pause-player-1")).toHaveAttribute("data-holding", "false");
-    expect(screen.getByTestId("pause-player-2")).toHaveTextContent("+2 min");
-    expect(screen.getByTestId("pause-player-2")).toHaveTextContent("Paused");
+    expect(screen.queryByTestId("pause-player-1-countdown")).not.toBeInTheDocument();
   });
 
-  it("lets the player holding the pause resume it", () => {
+  it("lets a player end their own pause", () => {
     const props = renderOverlay();
     fireEvent.click(screen.getByTestId("pause-resume-button"));
     expect(props.onResume).toHaveBeenCalledTimes(1);
   });
 
-  it("lets a player with an unspent pause add time", () => {
+  it("lets a player with an unspent pause start their own", () => {
     const props = renderOverlay({ myPlayerSeat: 1 });
-    fireEvent.click(screen.getByRole("button", { name: "Add 2 min" }));
-    expect(props.onExtend).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Pause 2 min" }));
+    expect(props.onPause).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the add-time button once the player has spent their pause", () => {
-    renderOverlay({
-      myPlayerSeat: 1,
-      pauseUsed: [true, true, false, false],
-      pauseExtended: [false, true, false, false],
-    });
-    expect(screen.queryByTestId("pause-extend-button")).not.toBeInTheDocument();
-  });
-
-  it("gives the player who paused only Resume, since pausing spent their move", () => {
+  it("offers no second pause to a player who already used theirs", () => {
     renderOverlay();
-    expect(screen.queryByTestId("pause-extend-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pause-own-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("pause-resume-button")).toBeInTheDocument();
   });
 
-  it("asks a player who holds no pause to wait, with no way to resume for others", () => {
-    renderOverlay({ myPlayerSeat: 2 });
+  it("gives a player whose pause is over no way to end someone else's", () => {
+    renderOverlay({ myPlayerSeat: 2, pauseUsed: [true, false, true, false] });
     expect(screen.getByTestId("pause-waiting")).toHaveTextContent("Waiting to resume…");
     expect(screen.queryByTestId("pause-resume-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pause-own-button")).not.toBeInTheDocument();
     expect(screen.queryByText(/resume all/i)).not.toBeInTheDocument();
   });
 
-  it("names the extension in whole minutes of one pause window", () => {
-    renderOverlay({
-      pauseUsed: [true, true, true, false],
-      pauseExtended: [false, true, true, false],
-      pauseTotalSec: 360,
-      myPlayerSeat: 3,
-    });
-    expect(screen.getByTestId("pause-extend-button")).toHaveTextContent("Add 2 min");
+  it("hides the ring when no pause clock is known", () => {
+    renderOverlay({ playerPauseExpiresAt: NO_CLOCKS });
+    expect(screen.queryByTestId("pause-countdown")).not.toBeInTheDocument();
   });
 });

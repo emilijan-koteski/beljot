@@ -177,9 +177,8 @@ const mockMatchState: MatchState = {
   previousPhase: "" as const,
   pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
-  pauseExtended: [false, false, false, false] as [boolean, boolean, boolean, boolean],
-  pauseExpiresAt: null,
-  pauseTotalSec: 0,
+  playerPauseExpiresAt: [null, null, null, null],
+  pauseWindowSec: 120,
   surrenderProposerSeat: null,
   surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   turnTimeRemaining: 0,
@@ -1108,20 +1107,20 @@ describe("MatchPage", () => {
     expect(dialogZ).toBeGreaterThan(pauseZ);
   });
 
-  it("adds time to the pause from the overlay, with no host override", () => {
+  it("starts the player's own pause from the overlay, with no host override", () => {
     useMatchStore.getState().setMatchState({
       ...mockMatchState,
       phase: "paused",
       pausedPlayers: [false, true, false, false],
-      pauseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
-      pauseTotalSec: 120,
+      pauseUsed: [false, true, false, false],
+      playerPauseExpiresAt: [null, new Date(Date.now() + 60_000).toISOString(), null, null],
     });
     useMatchStore.getState().setMyPlayerSeat(0);
 
     renderMatchPage();
-    fireEvent.click(screen.getByTestId("pause-extend-button"));
+    fireEvent.click(screen.getByTestId("pause-own-button"));
 
-    expect(mockSendMessage).toHaveBeenCalledWith("action:extend_pause", {});
+    expect(mockSendMessage).toHaveBeenCalledWith("action:pause", {});
     expect(screen.queryByText(/resume all/i)).not.toBeInTheDocument();
   });
 

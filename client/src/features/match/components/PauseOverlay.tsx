@@ -4,6 +4,7 @@ import { playerDisplayName } from "@/shared/lib/botName";
 import { Z } from "@/shared/lib/zLayers";
 import type { PlayerState } from "@/shared/types/matchTypes";
 
+import { formatCountdown, useTurnCountdown } from "../lib/turnCountdown";
 import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -15,43 +16,62 @@ type Seats<T> = [T, T, T, T];
 interface PauseOverlayProps {
   pausedPlayers: Seats<boolean>;
   pauseUsed: Seats<boolean>;
-  pauseExtended: Seats<boolean>;
-  pauseExpiresAt: string | null;
-  pauseTotalSec: number;
+  playerPauseExpiresAt: Seats<string | null>;
+  pauseWindowSec: number;
   players: Seats<PlayerState>;
   myPlayerSeat: number;
   onResume: () => void;
-  onExtend: () => void;
+  onPause: () => void;
 }
 
 const SECONDS_PER_MINUTE = 60;
 const FALLBACK_WINDOW_SEC = 120;
 
-/** One pause window in seconds: the pause's full length split over the opening window and each extension. */
-function pauseWindowSec(totalSec: number, extended: Seats<boolean>): number {
-  const extensions = extended.filter(Boolean).length;
-  return totalSec > 0 ? totalSec / (1 + extensions) : FALLBACK_WINDOW_SEC;
+/** The end of the running pause that ends last, when play resumes if nobody resumes early. */
+function latestExpiry(paused: Seats<boolean>, expiries: Seats<string | null>): string | null {
+  let latest: string | null = null;
+  paused.forEach((held, seat) => {
+    const expiry = expiries[seat];
+    if (held && expiry && (latest === null || Date.parse(expiry) > Date.parse(latest))) {
+      latest = expiry;
+    }
+  });
+  return latest;
+}
+
+/** A running pause's own clock, in its player's row. */
+function RowCountdown({ expiresAt, seat }: { expiresAt: string; seat: number }) {
+  const remaining = useTurnCountdown(expiresAt);
+  return (
+    <span
+      className="text-brass font-mono text-xs font-semibold tabular-nums"
+      data-testid={`pause-player-${seat}-countdown`}
+    >
+      {formatCountdown(remaining)}
+    </span>
+  );
 }
 
 /**
- * The pause overlay: a countdown to the automatic resume, who holds the pause, a button to add time for a
- * player who has not spent their one pause yet, and Resume for a holder. Play resumes when all holders resume.
+ * The pause overlay: each player's pause runs on its own clock and only they can end it early.
+ * Play resumes once no pause is left running; a player with an unspent pause can start theirs here.
  */
 export function PauseOverlay({
   pausedPlayers,
   pauseUsed,
-  pauseExtended,
-  pauseExpiresAt,
-  pauseTotalSec,
+  playerPauseExpiresAt,
+  pauseWindowSec,
   players,
   myPlayerSeat,
   onResume,
-  onExtend,
+  onPause,
 }: PauseOverlayProps) {
   const { t } = useTranslation();
   const holding = pausedPlayers[myPlayerSeat] === true;
-  const canExtend = pauseUsed[myPlayerSeat] === false;
-  const minutes = Math.round(pauseWindowSec(pauseTotalSec, pauseExtended) / SECONDS_PER_MINUTE);
+  const canPause = pauseUsed[myPlayerSeat] === false;
+  const windowSec = pauseWindowSec > 0 ? pauseWindowSec : FALLBACK_WINDOW_SEC;
+  const minutes = Math.round(windowSec / SECONDS_PER_MINUTE);
+  const resumesAt = latestExpiry(pausedPlayers, playerPauseExpiresAt);
 
   return (
     <div
@@ -63,11 +83,11 @@ export function PauseOverlay({
       <OverlayBackdrop dim="blocker">
         <ClassicPanel size="dialog" title={t("match.pause.title")}>
           <div className="flex flex-col items-center gap-4">
-            {pauseExpiresAt !== null && (
+            {resumesAt !== null && (
               <div className="flex flex-col items-center gap-2">
                 <CountdownRing
-                  expiresAt={pauseExpiresAt}
-                  totalSeconds={pauseTotalSec > 0 ? pauseTotalSec : FALLBACK_WINDOW_SEC}
+                  expiresAt={resumesAt}
+                  totalSeconds={windowSec}
                   testId="pause-countdown"
                 />
                 <p
@@ -82,7 +102,7 @@ export function PauseOverlay({
             <ul className="m-0 flex w-full list-none flex-col gap-2 p-0">
               {players.map((player) => {
                 const held = pausedPlayers[player.seat] === true;
-                const extended = pauseExtended[player.seat] === true;
+                const expiry = playerPauseExpiresAt[player.seat];
                 return (
                   <li
                     key={player.seat}
@@ -97,16 +117,12 @@ export function PauseOverlay({
                     <span className="flex-1 truncate text-sm" style={{ color: "var(--ink-light)" }}>
                       {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                     </span>
-                    {extended && (
-                      <span className="text-brass font-mono text-xs font-semibold">
-                        {t("match.pause.extendedRow", { minutes })}
-                      </span>
-                    )}
                     {held && (
                       <span className="text-brass text-xs font-semibold">
                         {t("match.pause.pausedNow")}
                       </span>
                     )}
+                    {held && expiry && <RowCountdown expiresAt={expiry} seat={player.seat} />}
                   </li>
                 );
               })}
@@ -123,9 +139,9 @@ export function PauseOverlay({
                 {t("match.pause.waitingToResume")}
               </p>
             )}
-            {canExtend && (
-              <ClassicButton onClick={onExtend} data-testid="pause-extend-button">
-                {t("match.pause.extend", { minutes })}
+            {canPause && (
+              <ClassicButton onClick={onPause} data-testid="pause-own-button">
+                {t("match.pause.pauseButton", { minutes })}
               </ClassicButton>
             )}
             {holding && (

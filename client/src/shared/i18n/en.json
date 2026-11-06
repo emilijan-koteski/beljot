@@ -1070,10 +1070,8 @@
       "pauseUsed": "Pause used",
       "pausedNow": "Paused",
       "countdownLabel": "Until play resumes",
-      "extend": "Add {{minutes}} min",
-      "extendedRow": "+{{minutes}} min",
       "timedOutToast": "Time's up. Play resumes.",
-      "extendedToast": "{{player}} added time to the pause"
+      "pauseButton": "Pause {{minutes}} min"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} disconnected",

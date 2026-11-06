@@ -212,10 +212,6 @@ func cloneGameState(state *GameState) *GameState {
 		v := *state.TurnExpiresAt
 		newState.TurnExpiresAt = &v
 	}
-	if state.PauseExpiresAt != nil {
-		v := *state.PauseExpiresAt
-		newState.PauseExpiresAt = &v
-	}
 	if state.PendingBelotSeat != nil {
 		v := *state.PendingBelotSeat
 		newState.PendingBelotSeat = &v
