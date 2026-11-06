@@ -37,6 +37,7 @@ import type {
   MatchEndPayload,
   MatchResumedPayload,
   MatchStartedPayload,
+  PauseExtendedPayload,
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerJoinedPayload,
@@ -70,6 +71,7 @@ import {
   ERROR_NOT_ROOM_OWNER,
   ERROR_NOT_YOUR_TURN,
   ERROR_PAUSE_EXHAUSTED,
+  ERROR_PAUSE_EXTEND_USED,
   ERROR_PLAYER_DISCONNECTED,
   ERROR_SURRENDER_EXHAUSTED,
   ERROR_WHISPER_BLOCKED_IN_GAME,
@@ -87,6 +89,7 @@ import {
   EVENT_MATCH_PAUSED,
   EVENT_MATCH_RESUMED,
   EVENT_MATCH_STATE,
+  EVENT_PAUSE_EXTENDED,
   EVENT_PLAYER_DECLARED,
   EVENT_PLAYER_DISCONNECTED,
   EVENT_PLAYER_RECONNECTED,
@@ -436,9 +439,18 @@ function dispatchGameEvent(message: WsMessage): void {
 
   if (type === EVENT_MATCH_RESUMED) {
     const payload = message.payload as MatchResumedPayload;
-    if (payload.ownerOverride) {
-      toast.info(i18n.t("match.pause.ownerResumedToast"), { duration: 3000 });
+    if (payload.timedOut === true) {
+      toast.info(i18n.t("match.pause.timedOutToast"), { duration: 3000 });
     }
+    return;
+  }
+
+  if (type === EVENT_PAUSE_EXTENDED) {
+    const payload = message.payload as PauseExtendedPayload;
+    const seat = payload?.extendedBy;
+    if (typeof seat !== "number" || !Number.isInteger(seat) || seat < 0 || seat > 3) return;
+    const playerName = store.matchState?.players[seat]?.username ?? `Player ${seat + 1}`;
+    toast.info(i18n.t("match.pause.extendedToast", { player: playerName }), { duration: 3000 });
     return;
   }
 
@@ -824,6 +836,7 @@ const GAME_ERROR_TYPES: Set<string> = new Set([
   ERROR_ILLEGAL_PLAY,
   ERROR_PAUSE_EXHAUSTED,
   ERROR_NO_ACTIVE_PAUSE,
+  ERROR_PAUSE_EXTEND_USED,
   ERROR_NOT_ROOM_OWNER,
   ERROR_PLAYER_DISCONNECTED,
   ERROR_MUST_PICK_TRUMP,

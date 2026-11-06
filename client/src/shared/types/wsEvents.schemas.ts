@@ -14,6 +14,7 @@ import type {
   MatchEndPayload,
   MatchPausedPayload,
   MatchResumedPayload,
+  PauseExtendedPayload,
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerReconnectedPayload,
@@ -116,6 +117,9 @@ export const EventMatchStateSchema = z.strictObject({
   previousPhase: z.string(),
   pausedPlayers: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
   pauseUsed: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
+  pauseExtended: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
+  pauseExpiresAt: z.string().nullable(),
+  pauseTotalSec: z.number(),
   turnTimeRemaining: z.number(),
   surrenderProposerSeat: z.number().nullable(),
   surrenderUsed: z.tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean()]),
@@ -219,7 +223,12 @@ export const MatchPausedPayloadSchema = z.strictObject({
 
 export const MatchResumedPayloadSchema = z.strictObject({
   resumedBy: z.number(),
-  ownerOverride: z.boolean(),
+  timedOut: z.boolean(),
+});
+
+export const PauseExtendedPayloadSchema = z.strictObject({
+  extendedBy: z.number().int().min(0).max(3),
+  pauseExpiresAt: z.string(),
 });
 
 export const AutoActionPayloadSchema = z.strictObject({
@@ -375,6 +384,12 @@ type _MatchResumedConformance = MutualExtends<
 >;
 const _matchResumedConforms: _MatchResumedConformance = true;
 
+type _PauseExtendedConformance = MutualExtends<
+  z.infer<typeof PauseExtendedPayloadSchema>,
+  PauseExtendedPayload
+>;
+const _pauseExtendedConforms: _PauseExtendedConformance = true;
+
 type _AutoActionConformance = MutualExtends<
   z.infer<typeof AutoActionPayloadSchema>,
   AutoActionPayload
@@ -444,6 +459,7 @@ export const _conformanceWitnesses = {
   _belotAnnouncedConforms,
   _matchPausedConforms,
   _matchResumedConforms,
+  _pauseExtendedConforms,
   _autoActionConforms,
   _coinSettlementConforms,
   _xpAwardedConforms,

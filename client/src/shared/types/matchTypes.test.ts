@@ -83,7 +83,7 @@ describe("gameTypes", () => {
         "decline_belot",
         "pause",
         "unpause",
-        "owner_unpause",
+        "extend_pause",
       ];
 
       expect(actions).toHaveLength(10);
@@ -193,6 +193,9 @@ describe("gameTypes", () => {
         previousPhase: "" as const,
         pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
         pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+        pauseExtended: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+        pauseExpiresAt: null,
+        pauseTotalSec: 0,
         surrenderProposerSeat: null,
         surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
         turnTimeRemaining: 0,

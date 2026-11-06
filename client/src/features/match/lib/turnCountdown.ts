@@ -88,3 +88,11 @@ export function useRingDrain(
     return ringDrainStyle(totalMs, remainingMsUntil(expiresAt), ringEmpty);
   }, [expiresAt, totalDurationSec, ringEmpty]);
 }
+
+/** Formats whole seconds as m:ss, never below 0:00. */
+export function formatCountdown(totalSeconds: number): string {
+  if (totalSeconds <= 0) return "0:00";
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}

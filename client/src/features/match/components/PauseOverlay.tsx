@@ -1,4 +1,3 @@
-import { Crown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { playerDisplayName } from "@/shared/lib/botName";
@@ -8,35 +7,49 @@ import type { PlayerState } from "@/shared/types/matchTypes";
 import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicButton } from "./overlay/ClassicButton";
 import { ClassicPanel } from "./overlay/ClassicPanel";
+import { CountdownRing } from "./overlay/CountdownRing";
 import { OverlayBackdrop } from "./overlay/OverlayBackdrop";
 
+type Seats<T> = [T, T, T, T];
+
 interface PauseOverlayProps {
-  pausedPlayers: [boolean, boolean, boolean, boolean];
-  pauseUsed: [boolean, boolean, boolean, boolean];
-  players: [PlayerState, PlayerState, PlayerState, PlayerState];
+  pausedPlayers: Seats<boolean>;
+  pauseExtended: Seats<boolean>;
+  pauseExpiresAt: string | null;
+  pauseTotalSec: number;
+  players: Seats<PlayerState>;
   myPlayerSeat: number;
-  isRoomOwner: boolean;
   onResume: () => void;
-  onPause: () => void;
-  onOwnerResume: () => void;
+  onExtend: () => void;
+}
+
+const SECONDS_PER_MINUTE = 60;
+const FALLBACK_WINDOW_SEC = 120;
+
+/** One pause window in seconds: the pause's full length split over the opening window and each extension. */
+function pauseWindowSec(totalSec: number, extended: Seats<boolean>): number {
+  const extensions = extended.filter(Boolean).length;
+  return totalSec > 0 ? totalSec / (1 + extensions) : FALLBACK_WINDOW_SEC;
 }
 
 /**
- * Pause overlay listing each player's pause status, with Resume, Pause, and owner-only Resume all controls.
+ * The pause overlay: a countdown to the automatic resume, who holds the pause, a once-per-pause button to add
+ * time, and Resume for a player holding it. Play resumes when every holder resumes or the time runs out.
  */
 export function PauseOverlay({
   pausedPlayers,
-  pauseUsed,
+  pauseExtended,
+  pauseExpiresAt,
+  pauseTotalSec,
   players,
   myPlayerSeat,
-  isRoomOwner,
   onResume,
-  onPause,
-  onOwnerResume,
+  onExtend,
 }: PauseOverlayProps) {
   const { t } = useTranslation();
-  const hasActivePause = pausedPlayers[myPlayerSeat];
-  const canStackPause = !hasActivePause && !pauseUsed[myPlayerSeat];
+  const holding = pausedPlayers[myPlayerSeat] === true;
+  const canExtend = pauseExtended[myPlayerSeat] === false;
+  const minutes = Math.round(pauseWindowSec(pauseTotalSec, pauseExtended) / SECONDS_PER_MINUTE);
 
   return (
     <div
@@ -47,68 +60,75 @@ export function PauseOverlay({
     >
       <OverlayBackdrop dim="blocker">
         <ClassicPanel size="dialog" title={t("match.pause.title")}>
-          <div className="flex flex-col gap-2 mb-4">
-            {players.map((player) => {
-              const isPaused = pausedPlayers[player.seat];
-              const usedPause = pauseUsed[player.seat];
-              return (
-                <div
-                  key={player.seat}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg"
-                  style={{
-                    background: isPaused ? "var(--brass-10)" : "var(--shade-20)",
-                    border: isPaused ? "1px solid var(--brass-40)" : "1px solid var(--sheen-6)",
-                  }}
-                  data-testid={isPaused ? `pause-player-${player.seat}` : undefined}
+          <div className="flex flex-col items-center gap-4">
+            {pauseExpiresAt !== null && (
+              <div className="flex flex-col items-center gap-2">
+                <CountdownRing
+                  expiresAt={pauseExpiresAt}
+                  totalSeconds={pauseTotalSec > 0 ? pauseTotalSec : FALLBACK_WINDOW_SEC}
+                  testId="pause-countdown"
+                />
+                <p
+                  className="m-0 text-2xs tracking-caps uppercase"
+                  style={{ color: "var(--ink-light)", opacity: 0.55 }}
                 >
-                  <span className="text-sm flex-1" style={{ color: "var(--ink-light)" }}>
-                    {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
-                  </span>
-                  {isPaused ? (
-                    <span className="text-xs font-semibold" style={{ color: "var(--brass)" }}>
-                      {t("match.pause.pausedNow", { defaultValue: "paused now" })}
+                  {t("match.pause.countdownLabel")}
+                </p>
+              </div>
+            )}
+
+            <ul className="m-0 flex w-full list-none flex-col gap-2 p-0">
+              {players.map((player) => {
+                const held = pausedPlayers[player.seat] === true;
+                const extended = pauseExtended[player.seat] === true;
+                return (
+                  <li
+                    key={player.seat}
+                    className="flex items-center gap-3 rounded-lg border px-3 py-2"
+                    style={{
+                      background: held ? "var(--brass-10)" : "var(--shade-20)",
+                      borderColor: held ? "var(--brass-40)" : "var(--sheen-6)",
+                    }}
+                    data-testid={`pause-player-${player.seat}`}
+                    data-holding={held ? "true" : "false"}
+                  >
+                    <span className="flex-1 truncate text-sm" style={{ color: "var(--ink-light)" }}>
+                      {playerDisplayName(t, player) ?? `Player ${player.seat + 1}`}
                     </span>
-                  ) : (
-                    <span className="text-xs" style={{ color: "var(--ink-light)", opacity: 0.7 }}>
-                      {usedPause
-                        ? t("match.pause.pauseUsedRow", { defaultValue: "pause used" })
-                        : t("match.pause.pauseAvailable", { defaultValue: "pause available" })}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                    {extended && (
+                      <span className="text-brass font-mono text-xs font-semibold">
+                        {t("match.pause.extendedRow", { minutes })}
+                      </span>
+                    )}
+                    {held && (
+                      <span className="text-brass text-xs font-semibold">
+                        {t("match.pause.pausedNow")}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
-          <ClassicActions className="mt-4" testId="pause-actions">
-            {hasActivePause ? (
-              <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
-                {t("match.pause.resume")}
-              </ClassicButton>
-            ) : canStackPause ? (
-              <ClassicButton onClick={onPause} data-testid="pause-stack-button">
-                {t("match.pause.pauseButton")}
-              </ClassicButton>
-            ) : (
+          <ClassicActions className="mt-5" testId="pause-actions">
+            {!holding && (
               <p
-                className="mr-auto text-sm italic"
+                className="mr-auto mb-0 text-sm italic"
                 style={{ color: "var(--ink-light)", opacity: 0.65 }}
                 data-testid="pause-waiting"
               >
                 {t("match.pause.waitingToResume")}
               </p>
             )}
-
-            {isRoomOwner && (
-              <ClassicButton
-                variant={hasActivePause ? "ghost" : "primary"}
-                onClick={onOwnerResume}
-                data-testid="pause-owner-resume-button"
-              >
-                <span className="inline-flex items-center justify-center gap-1.5">
-                  <Crown size={14} aria-hidden="true" />
-                  {t("match.pause.resumeAll")}
-                </span>
+            {canExtend && (
+              <ClassicButton onClick={onExtend} data-testid="pause-extend-button">
+                {t("match.pause.extend", { minutes })}
+              </ClassicButton>
+            )}
+            {holding && (
+              <ClassicButton variant="primary" onClick={onResume} data-testid="pause-resume-button">
+                {t("match.pause.resume")}
               </ClassicButton>
             )}
           </ClassicActions>

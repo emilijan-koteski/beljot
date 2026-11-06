@@ -177,6 +177,9 @@ const mockMatchState: MatchState = {
   previousPhase: "" as const,
   pausedPlayers: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   pauseUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+  pauseExtended: [false, false, false, false] as [boolean, boolean, boolean, boolean],
+  pauseExpiresAt: null,
+  pauseTotalSec: 0,
   surrenderProposerSeat: null,
   surrenderUsed: [false, false, false, false] as [boolean, boolean, boolean, boolean],
   turnTimeRemaining: 0,
@@ -1103,6 +1106,23 @@ describe("MatchPage", () => {
     const dialogZ = Number(screen.getByTestId(dialog).style.zIndex);
     const pauseZ = Number(screen.getByTestId("pause-overlay").style.zIndex);
     expect(dialogZ).toBeGreaterThan(pauseZ);
+  });
+
+  it("adds time to the pause from the overlay, with no host override", () => {
+    useMatchStore.getState().setMatchState({
+      ...mockMatchState,
+      phase: "paused",
+      pausedPlayers: [false, true, false, false],
+      pauseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      pauseTotalSec: 120,
+    });
+    useMatchStore.getState().setMyPlayerSeat(0);
+
+    renderMatchPage();
+    fireEvent.click(screen.getByTestId("pause-extend-button"));
+
+    expect(mockSendMessage).toHaveBeenCalledWith("action:extend_pause", {});
+    expect(screen.queryByText(/resume all/i)).not.toBeInTheDocument();
   });
 
   it("hides declarationReveal while the table is paused (AC3)", () => {

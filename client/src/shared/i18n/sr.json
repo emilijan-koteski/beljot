@@ -937,7 +937,8 @@
       "pauseExhausted": "Pauza je već iskorišćena",
       "noActivePause": "Nemaš aktivnu pauzu",
       "notRoomOwner": "Samo domaćin može ovo da uradi",
-      "mustPickTrump": "Ovde ne možeš dalje. Izaberi boju."
+      "mustPickTrump": "Ovde ne možeš dalje. Izaberi boju.",
+      "pauseExtendUsed": "Produženje ove pauze je već iskorišćeno"
     },
     "timer": {
       "autoPlayed": "Automatski odigrano: {{card}}",
@@ -1067,13 +1068,13 @@
       "title": "Meč pauziran",
       "waitingToResume": "Čeka se nastavak…",
       "resume": "Nastavi",
-      "pauseButton": "Pauza",
       "pauseUsed": "Pauza iskorišćena",
-      "pausedNow": "pauzira sada",
-      "pauseAvailable": "pauza dostupna",
-      "pauseUsedRow": "pauza iskorišćena",
-      "resumeAll": "Nastavi sve",
-      "ownerResumedToast": "Domaćin je nastavio igru"
+      "pausedNow": "Pauzira",
+      "countdownLabel": "Do nastavka igre",
+      "extend": "Dodaj {{minutes}} min",
+      "extendedRow": "+{{minutes}} min",
+      "timedOutToast": "Vreme je isteklo. Igra se nastavlja.",
+      "extendedToast": "{{player}}: pauza je produžena"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} · veza prekinuta",

@@ -937,7 +937,8 @@
       "pauseExhausted": "You've already used your pause",
       "noActivePause": "You don't have an active pause",
       "notRoomOwner": "Only the host can do this",
-      "mustPickTrump": "You can't pass here. Choose a suit."
+      "mustPickTrump": "You can't pass here. Choose a suit.",
+      "pauseExtendUsed": "You've already added time to this pause"
     },
     "timer": {
       "autoPlayed": "Auto-played: {{card}}",
@@ -1067,13 +1068,13 @@
       "title": "Match paused",
       "waitingToResume": "Waiting to resume…",
       "resume": "Resume",
-      "pauseButton": "Pause",
       "pauseUsed": "Pause used",
-      "pausedNow": "paused now",
-      "pauseAvailable": "pause available",
-      "pauseUsedRow": "pause used",
-      "resumeAll": "Resume all",
-      "ownerResumedToast": "The host resumed the game"
+      "pausedNow": "Paused",
+      "countdownLabel": "Until play resumes",
+      "extend": "Add {{minutes}} min",
+      "extendedRow": "+{{minutes}} min",
+      "timedOutToast": "Time's up. Play resumes.",
+      "extendedToast": "{{player}} added time to the pause"
     },
     "disconnect": {
       "playerDisconnected": "{{player}} disconnected",
