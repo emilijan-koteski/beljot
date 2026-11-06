@@ -945,7 +945,8 @@
       "autoPickedTrump": "{{player}} · времето истече, адутот е избран",
       "autoSkippedDeclare": "Ти истече времето · најавите се прескокнати",
       "autoSkippedBelot": "Ти истече времето · Бељот прескокнат",
-      "timedOut": "{{player}} · времето истече"
+      "timedOut": "{{player}} · времето истече",
+      "lastWarning": "Ако го пропуштиш следниот потез, го напушташ мечот"
     },
     "score": {
       "heading": "Резултат",
@@ -1083,6 +1084,7 @@
       "honorNoteOther": "Ако времето истече, тоа е напуштање и се губи чест.",
       "honorNoteSelf": "Остани на оваа страница. Ако времето истече, го напушташ мечот и губиш чест.",
       "matchAbandoned": "{{player}} го напушти мечот",
+      "missedTurns": "Три пропуштени потези по ред",
       "matchAbandonedScores": "Финале: Ние {{us}} : Тие {{them}}",
       "abandonCountsWin": "Се смета за победа",
       "abandonCountsLoss": "Се смета за пораз",

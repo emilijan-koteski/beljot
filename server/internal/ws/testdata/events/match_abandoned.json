@@ -1,5 +1,6 @@
 {
   "abandonedByPlayer": 2,
+  "reason": "missed_turns",
   "teamAFinalScore": 420,
   "teamBFinalScore": 380,
   "matchDurationSec": 600

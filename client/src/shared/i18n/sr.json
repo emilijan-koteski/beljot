@@ -945,7 +945,8 @@
       "autoPickedTrump": "{{player}} · isteklo vreme, adut izabran",
       "autoSkippedDeclare": "Isteklo ti je vreme · zvanja preskočena",
       "autoSkippedBelot": "Isteklo ti je vreme · Bela preskočena",
-      "timedOut": "{{player}} · isteklo vreme"
+      "timedOut": "{{player}} · isteklo vreme",
+      "lastWarning": "Ako propustiš sledeći potez, napuštaš meč"
     },
     "score": {
       "heading": "Rezultat",
@@ -1083,6 +1084,7 @@
       "honorNoteOther": "Ako vreme istekne, to je napuštanje meča i gubi se čast.",
       "honorNoteSelf": "Ostani na ovoj stranici. Ako vreme istekne, napuštaš meč i gubiš čast.",
       "matchAbandoned": "{{player}} · meč napušten",
+      "missedTurns": "Tri propuštena poteza zaredom",
       "matchAbandonedScores": "Rezultat: Mi {{us}} : Oni {{them}}",
       "abandonCountsWin": "Računa se kao pobeda",
       "abandonCountsLoss": "Računa se kao poraz",

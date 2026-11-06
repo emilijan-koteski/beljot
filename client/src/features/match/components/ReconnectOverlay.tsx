@@ -136,6 +136,16 @@ export function ReconnectOverlay({
                 })}
               </ResultHeading>
 
+              {abandonedData.reason === "missed_turns" && (
+                <p
+                  className="m-0 text-sm"
+                  style={{ color: "var(--ink-light)", opacity: 0.7 }}
+                  data-testid="abandon-reason"
+                >
+                  {t("match.disconnect.missedTurns")}
+                </p>
+              )}
+
               <FinalScore
                 sides={[
                   { label: t("team.us"), score: usValue, color: TEAM_GOLD[0] },

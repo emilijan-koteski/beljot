@@ -158,11 +158,17 @@ func TestEventsJSONContract(t *testing.T) {
 			name: "MatchAbandonedPayload",
 			sample: ws.MatchAbandonedPayload{
 				AbandonedByPlayer: 2,
+				Reason:            ws.AbandonReasonMissedTurns,
 				TeamAFinalScore:   420,
 				TeamBFinalScore:   380,
 				MatchDurationSec:  600,
 			},
 			goldenFile: "match_abandoned.json",
+		},
+		{
+			name:       "MissedTurnWarningPayload",
+			sample:     ws.MissedTurnWarningPayload{MissedTurns: 2},
+			goldenFile: "missed_turn_warning.json",
 		},
 		{
 			name: "TrumpSelectedPayload",

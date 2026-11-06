@@ -14,6 +14,7 @@ import type {
   MatchEndPayload,
   MatchPausedPayload,
   MatchResumedPayload,
+  MissedTurnWarningPayload,
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerReconnectedPayload,
@@ -185,6 +186,7 @@ export const MatchEndPayloadSchema = z.strictObject({
 
 export const MatchAbandonedPayloadSchema = z.strictObject({
   abandonedByPlayer: z.number(),
+  reason: z.union([z.literal("disconnect"), z.literal("missed_turns")]),
   teamAFinalScore: z.number(),
   teamBFinalScore: z.number(),
   matchDurationSec: z.number(),
@@ -238,6 +240,10 @@ export const AutoActionPayloadSchema = z.strictObject({
     z.literal("pick_trump"),
     z.literal("timeout"),
   ]),
+});
+
+export const MissedTurnWarningPayloadSchema = z.strictObject({
+  missedTurns: z.number(),
 });
 
 export const CoinSettlementPayloadSchema = z.strictObject({
@@ -388,6 +394,12 @@ type _AutoActionConformance = MutualExtends<
 >;
 const _autoActionConforms: _AutoActionConformance = true;
 
+type _MissedTurnWarningConformance = MutualExtends<
+  z.infer<typeof MissedTurnWarningPayloadSchema>,
+  MissedTurnWarningPayload
+>;
+const _missedTurnWarningConforms: _MissedTurnWarningConformance = true;
+
 type _CoinSettlementConformance = MutualExtends<
   z.infer<typeof CoinSettlementPayloadSchema>,
   CoinSettlementPayload
@@ -452,6 +464,7 @@ export const _conformanceWitnesses = {
   _matchPausedConforms,
   _matchResumedConforms,
   _autoActionConforms,
+  _missedTurnWarningConforms,
   _coinSettlementConforms,
   _xpAwardedConforms,
   _honorUpdatedConforms,

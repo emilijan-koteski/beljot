@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { MatchAbandonedPayload } from "@/shared/types/wsEvents";
+
 import { TEAM_GOLD, TEAM_SILVER } from "../lib/tableTheme";
 import { ReconnectOverlay } from "./ReconnectOverlay";
 
@@ -14,6 +16,7 @@ vi.mock("react-i18next", () => ({
         "match.disconnect.timeRanOut": "Time ran out",
         "match.disconnect.abandonCountsWin": "Counts as a win",
         "match.disconnect.abandonCountsLoss": "Counts as a loss",
+        "match.disconnect.missedTurns": "Three missed turns in a row",
         "match.matchResult.title": "Match complete",
         "team.us": "Us",
         "team.them": "Them",
@@ -115,8 +118,9 @@ describe("ReconnectOverlay", () => {
 
   it("renders abandonment message viewer-relative when abandonedData is provided (viewer teamA)", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 2,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -138,6 +142,43 @@ describe("ReconnectOverlay", () => {
     expect(screen.queryByTestId("reconnect-countdown")).not.toBeInTheDocument();
   });
 
+  it("says a forfeit came from three missed turns, and adds nothing for a disconnect", () => {
+    const missed: MatchAbandonedPayload = {
+      abandonedByPlayer: 1,
+      reason: "missed_turns",
+      teamAFinalScore: 450,
+      teamBFinalScore: 380,
+      matchDurationSec: 600,
+    };
+    const { rerender } = render(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
+        abandonedData={missed}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("abandon-title")).toHaveTextContent("Eve abandoned the match");
+    expect(screen.getByTestId("abandon-reason")).toHaveTextContent("Three missed turns in a row");
+    expect(screen.getByTestId("abandon-result-line")).toHaveAttribute("data-result", "win");
+
+    rerender(
+      <ReconnectOverlay
+        disconnectedPlayerName="Eve"
+        reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
+        abandonedData={{ ...missed, reason: "disconnect" }}
+        viewerTeam="teamA"
+        viewerSeat={0}
+        onReturnToLobby={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("abandon-reason")).not.toBeInTheDocument();
+  });
+
   it("colours the abandonment headline gold when it counts as the viewer's win", () => {
     render(
       <ReconnectOverlay
@@ -145,6 +186,7 @@ describe("ReconnectOverlay", () => {
         reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
         abandonedData={{
           abandonedByPlayer: 1,
+          reason: "disconnect",
           teamAFinalScore: 450,
           teamBFinalScore: 380,
           matchDurationSec: 600,
@@ -167,6 +209,7 @@ describe("ReconnectOverlay", () => {
         reconnectExpiresAt={new Date(Date.now() - 5000).toISOString()}
         abandonedData={{
           abandonedByPlayer: 2,
+          reason: "disconnect",
           teamAFinalScore: 450,
           teamBFinalScore: 380,
           matchDurationSec: 600,
@@ -184,8 +227,9 @@ describe("ReconnectOverlay", () => {
 
   it("flips abandonment scores when viewer is on teamB", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 2,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -206,8 +250,9 @@ describe("ReconnectOverlay", () => {
 
   it("shows the loss result line when the viewer shares the abandoner's team", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 2,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -231,8 +276,9 @@ describe("ReconnectOverlay", () => {
 
   it("shows the win result line when the viewer is on the opposing team", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 1,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -256,8 +302,9 @@ describe("ReconnectOverlay", () => {
 
   it("flips the result line for a teamB viewer (seat parity, not raw team A/B)", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 0,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -279,8 +326,9 @@ describe("ReconnectOverlay", () => {
 
   it("omits the result line when the viewer IS the abandoner (late reconnect)", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 2,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -303,8 +351,9 @@ describe("ReconnectOverlay", () => {
 
   it("shows the teammate's half-loss line, arriving after the panel mounted", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 2,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -348,6 +397,7 @@ describe("ReconnectOverlay", () => {
         reconnectExpiresAt={expiresAt}
         abandonedData={{
           abandonedByPlayer: 1,
+          reason: "disconnect",
           teamAFinalScore: 450,
           teamBFinalScore: 380,
           matchDurationSec: 600,
@@ -376,6 +426,7 @@ describe("ReconnectOverlay", () => {
         reconnectExpiresAt={expiresAt}
         abandonedData={{
           abandonedByPlayer: 2,
+          reason: "disconnect",
           teamAFinalScore: 450,
           teamBFinalScore: 380,
           matchDurationSec: 600,
@@ -418,8 +469,9 @@ describe("ReconnectOverlay", () => {
 
   it("omits the result line when abandonedByPlayer is out of range", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 7,
+      reason: "disconnect",
       teamAFinalScore: 450,
       teamBFinalScore: 380,
       matchDurationSec: 600,
@@ -441,8 +493,9 @@ describe("ReconnectOverlay", () => {
 
   it("omits the result line when the viewer seat is unknown", () => {
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 0,
+      reason: "disconnect",
       teamAFinalScore: 200,
       teamBFinalScore: 300,
       matchDurationSec: 120,
@@ -464,8 +517,9 @@ describe("ReconnectOverlay", () => {
   it("auto-redirects to lobby after 3 seconds when abandoned", () => {
     const onReturnToLobby = vi.fn();
     const expiresAt = new Date(Date.now() - 5000).toISOString();
-    const abandonedData = {
+    const abandonedData: MatchAbandonedPayload = {
       abandonedByPlayer: 0,
+      reason: "disconnect",
       teamAFinalScore: 200,
       teamBFinalScore: 300,
       matchDurationSec: 120,

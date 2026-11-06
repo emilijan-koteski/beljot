@@ -37,6 +37,7 @@ type LiveMatch struct {
 	botMemory                *bot.Memory
 	botSearchResults         [4]*botSearchEntry
 	dealGraceUntil           time.Time
+	missedTurns              [4]int
 	mu                       sync.RWMutex
 }
 
@@ -61,7 +62,7 @@ type XPAwarder interface {
 }
 
 // HonorEvent is one player's honor contribution from a finished match.
-// Abandoned is true only for the seat whose reconnect window expired.
+// Abandoned is true only for the seat that forfeited, by disconnect or by missed turns.
 type HonorEvent struct {
 	Abandoned bool
 }
@@ -414,6 +415,7 @@ func (m *Manager) applyAndBroadcastActionWith(session *LiveMatch, build func(gs 
 	}
 
 	m.setDealGraceLocked(session, dealGraceFor(oldState, newState))
+	session.resetMissedTurns(action)
 
 	if newState.Phase == game.PhasePaused {
 		if oldState.Phase != game.PhasePaused {
@@ -1348,6 +1350,11 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 		return
 	}
 
+	if session.missTurn(expectedSeat) {
+		m.abandonMatchLocked(session, expectedSeat, ws.AbandonReasonMissedTurns)
+		return
+	}
+
 	oldState := gs
 	newState, err := game.ApplyAction(oldState, action)
 	if err != nil {
@@ -1440,10 +1447,15 @@ func (m *Manager) handleTimerExpiry(session *LiveMatch, generation uint64, expec
 	session.gameState = finalState
 	playerIDs := session.playerIDs
 	startedAt := session.startedAt
+	lastWarning := session.onLastWarning(expectedSeat)
+	missedTurns := session.missedTurns[expectedSeat]
 	session.mu.Unlock()
 
 	if autoType, ok := autoActionTypeFor(action.Type); ok {
 		m.sendAutoAction(playerIDs, expectedSeat, autoType)
+	}
+	if lastWarning {
+		m.sendMissedTurnWarning(playerIDs[expectedSeat], missedTurns)
 	}
 
 	for _, step := range steps {

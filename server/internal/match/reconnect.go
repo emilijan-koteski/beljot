@@ -422,7 +422,13 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		return
 	}
 
-	abandonedSeat := seat
+	m.abandonMatchLocked(session, seat, ws.AbandonReasonDisconnect)
+}
+
+// abandonMatchLocked ends the match as a forfeit by seat, with every abandonment penalty.
+// Call under session.mu; it unlocks before settling, broadcasting and persisting.
+func (m *Manager) abandonMatchLocked(session *LiveMatch, abandonedSeat int, reason ws.AbandonReason) {
+	gs := session.gameState
 	abandonedPlayerID := session.playerIDs[abandonedSeat]
 
 	gs.Phase = game.PhaseMatchEnd
@@ -432,6 +438,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 		gs.PlayerReconnectExpiresAt[i] = nil
 	}
 	gs.SurrenderProposerSeat = nil
+	gs.TurnExpiresAt = nil
 
 	session.cancelAllReconnectTimers()
 	session.cancelTurnTimer()
@@ -460,6 +467,7 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 
 	abandonedPayload := ws.MatchAbandonedPayload{
 		AbandonedByPlayer: abandonedSeat,
+		Reason:            reason,
 		TeamAFinalScore:   teamAScore,
 		TeamBFinalScore:   teamBScore,
 		MatchDurationSec:  int(time.Since(startedAt).Seconds()),
@@ -505,10 +513,11 @@ func (m *Manager) handleSeatReconnectTimeout(session *LiveMatch, seat int, gener
 	}
 	m.hub.SendFrames(stateFrames)
 
-	slog.Info("session: match abandoned due to reconnect timeout",
+	slog.Info("session: match abandoned",
 		"roomID", roomID,
 		"abandonedBy", abandonedPlayerID,
 		"abandonedSeat", abandonedSeat,
+		"reason", reason,
 	)
 
 	ids, botFlags, hasBots := matchSeatColumns(playerIDs, botSeats)

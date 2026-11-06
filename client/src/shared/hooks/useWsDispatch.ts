@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { handleWsMessage as handleRoomListMessage } from "@/features/lobby/useRoomUpdates";
+import { clearMissedTurnWarning, showMissedTurnWarning } from "@/features/match/lib/matchToast";
 import { queryClient } from "@/shared/api/queryClient";
 import { queryKeys } from "@/shared/api/queryKeys";
 import { playSfx } from "@/shared/audio/audioEngine";
@@ -37,6 +38,7 @@ import type {
   MatchEndPayload,
   MatchResumedPayload,
   MatchStartedPayload,
+  MissedTurnWarningPayload,
   PlayerDeclaredPayload,
   PlayerDisconnectedPayload,
   PlayerJoinedPayload,
@@ -87,6 +89,7 @@ import {
   EVENT_MATCH_PAUSED,
   EVENT_MATCH_RESUMED,
   EVENT_MATCH_STATE,
+  EVENT_MISSED_TURN_WARNING,
   EVENT_PLAYER_DECLARED,
   EVENT_PLAYER_DISCONNECTED,
   EVENT_PLAYER_RECONNECTED,
@@ -245,6 +248,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_MATCH_END) {
+    clearMissedTurnWarning();
     const payload = message.payload as MatchEndPayload;
     const current = store.matchState;
     if (current) {
@@ -413,6 +417,17 @@ function dispatchGameEvent(message: WsMessage): void {
     return;
   }
 
+  if (type === EVENT_MISSED_TURN_WARNING) {
+    if (store.matchState === null) return;
+    const payload = message.payload as MissedTurnWarningPayload;
+    if (typeof payload?.missedTurns !== "number") {
+      console.warn("WS: ignoring malformed event:missed_turn_warning payload", payload);
+      return;
+    }
+    showMissedTurnWarning(i18n.t("match.timer.lastWarning"));
+    return;
+  }
+
   if (type === EVENT_AUTO_ACTION) {
     if (store.matchState === null) return;
     const payload = message.payload as AutoActionPayload;
@@ -467,6 +482,7 @@ function dispatchGameEvent(message: WsMessage): void {
   }
 
   if (type === EVENT_MATCH_ABANDONED) {
+    clearMissedTurnWarning();
     const payload = message.payload as MatchAbandonedPayload;
     store.setMatchAbandonedData(payload);
     store.setCoinSettlement(null);
