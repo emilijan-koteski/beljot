@@ -323,4 +323,45 @@ func TestSamplesForTrickSchedule(t *testing.T) {
 	for trick, samples := range want {
 		assert.Equal(t, samples, search.SamplesForTrick(trick), "trick %d", trick)
 	}
+	assert.Equal(t, search.OpeningSamples, search.SamplesForTrick(1))
+	assert.Equal(t, search.OpeningSamples, search.SamplesForTrick(2))
+}
+
+func TestChooseReportsPerCardStatistics(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, search.Options{Samples: 20, EarlyStopAfter: 20, EarlyStopSE: 1}, farFuture())
+	require.True(t, ok)
+	require.Len(t, res.Cards, len(c.legal))
+	best := res.Cards[search.CardIdx(res.Card)]
+	assert.InDelta(t, res.Mean, best.Mean, 1e-9)
+	for _, stats := range res.Cards {
+		assert.LessOrEqual(t, stats.Mean, best.Mean+1e-9)
+		assert.GreaterOrEqual(t, stats.SE, 0.0)
+	}
+}
+
+func TestChooseSplitsSamplesByClass(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	opts := search.Options{Samples: 20, EarlyStopAfter: 20, EarlyStopSE: 1,
+		SampleClass: func(hands [4]uint32) int { return int(hands[1] & 1) }}
+	res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+	require.True(t, ok)
+	assert.Equal(t, res.Samples, res.Classes[0].Samples+res.Classes[1].Samples)
+	for class := range res.Classes {
+		if res.Classes[class].Samples > 0 {
+			assert.Len(t, res.Classes[class].Means, len(c.legal))
+		}
+	}
+}
+
+func TestChooseSeedSaltChangesTheSamplesNotTheInformation(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	base := search.Options{Samples: 6, EarlyStopAfter: 6, EarlyStopSE: 1}
+	salted := base
+	salted.SeedSalt = 0xABCD
+	a, _ := search.Choose(c.in, c.pos, c.legal, c.settle, base, farFuture())
+	b, _ := search.Choose(c.in, c.pos, c.legal, c.settle, salted, farFuture())
+	again, _ := search.Choose(c.in, c.pos, c.legal, c.settle, salted, farFuture())
+	assert.Equal(t, b, again)
+	assert.NotEqual(t, a.Cards, b.Cards)
 }
