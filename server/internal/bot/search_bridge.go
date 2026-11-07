@@ -28,7 +28,7 @@ type SearchResult struct {
 }
 
 // SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on and only where
-// the schedule has samples, on the seat's own turn with a real choice, and not when a team could end the match.
+// the schedule has samples, on the seat's own turn with a real choice, and near a stop-at-target end only when it races.
 func SearchApplies(v View, fromTrick int) bool {
 	return SearchAppliesWith(v, fromTrick, DefaultSearchTuning())
 }
