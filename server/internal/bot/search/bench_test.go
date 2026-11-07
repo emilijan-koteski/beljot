@@ -15,6 +15,9 @@ import (
 const (
 	trick3Positions = 20
 	trick3MeanLimit = 250 * time.Millisecond
+	trick1Positions = 10
+	trick1MeanLimit = 400 * time.Millisecond
+	trick1Samples   = 12
 )
 
 type trick3Position struct {
@@ -86,4 +89,51 @@ func TestSearchTrick3StaysUnderTheDeadline(t *testing.T) {
 	mean := total / trick3Positions
 	t.Logf("trick 3 search over %d positions: mean %v, max %v", trick3Positions, mean, worst)
 	assert.Less(t, mean, trick3MeanLimit, "mean search time at trick 3")
+}
+
+// randomTrick1Position deals eight cards to each seat and leaves a random leader to open trick 1 under a random trump.
+func randomTrick1Position(rng *rand.Rand) trick3Position {
+	trump := rng.IntN(4)
+	clockwise := rng.IntN(2) == 1
+	var hands [4]uint32
+	for i, card := range rng.Perm(search.NCards) {
+		hands[i/8] |= 1 << uint(card)
+	}
+	leader := rng.IntN(4)
+	pos := search.Position{Trump: trump, Clockwise: clockwise, Leader: leader}
+	settle := settlementOver(trump, nil, hands[:]...)
+	settle.HandPoints = [2]int{}
+	settle.DeclPoints = [2]int{}
+	settle.TricksWon = [2]int{}
+	settle.CallerTeam = rng.IntN(2)
+	return trick3Position{
+		in:     informationFor(leader, hands),
+		pos:    pos,
+		legal:  legalFor(pos, hands[leader]),
+		settle: settle,
+	}
+}
+
+func TestSearchTrick1StaysUnderTheDeadline(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 1))
+	opts := search.Options{Samples: trick1Samples, EarlyStopAfter: 8, EarlyStopSE: 1.0}
+
+	var total, worst time.Duration
+	for range trick1Positions {
+		p := randomTrick1Position(rng)
+		start := time.Now()
+		_, ok := search.Choose(p.in, p.pos, p.legal, p.settle, opts, farFuture())
+		elapsed := time.Since(start)
+		require.True(t, ok, "the search must reach a decision on a consistent position")
+		total += elapsed
+		worst = max(worst, elapsed)
+	}
+
+	mean := total / trick1Positions
+	t.Logf("trick 1 search over %d positions: mean %v, max %v", trick1Positions, mean, worst)
+	if search.OpeningSamples == 0 {
+		t.Log("not asserted: opening search off")
+		return
+	}
+	assert.Less(t, mean, trick1MeanLimit, "mean search time at trick 1")
 }
