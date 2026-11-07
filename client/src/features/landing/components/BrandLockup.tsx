@@ -1,5 +1,7 @@
 import { Link } from "react-router";
 
+import { WORDMARK_PER_FONT_SIZE } from "@/shared/components/brand/brandSizes";
+import { BrandWordmark } from "@/shared/components/brand/BrandWordmark";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
@@ -34,9 +36,12 @@ export function BrandLockup({
         className="shrink-0"
         style={{ width: size, height: size }}
       />
-      <span className="text-ink font-semibold tracking-tight" style={{ fontSize: wordmarkSize }}>
-        Beljot
-        {showSuffix && <span className="text-ink-dim font-medium">.online</span>}
+      <span className="text-ink inline-flex">
+        <span className="sr-only">Beljot{showSuffix ? ".online" : ""}</span>
+        <BrandWordmark
+          height={Math.round(wordmarkSize * WORDMARK_PER_FONT_SIZE)}
+          suffix={showSuffix}
+        />
       </span>
     </Link>
   );
