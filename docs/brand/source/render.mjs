@@ -36,4 +36,8 @@ for (const [src, widthMm, bg = "transparent"] of pdfs) {
   await page.pdf({ path: join(brand, src.replace(".svg", ".pdf")), width: `${widthMm}mm`, height: `${heightMm}mm`, printBackground: true, pageRanges: "1" });
   await page.close();
 }
+const og = await browser.newPage({ viewport: { width: 1200, height: 630 } });
+await og.goto(`file://${join(here, "build", "og.svg")}`);
+await og.waitForTimeout(500);
+await og.screenshot({ path: join(here, "..", "..", "..", "client", "public", "og-image.jpg"), type: "jpeg", quality: 86 });
 await browser.close();

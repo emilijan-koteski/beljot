@@ -14,6 +14,7 @@ The logo is a brass casino chip: felt inserts on the rim, BELJOT around the top,
 | `beljot-chip-white.svg` | One colour, white: reversed out of dark photos or dark stock. |
 | `beljot-chip-gold.svg` / `.pdf` | One colour, brass `#c9a876`: the plate for gold foil or embossing. |
 | `beljot-chip-1024.png` | Raster for tools that refuse vectors. |
+| `client/public/og-image.jpg` | The 1200×630 link preview shown when beljot.online is shared. After changing it, re-scrape the link in Facebook's Sharing Debugger. |
 
 Every letter is outlined, so no file needs a font installed. The PDFs are vector; they are sized at 100mm (chip) and 180mm wide (lockups) but scale freely.
 
@@ -41,12 +42,12 @@ Cinzel (wordmark, rim) and Bodoni Moda (the B), both SIL Open Font License, free
 
 ## Regenerate
 
-`source/` builds every file here, plus `client/public/beljot-logo.svg`, `beljot-chip.svg`, the PNG icons and the header wordmark (`client/src/shared/components/brand/wordmarkPaths.ts`). Change the design there, never the paths by hand:
+`source/` builds every file here, plus `client/public/beljot-logo.svg`, `beljot-chip.svg`, the PNG icons, the link-preview image `og-image.jpg` (`og.py`) and the header wordmark (`client/src/shared/components/brand/wordmarkPaths.ts`). Change the design there, never the paths by hand:
 
 ```bash
 cd docs/brand/source
 ./fetch_fonts.sh && pip install -r requirements.txt
-python3 final.py
+python3 final.py && python3 og.py
 cd ../../../client && node ../docs/brand/source/render.mjs
 ```
 
