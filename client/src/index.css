@@ -348,9 +348,9 @@
    rank ramps the way `.game-table` does, so every shared component themes
    itself with no fork. The action colour is the felt lime, as on the
    landing: whatever is green on Parchment (the primary button, checked
-   controls, the selected chip, focus) is lime here, flat: the lime is
-   bright enough on felt, so its fills cast a plain dark shadow instead of
-   a lime glow. Brass stays on the hairlines, eyebrows and badges.
+   controls, the selected chip, focus) is lime here. The lime is bright
+   enough on felt, so its fills cast only a faint lime haze, not the
+   table's strong glow. Brass stays on the hairlines, eyebrows and badges.
 
    `:root.brass-mode` outranks every `:root` block whatever its place in
    this sheet. The table keeps its own `.game-table` scope, so nothing in a
@@ -374,8 +374,7 @@
   --accent-deep: #00b07c;
   --accent-soft: color-mix(in srgb, var(--accent-light) 18%, transparent);
   --accent-ink: #0a1812;
-  --shadow-glow: 0 6px 14px -8px rgb(0 0 0 / 0.55);
-  --shadow-glow-lg: 0 10px 20px -10px rgb(0 0 0 / 0.6);
+  --accent-glow: color-mix(in srgb, var(--accent-light) 22%, transparent);
 
   /* Lighter than the felt table's #9c7d4e: here brass-deep is small text
      (eyebrows, chevrons, the warning tone), so it needs 4.5:1 on --surface. */
