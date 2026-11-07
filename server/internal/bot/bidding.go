@@ -38,18 +38,15 @@ func profileSuit(hand []game.Card, suit game.Suit) suitProfile {
 	return p
 }
 
-// matchesBidTable reports whether the bid hand fits one of the twelve simulation-calibrated shapes
-// for calling suit. Rows 7 to 11 need a face-up candidate, row 12 needs a candidate-less variant.
+// matchesBidTable reports whether the bid hand fits one of the simulation-calibrated shapes for calling
+// suit. Rows 9 to 11 need a face-up candidate, row 12 needs a candidate-less variant.
 func matchesBidTable(hand []game.Card, suit game.Suit, hasCandidate bool, pos int) bool {
 	p := profileSuit(hand, suit)
 	return p.jack && p.nine ||
 		p.jack && p.count >= 3 ||
 		p.count >= 4 && p.nine ||
-		p.count >= 4 && p.ace ||
 		p.count >= 4 && p.sideAces >= 1 ||
 		p.count >= 5 ||
-		hasCandidate && p.nine && p.ace && p.count == 3 && p.sideAces >= 1 ||
-		hasCandidate && p.jack && p.ace && p.count == 2 && p.sideAces >= 1 ||
 		hasCandidate && p.jack && p.count == 2 && p.sideAces >= 2 ||
 		hasCandidate && p.nine && !p.jack && !p.ace && p.count == 3 && p.sideAces >= 1 ||
 		hasCandidate && pos == 2 && p.jack && p.count == 2 && p.sideAces >= 1 ||

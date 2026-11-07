@@ -4,7 +4,8 @@ Companion to `BOT_V2_PROPOSAL.md`. Everything here was produced by the throwaway
 `docs/bot/lab/` (a copy of the sources; they were run from a git worktree as
 `server/internal/botlab` + `server/cmd/botlab`, against the real engine and the real bot).
 Date: 2026-10-25, commit 2d70456. §3.4 was run on 2026-10-25/26 on branch `feat/bot-v2-phase2`
-at `dd4ec76`, after the lab snapshot was updated to the phase-1 `View` (§1.5, §4).
+at `dd4ec76`, after the lab snapshot was updated to the phase-1 `View` (§1.5, §4). §3.5 was run on 2026-11-07 on
+branch `feat/bot-v2-phase3` at `49f242f3`, with the shipped search on every seat.
 
 ## 1. Instruments
 
@@ -771,7 +772,200 @@ to about 930 000 rollouts at the phase-1 call rate (9.7 and 11.7 per deal, count
 above), which is roughly 40 CPU-hours, several hours on six workers. That is an estimate from the
 gate timings, not a run. The phase-3 solver speed-ups (`BOT_V2_PROPOSAL.md` §4.7) are what make
 repeating it routine, and until then the table is calibrated under the rule layer while the
-search plays only the cards from trick 3.
+search plays only the cards from trick 3. §3.5 is that repeat, at the 20 000 / 10 000 sizes.
+
+### 3.5 Recalibration under the search (2026-11-07)
+
+§3.4 re-checked the table under the phase-1 rule layer and noted that nothing yet measured the
+search. This section does that: the same `bidpos` rollouts, with every seat playing the
+`shipped` policy, which is the real bot (`bot.Decide` with the search at its shipped defaults:
+from trick 3, 32 / 60 / 80 / 60 samples, defender trump-lead bonus 10, Ten-under-Ace 3, race
+objective on). It applies the numeric half of the proposal's criterion only (gain at least 2 SE
+and at least +5 per hand, n at least 150). Whether a human partner would accept a shape is the
+owner's call at PR review, so every cell that passes the numbers is in the table and every flip
+is listed below with its hand shape. Rows 4 (Croatian) and 7 (Bitola), which the owner kept by
+decision on 2026-10-26, are governed by the same numeric criterion this time (owner's decision
+2026-10-26).
+
+**Instrument.** The lab snapshot of `docs/bot/lab/` (including `shipped.go`) built over the
+server at commit 49f242f3 (branch `feat/bot-v2-phase3`), in a scratch tree. `bidpos` walks the
+bidding with the shipped bot and, at each decision point, rolls the call and the pass out with
+`-a=shipped:3` on all four seats. A 200-deal probe took 31 s on six workers, which put the
+original 60 000 / 30 000 sizes at about 2.6 + 1.5 hours of wall time, over the two-hour limit.
+The 20 000 / 10 000 sizes of §3.4 are therefore the measurement. **The standard errors are about
+twice those of §3.2 and of the 100 000-deal confirmation of §3.4, so a cell can fail the 2 SE test
+here on sample size alone.**
+
+| Run | Variant | Deals | Seed | Non-forced rows | Wall time |
+|---|---|---|---|---|---|
+| search recalibration | Bitola | 20 000 | 901 | 115 903 | 3 086 s |
+| search recalibration | Croatian | 10 000 | 902 | 84 112 | 1 826 s |
+
+```
+./botlab -exp=bidpos -a=shipped:3 -n=20000 -seed=901 -csv=recal3_bitola.csv -workers=6
+./botlab -exp=bidpos -a=shipped:3 -n=10000 -seed=902 -variant=croatia -csv=recal3_croatia.csv -workers=6
+python3 -I class_table.py recal3_bitola.csv recal3_croatia.csv
+```
+
+Rows per deal are 5.8 (Bitola) and 8.4 (Croatian, non-forced), as in §3.4.
+
+**Class tables** (same layout as §3.4: non-forced rows pooled over positions, n at least 150 in
+either variant, gain = EV(call) − EV(pass) ± SE). A bold gain moved by more than 2 combined SE
+(this run's SE and the §3.4 re-check cell's, added in quadrature) against the §3.4 re-check cell of
+the same class. 11 Bitola and 12 Croatian cells moved by that test.
+
+| class | trumps | side Aces | Bitola n | Bitola gain | Croatian n | Croatian gain |
+|---|---|---|---|---|---|---|
+| - | 0 | 0 | 4 325 | −104.2 ± 2.2 | 4 968 | **−96.4 ± 2.0** |
+| - | 0 | 1 | 4 451 | −99.1 ± 2.2 | 5 624 | −99.0 ± 1.9 |
+| - | 0 | 2 | 1 417 | **−76.9 ± 4.1** | 1 743 | −101.9 ± 3.6 |
+| - | 1 | 0 | 11 421 | −93.7 ± 1.3 | 9 363 | **−78.5 ± 1.5** |
+| - | 1 | 1 | 9 934 | **−82.7 ± 1.5** | 8 240 | **−81.0 ± 1.6** |
+| - | 1 | 2 | 2 279 | −73.1 ± 3.3 | 1 907 | −77.7 ± 3.5 |
+| -A | 1 | 0 | 2 106 | −94.2 ± 3.2 | 1 950 | −109.5 ± 3.3 |
+| -A | 1 | 1 | 1 912 | −88.4 ± 3.5 | 1 655 | −102.7 ± 3.8 |
+| -A | 1 | 2 | 484 | −47.4 ± 7.6 | 386 | **−95.8 ± 8.1** |
+| 9 | 1 | 0 | 2 205 | −87.6 ± 3.2 | 1 779 | −76.9 ± 3.5 |
+| 9 | 1 | 1 | 1 892 | −68.2 ± 3.4 | 1 710 | −76.1 ± 3.7 |
+| 9 | 1 | 2 | 426 | −52.5 ± 7.3 | 406 | −54.3 ± 7.1 |
+| J | 1 | 0 | 2 100 | −49.4 ± 3.2 | 2 069 | −50.2 ± 3.4 |
+| J | 1 | 1 | 1 842 | −27.0 ± 3.5 | 1 794 | **−39.2 ± 3.9** |
+| J | 1 | 2 | 472 | −6.3 ± 7.0 | 449 | −41.1 ± 7.1 |
+| - | 2 | 0 | 8 610 | **−70.8 ± 1.6** | 5 480 | **−56.0 ± 2.1** |
+| - | 2 | 1 | 5 902 | **−58.5 ± 1.9** | 3 647 | **−55.9 ± 2.6** |
+| - | 2 | 2 | 1 016 | −44.1 ± 4.8 | 598 | −50.1 ± 6.4 |
+| -A | 2 | 0 | 4 343 | −74.6 ± 2.3 | 2 733 | −78.1 ± 2.9 |
+| -A | 2 | 1 | 2 829 | −67.0 ± 2.9 | 1 861 | −75.3 ± 3.6 |
+| -A | 2 | 2 | 478 | −36.2 ± 7.7 | 282 | **−52.7 ± 8.6** |
+| 9 | 2 | 0 | 4 255 | **−46.5 ± 2.3** | 2 723 | **−39.7 ± 3.0** |
+| 9 | 2 | 1 | 2 889 | **−33.5 ± 2.9** | 1 878 | **−34.0 ± 3.7** |
+| 9 | 2 | 2 | 493 | −21.2 ± 7.4 | 292 | −15.1 ± 9.5 |
+| 9A | 2 | 0 | 849 | −57.0 ± 5.1 | 544 | −54.7 ± 7.0 |
+| 9A | 2 | 1 | 534 | **−28.3 ± 6.6** | 362 | −57.3 ± 8.5 |
+| J | 2 | 0 | 4 231 | −15.9 ± 2.4 | 2 905 | −15.6 ± 3.0 |
+| J | 2 | 1 | 2 961 | +0.2 ± 2.8 | 1 962 | −8.4 ± 3.7 |
+| J | 2 | 2 | 480 | **+39.0 ± 6.6** | 323 | +16.8 ± 9.5 |
+| J9 | 2 | 0 | 838 | +20.5 ± 4.6 | 563 | +29.7 ± 6.4 |
+| J9 | 2 | 1 | 587 | +45.4 ± 6.2 | 404 | **+62.9 ± 8.0** |
+| JA | 2 | 0 | 838 | −19.9 ± 5.2 | 586 | −34.0 ± 6.3 |
+| JA | 2 | 1 | 546 | +5.1 ± 6.8 | 385 | −21.1 ± 8.4 |
+| - | 3 | 0 | 2 410 | **−33.7 ± 3.2** | 1 269 | −27.9 ± 4.5 |
+| - | 3 | 1 | 1 191 | −31.4 ± 4.6 | 571 | −9.9 ± 6.9 |
+| -A | 3 | 0 | 2 392 | −37.6 ± 3.1 | 1 260 | −32.3 ± 4.7 |
+| -A | 3 | 1 | 1 134 | −28.7 ± 4.7 | 544 | −32.2 ± 6.8 |
+| 9 | 3 | 0 | 2 374 | **−9.9 ± 3.2** | 1 174 | −3.1 ± 4.9 |
+| 9 | 3 | 1 | 1 149 | +7.8 ± 4.4 | 562 | +9.7 ± 6.8 |
+| 9A | 3 | 0 | 1 162 | −14.8 ± 4.5 | 609 | −28.3 ± 6.6 |
+| 9A | 3 | 1 | 568 | +9.1 ± 6.3 | 308 | −0.6 ± 8.8 |
+| J | 3 | 0 | 2 417 | +36.3 ± 3.0 | 1 240 | **+39.8 ± 4.5** |
+| J | 3 | 1 | 1 138 | **+59.9 ± 4.2** | 611 | +50.8 ± 6.3 |
+| J9 | 3 | 0 | 1 283 | +64.3 ± 4.0 | 651 | +65.3 ± 5.9 |
+| J9 | 3 | 1 | 615 | +88.3 ± 5.8 | 311 | +91.3 ± 9.5 |
+| J9A | 3 | 0 | 234 | +75.9 ± 9.5 | — | — |
+| JA | 3 | 0 | 1 235 | +32.5 ± 4.4 | 640 | +29.0 ± 6.1 |
+| JA | 3 | 1 | 579 | +52.3 ± 6.1 | 301 | +31.7 ± 8.9 |
+| - | 4 | 0 | 242 | +2.0 ± 10.4 | — | — |
+| -A | 4 | 0 | 492 | −2.3 ± 6.9 | 179 | +15.0 ± 11.4 |
+| 9 | 4 | 0 | 463 | +28.0 ± 7.3 | 166 | +31.8 ± 13.9 |
+| 9A | 4 | 0 | 471 | +26.8 ± 6.9 | 218 | +36.7 ± 11.2 |
+| J | 4 | 0 | 514 | +78.9 ± 6.1 | 190 | +99.0 ± 10.6 |
+| J | 4 | 1 | 154 | +74.3 ± 11.9 | — | — |
+| J9 | 4 | 0 | 523 | +107.6 ± 6.2 | 190 | +109.0 ± 11.4 |
+| J9A | 4 | 0 | 274 | +86.5 ± 9.0 | — | — |
+| JA | 4 | 0 | 521 | +72.5 ± 6.4 | 172 | +60.7 ± 10.7 |
+
+**What moved.** Almost every class the table passes on (the pass side of the comparison) is less
+bad under the search than under the rules, by 6 to 14 points in the large cells, so the whole
+table shifted toward calling. The cells that cross the inclusion line are the ones that matter,
+and they are in the verdicts below.
+
+**The table's evidence cells, per row** (gain ± SE; the shape of each cell is the one of the §3.4
+evidence tables; verdict by the numeric criterion, n at least 150). Bitola:
+
+| Row | Cell | §3.4 re-check | §3.4 confirmation | Search (20 000 deals) | Verdict |
+|---|---|---|---|---|---|
+| 1 | J9, 2 trumps, no side Ace | +21.1 ± 4.7 | +13.5 ± 2.1 | +20.5 ± 4.6 (n 838) | in |
+| 1 | J9, 3 trumps, no side Ace | +63.3 ± 3.8 | +65.5 ± 1.7 | +66.1 ± 3.7 (n 1 517) | in |
+| 1 | J9, 4 trumps, no side Ace | +118.9 ± 5.7 | +114.2 ± 2.7 | +100.4 ± 5.1 (n 797) | in |
+| 2 | J, 3 trumps, no side Ace | +31.0 ± 2.9 | +26.5 ± 1.3 | +36.3 ± 3.0 (n 2 417) | in |
+| 2 | J, 3 trumps, one side Ace | +45.4 ± 4.0 | +49.3 ± 1.8 | +59.9 ± 4.2 (n 1 138) | in |
+| 3 | 9, 4 trumps, no J/A, no side Ace | +41.6 ± 6.8 | +28.4 ± 3.2 | +28.0 ± 7.3 (n 463) | in (3.8 SE) |
+| 4 | A, 4 trumps, no J/9, no side Ace | −2.5 ± 7.3 | +6.6 ± 3.2 | −2.3 ± 6.9 (n 492) | **out** (−0.3 SE) |
+| 5 | 4 trumps, no J/9/A, exactly one side Ace | +31.4 ± 18.3 (n 66) | +14.1 ± 8.3 | +5.6 ± 20.9 (n 67) | no verdict (n below 150), stays |
+| 6 | 5 or more trumps | +112.3 ± 7.3 | +120.0 ± 3.4 | +127.0 ± 8.6 (n 391) | in |
+| 7 | 9 and A, 3 trumps, one or more side Aces | +12.0 ± 6.0 | +2.4 ± 2.7 | +7.9 ± 6.0 (n 622) | **out** (1.3 SE) |
+| 8 | J and A, 2 trumps, one or more side Aces | +6.4 ± 6.1 | +7.4 ± 2.5 | +9.5 ± 6.2 (n 650) | **out** (1.5 SE) |
+| 9 | J, 2 trumps (no 9/A), two side Aces | +13.8 ± 6.9 | +15.3 ± 3.0 | +39.0 ± 6.6 (n 480) | in (5.9 SE) |
+| 10 | 9, 3 trumps (no J/A), one or more side Aces | +6.2 ± 4.5 | +3.9 ± 1.9 | +8.7 ± 4.2 (n 1 258) | in (2.1 SE, narrowly) |
+| 11 | J, 2 trumps (no 9), a side Ace, third to speak | +8.9 ± 4.9 | +7.8 ± 2.1 | +11.5 ± 4.9 (n 888) | in (2.3 SE) |
+
+Croatian (rows marked "out" are shapes the table does not call in Croatia):
+
+| Row | Cell | §3.4 re-check | §3.4 confirmation | Search (10 000 deals) | Verdict |
+|---|---|---|---|---|---|
+| 1 | J9, 2 trumps, no side Ace | +30.4 ± 6.8 | +17.3 ± 2.8 | +29.7 ± 6.4 (n 563) | in |
+| 1 | J9, 3 trumps, no side Ace | +64.1 ± 5.5 | +67.6 ± 2.6 | +64.6 ± 5.6 (n 761) | in |
+| 1 | J9, 4 trumps, no side Ace | +100.3 ± 9.9 | +104.2 ± 4.8 | +104.5 ± 8.9 (n 292) | in |
+| 2 | J, 3 trumps, no side Ace | +23.1 ± 4.5 | +31.4 ± 2.0 | +39.8 ± 4.5 (n 1 240) | in |
+| 2 | J, 3 trumps, one side Ace | +42.0 ± 6.2 | +41.0 ± 2.8 | +50.8 ± 6.3 (n 611) | in |
+| 3 | 9, 4 trumps, no J/A, no side Ace | +26.8 ± 11.1 | +21.5 ± 5.4 | +31.8 ± 13.9 (n 166) | in (2.3 SE) |
+| 4 | A, 4 trumps, no J/9, no side Ace | +17.5 ± 13.1 | −5.3 ± 5.2 | +15.0 ± 11.4 (n 179) | **out** (1.3 SE) |
+| 5 | 4 trumps, no J/9/A, exactly one side Ace | +20.7 ± 24.9 (n 29) | +9.6 ± 14.6 | +37.7 ± 40.0 (n 18) | no verdict (n below 150), stays |
+| 6 | 5 or more trumps | +103.2 ± 14.3 (n 111) | +107.1 ± 6.5 | +126.8 ± 15.4 (n 113) | no verdict (n below 150), stays |
+| 12 | J, 2 trumps (no 9), a side Ace, second to speak | +13.8 ± 5.0 | +12.9 ± 2.2 | +18.3 ± 4.9 (n 935) | in (3.8 SE) |
+| 12 (pass) | same, first to speak | −12.7 ± 4.5 | −17.0 ± 2.1 | −20.9 ± 5.0 (n 1 226) | stays out |
+| 12 (pass) | same, third to speak | −19.6 ± 6.9 | −17.8 ± 3.0 | −17.1 ± 7.0 (n 565) | stays out |
+| 7 (out) | 9 and A, 3 trumps, one side Ace | −8.6 ± 9.4 | −9.9 ± 4.1 | −0.6 ± 8.8 (n 308) | stays out |
+| 8 (out) | J and A, 2 trumps, a side Ace | −3.6 ± 7.3 | −13.3 ± 3.2 | −16.2 ± 7.8 (n 441) | stays out |
+| 9 (out) | J, 2 trumps (no 9/A), two side Aces | −5.5 ± 8.5 | +10.0 ± 4.1 | +16.8 ± 9.5 (n 323) | stays out (1.8 SE) |
+| 9 (out) | same, the pair may hold the Ace (the shape row 9 calls) | −3.9 ± 7.8 | +6.4 ± 3.7 | +17.0 ± 8.7 (n 379) | stays out (1.95 SE) |
+| 10 (out) | 9, 3 trumps (no J/A), a side Ace | −0.0 ± 6.4 | −0.2 ± 2.9 | +11.9 ± 6.5 (n 607) | stays out (1.8 SE) |
+
+**Verdicts.**
+
+- **Row 4, Bitola and Croatian (the Ace with four or more trumps, no Jack or 9, no side Ace):
+  out.** Bitola −2.3 ± 6.9 (n 492), Croatian +15.0 ± 11.4 (n 179, 1.3 SE). The code row is one
+  rule for both variants, so it leaves both. The same hands with a side Ace still call through
+  row 5.
+- **Row 7, Bitola (9 and Ace, three trumps, one or more side Aces): out.** +7.9 ± 6.0 (n 622):
+  above +5 but 1.3 SE. With exactly one side Ace, +9.1 ± 6.3 (n 568).
+- **Row 8, Bitola (J and Ace doubleton, a side Ace): out.** +9.5 ± 6.2 (n 650), 1.5 SE. Its
+  §3.4 confirmation figure (+7.4 ± 2.5) passed; it fails here on this run's SE.
+- **Croatian row 9 shape (J doubleton, two side Aces): stays out.** +16.8 ± 9.5 (n 323, 1.8 SE)
+  when the pair has no Ace and +17.0 ± 8.7 (n 379, 1.95 SE) in the shape row 9 calls. It clears
+  +5 and sits just under 2 SE, so it is the nearest candidate and the cell to extend first.
+- Rows 1, 2, 3, 6, 9, 10 and 11 (Bitola) and rows 1, 2, 3 and 12 (Croatian) pass. Bitola row 10
+  (2.1 SE) and Croatian row 3 (2.3 SE, n 166) are narrow. Bitola row 9 rose from +15.3 ± 3.0 to
+  +39.0 ± 6.6. Croatian rows 5 and 6 and Bitola row 5 have no cell with n at least 150 and are
+  untouched.
+- No row enters in either variant: Croatian rows 7, 8 and 10 stay out. The position cells of
+  Croatian row 12 hold (+18.3 ± 4.9 second to speak, −20.9 ± 5.0 first, −17.1 ± 7.0 third).
+
+**Flips.** Four rows leave the table, none enters:
+
+| Row | Variant | Shape | Old verdict | New verdict | Gain ± SE (n) |
+|---|---|---|---|---|---|
+| 4 | Bitola | the Ace with four or more trumps, no Jack or 9, no side Ace | in (owner's decision) | out | −2.3 ± 6.9 (492) |
+| 4 | Croatian | the same shape | in (owner's decision) | out | +15.0 ± 11.4 (179), 1.3 SE |
+| 7 | Bitola | 9 and Ace, exactly three trumps, one or more side Aces | in (owner's decision) | out | +7.9 ± 6.0 (622), 1.3 SE |
+| 8 | Bitola | J and Ace, exactly two trumps, one or more side Aces | in | out | +9.5 ± 6.2 (650), 1.5 SE |
+
+The lab's own scoring (gain summed over the rows where the table's call changes, per non-forced
+row) puts the flips at −0.056 ± 0.052 (Bitola, 1 538 rows) and −0.032 ± 0.024 (Croatian, 179
+rows): level to slightly negative, and in-sample, since the flips were chosen on these rows. For
+reference, the old table scores +7.16 ± 0.18 (Bitola) and +4.52 ± 0.17 (Croatian) per non-forced
+row, the bot's own calls (`natural`) +7.12 ± 0.18 and +4.33 ± 0.17, and the table after the
+flips +7.10 ± 0.17 and +4.49 ± 0.17. What the numbers support is "no evidence the four shapes
+help", not "they hurt": a 20 000 / 10 000 run cannot separate a gain of +5 to +10 from zero, and
+rows 4 and 8 in Bitola passed or nearly passed in the §3.4 100 000-deal confirmation (+6.6 ± 3.2,
++7.4 ± 2.5). A larger run is the way to settle the three cells at 1.3 to 1.5 SE. The shape
+judgment on all four flips is the owner's at PR review.
+
+Position slices of a class (class × trumps × side Aces × seat) with n at least 150 show a few
+cells that pass 2 SE and are not in the table (Croatian 9 with three trumps, second to speak:
++17.5 ± 8.1, n 388, and with a side Ace +27.3 ± 10.7, n 169). Among that many slices a few such
+cells are expected by chance, and the aggregate over positions (the Croatian row 10 cell above,
++11.9 ± 6.5) is under 2 SE, so none is applied.
 
 ## 4. Reproducing
 
