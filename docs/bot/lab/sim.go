@@ -144,7 +144,13 @@ func RandomDeal(rng *rand.Rand) Deal {
 
 // NewDealState builds a fresh engine state for the deal under the variant, mirroring game.dealCards.
 func NewDealState(d Deal, variant game.Variant) *game.GameState {
-	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false, true, false)
+	return NewDealStateWith(d, variant, [2]int{}, false)
+}
+
+// NewDealStateWith is NewDealState with the teams' match scores and the room's stop-at-target rule.
+func NewDealStateWith(d Deal, variant game.Variant, scores [2]int, stopAtTarget bool) *game.GameState {
+	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, stopAtTarget, true, false)
+	gs.TeamScores = scores
 	for i := range gs.Players {
 		gs.Players[i].Hand = []game.Card{}
 		gs.Players[i].FaceDownCards = nil
@@ -275,6 +281,7 @@ type HandOutcome struct {
 	Score  game.HandScore
 	Caller int
 	Trump  game.Suit
+	Winner *int
 }
 
 // PlayHand drives one deal to a scored hand with the given seat policies.
@@ -356,9 +363,9 @@ func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, er
 			return HandOutcome{Status: HandScored, Score: *gs.LastHandResult, Caller: *gs.TrumpCallerSeat, Trump: *gs.TrumpSuit}, nil
 		case game.PhaseMatchEnd:
 			if gs.LastHandResult == nil {
-				return HandOutcome{Status: HandInstantWin}, nil
+				return HandOutcome{Status: HandInstantWin, Winner: gs.WinnerTeam}, nil
 			}
-			return HandOutcome{Status: HandScored, Score: *gs.LastHandResult, Caller: *gs.TrumpCallerSeat, Trump: *gs.TrumpSuit}, nil
+			return HandOutcome{Status: HandScored, Score: *gs.LastHandResult, Caller: *gs.TrumpCallerSeat, Trump: *gs.TrumpSuit, Winner: gs.WinnerTeam}, nil
 		default:
 			return HandOutcome{}, fmt.Errorf("unexpected phase %s", gs.Phase)
 		}

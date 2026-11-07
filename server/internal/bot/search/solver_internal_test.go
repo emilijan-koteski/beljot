@@ -62,3 +62,17 @@ func TestOptimisedSolverMatchesPlainOnFullHands(t *testing.T) {
 		require.Equal(t, plain.RootValues(hands, leader, trick, capot), fast.RootValues(hands, leader, trick, capot), "position %d", i)
 	}
 }
+
+func TestOptimisedSolverMatchesPlainWhenRacing(t *testing.T) {
+	rng := rand.New(rand.NewPCG(59, 61))
+	for i := range 40 {
+		hands, leader, trick, trump, clockwise, capot := randomTrick3Deal(rng)
+		race := &Race{Target: 1001, Banked: [2]int{900 + rng.IntN(100), 900 + rng.IntN(100)}, Caller: rng.IntN(2)}
+		fast := NewSolver(trump, clockwise)
+		fast.SetRace(race)
+		plain := NewSolver(trump, clockwise)
+		plain.plain = true
+		plain.SetRace(race)
+		require.Equal(t, plain.RootValues(hands, leader, trick, capot), fast.RootValues(hands, leader, trick, capot), "position %d race %+v", i, *race)
+	}
+}

@@ -16,7 +16,7 @@ var (
 )
 
 func ChooserResultForTest(v View, deadline time.Time) (search.Result, bool) {
-	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline, 0, nil)
+	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline, SearchTuning{}, nil)
 }
 
 func TenUnderAceCandidateForTest(v View) *game.Card {

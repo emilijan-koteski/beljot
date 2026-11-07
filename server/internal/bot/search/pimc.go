@@ -11,14 +11,15 @@ import (
 
 const samplerStream = 0x5EED
 
-// Position is the trick in progress as the solver sees it: the trump suit index, the direction of play, who led the
-// trick, the card indexes already played to it and the capot flag.
+// Position is the trick in progress as the solver sees it: trump suit index, direction of play, the trick's leader,
+// its card indexes and the capot flag, plus Race when the solver should race for a stop-at-target match.
 type Position struct {
 	Trump     int
 	Clockwise bool
 	Leader    int
 	Trick     []int
 	Capot     int8
+	Race      *Race
 }
 
 // Options bound the search: at most Samples deals, and a stop once at least EarlyStopAfter are in and the best card
@@ -85,6 +86,7 @@ func Choose(
 	teamSign := 1 - 2*game.TeamForSeat(in.Seat)
 	rng := rand.New(rand.NewPCG(in.Seed()^opts.SeedSalt, samplerStream))
 	solver := NewSolver(pos.Trump, pos.Clockwise)
+	solver.SetRace(pos.Race)
 	for votes.n < opts.Samples {
 		if time.Now().After(deadline) {
 			return Result{}, false
@@ -143,7 +145,7 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 		if !ok {
 			return false
 		}
-		settled[i] = teamSign * Settle(s, remainder)
+		settled[i] = teamSign * settledValue(s, remainder)
 	}
 	for i, card := range t.cards {
 		t.values[card] = append(t.values[card], settled[i])
@@ -157,6 +159,14 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 	}
 	t.n++
 	return true
+}
+
+// settledValue is a root value as the hand's award, except a match the race already decided, which stays ±RaceWin.
+func settledValue(s Settlement, value int) int {
+	if value == RaceWin || value == -RaceWin {
+		return value
+	}
+	return Settle(s, value)
 }
 
 // ranking returns the best card and the runner-up, preferring the lowest card index on equal sums.

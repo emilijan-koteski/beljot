@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|regret|stability")
+	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
 	polA    = flag.String("a", "current", "policy A")
 	polB    = flag.String("b", "random", "policy B")
 	n       = flag.Int("n", 200, "deals")
@@ -81,6 +81,8 @@ func main() {
 		ddcheck2()
 	case "duplicate":
 		duplicate(v)
+	case "race":
+		race(v)
 	case "regret":
 		regret(v)
 	case "bidtable":

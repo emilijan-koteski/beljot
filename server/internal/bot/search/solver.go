@@ -24,6 +24,7 @@ type memoKey struct {
 	hands  [4]uint32
 	leader int8
 	capot  int8
+	gained [2]uint8
 }
 
 type memoEntry struct {
@@ -43,6 +44,8 @@ type Solver struct {
 	cardPoints   [NCards]int
 	memo         map[memoKey]memoEntry
 	plain        bool
+	race         *Race
+	gained       [2]int
 }
 
 // NewSolver returns a solver for the trump suit index and the room's direction of play.
@@ -64,6 +67,21 @@ func NewSolver(trump int, clockwise bool) *Solver {
 func (s *Solver) Reset() {
 	clear(s.memo)
 	s.Nodes = 0
+}
+
+// SetRace makes the solver race for the match: a trick that decides it is worth ±RaceWin, and nil turns that off.
+func (s *Solver) SetRace(r *Race) {
+	s.race = r
+	clear(s.memo)
+}
+
+// pointBounded reports whether the claims and the point bounds apply: they assume every value is a point count.
+func (s *Solver) pointBounded() bool {
+	return !s.plain && s.race == nil
+}
+
+func (s *Solver) gainedKey() [2]uint8 {
+	return [2]uint8{uint8(s.gained[0]), uint8(s.gained[1])}
 }
 
 func rankStrength(card, trump int) int {
@@ -209,7 +227,7 @@ func (s *Solver) search(hands [4]uint32, leader int, trick []int, capot int8, al
 		if hands == [4]uint32{} {
 			return 0
 		}
-		if !s.plain {
+		if s.pointBounded() {
 			if value, ok := s.claim(hands, leader, capot); ok {
 				return value
 			}
@@ -222,7 +240,7 @@ func (s *Solver) search(hands [4]uint32, leader int, trick []int, capot int8, al
 			}
 			alpha, beta = max(alpha, lo), min(beta, hi)
 		}
-		key = memoKey{hands: hands, leader: int8(leader), capot: capot}
+		key = memoKey{hands: hands, leader: int8(leader), capot: capot, gained: s.gainedKey()}
 		if e, ok := s.memo[key]; ok {
 			if int(e.lo) >= beta {
 				return int(e.lo)
@@ -317,10 +335,32 @@ func (s *Solver) play(hands [4]uint32, leader int, trick []int, card int, capot 
 	}
 
 	winnerSeat, gain, capot := s.closeTrick(played, leader, capot)
+	if s.race != nil {
+		return s.raceAfterTrick(hands, winnerSeat, gain, capot, alpha, beta)
+	}
 	if hands == [4]uint32{} {
 		return gain + finalBonus(capot, 1-2*game.TeamForSeat(winnerSeat))
 	}
 	return gain + s.search(hands, winnerSeat, nil, capot, alpha-gain, beta-gain)
+}
+
+// raceAfterTrick values a closed trick in race mode, where values count from the root: ±RaceWin once a trick
+// before the last decides the match, the points gained so far plus the hand's end when nothing does.
+func (s *Solver) raceAfterTrick(hands [4]uint32, winnerSeat, gain int, capot int8, alpha, beta int) int {
+	soFar := s.gained[game.TeamA] - s.gained[game.TeamB] + gain
+	if hands == [4]uint32{} {
+		return soFar + finalBonus(capot, 1-2*game.TeamForSeat(winnerSeat))
+	}
+	saved := s.gained
+	team := game.TeamForSeat(winnerSeat)
+	s.gained[team] += (1 - 2*team) * gain
+	winner, decided := RaceDecided(*s.race, s.gained)
+	value := raceValue(winner)
+	if !decided {
+		value = s.search(hands, winnerSeat, nil, capot, alpha, beta)
+	}
+	s.gained = saved
+	return value
 }
 
 // closeTrick scores a full trick: the seat that won it, its points signed for team A and the capot flag after it.

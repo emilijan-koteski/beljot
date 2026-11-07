@@ -44,7 +44,7 @@ func SearchAppliesWith(v View, fromTrick int, t SearchTuning) bool {
 	if len(v.LegalCards) <= 1 || v.TrickNumber < fromTrick || samplesFor(v.TrickNumber, t) == 0 {
 		return false
 	}
-	return !withinStopAtTargetReach(v)
+	return t.RaceObjective || !withinStopAtTargetReach(v)
 }
 
 func withinStopAtTargetReach(v View) bool {
@@ -53,12 +53,28 @@ func withinStopAtTargetReach(v View) bool {
 	}
 	reach := remainingCardPoints(v) + lastTrickBonusPoints
 	for team := range 2 {
-		banked := v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team] + ownBelotePoints(v, team)
-		if v.MatchTarget-banked <= reach {
+		if v.MatchTarget-runningTotal(v, team) <= reach {
 			return true
 		}
 	}
 	return false
+}
+
+// runningTotal is what the team would bank if the match stopped now, the bot's own certain Belote included.
+func runningTotal(v View, team int) int {
+	return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team] + ownBelotePoints(v, team)
+}
+
+// raceFor is the stop-at-target race the search plays when the tuning races and a team is within reach, else nil.
+func raceFor(v View, t SearchTuning) *search.Race {
+	if !t.RaceObjective || !withinStopAtTargetReach(v) {
+		return nil
+	}
+	return &search.Race{
+		Target: v.MatchTarget,
+		Banked: [2]int{runningTotal(v, game.TeamA), runningTotal(v, game.TeamB)},
+		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
+	}
 }
 
 // SearchCard runs the search for the seat's card, reporting false when it reached no decision and the rules should play.
@@ -73,7 +89,7 @@ func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, b
 	if samples == 0 || v.TrumpSuit == nil || v.TrumpCallerSeat == nil {
 		return SearchResult{}, false
 	}
-	res, ok := chooseSearch(v, samples, deadline, t.SeedSalt, trumpDrawClass(v, t))
+	res, ok := chooseSearch(v, samples, deadline, t, trumpDrawClass(v, t))
 	if !ok {
 		return SearchResult{}, false
 	}
@@ -87,9 +103,9 @@ func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, b
 	return SearchResult{Card: card, Samples: res.Samples, Margin: res.Margin, SE: res.SE}, true
 }
 
-func chooseSearch(v View, samples int, deadline time.Time, seedSalt uint64, class func(hands [4]uint32) int) (search.Result, bool) {
-	opts := search.Options{Samples: samples, SeedSalt: seedSalt, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE, SampleClass: class}
-	return search.Choose(informationFrom(v), positionFrom(v), v.LegalCards, settlementFrom(v), opts, deadline)
+func chooseSearch(v View, samples int, deadline time.Time, t SearchTuning, class func(hands [4]uint32) int) (search.Result, bool) {
+	opts := search.Options{Samples: samples, SeedSalt: t.SeedSalt, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE, SampleClass: class}
+	return search.Choose(informationFrom(v), positionFrom(v, t), v.LegalCards, settlementFrom(v), opts, deadline)
 }
 
 // DecideWith plays the searched card when it is still a legal play and nothing else is pending, otherwise it decides by
@@ -157,14 +173,15 @@ func trickMask(v View) uint32 {
 	return mask
 }
 
-// positionFrom needs a trump suit. The trick lists its cards in play order, led by the first card's seat.
-func positionFrom(v View) search.Position {
+// positionFrom needs a trump suit and its caller. The trick lists its cards in play order, led by the first card's seat.
+func positionFrom(v View, t SearchTuning) search.Position {
 	pos := search.Position{
 		Trump:     search.SuitIdx(*v.TrumpSuit),
 		Clockwise: v.Clockwise,
 		Leader:    v.Seat,
 		Trick:     make([]int, len(v.CurrentTrick)),
 		Capot:     search.CapotFlag(v.TricksWon),
+		Race:      raceFor(v, t),
 	}
 	if len(v.CurrentTrick) > 0 {
 		pos.Leader = v.CurrentTrick[0].PlayerSeat
