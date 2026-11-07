@@ -855,42 +855,45 @@ type playTweakCase struct {
 	wantCard       string
 }
 
+func viewForTweakCase(tt playTweakCase) bot.View {
+	gs := testfixtures.NewGameMidPlay(1)
+	gs.Players[0].Hand = tt.hand
+	gs.CurrentTrick = tt.trick
+	gs.ActivePlayerSeat = 0
+	caller := tt.callerSeat
+	gs.TrumpCallerSeat = &caller
+	if len(tt.trick) > 0 {
+		lead := tt.trick[0].Card.Suit
+		gs.LeadSuit = &lead
+	}
+
+	mem := bot.NewMemory()
+	for _, o := range tt.observes {
+		mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
+	}
+	for seat, ids := range tt.located {
+		for _, id := range ids {
+			mem.ObserveLocatedCard(seat, card(id))
+		}
+	}
+	for seat, ids := range tt.declaredBySeat {
+		gs.Players[seat].Declarations = []game.Declaration{{
+			Type:       game.DeclarationSequence,
+			Cards:      cards(ids...),
+			PlayerSeat: seat,
+		}}
+	}
+	if len(tt.declaredBySeat) > 0 {
+		mem.ObserveDeclarations(gs.Players)
+	}
+	return viewFromState(gs, 0, mem)
+}
+
 func runPlayTweakCases(t *testing.T, tests []playTweakCase) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gs := testfixtures.NewGameMidPlay(1)
-			gs.Players[0].Hand = tt.hand
-			gs.CurrentTrick = tt.trick
-			gs.ActivePlayerSeat = 0
-			caller := tt.callerSeat
-			gs.TrumpCallerSeat = &caller
-			if len(tt.trick) > 0 {
-				lead := tt.trick[0].Card.Suit
-				gs.LeadSuit = &lead
-			}
-
-			mem := bot.NewMemory()
-			for _, o := range tt.observes {
-				mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
-			}
-			for seat, ids := range tt.located {
-				for _, id := range ids {
-					mem.ObserveLocatedCard(seat, card(id))
-				}
-			}
-			for seat, ids := range tt.declaredBySeat {
-				gs.Players[seat].Declarations = []game.Declaration{{
-					Type:       game.DeclarationSequence,
-					Cards:      cards(ids...),
-					PlayerSeat: seat,
-				}}
-			}
-			if len(tt.declaredBySeat) > 0 {
-				mem.ObserveDeclarations(gs.Players)
-			}
-
-			action := bot.Decide(viewFromState(gs, 0, mem))
+			action := bot.Decide(viewForTweakCase(tt))
 			require.Equal(t, game.ActionPlayCard, action.Type)
 			require.NotNil(t, action.Card)
 			assert.Equal(t, tt.wantCard, action.Card.String())
@@ -1566,9 +1569,9 @@ func TestDecide_BossPreservingSmear(t *testing.T) {
 	})
 }
 
-func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
+func tenUnderAceCases() []playTweakCase {
 	spades := game.SuitSpades
-	runPlayTweakCases(t, []playTweakCase{
+	return []playTweakCase{
 		{
 			name:       "void in trump, throws the ten and keeps the ace to show it",
 			hand:       cards("AS", "TS", "7D"),
@@ -1598,7 +1601,27 @@ func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
 			callerSeat: 2,
 			wantCard:   "AS",
 		},
-	})
+	}
+}
+
+func TestDecide_TenUnderTheAceOnPartnersSafeTrick(t *testing.T) {
+	runPlayTweakCases(t, tenUnderAceCases())
+}
+
+func TestTenUnderAceCandidateMatchesTheRule(t *testing.T) {
+	for _, tt := range tenUnderAceCases() {
+		t.Run(tt.name, func(t *testing.T) {
+			v := viewForTweakCase(tt)
+			got := bot.TenUnderAceCandidateForTest(v)
+			if tt.wantCard[0] != 'T' {
+				assert.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			assert.Equal(t, tt.wantCard, got.String())
+			assert.Equal(t, tt.wantCard, bot.Decide(v).Card.String())
+		})
+	}
 }
 
 // TestDecide_RetainUncuttableBoss checks the bot treats an uncuttable side boss as a trick-8 winner,

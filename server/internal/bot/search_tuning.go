@@ -33,6 +33,10 @@ func samplesFor(trick int, t SearchTuning) int {
 
 // chooseAdjusted picks the legal card with the highest adjusted mean, the lowest card index winning ties.
 func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool) {
+	var ten *game.Card
+	if v.TrumpSuit != nil && t.TenUnderAceBonus != 0 {
+		ten = tenUnderAceCandidate(v, v.LegalCards, *v.TrumpSuit)
+	}
 	var best game.Card
 	bestIdx, bestScore, found := 0, 0.0, false
 	for _, c := range v.LegalCards {
@@ -42,6 +46,9 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 			continue
 		}
 		score := stats.Mean
+		if ten != nil && c == *ten {
+			score += float64(t.TenUnderAceBonus)
+		}
 		if !found || score > bestScore || (score == bestScore && idx < bestIdx) {
 			best, bestIdx, bestScore, found = c, idx, score, true
 		}

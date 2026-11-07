@@ -973,8 +973,18 @@ func trickPoints(v View, trump game.Suit) int {
 // guarding, and discards the Ten instead of a non-trump Ace it backs. Falls back to
 // highestPointNonOvertaking when only such bosses remain, and returns nil when every card overtakes.
 func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
+	best, substitutable := smearSelection(v, legal, trump)
+	if !substitutable {
+		return best
+	}
+	return tenUnderAce(v, legal, best, trump)
+}
+
+// smearSelection is the card bestSmear picks before the Ten-under-Ace swap, and whether that swap
+// applies to it. The fallback to highestPointNonOvertaking is final.
+func smearSelection(v View, legal []game.Card, trump game.Suit) (*game.Card, bool) {
 	if len(v.CurrentTrick) == 0 {
-		return nil
+		return nil, false
 	}
 	var best *game.Card
 	bestPts := -1
@@ -999,9 +1009,35 @@ func bestSmear(v View, legal []game.Card, trump game.Suit) *game.Card {
 		}
 	}
 	if best == nil && hasCandidate {
-		return highestPointNonOvertaking(v, legal, trump)
+		return highestPointNonOvertaking(v, legal, trump), false
 	}
-	return tenUnderAce(v, legal, best, trump)
+	return best, true
+}
+
+// tenUnderAceCandidate returns the Ten the rule layer would play through the Ten-under-Ace swap on
+// this trick, or nil when the rule plays something else.
+func tenUnderAceCandidate(v View, legal []game.Card, trump game.Suit) *game.Card {
+	if len(v.CurrentTrick) == 0 || !smearBranchApplies(v, trump) {
+		return nil
+	}
+	best, substitutable := smearSelection(v, legal, trump)
+	if !substitutable || best == nil {
+		return nil
+	}
+	ten := tenUnderAce(v, legal, best, trump)
+	if ten == nil || *ten == *best {
+		return nil
+	}
+	return ten
+}
+
+// smearBranchApplies reports whether chooseFollow reaches bestSmear on this trick.
+func smearBranchApplies(v View, trump game.Suit) bool {
+	winnerSeat, _ := trickWinner(v.CurrentTrick, trump)
+	if game.TeamForSeat(winnerSeat) == game.TeamForSeat(v.Seat) {
+		return partnerWinIsSafe(v, trump) || shouldSmearOntoPartnerBoss(v, trump)
+	}
+	return partnerTakesTrick(v, trump)
 }
 
 // tenUnderAce swaps a non-trump Ace for the Ten of its suit when the Ten is legal and does not
