@@ -108,3 +108,32 @@ func TestChooseAdjustedPenalisesTheDefendersTrumpLead(t *testing.T) {
 		})
 	}
 }
+
+func TestChooseAdjustedPrefersTheSteadierLead(t *testing.T) {
+	hearts := game.SuitHearts
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("7S")): {Mean: 10, SE: 1},
+		search.CardIdx(card("AC")): {Mean: 11, SE: 4},
+	}}
+	oneCard := []game.TrickCard{{Card: card("7D"), PlayerSeat: 3}}
+	tests := []struct {
+		name   string
+		lambda float64
+		trick  []game.TrickCard
+		want   string
+	}{
+		{"no risk weight", 0, nil, "AC"},
+		{"a mild risk weight", 0.25, nil, "AC"},
+		{"a risk weight past the crossover", 0.5, nil, "7S"},
+		{"a full risk weight", 1, nil, "7S"},
+		{"a non-empty trick ignores the weight", 1, oneCard, "AC"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := defenderLeadView([]string{"7S", "AC"}, &hearts, 0, tt.trick)
+			got, ok := bot.ChooseAdjustedForTest(v, res, bot.SearchTuning{LeadRiskLambda: tt.lambda})
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}

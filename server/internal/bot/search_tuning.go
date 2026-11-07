@@ -55,6 +55,7 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		ten = tenUnderAceCandidate(v, v.LegalCards, *v.TrumpSuit)
 	}
 	penaliseTrump := t.DefenderTrumpLeadBonus > 0 && defenderTrumpLeadConvention(v)
+	riskAdjustLead := t.LeadRiskLambda > 0 && len(v.CurrentTrick) == 0
 	var best game.Card
 	bestIdx, bestScore, found := 0, 0.0, false
 	for _, c := range v.LegalCards {
@@ -64,6 +65,9 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 			continue
 		}
 		score := stats.Mean
+		if riskAdjustLead {
+			score -= t.LeadRiskLambda * stats.SE
+		}
 		if ten != nil && c == *ten {
 			score += float64(t.TenUnderAceBonus)
 		}
