@@ -31,12 +31,30 @@ func samplesFor(trick int, t SearchTuning) int {
 	return search.SamplesForTrick(trick)
 }
 
+// defenderTrumpLeadConvention reports whether the seat is on lead for the defending team while holding a legal non-trump card.
+func defenderTrumpLeadConvention(v View) bool {
+	if len(v.CurrentTrick) != 0 || v.TrumpSuit == nil || myTeamCalledTrump(v) {
+		return false
+	}
+	for _, c := range v.LegalCards {
+		if c.Suit != *v.TrumpSuit {
+			return true
+		}
+	}
+	return false
+}
+
+func isPenalisedDefenderTrump(c game.Card, trump game.Suit) bool {
+	return c.Suit == trump && c.Rank != game.RankJack && c.Rank != game.Rank9
+}
+
 // chooseAdjusted picks the legal card with the highest adjusted mean, the lowest card index winning ties.
 func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool) {
 	var ten *game.Card
 	if v.TrumpSuit != nil && t.TenUnderAceBonus != 0 {
 		ten = tenUnderAceCandidate(v, v.LegalCards, *v.TrumpSuit)
 	}
+	penaliseTrump := t.DefenderTrumpLeadBonus > 0 && defenderTrumpLeadConvention(v)
 	var best game.Card
 	bestIdx, bestScore, found := 0, 0.0, false
 	for _, c := range v.LegalCards {
@@ -48,6 +66,9 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		score := stats.Mean
 		if ten != nil && c == *ten {
 			score += float64(t.TenUnderAceBonus)
+		}
+		if penaliseTrump && isPenalisedDefenderTrump(c, *v.TrumpSuit) {
+			score -= float64(t.DefenderTrumpLeadBonus)
 		}
 		if !found || score > bestScore || (score == bestScore && idx < bestIdx) {
 			best, bestIdx, bestScore, found = c, idx, score, true

@@ -26,3 +26,7 @@ func TenUnderAceCandidateForTest(v View) *game.Card {
 func ChooseAdjustedForTest(v View, res search.Result, t SearchTuning) (game.Card, bool) {
 	return chooseAdjusted(v, res, t)
 }
+
+func DefenderTrumpLeadConventionForTest(v View) bool {
+	return defenderTrumpLeadConvention(v)
+}
