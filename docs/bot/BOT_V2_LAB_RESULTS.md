@@ -318,10 +318,27 @@ Frequency (B1), both sides `shipped:3`, all phase-3 flags off, seed 601:
 | B4 `drawCond` vs `noDrawCond` | Bitola | 641 | c5567547 + B1, B2 | +0.14 ± 0.45 (deferred 267 of 12271 = 2.2 %) | | |
 | B4 `drawCond` vs `noDrawCond` | Croatian | 642 | c5567547 + B1, B2 | -0.24 ± 0.46 (deferred 344 of 13634 = 2.5 %) | -0.05 ± 0.32 (-0.1) | not better at 2 SE, not shipped |
 | Caps `caps2x` (32/60/80 on tricks 3/4/5) vs `noCaps` | Bitola | 661 | c5567547 + B1, B2 | +0.68 ± 0.59 | | |
-| Caps `caps2x` vs `noCaps` | Croatian | 662 | c5567547 + B1, B2 | +0.78 ± 0.56 | +0.73 ± 0.41 (+1.8) | not better at 2 SE, not shipped (same sign in both variants, an owner may want a larger run) |
+| Caps `caps2x` vs `noCaps` | Croatian | 662 | c5567547 + B1, B2 | +0.78 ± 0.56 | +0.73 ± 0.41 (+1.8) | below 2 SE, sent to a confirmation run |
+| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Bitola | 663 | 3cec38ef | +0.91 ± 0.31 | | |
+| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Croatian | 664 | 3cec38ef | +0.65 ± 0.39 | four runs pooled **+0.79 ± 0.21 (+3.8)** | better at 2 SE, no opposite sign, **ships (32/60/80 on tricks 3/4/5 in `search.SamplesForTrick`)** |
 
-Shipped by this step: `DefenderTrumpLeadBonus` 10 and `TenUnderAceBonus` 3. Off: `LeadRiskLambda`
-(0), `TrumpDrawConditional` (false), `SampleCaps` (all 0, the schedule stays 16/30/40/60). B1 ships
+Confirmation commands: `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 -flagsB=noCaps
+-n=3000 -seed=663 -workers=6` and the same with `-variant=croatia -seed=664`, lab built from
+3cec38ef. Four-run pool by weights 1/SE²: (0.68·2.87 + 0.78·3.19 + 0.91·10.41 + 0.65·6.58) / 23.04
+= +0.79, SE 1/√23.04 = 0.21.
+
+| Item | Result |
+|---|---|
+| `DefenderTrumpLeadBonus` (B1) | ships at 10 |
+| `TenUnderAceBonus` (B2) | ships at 3 |
+| `LeadRiskLambda` (B3) | off |
+| `TrumpDrawConditional` (B4) | off |
+| Sample caps | ships: `search.SamplesForTrick` is 32/60/80 on tricks 3/4/5 (60 from trick 6), `SampleCaps` stays 0 |
+
+Gates after the schedule change (f32985b0): the trick-3 benchmark mean is 29.8 ms (max 89.9 ms,
+limit 250 ms); search share 82.0 % over 60 hands (9250/11280, 412 plays); search minus rules
++7.10 ± 5.35 per deal over 40 deals (434 plays). The gate values below are those before the
+schedule change. B1 ships
 by the convention rule although its pooled point estimate is -0.19 ± 0.21: it is the largest bonus
 that is not worse at 2 SE, and the veto (the only stronger form) is worse at 3.1 SE pooled.
 
