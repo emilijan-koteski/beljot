@@ -75,6 +75,12 @@ whether the bot would naturally call. Bitola: 60 000 deals → 502 021 rows. Cro
 - `pimc:S[:T]`: PIMC with `S` samples per decision from trick `T` (default 1); `pimcs:a,b,c,...`
   samples per trick; bidding and declarations by `lab[flags]`; sampler flags `declInfer`,
   `bidInfer`, `contract` (capot-correct since revision 2), `riskNN` (rank by mean − NN/10 · SE).
+- `shipped[:T]`: the production search path from trick `T` (default 3): `bot.SearchAppliesWith`,
+  `bot.SearchCardWith`, `bot.DecideWith`, with no deadline, otherwise `bot.Decide`. The tuning is
+  `bot.DefaultSearchTuning()` plus the flags `phase2` (zero tuning), `defTrump3`, `defTrump10`,
+  `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
+  `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`. `duplicate` prints the
+  applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `random`: uniform over legal options.
 
 ## 2. Results
@@ -246,6 +252,19 @@ P(at least one opponent is void in the suit **and** holds a trump), bot holds `k
 | 2 | 3 | 0.115 | 0.570 |
 | 3 | 1 | 0.203 | **0.770** |
 | 3 | 3 | 0.195 | 0.737 |
+
+### 2.9 Phase 3 measurements
+
+These rows use the `shipped` policy (§1.5): the production search path, so a number here is what a
+player meets. Every tuning is measured against the cumulative baseline, the bot as shipped at the
+previous step, never against the phase-2 snapshot alone. Duplicate, 400 deals per row unless noted;
+advantage is per hand, ± is one standard error, commit is the server code the lab was built from.
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Result |
+|---|---|---|---|---|---|---|
+| `shipped:3` | `shipped:3` | Bitola | 40 | 1 | d3bdf40 | +0.00 ± 0.00; counts of A and B equal (applied 492, decided 492, deferred 0) |
+| `shipped:3` | `current` | Bitola | 400 | 301 | d3bdf40 | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55 |
+| `shipped:3` | `current` | Croatian | 400 | 302 | d3bdf40 | +10.96 ± 2.24 (A share 52.8%); decided 5513, deferred 0, defender trump leads 62 |
 
 ## 3. Bidding calibration tables
 
@@ -612,7 +631,7 @@ server module.
 ```
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
-cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory}.go /tmp/lab/server/internal/botlab/
+cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped}.go /tmp/lab/server/internal/botlab/
 cp docs/bot/lab/{main,bidtable,bidpos}.go   /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300

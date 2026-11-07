@@ -53,7 +53,12 @@ type CurrentBot struct{}
 
 func (CurrentBot) Name() string { return "current" }
 func (CurrentBot) Decide(v View) game.Action {
-	return bot.Decide(bot.View{
+	return bot.Decide(toBotView(v))
+}
+
+// toBotView converts the lab view into the production bot's view.
+func toBotView(v View) bot.View {
+	return bot.View{
 		Seat: v.Seat, Hand: v.Hand, LegalCards: v.LegalCards, Phase: v.Phase, BiddingRound: v.BiddingRound,
 		TrumpCandidate: v.TrumpCandidate, TrumpSuit: v.TrumpSuit, TrumpCallerSeat: v.TrumpCallerSeat,
 		DealerSeat: v.DealerSeat, MustPickTrump: v.MustPickTrump, CurrentTrick: v.CurrentTrick, LeadSuit: v.LeadSuit,
@@ -62,7 +67,7 @@ func (CurrentBot) Decide(v View) game.Action {
 		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
-	})
+	}
 }
 
 // LabBot runs the lab copy of the bot (with experiment flags).
