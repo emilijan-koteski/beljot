@@ -119,6 +119,7 @@ export function TrickArea({
               top: "50%",
               transform: `translate(calc(-50% + ${slot.offsetX * slotScale}px), calc(-50% + ${slot.offsetY * slotScale}px)) rotate(${slot.rotation}deg)`,
               zIndex: fromSnapshot ? 1 : 2,
+              borderRadius: CARD_SIZES.md.radius,
             }}
           >
             <PlayingCard card={tc.card} state="default" size="md" withTransition={false} />
