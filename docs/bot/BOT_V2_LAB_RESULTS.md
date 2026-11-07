@@ -265,6 +265,7 @@ advantage is per hand, ± is one standard error, commit is the server code the l
 | `shipped:3` | `shipped:3` | Bitola | 40 | 1 | d3bdf40 | +0.00 ± 0.00; counts of A and B equal (applied 492, decided 492, deferred 0) |
 | `shipped:3` | `current` | Bitola | 400 | 301 | d3bdf40 | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55 |
 | `shipped:3` | `current` | Croatian | 400 | 302 | d3bdf40 | +10.96 ± 2.24 (A share 52.8%); decided 5513, deferred 0, defender trump leads 62 |
+| `shipped:3` | `current` | Bitola | 400 | 301 | abbce77 | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55; identical to d3bdf40 after the solver speed-up, wall 10 s before and 4 s after (`-workers=6`) |
 
 ## 3. Bidding calibration tables
 
