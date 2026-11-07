@@ -16,7 +16,7 @@ var (
 )
 
 func ChooserResultForTest(v View, deadline time.Time) (search.Result, bool) {
-	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline, 0)
+	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline, 0, nil)
 }
 
 func TenUnderAceCandidateForTest(v View) *game.Card {
@@ -29,4 +29,24 @@ func ChooseAdjustedForTest(v View, res search.Result, t SearchTuning) (game.Card
 
 func DefenderTrumpLeadConventionForTest(v View) bool {
 	return defenderTrumpLeadConvention(v)
+}
+
+func TopOutstandingTrumpForTest(v View) int {
+	return topOutstandingTrump(v)
+}
+
+func TopTrumpWithOpponentsForTest(seat, top int) func(hands [4]uint32) int {
+	return topTrumpWithOpponents(View{Seat: seat}, top)
+}
+
+func TrumpDrawIsAGuessForTest(v View, res search.Result) bool {
+	return trumpDrawIsAGuess(v, res)
+}
+
+func DeferTrumpDrawForTest(v View, res search.Result, adjusted game.Card, t SearchTuning) (SearchResult, bool) {
+	return deferTrumpDraw(v, res, adjusted, t)
+}
+
+func ChooseCardForTest(v View) game.Card {
+	return chooseCard(v)
 }

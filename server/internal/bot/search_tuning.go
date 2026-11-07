@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"math"
+
 	"github.com/emilijan/beljot/server/internal/bot/search"
 	"github.com/emilijan/beljot/server/internal/game"
 )
@@ -79,4 +81,88 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		}
 	}
 	return best, found
+}
+
+// topOutstandingTrump is the index of the strongest trump the seat has not placed, or -1 when every trump is in the
+// seat's hand, played or in the trick.
+func topOutstandingTrump(v View) int {
+	in := informationFrom(v)
+	outstanding := in.Unseen
+	for seat := range 4 {
+		if seat != v.Seat {
+			outstanding |= in.Known[seat]
+		}
+	}
+	best, bestOrder := -1, -1
+	for rank, order := range game.TrumpRankOrder {
+		idx := search.CardIdx(game.Card{Suit: *v.TrumpSuit, Rank: rank})
+		if outstanding&(1<<uint(idx)) != 0 && order > bestOrder {
+			best, bestOrder = idx, order
+		}
+	}
+	return best
+}
+
+// topTrumpWithOpponents classes a sampled deal 1 when either opponent of the seat holds the card top, else 0.
+func topTrumpWithOpponents(v View, top int) func(hands [4]uint32) int {
+	left, right := (v.Seat+1)%4, (v.Seat+3)%4
+	return func(hands [4]uint32) int {
+		if (hands[left]|hands[right])&(1<<uint(top)) != 0 {
+			return 1
+		}
+		return 0
+	}
+}
+
+func trumpDrawClass(v View, t SearchTuning) func(hands [4]uint32) int {
+	if !t.TrumpDrawConditional || len(v.CurrentTrick) != 0 || v.TrumpSuit == nil {
+		return nil
+	}
+	top := topOutstandingTrump(v)
+	if top < 0 {
+		return nil
+	}
+	return topTrumpWithOpponents(v, top)
+}
+
+// trumpDrawIsAGuess reports whether the chooser's trump lead is right in only one of the two top-trump classes.
+func trumpDrawIsAGuess(v View, res search.Result) bool {
+	if len(v.CurrentTrick) != 0 || v.TrumpSuit == nil || res.Card.Suit != *v.TrumpSuit {
+		return false
+	}
+	preferring := 0
+	for _, class := range res.Classes {
+		if class.Samples == 0 {
+			return false
+		}
+		if classPrefersTrump(v, class) {
+			preferring++
+		}
+	}
+	return preferring == 1
+}
+
+func classPrefersTrump(v View, class search.ClassStats) bool {
+	bestTrump, bestOther := math.Inf(-1), math.Inf(-1)
+	for _, c := range v.LegalCards {
+		mean, ok := class.Means[search.CardIdx(c)]
+		if !ok {
+			continue
+		}
+		if c.Suit == *v.TrumpSuit {
+			bestTrump = max(bestTrump, mean)
+		} else {
+			bestOther = max(bestOther, mean)
+		}
+	}
+	return !math.IsInf(bestTrump, -1) && !math.IsInf(bestOther, -1) && bestTrump > bestOther
+}
+
+// deferTrumpDraw hands the decision to the rule layer when the adjusted choice is a trump lead that the top trump's
+// whereabouts decide.
+func deferTrumpDraw(v View, res search.Result, adjusted game.Card, t SearchTuning) (SearchResult, bool) {
+	if !t.TrumpDrawConditional || v.TrumpSuit == nil || adjusted.Suit != *v.TrumpSuit || !trumpDrawIsAGuess(v, res) {
+		return SearchResult{}, false
+	}
+	return SearchResult{Card: chooseCard(v), Samples: res.Samples, Margin: res.Margin, SE: res.SE, Deferred: true}, true
 }

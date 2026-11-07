@@ -72,7 +72,7 @@ func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, b
 	if samples == 0 || v.TrumpSuit == nil || v.TrumpCallerSeat == nil {
 		return SearchResult{}, false
 	}
-	res, ok := chooseSearch(v, samples, deadline, t.SeedSalt)
+	res, ok := chooseSearch(v, samples, deadline, t.SeedSalt, trumpDrawClass(v, t))
 	if !ok {
 		return SearchResult{}, false
 	}
@@ -80,11 +80,14 @@ func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, b
 	if !ok {
 		return SearchResult{}, false
 	}
+	if deferred, ok := deferTrumpDraw(v, res, card, t); ok {
+		return deferred, true
+	}
 	return SearchResult{Card: card, Samples: res.Samples, Margin: res.Margin, SE: res.SE}, true
 }
 
-func chooseSearch(v View, samples int, deadline time.Time, seedSalt uint64) (search.Result, bool) {
-	opts := search.Options{Samples: samples, SeedSalt: seedSalt, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE}
+func chooseSearch(v View, samples int, deadline time.Time, seedSalt uint64, class func(hands [4]uint32) int) (search.Result, bool) {
+	opts := search.Options{Samples: samples, SeedSalt: seedSalt, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE, SampleClass: class}
 	return search.Choose(informationFrom(v), positionFrom(v), v.LegalCards, settlementFrom(v), opts, deadline)
 }
 

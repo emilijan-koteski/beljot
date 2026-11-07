@@ -386,3 +386,22 @@ func TestDecideWithFallsBackToTheRules(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchCardWithDefersAGuessedTrumpDraw(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	checked := 0
+	for seat := range 4 {
+		v := viewFromState(gs, seat, memoryOfMissingCards(gs))
+		if !bot.SearchApplies(v, 3) {
+			continue
+		}
+		got, ok := bot.SearchCardWith(v, farFuture(), bot.SearchTuning{TrumpDrawConditional: true})
+		require.True(t, ok)
+		assert.Contains(t, v.LegalCards, got.Card)
+		if got.Deferred {
+			assert.Equal(t, bot.ChooseCardForTest(v), got.Card)
+		}
+		checked++
+	}
+	assert.Positive(t, checked)
+}

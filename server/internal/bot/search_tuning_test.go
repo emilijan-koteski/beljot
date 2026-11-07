@@ -137,3 +137,95 @@ func TestChooseAdjustedPrefersTheSteadierLead(t *testing.T) {
 		})
 	}
 }
+
+func TestTopOutstandingTrump(t *testing.T) {
+	hearts := game.SuitHearts
+	tests := []struct {
+		name   string
+		hand   []string
+		played []string
+		trick  []game.TrickCard
+		want   int
+	}{
+		{"the jack is out there", []string{"7S", "AC"}, nil, nil, search.CardIdx(card("JH"))},
+		{"the jack is in hand", []string{"JH", "AC"}, nil, nil, search.CardIdx(card("9H"))},
+		{"the jack and nine are played", []string{"7S", "AC"}, []string{"JH", "9H"}, nil, search.CardIdx(card("AH"))},
+		{"the jack is in the trick", []string{"7S", "AC"}, nil, []game.TrickCard{{Card: card("JH"), PlayerSeat: 3}}, search.CardIdx(card("9H"))},
+		{"every trump is accounted for", []string{"JH", "AC"}, []string{"9H", "AH", "TH", "KH", "QH", "8H", "7H"}, nil, -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := defenderLeadView(tt.hand, &hearts, 0, tt.trick)
+			v.PlayedCards = cards(tt.played...)
+			assert.Equal(t, tt.want, bot.TopOutstandingTrumpForTest(v))
+		})
+	}
+}
+
+func TestTopTrumpWithOpponentsClassifiesTheSample(t *testing.T) {
+	top := search.CardIdx(card("JH"))
+	class := bot.TopTrumpWithOpponentsForTest(0, top)
+	var withPartner, withOpponent [4]uint32
+	withPartner[2] = 1 << uint(top)
+	withOpponent[1] = 1 << uint(top)
+	assert.Equal(t, 0, class(withPartner))
+	assert.Equal(t, 1, class(withOpponent))
+	withOpponent[1] = 0
+	withOpponent[3] = 1 << uint(top)
+	assert.Equal(t, 1, class(withOpponent))
+}
+
+func guessResult(chosen string, partner, opponents map[int]float64, opponentSamples int) search.Result {
+	return search.Result{Card: card(chosen), Classes: [2]search.ClassStats{
+		{Samples: 5, Means: partner},
+		{Samples: opponentSamples, Means: opponents},
+	}}
+}
+
+func TestTrumpDrawIsAGuess(t *testing.T) {
+	hearts := game.SuitHearts
+	jh, s7 := search.CardIdx(card("JH")), search.CardIdx(card("7S"))
+	partnerWins := map[int]float64{jh: 20, s7: 10}
+	opponentsWin := map[int]float64{jh: 5, s7: 12}
+	oneCard := []game.TrickCard{{Card: card("7D"), PlayerSeat: 3}}
+	tests := []struct {
+		name  string
+		res   search.Result
+		hand  []string
+		trick []game.TrickCard
+		want  bool
+	}{
+		{"the classes disagree", guessResult("JH", partnerWins, opponentsWin, 5), []string{"JH", "7S"}, nil, true},
+		{"both classes prefer the trump", guessResult("JH", partnerWins, map[int]float64{jh: 15, s7: 12}, 5), []string{"JH", "7S"}, nil, false},
+		{"one class has no samples", guessResult("JH", partnerWins, nil, 0), []string{"JH", "7S"}, nil, false},
+		{"neither class prefers the trump", guessResult("JH", map[int]float64{jh: 5, s7: 10}, opponentsWin, 5), []string{"JH", "7S"}, nil, false},
+		{"no non-trump card to compare", guessResult("JH", partnerWins, opponentsWin, 5), []string{"JH", "9H"}, nil, false},
+		{"the chosen card is not a trump", guessResult("7S", partnerWins, opponentsWin, 5), []string{"JH", "7S"}, nil, false},
+		{"the trick is not empty", guessResult("JH", partnerWins, opponentsWin, 5), []string{"JH", "7S"}, oneCard, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := defenderLeadView(tt.hand, &hearts, 0, tt.trick)
+			assert.Equal(t, tt.want, bot.TrumpDrawIsAGuessForTest(v, tt.res))
+		})
+	}
+}
+
+func TestDeferTrumpDrawHandsAGuessToTheRules(t *testing.T) {
+	hearts := game.SuitHearts
+	jh, s7 := search.CardIdx(card("JH")), search.CardIdx(card("7S"))
+	res := guessResult("JH", map[int]float64{jh: 20, s7: 10}, map[int]float64{jh: 5, s7: 12}, 5)
+	res.Samples = 40
+	v := defenderLeadView([]string{"JH", "7S"}, &hearts, 0, nil)
+
+	got, deferred := bot.DeferTrumpDrawForTest(v, res, card("JH"), bot.SearchTuning{TrumpDrawConditional: true})
+	require.True(t, deferred)
+	assert.True(t, got.Deferred)
+	assert.Equal(t, 40, got.Samples)
+	assert.Contains(t, v.LegalCards, got.Card)
+
+	_, deferred = bot.DeferTrumpDrawForTest(v, res, card("JH"), bot.SearchTuning{})
+	assert.False(t, deferred, "the conditional is off")
+	_, deferred = bot.DeferTrumpDrawForTest(v, res, card("7S"), bot.SearchTuning{TrumpDrawConditional: true})
+	assert.False(t, deferred, "the adjusted choice is not a trump")
+}
