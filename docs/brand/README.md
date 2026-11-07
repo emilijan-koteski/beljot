@@ -15,7 +15,7 @@ The logo is a brass casino chip: felt inserts on the rim, BELJOT around the top,
 | `beljot-chip-gold.svg` / `.pdf` | One colour, brass `#c9a876`: the plate for gold foil or embossing. |
 | `beljot-chip-1024.png` | Raster for tools that refuse vectors. |
 | `client/public/og-image.jpg` | The 1200×630 link preview shown when beljot.online is shared: Dama presenting the chip. After changing it, re-scrape the link in Facebook's Sharing Debugger. |
-| `mascot/dama-*.webp` | Dama, the house hostess, cut out on transparency: `welcome`, `cards-half`, `signature`, `dealing` and `win`. |
+| `mascot/dama-*.webp` | Dama, the house hostess, cut out on transparency in ten poses: `signature`, `welcome`, `dealing`, `win`, `cards-half`, `win-half`, `consolation`, `thinking`, `pointing` and `bust`. `bust` and `win-half` end at the frame, so anchor them to the bottom of a panel. |
 
 Every letter is outlined, so no file needs a font installed. The PDFs are vector; they are sized at 100mm (chip) and 180mm wide (lockups) but scale freely.
 
