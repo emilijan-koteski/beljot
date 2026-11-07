@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -7,49 +8,77 @@ from kit import BRASS, CREAM, cinzel, num  # noqa: E402
 from options import chip_defs, chip_mark  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-CARDS = os.path.join(REPO, "client", "public", "cards", "french") + "/"
+MASCOT = os.path.join(HERE, "..", "mascot") + "/"
 OUT = os.path.join(HERE, "build")
+W, H = 1200, 630
+SIZES = {"dama-cards-half": (758, 768), "dama-welcome": (986, 1600)}
 
 
-def card(face, cx, cy, w, rot):
-    h = w * 1.4
-    return (f'<g transform="translate({num(cx)} {num(cy)}) rotate({rot})">'
-            f'<rect x="{num(-w / 2 + 2)}" y="{num(-h / 2 + 6)}" width="{num(w)}" height="{num(h)}" rx="{num(w * 0.05)}" fill="#000" opacity=".35" filter="url(#cs)"/>'
-            f'<rect x="{num(-w / 2)}" y="{num(-h / 2)}" width="{num(w)}" height="{num(h)}" rx="{num(w * 0.05)}" fill="#fbf8ef" stroke="#00000033" stroke-width="1"/>'
-            f'<image href="file://{CARDS}{face}.svg" x="{num(-w / 2)}" y="{num(-h / 2)}" width="{num(w)}" height="{num(h)}"/></g>')
+def defs(spot_x, spot_y):
+    return (chip_defs("og")
+            + '<radialGradient id="felt" cx=".5" cy=".42" r=".8"><stop offset="0" stop-color="#22573f"/>'
+              '<stop offset=".55" stop-color="#123a29"/><stop offset="1" stop-color="#071510"/></radialGradient>'
+            + f'<radialGradient id="spot" gradientUnits="userSpaceOnUse" cx="{spot_x}" cy="{spot_y}" r="420">'
+              '<stop offset="0" stop-color="#f3d9a0" stop-opacity=".28"/><stop offset=".5" stop-color="#e0b56a" stop-opacity=".08"/>'
+              '<stop offset="1" stop-color="#e0b56a" stop-opacity="0"/></radialGradient>'
+            + '<filter id="bokeh" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter>'
+            + '<filter id="lift" x="-30%" y="-30%" width="160%" height="160%">'
+              '<feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity=".5"/></filter>')
 
 
-def og_svg():
-    W, H = 1200, 630
-    defs = (chip_defs("og")
-            + '<radialGradient id="felt" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#22573f"/>'
-              '<stop offset=".55" stop-color="#123a29"/><stop offset="1" stop-color="#081710"/></radialGradient>'
-            + '<filter id="cs" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>'
-            + '<filter id="chipShadow" x="-30%" y="-30%" width="160%" height="160%">'
-              '<feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".55"/></filter>'
-            + '<radialGradient id="spot" cx=".5" cy=".38" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".09"/>'
-              '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>')
-    parts = [f'<rect width="{W}" height="{H}" fill="url(#felt)"/>',
-             f'<rect width="{W}" height="{H}" fill="url(#spot)"/>',
-             f'<rect x="18" y="18" width="{W - 36}" height="{H - 36}" rx="22" fill="none" stroke="{BRASS}" stroke-opacity=".35" stroke-width="1.5"/>']
-    fan = [("AH", -36), ("JH", -18), ("TH", 0), ("9H", 18), ("KH", 36)]
-    px, py = 600, 590
-    for face, rot in fan:
-        parts.append(f'<g transform="rotate({rot} {px} {py})">{card(face, px, py - 330, 150, 0)}</g>')
-    parts.append(f'<g filter="url(#chipShadow)">{chip_mark("og", 600, 250, 146)}</g>')
-    name = cinzel(700)
-    parts.append(f'<path d="{name.path("BELJOT", 62, 600, 532, tracking=14, anchor="middle")}" fill="{CREAM}"/>')
-    sub = cinzel(600)
-    parts.append(f'<path d="{sub.path("PLAY BELJOT ONLINE", 18, 600, 570, tracking=7, anchor="middle")}" fill="{BRASS}"/>')
-    rule_w = 130
-    parts.append(f'<rect x="{600 - 300 - rule_w / 2}" y="563" width="{rule_w}" height="1.5" fill="{BRASS}" opacity=".7"/>')
-    parts.append(f'<rect x="{600 + 300 - rule_w / 2}" y="563" width="{rule_w}" height="1.5" fill="{BRASS}" opacity=".7"/>')
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{W}" height="{H}" '
-            f'viewBox="0 0 {W} {H}"><defs>{defs}</defs>{"".join(parts)}</svg>')
+def bokeh(seed, region, n=26):
+    rnd = random.Random(seed)
+    x0, y0, x1, y1 = region
+    dots = []
+    for _ in range(n):
+        r = rnd.choice([1.5, 2, 2.5, 3, 4, 5])
+        op = rnd.uniform(0.25, 0.75) if r < 3.5 else rnd.uniform(0.12, 0.3)
+        dots.append(f'<circle cx="{num(rnd.uniform(x0, x1))}" cy="{num(rnd.uniform(y0, y1))}" r="{r}" fill="#f2d48f" opacity="{num(op)}"/>')
+    return f'<g filter="url(#bokeh)">{"".join(dots)}</g>'
+
+
+def dama(name, x, y, height):
+    sw, sh = SIZES[name]
+    width = sw * height / sh
+    return f'<image href="file://{MASCOT}{name}.webp" x="{num(x)}" y="{num(y)}" width="{num(width)}" height="{num(height)}"/>'
+
+
+def wordmark(cx, base, size, tag):
+    return (f'<path d="{cinzel(700).path("BELJOT", size, cx, base, tracking=size * 0.22, anchor="middle")}" fill="{CREAM}"/>'
+            f'<path d="{cinzel(600).path("PLAY BELJOT ONLINE", tag, cx, base + 40, tracking=tag * 0.38, anchor="middle")}" fill="{BRASS}"/>')
+
+
+def page(body, spot):
+    frame = f'<rect x="18" y="18" width="{W - 36}" height="{H - 36}" rx="22" fill="none" stroke="{BRASS}" stroke-opacity=".35" stroke-width="1.5"/>'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
+            f'<defs>{defs(*spot)}</defs><rect width="{W}" height="{H}" fill="url(#felt)"/><rect width="{W}" height="{H}" fill="url(#spot)"/>'
+            f'{body}{frame}</svg>')
+
+
+def trumps():
+    sw, sh = SIZES["dama-cards-half"]
+    height = 640
+    x = W - 40 - sw * height / sh
+    body = (bokeh(3, (620, 40, 1160, 560))
+            + dama("dama-cards-half", x, H - height + 8, height)
+            + f'<g filter="url(#lift)">{chip_mark("og", 360, 236, 140)}</g>'
+            + bokeh(4, (120, 60, 600, 400), 12)
+            + wordmark(360, 486, 56, 17))
+    return page(body, (860, 230))
+
+
+def presents():
+    body = (bokeh(1, (40, 40, 640, 560))
+            + dama("dama-welcome", 70, 22, 1010)
+            + f'<g filter="url(#lift)">{chip_mark("og", 860, 236, 132)}</g>'
+            + bokeh(2, (700, 60, 1150, 420), 14)
+            + wordmark(860, 486, 54, 17))
+    return page(body, (380, 210))
 
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    open(f"{OUT}/og.svg", "w").write(og_svg())
-    print("ok")
+    layout = sys.argv[1] if len(sys.argv) > 1 else "trumps"
+    with open(os.path.join(OUT, "og.svg"), "w") as fh:
+        fh.write({"trumps": trumps, "presents": presents}[layout]())
+    print("ok", layout)
