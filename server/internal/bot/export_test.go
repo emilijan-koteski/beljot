@@ -39,8 +39,12 @@ func TopTrumpWithOpponentsForTest(seat, top int) func(hands [4]uint32) int {
 	return topTrumpWithOpponents(View{Seat: seat}, top)
 }
 
-func TrumpDrawIsAGuessForTest(v View, res search.Result) bool {
-	return trumpDrawIsAGuess(v, res)
+func TrumpDrawIsAGuessForTest(v View, adjusted game.Card, res search.Result) bool {
+	return trumpDrawIsAGuess(v, adjusted, res)
+}
+
+func SamplesForForTest(trick int, t SearchTuning) int {
+	return samplesFor(trick, t)
 }
 
 func DeferTrumpDrawForTest(v View, res search.Result, adjusted game.Card, t SearchTuning) (SearchResult, bool) {

@@ -200,13 +200,12 @@ func TestTrumpDrawIsAGuess(t *testing.T) {
 		{"one class has no samples", guessResult("JH", partnerWins, nil, 0), []string{"JH", "7S"}, nil, false},
 		{"neither class prefers the trump", guessResult("JH", map[int]float64{jh: 5, s7: 10}, opponentsWin, 5), []string{"JH", "7S"}, nil, false},
 		{"no non-trump card to compare", guessResult("JH", partnerWins, opponentsWin, 5), []string{"JH", "9H"}, nil, false},
-		{"the chosen card is not a trump", guessResult("7S", partnerWins, opponentsWin, 5), []string{"JH", "7S"}, nil, false},
 		{"the trick is not empty", guessResult("JH", partnerWins, opponentsWin, 5), []string{"JH", "7S"}, oneCard, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := defenderLeadView(tt.hand, &hearts, 0, tt.trick)
-			assert.Equal(t, tt.want, bot.TrumpDrawIsAGuessForTest(v, tt.res))
+			assert.Equal(t, tt.want, bot.TrumpDrawIsAGuessForTest(v, tt.res.Card, tt.res))
 		})
 	}
 }
@@ -228,4 +227,25 @@ func TestDeferTrumpDrawHandsAGuessToTheRules(t *testing.T) {
 	assert.False(t, deferred, "the conditional is off")
 	_, deferred = bot.DeferTrumpDrawForTest(v, res, card("7S"), bot.SearchTuning{TrumpDrawConditional: true})
 	assert.False(t, deferred, "the adjusted choice is not a trump")
+}
+
+func TestTrumpDrawIsAGuessJudgesTheAdjustedCard(t *testing.T) {
+	hearts := game.SuitHearts
+	jh, s7 := search.CardIdx(card("JH")), search.CardIdx(card("7S"))
+	res := guessResult("7S", map[int]float64{jh: 20, s7: 10}, map[int]float64{jh: 5, s7: 12}, 5)
+	v := defenderLeadView([]string{"JH", "7S"}, &hearts, 0, nil)
+
+	assert.True(t, bot.TrumpDrawIsAGuessForTest(v, card("JH"), res), "a promoted trump lead is judged")
+	assert.False(t, bot.TrumpDrawIsAGuessForTest(v, card("7S"), res), "a non-trump adjusted card is not a trump draw")
+}
+
+func TestSamplesForHonoursACap(t *testing.T) {
+	caps := bot.SearchTuning{SampleCaps: [9]int{3: 32, 4: 60, 5: 80}}
+	assert.Equal(t, 32, bot.SamplesForForTest(3, caps))
+	assert.Equal(t, 60, bot.SamplesForForTest(4, caps))
+	assert.Equal(t, 80, bot.SamplesForForTest(5, caps))
+	assert.Equal(t, search.SamplesForTrick(6), bot.SamplesForForTest(6, caps))
+	assert.Equal(t, 12, bot.SamplesForForTest(1, bot.SearchTuning{OpeningSamples: 12, SampleCaps: [9]int{3: 32}}))
+	assert.Equal(t, 7, bot.SamplesForForTest(2, bot.SearchTuning{OpeningSamples: 12, SampleCaps: [9]int{2: 7}}))
+	assert.Equal(t, search.SamplesForTrick(3), bot.SamplesForForTest(3, bot.SearchTuning{}))
 }

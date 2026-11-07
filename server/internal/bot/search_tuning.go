@@ -18,7 +18,8 @@ type SearchTuning struct {
 	TrumpDrawConditional   bool
 	RaceObjective          bool
 	OpeningSamples         int
-	SeedSalt               uint64
+	SampleCaps             [9]int
+	SeedSalt              uint64
 }
 
 // DefaultSearchTuning is the tuning the bot ships with.
@@ -26,7 +27,11 @@ func DefaultSearchTuning() SearchTuning {
 	return SearchTuning{}
 }
 
+// samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
 func samplesFor(trick int, t SearchTuning) int {
+	if trick >= 1 && trick < len(t.SampleCaps) && t.SampleCaps[trick] != 0 {
+		return t.SampleCaps[trick]
+	}
 	if trick < 3 && t.OpeningSamples > 0 {
 		return t.OpeningSamples
 	}
@@ -125,9 +130,9 @@ func trumpDrawClass(v View, t SearchTuning) func(hands [4]uint32) int {
 	return topTrumpWithOpponents(v, top)
 }
 
-// trumpDrawIsAGuess reports whether the chooser's trump lead is right in only one of the two top-trump classes.
-func trumpDrawIsAGuess(v View, res search.Result) bool {
-	if len(v.CurrentTrick) != 0 || v.TrumpSuit == nil || res.Card.Suit != *v.TrumpSuit {
+// trumpDrawIsAGuess reports whether the adjusted trump lead is right in only one of the two top-trump classes.
+func trumpDrawIsAGuess(v View, adjusted game.Card, res search.Result) bool {
+	if len(v.CurrentTrick) != 0 || v.TrumpSuit == nil || adjusted.Suit != *v.TrumpSuit {
 		return false
 	}
 	preferring := 0
@@ -161,7 +166,7 @@ func classPrefersTrump(v View, class search.ClassStats) bool {
 // deferTrumpDraw hands the decision to the rule layer when the adjusted choice is a trump lead that the top trump's
 // whereabouts decide.
 func deferTrumpDraw(v View, res search.Result, adjusted game.Card, t SearchTuning) (SearchResult, bool) {
-	if !t.TrumpDrawConditional || v.TrumpSuit == nil || adjusted.Suit != *v.TrumpSuit || !trumpDrawIsAGuess(v, res) {
+	if !t.TrumpDrawConditional || !trumpDrawIsAGuess(v, adjusted, res) {
 		return SearchResult{}, false
 	}
 	return SearchResult{Card: chooseCard(v), Samples: res.Samples, Margin: res.Margin, SE: res.SE, Deferred: true}, true

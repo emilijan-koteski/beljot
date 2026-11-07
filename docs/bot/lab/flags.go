@@ -86,6 +86,12 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	if f.On("noOpening") {
 		t.OpeningSamples = 0
 	}
+	if f.On("caps2x") {
+		t.SampleCaps[3], t.SampleCaps[4], t.SampleCaps[5] = 32, 60, 80
+	}
+	if f.On("noCaps") {
+		t.SampleCaps = [9]int{}
+	}
 	return t
 }
 

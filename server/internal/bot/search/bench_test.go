@@ -73,7 +73,7 @@ func randomTrick3Position(rng *rand.Rand) trick3Position {
 
 func TestSearchTrick3StaysUnderTheDeadline(t *testing.T) {
 	rng := rand.New(rand.NewPCG(3, 3))
-	opts := search.Options{Samples: 16, EarlyStopAfter: 8, EarlyStopSE: 1.0}
+	opts := search.Options{Samples: search.SamplesForTrick(3), EarlyStopAfter: 8, EarlyStopSE: 1.0}
 
 	var total, worst time.Duration
 	for range trick3Positions {
