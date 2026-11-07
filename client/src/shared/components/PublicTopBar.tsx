@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { WORDMARK_NAV_HEIGHT } from "@/shared/components/brand/brandSizes";
+import { BrandWordmark } from "@/shared/components/brand/BrandWordmark";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { buttonVariants } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
@@ -15,9 +17,9 @@ export function PublicTopBar() {
     >
       <Link to="/" className="flex items-center gap-2.5" data-testid="public-logo">
         <img src="/beljot-logo.svg" alt="" aria-hidden="true" className="size-7 shrink-0" />
-        <span className="text-ink text-xl font-semibold tracking-tight">
-          Beljot
-          <span className="text-brass font-medium">.online</span>
+        <span className="text-ink inline-flex">
+          <span className="sr-only">Beljot.online</span>
+          <BrandWordmark height={WORDMARK_NAV_HEIGHT} />
         </span>
       </Link>
 

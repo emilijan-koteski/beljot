@@ -3,6 +3,8 @@ import { type MouseEvent as ReactMouseEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
+import { WORDMARK_NAV_HEIGHT } from "@/shared/components/brand/brandSizes";
+import { BrandWordmark } from "@/shared/components/brand/BrandWordmark";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
@@ -93,14 +95,11 @@ export function TopBar({
           data-testid="app-logo"
         />
         <span
-          className={cn(
-            "text-ink text-xl font-semibold tracking-tight whitespace-nowrap",
-            showFullBrand ? "inline" : "hidden xl:inline",
-          )}
+          className={cn("text-ink", showFullBrand ? "inline-flex" : "hidden xl:inline-flex")}
           data-testid="app-name"
         >
-          {t("nav.appName")}
-          <span className="text-brass font-medium">.online</span>
+          <span className="sr-only">{t("nav.appName")}.online</span>
+          <BrandWordmark height={WORDMARK_NAV_HEIGHT} />
         </span>
       </Link>
 
