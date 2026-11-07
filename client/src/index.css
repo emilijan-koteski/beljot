@@ -346,10 +346,10 @@
    It re-roots the parchment tokens to the felt palette under the SAME
    names, as `.felt-surface` does for the landing, and lifts the honour and
    rank ramps the way `.game-table` does, so every shared component themes
-   itself with no fork. Brass is the action colour here, as it is in
-   `.felt-controls` and `.chat-dock-match`: the felt lime is the table's
-   turn signal, so off the table it is kept for `--positive` alone (a win,
-   a player online, the grandmaster tier).
+   itself with no fork. The action colour is the felt lime, as on the
+   landing: whatever is green on Parchment (the primary button, checked
+   controls, the selected chip, focus) is lime here. Brass stays on the
+   hairlines, eyebrows and badges.
 
    `:root.brass-mode` outranks every `:root` block whatever its place in
    this sheet. The table keeps its own `.game-table` scope, so nothing in a
@@ -369,19 +369,14 @@
   --ink-dim: #c8d5cd;
   --ink-mute: color-mix(in srgb, var(--ink-light) 65%, transparent);
 
-  --accent: var(--brass);
-  --accent-deep: var(--brass-deep);
-  --accent-soft: var(--brass-soft);
-  --accent-ink: var(--brass-ink);
-  --accent-glow: var(--brass-40);
-
-  --positive: var(--accent-light);
-  --positive-deep: var(--accent-light);
-  --positive-soft: color-mix(in srgb, var(--accent-light) 16%, transparent);
+  --accent: var(--accent-light);
+  --accent-deep: #00b07c;
+  --accent-soft: color-mix(in srgb, var(--accent-light) 18%, transparent);
+  --accent-ink: #0a1812;
+  --accent-glow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
   /* Lighter than the felt table's #9c7d4e: here brass-deep is small text
-     (eyebrows, chevrons, the warning tone) and the primary hover, so it
-     needs 4.5:1 on --surface. */
+     (eyebrows, chevrons, the warning tone), so it needs 4.5:1 on --surface. */
   --brass-deep: #b8956a;
   --danger: var(--danger-light);
   --bot-deep: #8ecbee;
@@ -416,8 +411,7 @@
 
 /* Positive — the colour of a good result (a win, a player online, a full
    table). It IS the scope's accent, re-resolved per scope like the team
-   companions below; only brass mode splits the two, because there the
-   accent turns brass and a win must still read green. */
+   companions below. */
 :root,
 .parchment-inset,
 .game-table,
