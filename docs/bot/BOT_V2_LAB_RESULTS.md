@@ -392,6 +392,30 @@ Gates after shipping: `go test -tags nodynamic ./internal/bot/... ./internal/mat
 Those simulations play without stop at target, so the flag does not reach them; the search share
 moves with the engine's random dealer (78.5 %, 79.6 % and 83.7 % on three runs with the flag off).
 
+#### D. The opening search
+
+D, searching tricks 1 and 2 as well (`SearchTuning.OpeningSamples = 12`, flag `opening12`). A is
+`shipped:1` with the flag, B is `shipped:3` (production: search from trick 3); both carry the
+shipped defaults (`DefenderTrumpLeadBonus 10`, `TenUnderAceBonus 3`, `RaceObjective true`).
+Lab built from 2b241506. Commands: `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3
+-n=1000 -seed=<seed> -workers=6`, with `-variant=croatia` for Croatian.
+
+| Item (A vs B) | Variant | Seed | Commit | Advantage per hand | Applied / Decided (A) | Pooled (z) | Decision |
+|---|---|---|---|---|---|---|---|
+| D `shipped:1[opening12]` vs `shipped:3` | Bitola | 801 | 2b241506 | -0.54 ± 1.33 (A share 49.8%) | 17571 / 17571 (B: 12369) | | |
+| D `shipped:1[opening12]` vs `shipped:3` | Croatian | 802 | 2b241506 | +2.56 ± 1.49 (A share 50.6%) | 19416 / 19416 (B: 13564) | **+0.83 ± 0.99 (+0.8)** | |
+
+Pooled by weights 1/SE²: (-0.54 / 1.33² + 2.56 / 1.49²) / (1/1.33² + 1/1.49²) = +0.83, SE
+1 / √(1/1.33² + 1/1.49²) = 0.99, z = 0.84.
+
+Trick-1 benchmark (`TestSearchTrick1StaysUnderTheDeadline`, three runs, nothing else loading the
+machine): means 318.4, 319.3 and 318.5 ms (median 318.5 ms); maxima 574.4, 578.3 and 573.4 ms
+(median 574.4 ms).
+
+Gate conditions: (1) benchmark mean at most 400 ms: met (318.5 ms). (2) pooled gain positive at
+2 SE with no variant opposite at 2 SE: not met (+0.83 ± 0.99, z = 0.8; Bitola -0.54 is the
+opposite sign but well inside 2 SE). The decision is the controller's and the owner's.
+
 ## 3. Bidding calibration tables
 
 ### 3.1 By round and position (Bitola; rows are decision points × allowed suits)
