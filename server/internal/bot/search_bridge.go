@@ -13,6 +13,7 @@ const (
 	searchEarlyStopAfter = 8
 	searchEarlyStopSE    = 1.0
 	lastTrickBonusPoints = 10
+	beloteBonusPoints    = 20
 	allCards             = uint32(1<<search.NCards - 1)
 )
 
@@ -52,7 +53,7 @@ func withinStopAtTargetReach(v View) bool {
 	}
 	reach := remainingCardPoints(v) + lastTrickBonusPoints
 	for team := range 2 {
-		banked := v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team]
+		banked := v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team] + ownBelotePoints(v, team)
 		if v.MatchTarget-banked <= reach {
 			return true
 		}
@@ -178,12 +179,37 @@ func positionFrom(v View) search.Position {
 func settlementFrom(v View) search.Settlement {
 	return search.Settlement{
 		HandPoints:           v.HandPoints,
-		DeclPoints:           v.DeclPoints,
+		DeclPoints:           declPointsWithOwnBelote(v),
 		TricksWon:            v.TricksWon,
 		CallerTeam:           game.TeamForSeat(*v.TrumpCallerSeat),
 		DeclarationsTransfer: v.DeclarationsTransfer,
 		RemainingCardPoints:  remainingCardPoints(v),
 	}
+}
+
+func declPointsWithOwnBelote(v View) [2]int {
+	points := v.DeclPoints
+	for team := range points {
+		points[team] += ownBelotePoints(v, team)
+	}
+	return points
+}
+
+func ownBelotePoints(v View, team int) int {
+	if team != game.TeamForSeat(v.Seat) || !ownBeloteCertain(v) {
+		return 0
+	}
+	return beloteBonusPoints
+}
+
+// ownBeloteCertain reports that the seat will score Belote: declarations are on and its hand still holds the trump King and Queen.
+func ownBeloteCertain(v View) bool {
+	if !v.DeclarationsEnabled || v.TrumpSuit == nil {
+		return false
+	}
+	king := game.Card{Rank: game.RankKing, Suit: *v.TrumpSuit}
+	queen := game.Card{Rank: game.RankQueen, Suit: *v.TrumpSuit}
+	return slices.Contains(v.Hand, king) && slices.Contains(v.Hand, queen)
 }
 
 // remainingCardPoints sums the trump-aware points of the seat's hand, the unseen and located cards and the current

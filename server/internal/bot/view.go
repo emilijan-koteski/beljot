@@ -37,6 +37,7 @@ type View struct {
 	MatchTarget          int
 	StopAtTarget         bool
 	DeclarationsTransfer bool
+	DeclarationsEnabled  bool
 
 	PlayedCards   []game.Card
 	KnownVoids    [4][4]bool

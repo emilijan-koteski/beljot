@@ -45,6 +45,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		MatchTarget:          game.MatchTarget(gs.MatchMode),
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
 		PlayedCards:          mem.PlayedCards(),
 		KnownVoids:           mem.KnownVoids(),
 		KnownCards:           mem.KnownCards(),

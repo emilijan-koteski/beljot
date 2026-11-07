@@ -255,6 +255,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		MatchTarget:          game.MatchTarget(gs.MatchMode),
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true

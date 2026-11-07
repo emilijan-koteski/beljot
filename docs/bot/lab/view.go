@@ -43,6 +43,7 @@ type View struct {
 	MatchTarget          int
 	StopAtTarget         bool
 	DeclarationsTransfer bool
+	DeclarationsEnabled  bool
 
 	F Flags
 

@@ -67,6 +67,7 @@ func toBotView(v View) bot.View {
 		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
+		DeclarationsEnabled: v.DeclarationsEnabled,
 	}
 }
 
@@ -215,6 +216,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		MatchTarget:          game.MatchTarget(gs.MatchMode),
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true

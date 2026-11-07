@@ -184,7 +184,7 @@ func TestSettlementFromViewCarriesTheHandAndCountsTheCardsInPlay(t *testing.T) {
 	s := bot.SettlementFromForTest(v)
 
 	assert.Equal(t, gs.HandPoints, s.HandPoints)
-	assert.Equal(t, [2]int{50, 40}, s.DeclPoints)
+	assert.Equal(t, [2]int{70, 40}, s.DeclPoints)
 	assert.Equal(t, gs.TricksWon, s.TricksWon)
 	assert.Equal(t, game.TeamForSeat(*gs.TrumpCallerSeat), s.CallerTeam)
 	assert.True(t, s.DeclarationsTransfer)
@@ -404,4 +404,75 @@ func TestSearchCardWithDefersAGuessedTrumpDraw(t *testing.T) {
 		checked++
 	}
 	assert.Positive(t, checked)
+}
+
+func TestSettlementFromViewCountsTheBotsOwnBelote(t *testing.T) {
+	base := func() bot.View {
+		trump, caller := game.SuitHearts, 1
+		return bot.View{
+			Seat: 0, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller,
+			DeclarationsEnabled: true, DeclPoints: [2]int{20, 50},
+			Hand: cards("KH", "QH", "7S"),
+		}
+	}
+	tests := []struct {
+		name   string
+		mutate func(v *bot.View)
+		want   [2]int
+	}{
+		{"king and queen of trump", func(v *bot.View) {}, [2]int{40, 50}},
+		{"queen already played", func(v *bot.View) { v.Hand = cards("KH", "7S") }, [2]int{20, 50}},
+		{"declarations disabled", func(v *bot.View) { v.DeclarationsEnabled = false }, [2]int{20, 50}},
+		{"king and queen of a side suit", func(v *bot.View) { v.Hand = cards("KS", "QS", "7S") }, [2]int{20, 50}},
+		{"the seat of team B", func(v *bot.View) { v.Seat = 3 }, [2]int{20, 70}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := base()
+			tt.mutate(&v)
+			assert.Equal(t, tt.want, bot.SettlementFromForTest(v).DeclPoints)
+		})
+	}
+}
+
+func TestOwnBeloteSettlementMatchesTheEngine(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(7)
+	gs.BelotAnnounced = false
+	gs.Players[0].Hand = cards("KH", "QH")
+	gs.Players[1].Hand = cards("JS", "9S")
+	gs.Players[2].Hand = cards("AD", "TD")
+	gs.Players[3].Hand = cards("JD", "9D")
+	gs.ActivePlayerSeat = 0
+	require.True(t, gs.Rules.DeclarationsEnabled)
+
+	var hands [4]uint32
+	for seat := range hands {
+		hands[seat] = search.MaskOf(gs.Players[seat].Hand)
+	}
+	view := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.True(t, view.DeclarationsEnabled)
+	pos := bot.PositionFromForTest(view)
+	remainder := search.NewSolver(pos.Trump, pos.Clockwise).Value(hands, pos.Leader, pos.Trick, pos.Capot)
+	predicted := search.Settle(bot.SettlementFromForTest(view), remainder)
+
+	for range 8 {
+		if gs.Phase != game.PhasePlaying {
+			break
+		}
+		seat := gs.ActivePlayerSeat
+		next, err := game.ApplyAction(gs, game.Action{
+			Type: game.ActionPlayCard, PlayerSeat: seat, Card: &game.LegalCards(gs, seat)[0],
+		})
+		require.NoError(t, err)
+		gs = next
+		if gs.PendingBelotSeat != nil {
+			require.Equal(t, 0, *gs.PendingBelotSeat)
+			gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: 0})
+			require.NoError(t, err)
+		}
+	}
+
+	require.NotNil(t, gs.LastHandResult, "the two tricks must end the hand")
+	assert.Equal(t, 20, gs.BelotPoints[game.TeamA])
+	assert.Equal(t, predicted, gs.LastHandResult.TeamAHandTotal-gs.LastHandResult.TeamBHandTotal)
 }
