@@ -334,6 +334,7 @@ Confirmation commands: `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 
 | `LeadRiskLambda` (B3) | off |
 | `TrumpDrawConditional` (B4) | off |
 | Sample caps | ships: `search.SamplesForTrick` is 32/60/80 on tricks 3/4/5 (60 from trick 6), `SampleCaps` stays 0 |
+| `RaceObjective` (C2) | ships on, see C below |
 
 Gates after the schedule change (f32985b0): the trick-3 benchmark mean is 29.8 ms (max 89.9 ms,
 limit 250 ms); search share 82.0 % over 60 hands (9250/11280, 412 plays); search minus rules
@@ -356,6 +357,40 @@ Stability and cheat gap after B (lab at `4198b4fe` defaults, same sizes as the r
 | `cheat` | `shipped:3` | Bitola | 400 | 653 | 4198b4fe | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=653 -workers=6` | **+24.22 ± 2.94** (A share 57.6%); A made 95% of 224 calls, B 76% of 401; 175/800 passed out |
 
 The cheat gap is unchanged within noise (+24.15 before, +24.22 after).
+
+#### C. Endgame objectives
+
+C2, the race objective (`SearchTuning.RaceObjective`). On a stop-at-target table the engine ends
+the match the moment a team's running total (match score, hand points, declarations, Belote, no
+last-trick or Capot bonus) reaches the target after a trick, a declaration reveal or a Belote. With
+the flag on, the search no longer hands such positions to the rules: the solver tracks the card
+points each team gains and values a trick that decides the match at ±1000, and the chooser keeps
+those values as they are. The last trick goes through the hand score in the engine (no mid-hand
+stop there), so the solver keeps the plain remainder for it.
+
+`-exp=race` (`race.go`): per deal, one random team starts 10 to 160 short of 1001 and the other
+10 to 400 short, stop at target on; duplicate pairing with the scores fixed to the teams; each game
+scores +1 when A's team wins the match, -1 when it loses, 0 when the hand leaves it open; the
+result is the mean of the per-deal pair average. Command:
+`-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=<seed> -workers=6`
+with `-variant=croatia` for Croatian, lab built from 1c535a08 (B1, B2 and the sample caps on).
+
+| Item (A vs B) | Variant | Seed | Commit | Match edge per game | Decided | Pooled (z) | Decision |
+|---|---|---|---|---|---|---|---|
+| C2 `race` vs `noRace` | Bitola | 701 | 1c535a08 | +0.0150 ± 0.0061 (A won 635, B won 605) | 1240 / 2000 (62.0 %), 1032 mid-hand stops, 248 passed out | | |
+| C2 `race` vs `noRace` | Croatian | 702 | 1c535a08 | +0.0315 ± 0.0061 (A won 767, B won 704) | 1471 / 2000 (73.5 %), 1230 mid-hand stops | **+0.0233 ± 0.0043 (+5.4)** | better at 2 SE in both variants, **ships (`RaceObjective: true`)** |
+
+Pooled by weights 1/SE²: the two SEs are equal, so the mean is (0.0150 + 0.0315) / 2 = +0.0233 and
+the SE 0.0061 / √2 = 0.0043. A match edge of +0.023 per game is about 1.2 points of match-win
+probability on these tables. Searched decisions for A rose from 1514 to 7510 (Bitola) and from
+1729 to 8202 (Croatian) against the `noRace` side, which still hands the in-reach positions to the
+rules. Self-play sanity (`-flagsA=race -flagsB=race`, 20 deals): +0.0000 ± 0.0000.
+
+Gates after shipping: `go test -tags nodynamic ./internal/bot/... ./internal/match/` passes;
+`BELJOT_BOT_SIM=1 ... -run TestSimulation_Search` gives search share 72.1 % over 60 hands
+(8430/11690, 403 plays) and search minus rules +7.10 ± 5.35 per deal over 40 deals (434 plays).
+Those simulations play without stop at target, so the flag does not reach them; the search share
+moves with the engine's random dealer (78.5 %, 79.6 % and 83.7 % on three runs with the flag off).
 
 ## 3. Bidding calibration tables
 
@@ -723,13 +758,14 @@ server module.
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
 cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped}.go /tmp/lab/server/internal/botlab/
-cp docs/bot/lab/{main,bidtable,bidpos,stability}.go /tmp/lab/server/cmd/botlab/
+cp docs/bot/lab/{main,bidtable,bidpos,stability,race}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
 ./botlab -exp=duplicate -a=current -b=lab -n=4000                     # phase 1 against the frozen v1, §3.4
 ./botlab -exp=duplicate -a=pimc:12 -b=lab -n=120                      # §2.2: `lab` is the old `current`
 ./botlab -exp=duplicate -a=lab -flagsA=bidEV -b=lab -n=4000 -variant=croatia
 ./botlab -exp=regret -a=lab -n=600
+./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701   # §2.9 C
 ./botlab -exp=bidpos -a=lab -n=60000 -csv=bidpos_bitola.csv && python3 -I fit_bid.py bidpos_bitola.csv
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
 ```

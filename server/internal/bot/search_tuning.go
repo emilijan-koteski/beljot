@@ -19,12 +19,12 @@ type SearchTuning struct {
 	RaceObjective          bool
 	OpeningSamples         int
 	SampleCaps             [9]int
-	SeedSalt              uint64
+	SeedSalt               uint64
 }
 
 // DefaultSearchTuning is the tuning the bot ships with.
 func DefaultSearchTuning() SearchTuning {
-	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3}
+	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true}
 }
 
 // samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
