@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <title>Beljot.online</title>
@@ -40,8 +40,8 @@
       content="Dama, the Beljot hostess, presenting the brass Beljot chip"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <!-- Paints the signed-in player's brass mode before the session restores;
-         useThemeSync takes over (and clears it on sign-out) once it has. -->
+    <!-- Paints the stored theme (the player's or the visitor's) before the app loads;
+         useThemeSync takes over once the session restores. -->
     <script>
       try {
         if (localStorage.getItem("beljot.theme") === "brass") {

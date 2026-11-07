@@ -1,17 +1,18 @@
 import "@/shared/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LandingPage } from "@/features/landing/LandingPage";
 import { GuestRoute } from "@/shared/components/GuestRoute";
+import { BRASS_MODE_CLASS } from "@/shared/lib/themePreference";
 import { useAuthStore } from "@/shared/stores/authStore";
+import { useGuestThemeStore } from "@/shared/stores/themeStore";
 
-// Mirror the real App route tree: `/` is public-only (wrapped in GuestRoute).
-// A QueryClient is needed because the hero polls public stats via useQuery.
+/** Mirrors the real route tree: `/` is guest-only, wrapped in GuestRoute. */
 function renderAt(path: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -33,13 +34,22 @@ function renderAt(path: string) {
 describe("LandingPage", () => {
   beforeEach(() => {
     useAuthStore.setState({ token: null, user: null, isLoading: false });
+    useGuestThemeStore.setState({ theme: "parchment" });
   });
 
-  it("renders the landing page for a guest at /", () => {
+  afterEach(() => {
+    document.documentElement.classList.remove(BRASS_MODE_CLASS);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it("renders every section for a guest at /", () => {
     renderAt("/");
 
     expect(screen.getByTestId("landing-page")).toBeInTheDocument();
-    expect(screen.getByTestId("landing-hero-cta")).toBeInTheDocument();
+    for (const section of ["hero", "facts", "lobby", "rules", "table", "seasons", "closing"]) {
+      expect(screen.getByTestId(`landing-${section}`)).toBeInTheDocument();
+    }
   });
 
   it("points the CTAs at the auth pages", () => {
@@ -51,6 +61,30 @@ describe("LandingPage", () => {
     expect(screen.getByTestId("landing-cta")).toHaveAttribute("href", "/register");
   });
 
+  it("shows both rulebooks with their own bidding", () => {
+    renderAt("/");
+
+    const rules = screen.getByTestId("landing-rules");
+    expect(within(rules).getByRole("heading", { name: "Bitola" })).toBeInTheDocument();
+    expect(within(rules).getByRole("heading", { name: "Croatian" })).toBeInTheDocument();
+    expect(within(rules).getByText("All pass? The dealer picks trump.")).toBeInTheDocument();
+  });
+
+  it("shows the lobby screenshot in the visitor's theme", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    const lobby = screen.getByTestId("landing-lobby");
+    const [shot] = within(lobby).getAllByRole("img", { name: "The lobby with open rooms" });
+    expect(shot).toHaveAttribute("src", expect.stringContaining("lobby-phone-parchment.webp"));
+
+    await user.click(screen.getByTestId("landing-theme-toggle"));
+
+    expect(document.documentElement).toHaveClass(BRASS_MODE_CLASS);
+    const [brassShot] = within(lobby).getAllByRole("img", { name: "The lobby with open rooms" });
+    expect(brassShot).toHaveAttribute("src", expect.stringContaining("lobby-phone-brass.webp"));
+  });
+
   it("redirects an authenticated user away from / to /lobby", () => {
     useAuthStore.setState({ token: "test-token", isLoading: false });
     renderAt("/");
@@ -59,12 +93,16 @@ describe("LandingPage", () => {
     expect(screen.queryByTestId("landing-page")).not.toBeInTheDocument();
   });
 
-  it("links the footer to the public reference + legal pages", () => {
+  it("links the footer to the public reference and legal pages", () => {
     renderAt("/");
 
-    expect(screen.getByRole("link", { name: "Rules" })).toHaveAttribute("href", "/rules");
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
-    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("link", { name: "Rules" })).toHaveAttribute("href", "/rules");
+    expect(within(footer).getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+    expect(within(footer).getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
   });
 
   it("opens a contact dialog with email, LinkedIn and a beta disclaimer", async () => {

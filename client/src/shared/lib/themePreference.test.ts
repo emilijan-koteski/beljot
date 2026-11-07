@@ -6,8 +6,12 @@ import { makeUser } from "@/test-utils";
 import {
   applyTheme,
   BRASS_MODE_CLASS,
+  markThemePicked,
   persistTheme,
+  readStoredTheme,
+  reconcileThemePreference,
   resetThemeRequestSequence,
+  THEME_PICKED_KEY,
   THEME_STORAGE_KEY,
 } from "./themePreference";
 
@@ -25,6 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   document.documentElement.classList.remove(BRASS_MODE_CLASS);
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe("applyTheme", () => {
@@ -81,5 +86,55 @@ describe("persistTheme", () => {
     await persistTheme("brass", "parchment");
 
     expect(mockUpdatePreferences).not.toHaveBeenCalled();
+  });
+});
+
+describe("readStoredTheme", () => {
+  it("returns parchment on a first visit and the stored theme after one is shown", () => {
+    expect(readStoredTheme()).toBe("parchment");
+
+    applyTheme("brass");
+
+    expect(readStoredTheme()).toBe("brass");
+  });
+});
+
+describe("reconcileThemePreference", () => {
+  it("saves a theme picked before signing in when the account differs", async () => {
+    useAuthStore.setState({ user: makeUser({ id: 3, themePreference: "parchment" }) });
+    markThemePicked("brass");
+
+    const pending = reconcileThemePreference({ id: 3, themePreference: "parchment" });
+
+    expect(useAuthStore.getState().user?.themePreference).toBe("brass");
+    await pending;
+    expect(mockUpdatePreferences).toHaveBeenCalledWith(3, { themePreference: "brass" });
+    expect(window.sessionStorage.getItem(THEME_PICKED_KEY)).toBeNull();
+  });
+
+  it("keeps the account theme when the visitor never picked one", async () => {
+    applyTheme("brass");
+
+    await reconcileThemePreference({ id: 3, themePreference: "parchment" });
+
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
+  });
+
+  it("skips the save when the pick already matches the account", async () => {
+    markThemePicked("brass");
+
+    await reconcileThemePreference({ id: 3, themePreference: "brass" });
+
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
+  });
+
+  it("restores the account theme when the save fails", async () => {
+    useAuthStore.setState({ user: makeUser({ id: 3, themePreference: "parchment" }) });
+    markThemePicked("brass");
+    mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
+
+    await reconcileThemePreference({ id: 3, themePreference: "parchment" });
+
+    expect(useAuthStore.getState().user?.themePreference).toBe("parchment");
   });
 });

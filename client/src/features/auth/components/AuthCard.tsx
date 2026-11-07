@@ -11,13 +11,13 @@ export { Field };
 type AuthCardProps = {
   eyebrow: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 };
 
 /**
- * 440px parchment card with a brass top hairline, eyebrow, title, subtitle,
+ * 440px parchment card with a brass top hairline, eyebrow, title, optional subtitle,
  * and suit-pip divider before the form content.
  */
 export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCardProps) {
@@ -35,9 +35,18 @@ export function AuthCard({ eyebrow, title, subtitle, children, footer }: AuthCar
         {eyebrow}
       </div>
 
-      <h1 className="text-ink m-0 text-4xl leading-tight font-bold tracking-tight">{title}</h1>
+      <h1
+        className={cn(
+          "text-ink m-0 text-4xl leading-tight font-bold tracking-tight",
+          !subtitle && "mb-5.5",
+        )}
+      >
+        {title}
+      </h1>
 
-      <p className="text-ink-dim mt-2.5 mb-5.5 max-w-95 text-sm leading-relaxed">{subtitle}</p>
+      {subtitle && (
+        <p className="text-ink-dim mt-2.5 mb-5.5 max-w-95 text-sm leading-relaxed">{subtitle}</p>
+      )}
 
       <SuitRule />
 

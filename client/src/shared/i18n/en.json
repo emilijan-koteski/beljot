@@ -1143,7 +1143,6 @@
         "loginFailed": "Couldn't log in. Try again."
       },
       "eyebrow": "Welcome back",
-      "subtitle": "Sit back down at the table. Your seat's still warm.",
       "altPrompt": "New to Beljot?",
       "altCta": "Create an account",
       "forgotLink": "Forgot?"
@@ -1181,7 +1180,6 @@
         "registrationFailed": "Couldn't create your account. Try again."
       },
       "eyebrow": "Pull up a chair",
-      "subtitle": "Pick a name, get a seat. Four players to a table, two to a team.",
       "altPrompt": "Already have an account?",
       "altCta": "Log in"
     },
@@ -1263,67 +1261,84 @@
   "landing": {
     "nav": {
       "login": "Log in",
-      "signup": "Create free account"
+      "signup": "Create free account",
+      "rules": "Rules"
     },
     "hero": {
-      "eyebrow": "Beljot Online · 2 v 2 · Free to play",
-      "title1": "Sit down at",
-      "title2": "the table.",
-      "subtitle": "Belote is the classic four-player card game: two teams, race to 1001. Find a room in seconds, or invite your usual four with a code.",
+      "eyebrow": "2 v 2 · Free",
+      "title": "Deal me",
+      "titleAccent": "in.",
+      "subtitle": "Beljot for four, in your browser. Play with friends, strangers or bots.",
       "cta": "Create free account",
-      "playing": "playing right now",
-      "openTables": "open rooms"
+      "tableAlt": "A Beljot match in play",
+      "phoneAlt": "The same table on a phone, Croatian deck"
     },
-    "how": {
-      "eyebrow": "Three steps to the first trick",
-      "title": "You're dealt in before the coffee cools.",
-      "s1t": "Make a free account",
-      "s1b": "Pick a name, no downloads. You're in the lobby in a minute.",
-      "s2t": "Take a seat",
-      "s2b": "Hit Quick Play to be matched, or open a room and share the code.",
-      "s3t": "Take trump & play",
-      "s3b": "Call trump, win tricks with your partner, race to 1001."
+    "facts": {
+      "variants": "Bitola & Croatian",
+      "decks": "French or Croatian deck",
+      "languages": "4 languages",
+      "download": "No download"
     },
-    "feat": {
-      "f1tag": "The lobby · live",
-      "f1title": "Watch the rooms fill in real time",
-      "f1body": "Every open room and seat, live. Filter by timer or points, search by code, or hit Quick Play.",
-      "f2tag": "Teams · gold vs silver",
-      "f2title": "It's a partnership, not a free-for-all",
-      "f2body": "Two against two, partners across the table, race to 1001. Chat and emotes keep the table talking.",
-      "f3tag": "Profile · match history",
-      "f3title": "Every hand counts toward your record",
-      "f3body": "Matches played, win rate and a hand-by-hand history. See who you win with."
+    "lobby": {
+      "eyebrow": "Lobby",
+      "title": "Find a table in seconds.",
+      "body": "Every open room, live, with its rules on the card. Or let Quick Play seat you.",
+      "alt": "The lobby with open rooms"
     },
-    "room": {
-      "join": "Join",
-      "empty": "empty",
-      "r1title": "Saturday night long game",
-      "r1meta": "Bitola · 1001 pts · 30s",
-      "r1ago": "4m ago",
-      "r2title": "Quick 501, no timer",
-      "r2meta": "Croatian · 501 pts · relaxed",
-      "r2ago": "just now"
+    "rules": {
+      "eyebrow": "Rules",
+      "title1": "Two rulebooks.",
+      "title2": "Your table.",
+      "body": "Every room shows its rules before you sit down.",
+      "bitola": {
+        "title": "Bitola",
+        "b1": "Two bidding rounds on a turned-up card.",
+        "b2": "Declarations shown from trick two.",
+        "b3": "Belote on the queen, Rebelote on the king."
+      },
+      "croatian": {
+        "title": "Croatian",
+        "b1": "One bidding round on six cards; two stay face down.",
+        "b2": "All pass? The dealer picks trump.",
+        "b3": "Declarations before the first trick."
+      },
+      "room": {
+        "title": "Your room, your rules",
+        "target": "1001 or 501",
+        "timer": "Timed or relaxed",
+        "direction": "Either direction",
+        "declarations": "Declarations on or off",
+        "buyIn": "Buy-in",
+        "honor": "Honor minimum"
+      },
+      "frenchDeck": "French deck",
+      "croatianDeck": "Croatian deck"
     },
-    "vig": {
-      "trump": "Trump",
-      "opponent": "opponent",
-      "partner": "partner"
+    "table": {
+      "eyebrow": "Table",
+      "title": "Partners across the table.",
+      "body": "Us in gold, them in silver. Call trump, declare, announce Belote.",
+      "alt": "Your turn at the table",
+      "score": "Score",
+      "trump": "Trump: hearts",
+      "turn": "Your turn",
+      "legal": "Legal cards glow",
+      "clockTitle": "A clock on every move",
+      "clockBody": "Time out, and the game plays for you.",
+      "fairTitle": "Fair tables",
+      "fairBody": "Quit or miss three turns, and it costs coins, XP and honor."
     },
-    "prof": {
-      "member": "Member since 2024",
-      "games": "matches",
-      "winrate": "win rate",
-      "wins": "wins",
-      "recent": "Match history",
-      "won": "Win",
-      "lost": "Loss",
-      "with": "with"
+    "seasons": {
+      "eyebrow": "Seasons",
+      "title": "Climb the season.",
+      "body": "Wins earn Season Points. Your profile keeps every match, partner and rival.",
+      "profileAlt": "Your profile",
+      "leaderboardAlt": "The season leaderboard"
     },
     "cta": {
-      "eyebrow": "The table's set",
-      "title": "Your four are waiting.",
-      "body": "Free forever. No download. Deal the first hand tonight.",
+      "title1": "Your four",
+      "title2": "are waiting.",
+      "body": "Deal the first hand tonight.",
       "cta": "Create free account"
     },
     "foot": {
@@ -1331,6 +1346,7 @@
       "privacy": "Privacy",
       "terms": "Terms",
       "contact": "Contact",
+      "support": "Support",
       "copyright": "© 2026 Beljot.online"
     },
     "contact": {

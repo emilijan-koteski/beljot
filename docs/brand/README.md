@@ -58,4 +58,10 @@ cd ../../../client && node ../docs/brand/source/render.mjs
 
 `og.py` has two layouts: `presents` (the default, Dama on the left presenting the chip) and `trumps` (Dama on the right with her hand of cards). Run `python3 og.py trumps` to switch.
 
+`landing.mjs` captures the real match, lobby, profile and leaderboard screens shown on the landing page, with sample players in both themes, and sizes Dama's poses for it. It writes WebP into `client/public/landing/` and `client/public/mascot/`, and starts its own Vite dev server:
+
+```bash
+cd client && node ../docs/brand/source/landing.mjs
+```
+
 `options.py` also holds the four logo directions that were not chosen (card, hand, crown, diamond dot).
