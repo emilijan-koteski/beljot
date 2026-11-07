@@ -275,9 +275,9 @@ from the salt-0 card. Cheat gap: double-dummy on the true deal against the shipp
 
 | Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
 |---|---|---|---|---|---|---|---|
-| `shipped:3` | (self-play) | Bitola | 300 | 501 | b915934 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=501 -workers=6` | positions per trick 3..7: 711 / 731 / 769 / 770 / 813; changed 51.9% / 45.0% / 33.2% / 19.7% / 6.3%; pooled tricks 3-4 **48.4%** (1442), tricks 5-8 **19.5%** (2352) |
-| `shipped:3` | (self-play) | Croatian | 300 | 502 | b915934 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=502 -workers=6 -variant=croatia` | positions per trick 3..7: 824 / 807 / 810 / 829 / 858; changed 56.4% / 49.6% / 39.4% / 20.7% / 8.2%; pooled tricks 3-4 **53.0%** (1631), tricks 5-8 **22.5%** (2497) |
-| `cheat` | `shipped:3` | Bitola | 400 | 503 | b915934 | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=503 -workers=6` | **+24.15 ± 2.91** (A share 57.3%); A made 95% of 255 calls, B 78% of 398; 147/800 passed out |
+| `shipped:3` | (self-play) | Bitola | 300 | 501 | 7734271 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=501 -workers=6` | positions per trick 3..7: 711 / 731 / 769 / 770 / 813; changed 51.9% / 45.0% / 33.2% / 19.7% / 6.3%; pooled tricks 3-4 **48.4%** (1442), tricks 5-8 **19.5%** (2352) |
+| `shipped:3` | (self-play) | Croatian | 300 | 502 | 7734271 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=502 -workers=6 -variant=croatia` | positions per trick 3..7: 824 / 807 / 810 / 829 / 858; changed 56.4% / 49.6% / 39.4% / 20.7% / 8.2%; pooled tricks 3-4 **53.0%** (1631), tricks 5-8 **22.5%** (2497) |
+| `cheat` | `shipped:3` | Bitola | 400 | 503 | 7734271 | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=503 -workers=6` | **+24.15 ± 2.91** (A share 57.3%); A made 95% of 255 calls, B 78% of 398; 147/800 passed out; same result at b915934, since production salt is 0 |
 
 Reading: the chosen card is not stable under a re-seed in the early searched tricks, well above
 30 % on tricks 3-5 in both variants (trick 5 in Bitola is 33.2 %); the later tricks settle. The
