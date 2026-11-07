@@ -19,22 +19,28 @@ const (
 // SearchResult is the card the search chose with the deals behind it, its lead over the runner-up and that lead's
 // standard error.
 type SearchResult struct {
-	Card    game.Card
-	Samples int
-	Margin  float64
-	SE      float64
+	Card     game.Card
+	Samples  int
+	Margin   float64
+	SE       float64
+	Deferred bool
 }
 
 // SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on and only where
 // the schedule has samples, on the seat's own turn with a real choice, and not when a team could end the match.
 func SearchApplies(v View, fromTrick int) bool {
+	return SearchAppliesWith(v, fromTrick, DefaultSearchTuning())
+}
+
+// SearchAppliesWith is SearchApplies under a search tuning.
+func SearchAppliesWith(v View, fromTrick int, t SearchTuning) bool {
 	if fromTrick <= 0 || v.Phase != game.PhasePlaying || v.TrumpSuit == nil || v.ActivePlayerSeat != v.Seat {
 		return false
 	}
 	if v.PendingBelot || v.AwaitingDeclaration || v.PartnerProposedSurrender {
 		return false
 	}
-	if len(v.LegalCards) <= 1 || v.TrickNumber < fromTrick || search.SamplesForTrick(v.TrickNumber) == 0 {
+	if len(v.LegalCards) <= 1 || v.TrickNumber < fromTrick || samplesFor(v.TrickNumber, t) == 0 {
 		return false
 	}
 	return !withinStopAtTargetReach(v)
@@ -57,16 +63,29 @@ func withinStopAtTargetReach(v View) bool {
 // SearchCard runs the search for the seat's card, reporting false when it reached no decision and the rules should play.
 // It is deterministic for a given view.
 func SearchCard(v View, deadline time.Time) (SearchResult, bool) {
-	samples := search.SamplesForTrick(v.TrickNumber)
+	return SearchCardWith(v, deadline, DefaultSearchTuning())
+}
+
+// SearchCardWith is SearchCard under a search tuning.
+func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, bool) {
+	samples := samplesFor(v.TrickNumber, t)
 	if samples == 0 || v.TrumpSuit == nil || v.TrumpCallerSeat == nil {
 		return SearchResult{}, false
 	}
-	opts := search.Options{Samples: samples, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE}
-	res, ok := search.Choose(informationFrom(v), positionFrom(v), v.LegalCards, settlementFrom(v), opts, deadline)
+	res, ok := chooseSearch(v, samples, deadline)
 	if !ok {
 		return SearchResult{}, false
 	}
-	return SearchResult{Card: res.Card, Samples: res.Samples, Margin: res.Margin, SE: res.SE}, true
+	card, ok := chooseAdjusted(v, res, t)
+	if !ok {
+		return SearchResult{}, false
+	}
+	return SearchResult{Card: card, Samples: res.Samples, Margin: res.Margin, SE: res.SE}, true
+}
+
+func chooseSearch(v View, samples int, deadline time.Time) (search.Result, bool) {
+	opts := search.Options{Samples: samples, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE}
+	return search.Choose(informationFrom(v), positionFrom(v), v.LegalCards, settlementFrom(v), opts, deadline)
 }
 
 // DecideWith plays the searched card when it is still a legal play and nothing else is pending, otherwise it decides by

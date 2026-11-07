@@ -293,6 +293,37 @@ func TestSearchCardDeclinesWhereTheRulesPlay(t *testing.T) {
 	assert.False(t, ok, "no trump yields no decision")
 }
 
+func farFuture() time.Time { return time.Now().Add(time.Hour) }
+
+func TestSearchCardWithZeroTuningMatchesTheChooser(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	checked := 0
+	for seat := range 4 {
+		v := viewFromState(gs, seat, memoryOfMissingCards(gs))
+		if !bot.SearchApplies(v, 3) {
+			continue
+		}
+		want, okWant := bot.ChooserResultForTest(v, farFuture())
+		got, okGot := bot.SearchCardWith(v, farFuture(), bot.SearchTuning{})
+		require.Equal(t, okWant, okGot)
+		assert.Equal(t, want.Card, got.Card)
+		assert.Equal(t, want.Samples, got.Samples)
+		assert.Equal(t, want.Margin, got.Margin)
+		assert.Equal(t, want.SE, got.SE)
+		checked++
+	}
+	assert.Positive(t, checked)
+}
+
+func TestSearchAppliesWithOpeningSamples(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	v.TrickNumber = 1
+	assert.False(t, bot.SearchAppliesWith(v, 1, bot.SearchTuning{}))
+	assert.True(t, bot.SearchAppliesWith(v, 1, bot.SearchTuning{OpeningSamples: 12}))
+	assert.False(t, bot.SearchAppliesWith(v, 3, bot.SearchTuning{OpeningSamples: 12}))
+}
+
 func TestDecideWithFallsBackToTheRules(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(3)
 	base := viewFromState(gs, 0, memoryOfMissingCards(gs))
