@@ -78,7 +78,7 @@ def presents():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    layout = sys.argv[1] if len(sys.argv) > 1 else "trumps"
+    layout = sys.argv[1] if len(sys.argv) > 1 else "presents"
     with open(os.path.join(OUT, "og.svg"), "w") as fh:
         fh.write({"trumps": trumps, "presents": presents}[layout]())
     print("ok", layout)
