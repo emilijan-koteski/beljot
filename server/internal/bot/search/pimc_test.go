@@ -319,7 +319,7 @@ func TestChooseRefusesWhatItCannotAnswer(t *testing.T) {
 }
 
 func TestSamplesForTrickSchedule(t *testing.T) {
-	want := map[int]int{0: 0, 1: 0, 2: 0, 3: 16, 4: 30, 5: 40, 6: 60, 7: 60, 8: 60}
+	want := map[int]int{0: 0, 1: 0, 2: 0, 3: 32, 4: 60, 5: 80, 6: 60, 7: 60, 8: 60}
 	for trick, samples := range want {
 		assert.Equal(t, samples, search.SamplesForTrick(trick), "trick %d", trick)
 	}

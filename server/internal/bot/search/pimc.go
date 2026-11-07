@@ -63,11 +63,11 @@ func SamplesForTrick(trick int) int {
 	case trick < 3:
 		return OpeningSamples
 	case trick == 3:
-		return 16
+		return 32
 	case trick == 4:
-		return 30
+		return 60
 	case trick == 5:
-		return 40
+		return 80
 	}
 	return 60
 }
