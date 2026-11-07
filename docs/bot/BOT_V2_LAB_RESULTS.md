@@ -283,6 +283,63 @@ Reading: the chosen card is not stable under a re-seed in the early searched tri
 30 % on tricks 3-5 in both variants (trick 5 in Bitola is 33.2 %); the later tricks settle. The
 cap on samples was not changed here.
 
+#### B. Human play where it pays
+
+Duplicate, 1000 deals per row, `-workers=6`, `±` is one standard error of the pair difference.
+Every A/B is cumulative: the baseline is the bot with every earlier shipped item on, and only the
+item under test varies through flags. Croatian rows use the Bitola seed plus one, except B3 (the
+two λ rows already use 631 and 632, so Croatian uses 731 and 732). Pooled is inverse-variance
+(weight 1/SE² per variant). Rows built before `4198b4fe` carry the defaults of the step in the
+commit column (the defaults were edited and the lab rebuilt between steps). Every row is
+`-exp=duplicate -a=shipped:3 -flagsA=<A> -b=shipped:3 -flagsB=<B> -n=1000 -seed=<seed> -workers=6`
+with `-variant=croatia` for the Croatian rows and an empty B for "none".
+
+Frequency (B1), both sides `shipped:3`, all phase-3 flags off, seed 601:
+
+| Variant | Commit | Command | Result |
+|---|---|---|---|
+| Bitola | c5567547 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -n=1000 -seed=601 -workers=6` | +0.00 ± 0.00; decided 12460, defender trump leads 152 (1.2 % of decisions) |
+| Croatian | c5567547 | same, `-variant=croatia` | +0.00 ± 0.00; decided 13724, defender trump leads 168 (1.2 %) |
+
+| Item (A vs B) | Variant | Seed | Commit | Advantage | Pooled (z) | Decision |
+|---|---|---|---|---|---|---|
+| B1 `defTrump3` vs none | Bitola | 611 | c5567547 | -0.06 ± 0.23 (trump leads 103 vs 143) | | |
+| B1 `defTrump3` vs none | Croatian | 612 | c5567547 | -0.10 ± 0.17 (120 vs 186) | -0.09 ± 0.14 (-0.6) | not worse |
+| B1 `defTrump10` vs none | Bitola | 611 | c5567547 | -0.21 ± 0.33 (75 vs 143) | | |
+| B1 `defTrump10` vs none | Croatian | 612 | c5567547 | -0.17 ± 0.28 (82 vs 186) | -0.19 ± 0.21 (-0.9) | not worse, **largest such, ships (10)** |
+| B1 `defTrumpVeto` vs none | Bitola | 611 | c5567547 | -0.81 ± 0.50 (0 vs 143) | | |
+| B1 `defTrumpVeto` vs none | Croatian | 612 | c5567547 | -1.60 ± 0.56 (0 vs 186) | -1.16 ± 0.37 (-3.1) | worse at 2 SE (Croatian alone -2.9), not shipped |
+| B2 `tenUnder3` vs `noTenUnder` | Bitola | 621 | c5567547 + B1=10 | +0.02 ± 0.05 | | |
+| B2 `tenUnder3` vs `noTenUnder` | Croatian | 622 | c5567547 + B1=10 | -0.07 ± 0.09 | -0.00 ± 0.04 (0.0) | not worse, **ships (3)** |
+| B3 `risk5` vs `noRisk` | Bitola | 631 | c5567547 + B1, B2 | +0.06 ± 0.24 | | |
+| B3 `risk5` vs `noRisk` | Croatian | 731 | c5567547 + B1, B2 | +0.05 ± 0.28 | +0.06 ± 0.18 (+0.3) | not better at 2 SE, not shipped |
+| B3 `risk10` vs `noRisk` | Bitola | 632 | c5567547 + B1, B2 | -0.36 ± 0.34 | | |
+| B3 `risk10` vs `noRisk` | Croatian | 732 | c5567547 + B1, B2 | +0.44 ± 0.60 | -0.17 ± 0.30 (-0.6) | not better at 2 SE, not shipped |
+| B4 `drawCond` vs `noDrawCond` | Bitola | 641 | c5567547 + B1, B2 | +0.14 ± 0.45 (deferred 267 of 12271 = 2.2 %) | | |
+| B4 `drawCond` vs `noDrawCond` | Croatian | 642 | c5567547 + B1, B2 | -0.24 ± 0.46 (deferred 344 of 13634 = 2.5 %) | -0.05 ± 0.32 (-0.1) | not better at 2 SE, not shipped |
+| Caps `caps2x` (32/60/80 on tricks 3/4/5) vs `noCaps` | Bitola | 661 | c5567547 + B1, B2 | +0.68 ± 0.59 | | |
+| Caps `caps2x` vs `noCaps` | Croatian | 662 | c5567547 + B1, B2 | +0.78 ± 0.56 | +0.73 ± 0.41 (+1.8) | not better at 2 SE, not shipped (same sign in both variants, an owner may want a larger run) |
+
+Shipped by this step: `DefenderTrumpLeadBonus` 10 and `TenUnderAceBonus` 3. Off: `LeadRiskLambda`
+(0), `TrumpDrawConditional` (false), `SampleCaps` (all 0, the schedule stays 16/30/40/60). B1 ships
+by the convention rule although its pooled point estimate is -0.19 ± 0.21: it is the largest bonus
+that is not worse at 2 SE, and the veto (the only stronger form) is worse at 3.1 SE pooled.
+
+Gates at `4198b4fe`: `go test -tags nodynamic ./internal/bot/...` passes;
+`BELJOT_BOT_SIM=1 ... -run TestSimulation_Search` gives search share 74.6 % over 60 hands
+(8587/11510, search ran at 406 card plays) against the random baseline, and search minus rules
++3.45 ± 4.62 per deal over 40 deals (search ran at 436 card plays).
+
+Stability and cheat gap after B (lab at `4198b4fe` defaults, same sizes as the run before B):
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | (self-play) | Bitola | 300 | 651 | 4198b4fe | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=651 -workers=6` | positions per trick 3..7: 749 / 764 / 750 / 773 / 808; changed 52.7% / 46.3% / 33.6% / 16.8% / 6.3%; pooled tricks 3-4 **49.5%** (1513), tricks 5-8 **18.6%** (2331) |
+| `shipped:3` | (self-play) | Croatian | 300 | 652 | 4198b4fe | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=652 -workers=6 -variant=croatia` | positions per trick 3..7: 791 / 847 / 820 / 816 / 876; changed 52.5% / 47.3% / 35.6% / 19.1% / 6.3%; pooled tricks 3-4 **49.8%** (1638), tricks 5-8 **20.0%** (2512) |
+| `cheat` | `shipped:3` | Bitola | 400 | 653 | 4198b4fe | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=653 -workers=6` | **+24.22 ± 2.94** (A share 57.6%); A made 95% of 224 calls, B 76% of 401; 175/800 passed out |
+
+The cheat gap is unchanged within noise (+24.15 before, +24.22 after).
+
 ## 3. Bidding calibration tables
 
 ### 3.1 By round and position (Bitola; rows are decision points × allowed suits)
