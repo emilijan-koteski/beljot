@@ -15,5 +15,5 @@ var (
 )
 
 func ChooserResultForTest(v View, deadline time.Time) (search.Result, bool) {
-	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline)
+	return chooseSearch(v, search.SamplesForTrick(v.TrickNumber), deadline, 0)
 }

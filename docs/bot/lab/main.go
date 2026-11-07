@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|regret")
+	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|regret|stability")
 	polA    = flag.String("a", "current", "policy A")
 	polB    = flag.String("b", "random", "policy B")
 	n       = flag.Int("n", 200, "deals")
@@ -27,6 +27,7 @@ var (
 	flagsA  = flag.String("flagsA", "", "lab flags for A (comma list)")
 	flagsB  = flag.String("flagsB", "", "lab flags for B (comma list)")
 	workers = flag.Int("workers", runtime.NumCPU(), "parallel workers")
+	seeds   = flag.Int("seeds", 5, "seed salts per position for stability")
 	csvOut  = flag.String("csv", "bidpos.csv", "csv output for bidpos")
 )
 
@@ -84,6 +85,8 @@ func main() {
 		regret(v)
 	case "bidtable":
 		bidtable(v)
+	case "stability":
+		stability(v)
 	case "bidpos":
 		bidpos(v, *csvOut)
 	default:

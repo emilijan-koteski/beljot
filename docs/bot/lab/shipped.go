@@ -84,3 +84,6 @@ func isDefenderTrumpLead(v bot.View, card game.Card) bool {
 	}
 	return false
 }
+
+// ToBotView converts the lab view into the production bot's view.
+func ToBotView(v View) bot.View { return toBotView(v) }

@@ -260,12 +260,28 @@ player meets. Every tuning is measured against the cumulative baseline, the bot 
 previous step, never against the phase-2 snapshot alone. Duplicate, 400 deals per row unless noted;
 advantage is per hand, ± is one standard error, commit is the server code the lab was built from.
 
-| Policy A | Policy B | Variant | Deals | Seed | Commit | Result |
-|---|---|---|---|---|---|---|
-| `shipped:3` | `shipped:3` | Bitola | 40 | 1 | d3bdf40 | +0.00 ± 0.00; counts of A and B equal (applied 492, decided 492, deferred 0) |
-| `shipped:3` | `current` | Bitola | 400 | 301 | d3bdf40 | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55 |
-| `shipped:3` | `current` | Croatian | 400 | 302 | d3bdf40 | +10.96 ± 2.24 (A share 52.8%); decided 5513, deferred 0, defender trump leads 62 |
-| `shipped:3` | `current` | Bitola | 400 | 301 | abbce77 | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55; identical to d3bdf40 after the solver speed-up, wall 10 s before and 4 s after (`-workers=6`) |
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | `shipped:3` | Bitola | 40 | 1 | d3bdf40 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -n=40 -seed=1` | +0.00 ± 0.00; counts of A and B equal (applied 492, decided 492, deferred 0) |
+| `shipped:3` | `current` | Bitola | 400 | 301 | d3bdf40 | `-exp=duplicate -a=shipped:3 -b=current -n=400 -seed=301 -workers=6` | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55 |
+| `shipped:3` | `current` | Croatian | 400 | 302 | d3bdf40 | `-exp=duplicate -a=shipped:3 -b=current -n=400 -seed=302 -workers=6 -variant=croatia` | +10.96 ± 2.24 (A share 52.8%); decided 5513, deferred 0, defender trump leads 62 |
+| `shipped:3` | `current` | Bitola | 400 | 301 | abbce77 | `-exp=duplicate -a=shipped:3 -b=current -n=400 -seed=301 -workers=6` | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55; identical to d3bdf40 after the solver speed-up, wall 10 s before and 4 s after (`-workers=6`) |
+
+#### Stability and the cheat gap, before B
+
+Stability: `shipped:3` plays all four seats; at every position where the search ran, the search is
+re-run with sampler seed salts 0..4 and the position counts as changed if any salted card differs
+from the salt-0 card. Cheat gap: double-dummy on the true deal against the shipped bot.
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | (self-play) | Bitola | 300 | 501 | b915934 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=501 -workers=6` | positions per trick 3..7: 711 / 731 / 769 / 770 / 813; changed 51.9% / 45.0% / 33.2% / 19.7% / 6.3%; pooled tricks 3-4 **48.4%** (1442), tricks 5-8 **19.5%** (2352) |
+| `shipped:3` | (self-play) | Croatian | 300 | 502 | b915934 | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=502 -workers=6 -variant=croatia` | positions per trick 3..7: 824 / 807 / 810 / 829 / 858; changed 56.4% / 49.6% / 39.4% / 20.7% / 8.2%; pooled tricks 3-4 **53.0%** (1631), tricks 5-8 **22.5%** (2497) |
+| `cheat` | `shipped:3` | Bitola | 400 | 503 | b915934 | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=503 -workers=6` | **+24.15 ± 2.91** (A share 57.3%); A made 95% of 255 calls, B 78% of 398; 147/800 passed out |
+
+Reading: the chosen card is not stable under a re-seed in the early searched tricks, well above
+30 % on tricks 3-5 in both variants (trick 5 in Bitola is 33.2 %); the later tricks settle. The
+cap on samples was not changed here.
 
 ## 3. Bidding calibration tables
 
@@ -633,7 +649,7 @@ server module.
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
 cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped}.go /tmp/lab/server/internal/botlab/
-cp docs/bot/lab/{main,bidtable,bidpos}.go   /tmp/lab/server/cmd/botlab/
+cp docs/bot/lab/{main,bidtable,bidpos,stability}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
 ./botlab -exp=duplicate -a=current -b=lab -n=4000                     # phase 1 against the frozen v1, §3.4

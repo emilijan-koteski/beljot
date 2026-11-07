@@ -315,6 +315,21 @@ func TestSearchCardWithZeroTuningMatchesTheChooser(t *testing.T) {
 	assert.Positive(t, checked)
 }
 
+func TestSearchCardWithSeedSaltIsDeterministic(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.True(t, bot.SearchApplies(v, 3))
+	salted := bot.SearchTuning{SeedSalt: 7}
+
+	first, ok := bot.SearchCardWith(v, farFuture(), salted)
+	require.True(t, ok)
+	second, ok := bot.SearchCardWith(v, farFuture(), salted)
+	require.True(t, ok)
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, v.LegalCards, first.Card)
+}
+
 func TestSearchAppliesWithOpeningSamples(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(3)
 	v := viewFromState(gs, 0, memoryOfMissingCards(gs))

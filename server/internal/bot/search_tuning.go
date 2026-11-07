@@ -7,7 +7,8 @@ import (
 
 const DefenderTrumpLeadVeto = 10_000
 
-// SearchTuning holds the phase-3 behaviours layered on the search. The zero value is the phase-2 behaviour.
+// SearchTuning holds the phase-3 behaviours layered on the search. The zero value is the phase-2 behaviour, and SeedSalt
+// is a lab-only sampler seed offset that production leaves at 0.
 type SearchTuning struct {
 	DefenderTrumpLeadBonus int
 	TenUnderAceBonus       int
@@ -15,6 +16,7 @@ type SearchTuning struct {
 	TrumpDrawConditional   bool
 	RaceObjective          bool
 	OpeningSamples         int
+	SeedSalt               uint64
 }
 
 // DefaultSearchTuning is the tuning the bot ships with.
