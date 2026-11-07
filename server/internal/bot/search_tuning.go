@@ -24,7 +24,7 @@ type SearchTuning struct {
 
 // DefaultSearchTuning is the tuning the bot ships with.
 func DefaultSearchTuning() SearchTuning {
-	return SearchTuning{}
+	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3}
 }
 
 // samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
