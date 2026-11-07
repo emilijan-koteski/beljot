@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TrickCard } from "@/shared/types/matchTypes";
 
+import { CARD_SIZES } from "../lib/cardFace";
 import { TrickArea } from "./TrickArea";
 
 const trickCards: TrickCard[] = [
@@ -61,9 +62,10 @@ describe("TrickArea", () => {
     expect(screen.getByTestId("playing-card-9C")).toBeInTheDocument();
 
     const trickArea = screen.getByTestId("trick-area");
-    const glowEl = trickArea.querySelector('[data-winner="true"]');
+    const glowEl = trickArea.querySelector<HTMLElement>('[data-winner="true"]');
     expect(glowEl).toBeInTheDocument();
     expect(glowEl?.className).toContain("var(--accent-light)");
+    expect(glowEl?.style.borderRadius).toBe(`${CARD_SIZES.md.radius}px`);
   });
 
   it("filters out cards present in suppressedCardIds (overlay paints them)", () => {
