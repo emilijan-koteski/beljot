@@ -197,6 +197,13 @@ All of these must hold, otherwise the rule layer plays:
   to play plus the +10 for the last trick. With the race objective on those hands are searched
   too (5.10), and the race credits that Belote only when the seat plays the first of the pair.
 
+When the search values the match rather than the hand's points: on a stop-at-target table within
+reach (the race of 5.10), after each of tricks 1 to 7, on the seat's own Belote, and at the hand's
+end, where each sample's settled hand is added to the match scores and a team at or over the target
+decides the match (both over: the higher total, a tie to the caller). On a table that decides only
+at hand ends, `DecidingHand` would do the same at the hand's end when a team could still reach the
+target this hand; it ships off (5.10), so those hands are searched for points.
+
 ### 5.2 What is sampled
 
 `informationFrom` turns the `View` into what the sampler may use:
@@ -235,8 +242,10 @@ how the seats bid or by what they led or discarded (see 5.9).
   mirroring `scoreHand`. It adds the hand points already banked and both teams' declaration and
   Belote points. A Capot gives the whole hand and the Capot bonus to the sweeping team. A caller
   who does not beat the defenders (a tie loses) concedes the hand: the defenders take all card
-  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own.
-  `TestSettleMatchesEngineAtTheLastTrick` pins the agreement with the engine.
+  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own, and the
+  other side banks nothing. `search.SettleTotals` returns the two teams' awards and `Settle` is
+  their difference. `TestSettleMatchesEngineAtTheLastTrick` and
+  `TestSettleTotalsMatchEngineAtTheLastTrick` pin the agreement with the engine.
 - **Choose** (`search.Choose`): for each legal card, the settled values are averaged over the
   samples, signed for the seat's team, and the best average is played. Equal sums go to the lower
   card index, so ties are deterministic.
@@ -361,9 +370,12 @@ hands, identical on three repeated runs); its gate stays 60%.
   its own Belote, since the engine never stops the match after the eighth trick. A Belote the seat
   cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
   not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
-  Capot, a fall) is valued in points, not as a decided match. In a Bitola trick 1 with declarations
-  still open the engine checks the target only at the end of the trick; the search does not model
-  that case on tricks 1 and 2.
+  Capot, a fall) is valued as the decided match since phase 4 (5.10, the deciding hand). What
+  remains: the race starts only when a running total is within the card points still to play plus
+  10 of the target, so on a stop-at-target table a fall that would carry a team over from further
+  away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement;
+  in a Bitola trick 1 with declarations still open the engine checks the target only at the end of
+  the trick, and the search does not model that case on tricks 1 and 2.
 - **No bidding, declaration, Belote or surrender decisions.**
 
 ### 5.10 Conventions and risk inside the search
@@ -381,6 +393,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `LeadRiskLambda` | 0 | risk5 +0.06 ± 0.18, risk10 -0.17 ± 0.30 | Would rank leads by mean minus lambda times the spread; not better at 2 SE, the code stays and the constant is 0 |
 | `TrumpDrawConditional` | false | -0.05 ± 0.32 (deferred about 2% of decisions) | Would hand a trump draw that depends on where the top trump sits to the rule layer; not better at 2 SE, the code stays off |
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
+| `DecidingHand` | false | +0.0017 ± 0.0053 match edge per game (z 0.3) | On a table without stop-at-target, value a sample whose settled hand decides the match at plus or minus 1000, when a team could reach the target this hand (`couldDecideThisHand`); not better at 2 SE, the code stays off |
 | `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
 | `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
@@ -410,7 +423,11 @@ the match at plus or minus 1000, which the chooser keeps as it is. The seat's ow
 (+20, trump King and Queen still in hand, counted only when `View.DeclarationsEnabled` is on) is in
 the settlement, and the race keeps it out of the root totals: the solver credits it when the seat
 plays the first card of the pair and checks the target at that moment, as the engine does at the
-announcement. Tracking stops after the seventh trick (5.9). The gaps are in 5.9.
+announcement. Tracking of the running totals stops after the seventh trick, since the engine
+does not stop the match after the eighth. At the hand's end the chooser settles each sample into
+both teams' awards (`search.SettleTotals`) and applies the engine's end-of-hand rule to the match
+scores (`search.HandEndDecided`), so a hand that crosses only through the last-trick bonus, a Capot
+or a fall is worth plus or minus 1000 too. The gaps are in 5.9.
 
 ---
 

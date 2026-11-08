@@ -125,8 +125,8 @@ pass wins b/n`, where "wins" counts the pairs in which the tested team won the m
   16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`, and the phase-4 flags `blindTen3`,
-  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
-  `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0` and `CashHighWinnerBonus = 0`) and the bounds cleared. `duplicate` prints the
+  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, `deciding`, `noDeciding` (`DecidingHand`), and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
+  `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0`, `CashHighWinnerBonus = 0` and `DecidingHand = false`) and the bounds cleared. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
   and surrender come from the inner policy. Bidding: with probability 0.8 it calls when a suit holds J
@@ -560,6 +560,8 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
 | C2 cash the Ace or Ten, veto (`CashHighWinnerBonus 10000`) | with minus without -0.04 ± 0.03 (z -1.3), six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; every estimate is within noise of zero | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; the rule fires about once in a thousand decisions, the counter does not move) | d562fef2 |
 | B1 rank bounds from forced overplays (`RankBounds` into the sampler) | with minus without +0.60 ± 0.70 (z 0.9); Bitola +0.40 ± 0.90, Croatian +0.91 ± 1.13 | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (exactness; ships on its tests, the effect is reported, not gated) | 288ec0ae |
+| D6a the hand-end crossing in the stop-at-target race (`SettleTotals`, `HandEndDecided`) | `race` vs `noRace` before → after: Bitola +0.0225 ± 0.0071 → +0.0320 ± 0.0073, Croatian +0.0335 ± 0.0076 → +0.0525 ± 0.0079 | match edge per game, 1 000 deals per variant, `shipped:1` both sides, seeds 701/702 | ships (exactness; ships on its tests; not worse at 2 SE in either variant) | 86c3c757 → b4f4b3a4 |
+| D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
 
 #### D2 opening search
 
@@ -723,6 +725,40 @@ are exact facts (`TestMemoryBoundsMatchTheTrueHands`, 300 random engine games), 
 
 Pooling by weights 1/SE²: w = 1/0.90² = 1.235 and 1/1.13² = 0.783; (0.40 · 1.235 + 0.91 · 0.783) / 2.018 = +0.60; SE = 1 / √2.018 = 0.70; z = 0.9.
 Both variants are positive and within noise of zero.
+
+#### D6 the deciding hand
+
+**D6a (exactness).** On a stop-at-target table the race now also values the hand's end: each sample's settled hand is
+split into both teams' awards (`search.SettleTotals`, equal to `Settle` as a difference and to the engine's
+`TeamAHandTotal`/`TeamBHandTotal`) and the engine's end-of-hand rule is applied to the match scores (`search.HandEndDecided`).
+It ships on its tests (`TestSettleTotalsAgreesWithSettle`, `TestSettleTotalsMatchEngineAtTheLastTrick`,
+`TestRaceHandEndCrossingMatchesTheEngine`); the gate is that the §2.9 C rows are not worse at 2 SE. Both sides `shipped:1`, the
+cumulative baseline (opening search, blind-Ten veto, cash-high veto and rank bounds on both sides), `-workers=6`; "before" is
+the lab built from 86c3c757, "after" from b4f4b3a4 (the default `DecidingHand false` does not touch stop-at-target tables).
+
+| Variant | Seed | Commit | Command | Match edge per game (A minus B) | Counts |
+|---|---|---|---|---|---|
+| Bitola, before | 701 | 86c3c757 | `-exp=race -a=shipped:1 -flagsA=race -b=shipped:1 -flagsB=noRace -n=1000 -seed=701 -workers=6` | +0.0225 ± 0.0071 (95% CI ±0.0138), 325 s | `decided 1245 / 2000 games (62.2%): A won 645, B won 600; mid-hand stops 1014, passed out 258`; A applied 12193, B 1501 |
+| Bitola, after | 701 | b4f4b3a4 | same | +0.0320 ± 0.0073 (95% CI ±0.0143), 280 s | `decided 1238 / 2000 games (61.9%): A won 651, B won 587; mid-hand stops 993, passed out 258`; A applied 12182, B 1525 |
+| Croatian, before | 702 | 86c3c757 | `-exp=race -a=shipped:1 -flagsA=race -b=shipped:1 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia` | +0.0335 ± 0.0076 (95% CI ±0.0148), 285 s | `decided 1477 / 2000 games (73.8%): A won 772, B won 705; mid-hand stops 1233, passed out 0`; A applied 13165, B 1744 |
+| Croatian, after | 702 | b4f4b3a4 | same | +0.0525 ± 0.0079 (95% CI ±0.0155), 272 s | `decided 1481 / 2000 games (74.0%): A won 793, B won 688; mid-hand stops 1212, passed out 0`; A applied 13188, B 1752 |
+
+After minus before (independent runs on the same deals, so the SE of the difference is taken as unpaired): Bitola
++0.0095 ± 0.0102, Croatian +0.0190 ± 0.0110. Neither is worse at 2 SE; both moved up, within noise of zero.
+
+**D6b (strength).** On a table that decides the match only at hand ends, `DecidingHand` values a sample whose settled hand
+decides the match at ±1000 whenever `couldDecideThisHand` holds (some team's match score plus every card point of the hand,
+a Capot, all declarations and a Belote reaches the target); the solver itself plays for points. Server code at b4f4b3a4,
+`-workers=6`, the cumulative baseline on both sides.
+
+| Variant | Seed | Command | Match edge per game (A minus B) | Counts |
+|---|---|---|---|---|
+| Bitola | 1151 | `-exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1151 -workers=6` | -0.0005 ± 0.0065 (95% CI ±0.0127), 312 s | `decided 1251 / 2000 games (62.5%): A won 625, B won 626; mid-hand stops 0, passed out 260`; A applied 16998, B 17093 |
+| Croatian | 1152 | `-exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1152 -workers=6 -variant=croatia` | +0.0060 ± 0.0090 (95% CI ±0.0176), 372 s | `decided 1436 / 2000 games (71.8%): A won 724, B won 712; mid-hand stops 0, passed out 0`; A applied 19205, B 19357 |
+
+Pooling by weights 1/SE²: w = 1/0.0065² = 23 669 and 1/0.0090² = 12 346; (-0.0005 · 23 669 + 0.0060 · 12 346) / 36 015 =
++0.0017; SE = 1 / √36 015 = 0.0053; z = 0.3. Neither variant is opposite at 2 SE. Rule (a strength item ships only if better
+at 2 SE): not better, so `DecidingHand` ships false and the code stays for the lab.
 
 ## 3. Bidding calibration tables
 
@@ -1373,6 +1409,10 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6   # §2.10, match-score bidding probe
 ./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6   # §2.10, three-policy identity run
 ./botlab -exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6   # §2.10, shipped bot against the human-like bidder
+./botlab -exp=race -a=shipped:1 -flagsA=race -b=shipped:1 -flagsB=noRace -n=1000 -seed=701 -workers=6   # §2.10 D6a, before and after
+./botlab -exp=race -a=shipped:1 -flagsA=race -b=shipped:1 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia
+./botlab -exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1151 -workers=6   # §2.10 D6b
+./botlab -exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1152 -workers=6 -variant=croatia
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1
