@@ -66,3 +66,11 @@ func BlindTenForTest(v View, c game.Card) bool {
 func AvoidBlindTenForTest(v View, legal []game.Card, trump game.Suit, pick game.Card) game.Card {
 	return avoidBlindTen(v, legal, trump, pick)
 }
+
+func SuitAtRiskForTest(v View, suit game.Suit, trump game.Suit) bool {
+	return suitAtRisk(v, suit, trump)
+}
+
+func CashHighWinnerForTest(v View, c game.Card) bool {
+	return cashHighWinner(v, c, trickContextOf(v))
+}

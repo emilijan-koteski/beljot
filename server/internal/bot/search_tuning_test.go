@@ -288,3 +288,107 @@ func TestChooseAdjustedKeepsTheOnlyLegalTen(t *testing.T) {
 func TestDefaultSearchTuningBlindTenPenalty(t *testing.T) {
 	assert.Equal(t, bot.ConventionVeto, bot.DefaultSearchTuning().BlindTenPenalty)
 }
+
+func cashHighView(hand []string, trick []game.TrickCard) bot.View {
+	hearts := game.SuitHearts
+	v := bot.View{Seat: 0, Hand: cards(hand...), TrumpSuit: &hearts, CurrentTrick: trick}
+	for _, c := range v.Hand {
+		if len(trick) == 0 || c.Suit == trick[0].Card.Suit {
+			v.LegalCards = append(v.LegalCards, c)
+		}
+	}
+	if len(v.LegalCards) == 0 {
+		v.LegalCards = v.Hand
+	}
+	return v
+}
+
+func lastToPlayOnDiamonds(third string) []game.TrickCard {
+	return []game.TrickCard{{Card: card("8D"), PlayerSeat: 1}, {Card: card("7D"), PlayerSeat: 2}, {Card: card(third), PlayerSeat: 3}}
+}
+
+func TestSuitAtRisk(t *testing.T) {
+	hearts := game.SuitHearts
+	tests := []struct {
+		name  string
+		hand  []string
+		setup func(v *bot.View)
+		want  bool
+	}{
+		{"three held", []string{"AD", "QD", "9D", "7S"}, func(v *bot.View) {}, true},
+		{"two held and nothing declared", []string{"AD", "QD", "7S", "8S"}, func(v *bot.View) {}, false},
+		{"an opponent declared a run in the suit", []string{"AD", "QD", "7S", "8S"}, func(v *bot.View) {
+			v.DeclaredCards[1] = cards("7D", "8D", "9D")
+		}, true},
+		{"an opponent void in the suit with trumps possible", []string{"AD", "QD", "7S", "8S"}, func(v *bot.View) {
+			v.KnownVoids[1][bot.SuitIndex(game.SuitDiamonds)] = true
+		}, true},
+		{"an opponent void in the suit and in trumps", []string{"AD", "QD", "7S", "8S"}, func(v *bot.View) {
+			v.KnownVoids[1][bot.SuitIndex(game.SuitDiamonds)] = true
+			v.KnownVoids[1][bot.SuitIndex(hearts)] = true
+		}, false},
+		{"the partner void in the suit is no risk", []string{"AD", "QD", "7S", "8S"}, func(v *bot.View) {
+			v.KnownVoids[2][bot.SuitIndex(game.SuitDiamonds)] = true
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cashHighView(tt.hand, nil)
+			tt.setup(&v)
+			assert.Equal(t, tt.want, bot.SuitAtRiskForTest(v, game.SuitDiamonds, hearts))
+		})
+	}
+}
+
+func TestCashHighWinner(t *testing.T) {
+	tests := []struct {
+		name  string
+		hand  []string
+		trick []game.TrickCard
+		card  string
+		want  bool
+	}{
+		{"the Ace with three held", []string{"AD", "QD", "9D", "7S"}, lastToPlayOnDiamonds("JD"), "AD", true},
+		{"the Queen is never cashed", []string{"AD", "QD", "9D", "7S"}, lastToPlayOnDiamonds("JD"), "QD", false},
+		{"the Ten with three held", []string{"TD", "KD", "QD", "7S"}, lastToPlayOnDiamonds("JD"), "TD", true},
+		{"the King is never cashed", []string{"TD", "KD", "QD", "7S"}, lastToPlayOnDiamonds("JD"), "KD", false},
+		{"a trump cut", []string{"AD", "QD", "9D", "7S"}, []game.TrickCard{{Card: card("8D"), PlayerSeat: 1}, {Card: card("7D"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}}, "AD", false},
+		{"the led suit is trump", []string{"AH", "QH", "7H", "7S"}, []game.TrickCard{{Card: card("8H"), PlayerSeat: 1}, {Card: card("9S"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}}, "AH", false},
+		{"only the Ace overtakes", []string{"AD", "7D", "8D", "7S"}, lastToPlayOnDiamonds("JD"), "AD", false},
+		{"two held and nothing declared", []string{"AD", "QD", "7S", "8S"}, lastToPlayOnDiamonds("JD"), "AD", false},
+		{"not last to play", []string{"AD", "QD", "9D", "7S"}, lastToPlayOnDiamonds("JD")[:2], "AD", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, bot.CashHighWinnerForTest(cashHighView(tt.hand, tt.trick), card(tt.card)))
+		})
+	}
+}
+
+func TestChooseAdjustedCashesTheAceAtRisk(t *testing.T) {
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("AD")): {Mean: 1},
+		search.CardIdx(card("QD")): {Mean: 3},
+		search.CardIdx(card("9D")): {Mean: -5},
+	}}
+	v := cashHighView([]string{"AD", "QD", "9D", "7S"}, lastToPlayOnDiamonds("JD"))
+	tests := []struct {
+		name  string
+		bonus int
+		want  string
+	}{
+		{"the bonus moves the take to the Ace", 10, "AD"},
+		{"without the bonus the Queen wins", 0, "QD"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := bot.ChooseAdjustedForTest(v, res, bot.SearchTuning{CashHighWinnerBonus: tt.bonus})
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}
+
+func TestDefaultSearchTuningCashHighWinnerBonus(t *testing.T) {
+	assert.Equal(t, bot.ConventionVeto, bot.DefaultSearchTuning().CashHighWinnerBonus)
+}

@@ -48,6 +48,7 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	if f.On("phase3") {
 		t.OpeningSamples = 0
 		t.BlindTenPenalty = 0
+		t.CashHighWinnerBonus = 0
 	}
 	switch {
 	case f.On("defTrump3"):
@@ -72,6 +73,18 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noBlindTen") {
 		t.BlindTenPenalty = 0
+	}
+	switch {
+	case f.On("cashHigh3"):
+		t.CashHighWinnerBonus = 3
+	case f.On("cashHigh10"):
+		t.CashHighWinnerBonus = 10
+	}
+	if f.On("cashHighVeto") {
+		t.CashHighWinnerBonus = bot.ConventionVeto
+	}
+	if f.On("noCashHigh") {
+		t.CashHighWinnerBonus = 0
 	}
 	if f.On("tenUnder3") {
 		t.TenUnderAceBonus = 3

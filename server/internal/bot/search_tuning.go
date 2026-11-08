@@ -20,6 +20,7 @@ type SearchTuning struct {
 	RaceObjective          bool
 	OpeningSamples         int
 	BlindTenPenalty        int
+	CashHighWinnerBonus    int
 	SampleCaps             [9]int
 	SeedSalt               uint64
 }
@@ -27,7 +28,7 @@ type SearchTuning struct {
 // DefaultSearchTuning is the tuning the bot ships with.
 func DefaultSearchTuning() SearchTuning {
 	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true, OpeningSamples: search.OpeningSamples,
-		BlindTenPenalty: ConventionVeto}
+		BlindTenPenalty: ConventionVeto, CashHighWinnerBonus: ConventionVeto}
 }
 
 // samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
@@ -79,6 +80,56 @@ func blindTen(v View, c game.Card, ctx TrickContext) bool {
 	return true
 }
 
+func countSuit(cards []game.Card, suit game.Suit) int {
+	n := 0
+	for _, c := range cards {
+		if c.Suit == suit {
+			n++
+		}
+	}
+	return n
+}
+
+// suitAtRisk reports whether the suit will not run: the seat holds three or more of it, any seat declared three or more of
+// it, or an opponent is known void in it while still able to trump.
+func suitAtRisk(v View, suit game.Suit, trump game.Suit) bool {
+	if countSuit(v.Hand, suit) >= 3 {
+		return true
+	}
+	for _, declared := range v.DeclaredCards {
+		if countSuit(declared, suit) >= 3 {
+			return true
+		}
+	}
+	for _, o := range []int{(v.Seat + 1) % 4, (v.Seat + 3) % 4} {
+		if v.KnownVoids[o][SuitIndex(suit)] && !v.KnownVoids[o][SuitIndex(trump)] {
+			return true
+		}
+	}
+	return false
+}
+
+// cashHighWinner reports whether the card is the Ace or Ten taken last with a choice of led-suit winners, in a suit that
+// will not run.
+func cashHighWinner(v View, c game.Card, ctx TrickContext) bool {
+	if ctx.Position != 3 || ctx.Led == nil || v.TrumpSuit == nil || ctx.TrumpCut {
+		return false
+	}
+	trump, led := *v.TrumpSuit, *ctx.Led
+	if led == trump || c.Suit != led || (c.Rank != game.RankAce && c.Rank != game.RankTen) {
+		return false
+	}
+	if !wouldOvertake(c, v.CurrentTrick, trump) {
+		return false
+	}
+	for _, other := range v.LegalCards {
+		if other != c && other.Suit == led && wouldOvertake(other, v.CurrentTrick, trump) {
+			return suitAtRisk(v, led, trump)
+		}
+	}
+	return false
+}
+
 // chooseAdjusted picks the legal card with the highest adjusted mean, the lowest card index winning ties.
 func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool) {
 	var ten *game.Card
@@ -105,6 +156,9 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		}
 		if t.BlindTenPenalty > 0 && blindTen(v, c, ctx) {
 			score -= float64(t.BlindTenPenalty)
+		}
+		if t.CashHighWinnerBonus > 0 && cashHighWinner(v, c, ctx) {
+			score += float64(t.CashHighWinnerBonus)
 		}
 		if penaliseTrump && isPenalisedDefenderTrump(c, *v.TrumpSuit) {
 			score -= float64(t.DefenderTrumpLeadBonus)
