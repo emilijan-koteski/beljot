@@ -51,8 +51,10 @@ and B (game 2) take seats 0/2, so the printed difference is A minus B against th
 the deals without a reachability policy). In `bidpos`, `-b=<policy>` puts B on the three seats
 other than the tested one (the tested seat plays A in the rollouts and sets the `natural` column);
 the natural auction that walks to later positions, and the reachability walk behind `-shape`, use B.
-B's random stream is reseeded from the deal index at the start of every walk, in the prefilter and in
-the run alike, so both games of a pair and the walk see the same human bids for a deal wherever it is processed.
+In `bidpos -b`, B's random stream is reseeded from the deal index before the reachability walk, before the
+run's walk, and before every forced-call and forced-pass rollout, so the walk, the prefilter and both rollouts of a deal
+see the same human bids wherever the deal is processed (the CSV rows are the same under any `-workers`, up to row order).
+The forced pass of the last round-2 seat, which the game scores as a passed-out hand, now gets evPass 0 instead of a rollout of the engine's unseeded reshuffle.
 
 ### 1.3 Regret (`-exp=regret`)
 

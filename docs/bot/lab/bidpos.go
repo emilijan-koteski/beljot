@@ -52,9 +52,9 @@ func bidpos(v game.Variant, csvPath string) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(500+w))), *flagsA)
 			B, walker := A, A
-			walkSource := rand.NewPCG(*seed, 498)
+			walkSource, rollSource := rand.NewPCG(*seed, 498), rand.NewPCG(*seed, uint64(600+w))
 			if bGiven {
-				B = makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(600+w))), *flagsB)
+				B = makePolicy(*polB, rand.New(rollSource), *flagsB)
 				walker = makePolicy(*polB, rand.New(walkSource), *flagsB)
 			}
 			var lines []string
@@ -92,7 +92,9 @@ func bidpos(v game.Variant, csvPath string) {
 					}
 					evPass := 0.0
 					canPass := !game.MustPickTrump(gs, seat)
-					if canPass {
+					passesOut := gs.Rules.AllPassOutcome == game.AllPassReshuffleAndRotate && gs.BiddingRound == 2 && gs.BiddingPassCount == 3
+					if canPass && !passesOut {
+						rollSource.Seed(*seed, uint64(i))
 						passed, err := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: seat})
 						if err != nil {
 							panic(err)
@@ -114,6 +116,7 @@ func bidpos(v game.Variant, csvPath string) {
 							act.Suit = &ss
 						}
 						candidate := gs.TrumpCandidate
+						rollSource.Seed(*seed, uint64(i))
 						forced, err := game.ApplyAction(gs, act)
 						if err != nil {
 							panic(err)
@@ -139,7 +142,7 @@ func bidpos(v game.Variant, csvPath string) {
 					if walk.Type == game.ActionPickTrump || !canPass {
 						break
 					}
-					if gs.Rules.AllPassOutcome == game.AllPassReshuffleAndRotate && gs.BiddingRound == 2 && gs.BiddingPassCount == 3 {
+					if passesOut {
 						break
 					}
 					nextState, err := game.ApplyAction(gs, walk)
