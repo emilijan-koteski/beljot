@@ -774,12 +774,64 @@ skips when skipping is worth more than 5 points to the seat's team. Server code 
 with the `mk41` copy, `-events`, `-workers=6`, two runs at a time. The counts line carries the Belote searches and skips
 (added to `printCounts` with this item); "caller belote then fell" is the counter of §2.10 "Counters at the phase-3 bot".
 
-| Variant | Seed | Command | Advantage per hand (A minus B) | Counts and counters | Time |
+| Variant | Seed | Commit | Command | Advantage per hand (A minus B) | Time |
 |---|---|---|---|---|---|
-| Bitola | 1171 | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1171 -workers=6` | -0.01 ± 0.04 (95% CI ±0.07); `points banked: A 181058  B 181082  (A share 50.0%)`; `A called 905 (made 82%), B called 905 (made 82%), passed out 190 / 2000` | `A counts: applied 17762, decided 17762, deferred 0, defender trump leads 146, belote searches 152, belote skips 5`; `B counts: applied 17763, decided 17763, deferred 0, defender trump leads 145, belote searches 0, belote skips 0`; A `events A: decisions 28960, blind tens 332 (11.5 per 1000; forced 331, free 1), high kept then ruffed 3 (0.1 per 1000), capots made/conceded 53/53, caller belote then fell 4`; B `events B: decisions 28960, blind tens 334 (11.5 per 1000; forced 333, free 1), high kept then ruffed 3 (0.1 per 1000), capots made/conceded 53/53, caller belote then fell 7` | 605 s |
-| Croatian | 1172 | same with `-seed=1172 -variant=croatia` | -0.11 ± 0.17 (95% CI ±0.33); `points banked: A 195156  B 195374  (A share 50.0%)`; `A called 1000 (made 80%), B called 1000 (made 80%), passed out 0 / 2000` | `A counts: applied 19301, decided 19301, deferred 0, defender trump leads 182, belote searches 140, belote skips 7`; `B counts: applied 19301, decided 19301, deferred 0, defender trump leads 183, belote searches 0, belote skips 0`; A `events A: decisions 32000, blind tens 397 (12.4 per 1000; forced 396, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 52/53, caller belote then fell 5`; B `events B: decisions 32000, blind tens 398 (12.4 per 1000; forced 397, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 53/52, caller belote then fell 11` | 647 s |
-| Bitola, transfer off | 1173 | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=400 -seed=1173 -workers=6 -transfer=off` | +0.00 ± 0.00 (95% CI ±0.00); `points banked: A 72088  B 72088  (A share 50.0%)`; `A called 359 (made 86%), B called 359 (made 86%), passed out 82 / 800` | `A counts: applied 6973, decided 6973, deferred 0, defender trump leads 54, belote searches 0, belote skips 0`; B the same; `events A: decisions 11488, blind tens 134 (11.7 per 1000; forced 133, free 1), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 29/29, caller belote then fell 0`; B the same line | 236 s |
-| Croatian, transfer off | 1174 | same with `-seed=1174 -variant=croatia -transfer=off` | +0.00 ± 0.00 (95% CI ±0.00); `points banked: A 78830  B 78830  (A share 50.0%)`; `A called 400 (made 76%), B called 400 (made 76%), passed out 0 / 800` | `A counts: applied 7682, decided 7682, deferred 0, defender trump leads 68, belote searches 0, belote skips 0`; B the same; `events A: decisions 12800, blind tens 153 (12.0 per 1000; forced 151, free 2), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 19/19, caller belote then fell 0`; B the same line | 251 s |
+| Bitola | 1171 | d9e20b2f | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1171 -workers=6` | -0.01 ± 0.04 (95% CI ±0.07) | 605 s |
+| Croatian | 1172 | d9e20b2f | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1172 -variant=croatia -workers=6` | -0.11 ± 0.17 (95% CI ±0.33) | 647 s |
+| Bitola, transfer off | 1173 | d9e20b2f | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=400 -seed=1173 -workers=6 -transfer=off` | +0.00 ± 0.00 (95% CI ±0.00) | 236 s |
+| Croatian, transfer off | 1174 | d9e20b2f | `-exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=400 -seed=1174 -variant=croatia -workers=6 -transfer=off` | +0.00 ± 0.00 (95% CI ±0.00) | 251 s |
+
+Seed 1171 (Bitola), `./botlab -exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1171 -workers=6`:
+
+```
+shipped:1[beloteGate5] vs shipped:1[noBeloteGate] (bitola, 1000 deals x2, 605s)
+  A advantage per hand: -0.01 ± 0.04 (95% CI ±0.07)
+  points banked: A 181058  B 181082  (A share 50.0%)
+  A called 905 (made 82%), B called 905 (made 82%), passed out 190 / 2000
+  A counts: applied 17762, decided 17762, deferred 0, defender trump leads 146, belote searches 152, belote skips 5
+  B counts: applied 17763, decided 17763, deferred 0, defender trump leads 145, belote searches 0, belote skips 0
+  events A: decisions 28960, blind tens 332 (11.5 per 1000; forced 331, free 1), high kept then ruffed 3 (0.1 per 1000), capots made/conceded 53/53, caller belote then fell 4
+  events B: decisions 28960, blind tens 334 (11.5 per 1000; forced 333, free 1), high kept then ruffed 3 (0.1 per 1000), capots made/conceded 53/53, caller belote then fell 7
+```
+
+Seed 1172 (Croatian), `./botlab -exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1172 -variant=croatia -workers=6`:
+
+```
+shipped:1[beloteGate5] vs shipped:1[noBeloteGate] (croatia, 1000 deals x2, 647s)
+  A advantage per hand: -0.11 ± 0.17 (95% CI ±0.33)
+  points banked: A 195156  B 195374  (A share 50.0%)
+  A called 1000 (made 80%), B called 1000 (made 80%), passed out 0 / 2000
+  A counts: applied 19301, decided 19301, deferred 0, defender trump leads 182, belote searches 140, belote skips 7
+  B counts: applied 19301, decided 19301, deferred 0, defender trump leads 183, belote searches 0, belote skips 0
+  events A: decisions 32000, blind tens 397 (12.4 per 1000; forced 396, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 52/53, caller belote then fell 5
+  events B: decisions 32000, blind tens 398 (12.4 per 1000; forced 397, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 53/52, caller belote then fell 11
+```
+
+Seed 1173 (Bitola, transfer off), `./botlab -exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=400 -seed=1173 -workers=6 -transfer=off`:
+
+```
+shipped:1[beloteGate5] vs shipped:1[noBeloteGate] (bitola, 400 deals x2, 236s)
+  A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)
+  points banked: A 72088  B 72088  (A share 50.0%)
+  A called 359 (made 86%), B called 359 (made 86%), passed out 82 / 800
+  A counts: applied 6973, decided 6973, deferred 0, defender trump leads 54, belote searches 0, belote skips 0
+  B counts: applied 6973, decided 6973, deferred 0, defender trump leads 54, belote searches 0, belote skips 0
+  events A: decisions 11488, blind tens 134 (11.7 per 1000; forced 133, free 1), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 29/29, caller belote then fell 0
+  events B: decisions 11488, blind tens 134 (11.7 per 1000; forced 133, free 1), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 29/29, caller belote then fell 0
+```
+
+Seed 1174 (Croatian, transfer off), `./botlab -exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=400 -seed=1174 -variant=croatia -workers=6 -transfer=off`:
+
+```
+shipped:1[beloteGate5] vs shipped:1[noBeloteGate] (croatia, 400 deals x2, 251s)
+  A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)
+  points banked: A 78830  B 78830  (A share 50.0%)
+  A called 400 (made 76%), B called 400 (made 76%), passed out 0 / 800
+  A counts: applied 7682, decided 7682, deferred 0, defender trump leads 68, belote searches 0, belote skips 0
+  B counts: applied 7682, decided 7682, deferred 0, defender trump leads 68, belote searches 0, belote skips 0
+  events A: decisions 12800, blind tens 153 (12.0 per 1000; forced 151, free 2), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 19/19, caller belote then fell 0
+  events B: decisions 12800, blind tens 153 (12.0 per 1000; forced 151, free 2), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 19/19, caller belote then fell 0
+```
 
 Pooling by weights 1/SE² (printed two-decimal values): w = 1/0.04² = 625 and 1/0.17² = 34.6; (-0.01 · 625 - 0.11 · 34.6) /
 659.6 = -0.02; SE = 1 / √659.6 = 0.039; z = -0.4. Neither variant is opposite at 2 SE (-0.25 and -0.65 SE). Rule (a

@@ -77,7 +77,8 @@ Every time it is the bot's turn, it checks these in strict priority:
    play to the search (§5); `chooseCard` then plays only when the search does not apply or does
    not deliver in time.
 
-Scenarios 1 and 4 are "always do it" with nothing to tune, and 3 is unless the Belote search skips. The real intelligence is in
+Scenarios 1 and 4 always take the same action, with nothing to tune. Scenario 3 does too, except
+that the search may tell the caller to skip its Belote (rule 3). The real intelligence is in
 **bidding** and **card play**.
 
 ---
@@ -296,7 +297,8 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   layer builds the seat's view under the session lock and queues a search job. It does so only
   when the seat's turn is a plain card play: playing phase, no pending Belote or declaration, and
   no open surrender proposal from anyone. The one other job is the caller's Belote answer (§3
-  rule 3), queued the same way when its gate holds. The job itself runs on a pool worker without the lock.
+  rule 3), queued the same way when its gate holds. The job itself runs on a pool worker
+  without the lock.
   The pool has a fixed number of workers and a bounded queue (four jobs per worker). A full queue
   drops the new job, so a burst of bot turns never grows memory or blocks a timer goroutine.
 - The job has a deadline of `BELJOT_BOT_SEARCH_DEADLINE` (default 500 ms) counted from when it
@@ -1008,8 +1010,8 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
   search uses the hand points and tricks won only to score a sample, not to change its objective.
 - No signalling or inference from the **partner's** discards (only voids are used).
 - No forced pick in Bitola round 2 (weak hands just reshuffle).
-- Declarations and accepting surrender are unconditional (correct, nothing to tune); the Belote is
-  too unless the caller's Belote search skips it (§3 rule 3).
+- Declarations and accepting surrender are unconditional (correct, nothing to tune). The Belote
+  is too, unless the caller's Belote search skips it (§3 rule 3).
 
 ---
 
