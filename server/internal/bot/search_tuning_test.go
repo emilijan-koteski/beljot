@@ -98,8 +98,8 @@ func TestChooseAdjustedPenalisesTheDefendersTrumpLead(t *testing.T) {
 		{"the Jack of trump is exempt", []string{"JH", "7S"}, means(map[string]float64{"JH": 13, "7S": 12}), 10, "JH"},
 		{"the Nine of trump is exempt", []string{"9H", "7S"}, means(map[string]float64{"9H": 13, "7S": 12}), 10, "9H"},
 		{"a side Jack or Nine is not penalised", []string{"8H", "JS", "9C"}, means(map[string]float64{"8H": 5, "JS": 13, "9C": 12}), 10, "JS"},
-		{"the veto loses to any side lead", []string{"8H", "7S"}, means(map[string]float64{"8H": 100, "7S": 1}), bot.DefenderTrumpLeadVeto, "7S"},
-		{"only trumps legal still chooses a card", []string{"8H", "7H"}, means(map[string]float64{"8H": 5, "7H": 3}), bot.DefenderTrumpLeadVeto, "8H"},
+		{"the veto loses to any side lead", []string{"8H", "7S"}, means(map[string]float64{"8H": 100, "7S": 1}), bot.ConventionVeto, "7S"},
+		{"only trumps legal still chooses a card", []string{"8H", "7H"}, means(map[string]float64{"8H": 5, "7H": 3}), bot.ConventionVeto, "8H"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,4 +250,41 @@ func TestSamplesForHonoursACap(t *testing.T) {
 	assert.Equal(t, 12, bot.SamplesForForTest(1, bot.SearchTuning{OpeningSamples: 12, SampleCaps: [9]int{3: 32}}))
 	assert.Equal(t, 7, bot.SamplesForForTest(2, bot.SearchTuning{OpeningSamples: 12, SampleCaps: [9]int{2: 7}}))
 	assert.Equal(t, search.SamplesForTrick(3), bot.SamplesForForTest(3, bot.SearchTuning{}))
+}
+
+func TestChooseAdjustedPenalisesABlindTen(t *testing.T) {
+	hearts := game.SuitHearts
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("TS")): {Mean: 4},
+		search.CardIdx(card("7D")): {Mean: 0},
+	}}
+	v := defenderLeadView([]string{"TS", "7D"}, &hearts, 1, nil)
+	tests := []struct {
+		name    string
+		penalty int
+		want    string
+	}{
+		{"the penalty moves the lead off the blind ten", 10, "7D"},
+		{"without the penalty the ten wins", 0, "TS"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := bot.ChooseAdjustedForTest(v, res, bot.SearchTuning{BlindTenPenalty: tt.penalty})
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}
+
+func TestChooseAdjustedKeepsTheOnlyLegalTen(t *testing.T) {
+	hearts := game.SuitHearts
+	res := search.Result{Cards: map[int]search.CardStats{search.CardIdx(card("TS")): {Mean: -3}}}
+	v := defenderLeadView([]string{"TS"}, &hearts, 1, nil)
+	got, ok := bot.ChooseAdjustedForTest(v, res, bot.SearchTuning{BlindTenPenalty: bot.ConventionVeto})
+	require.True(t, ok)
+	assert.Equal(t, "TS", got.String())
+}
+
+func TestDefaultSearchTuningBlindTenPenalty(t *testing.T) {
+	assert.Equal(t, 10, bot.DefaultSearchTuning().BlindTenPenalty)
 }

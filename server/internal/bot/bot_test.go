@@ -2082,3 +2082,17 @@ func TestCardsProvablyAbsent(t *testing.T) {
 		})
 	}
 }
+
+func TestChooseFollowNeverDiscardsABlindTen(t *testing.T) {
+	v := viewForTweakCase(playTweakCase{
+		hand:       cards("AD", "TS"),
+		trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 3}},
+		callerSeat: 1,
+	})
+	assert.Equal(t, "AD", bot.ChooseCardForTest(v).String())
+}
+
+func TestChooseLeadNeverLeadsABlindTen(t *testing.T) {
+	v := viewForTweakCase(playTweakCase{hand: cards("TS", "7H"), callerSeat: 1})
+	assert.Equal(t, "7H", bot.ChooseCardForTest(v).String())
+}

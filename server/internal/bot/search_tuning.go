@@ -2,12 +2,13 @@ package bot
 
 import (
 	"math"
+	"slices"
 
 	"github.com/emilijan/beljot/server/internal/bot/search"
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-const DefenderTrumpLeadVeto = 10_000
+const ConventionVeto = 10_000
 
 // SearchTuning holds the phase-3 behaviours layered on the search. The zero value is the phase-2 behaviour, and SeedSalt
 // is a lab-only sampler seed offset that production leaves at 0.
@@ -18,13 +19,15 @@ type SearchTuning struct {
 	TrumpDrawConditional   bool
 	RaceObjective          bool
 	OpeningSamples         int
+	BlindTenPenalty        int
 	SampleCaps             [9]int
 	SeedSalt               uint64
 }
 
 // DefaultSearchTuning is the tuning the bot ships with.
 func DefaultSearchTuning() SearchTuning {
-	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true, OpeningSamples: search.OpeningSamples}
+	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true, OpeningSamples: search.OpeningSamples,
+		BlindTenPenalty: 10}
 }
 
 // samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
@@ -55,6 +58,27 @@ func isPenalisedDefenderTrump(c game.Card, trump game.Suit) bool {
 	return c.Suit == trump && c.Rank != game.RankJack && c.Rank != game.Rank9
 }
 
+// blindTen reports whether the card is a side-suit Ten played while its Ace is out and not known to be with the partner,
+// on a lead or onto a trick the seat's side is not winning.
+func blindTen(v View, c game.Card, ctx TrickContext) bool {
+	if c.Rank != game.RankTen || v.TrumpSuit == nil || c.Suit == *v.TrumpSuit {
+		return false
+	}
+	if ctx.Position != 0 && ctx.SideWinning {
+		return false
+	}
+	ace := game.Card{Rank: game.RankAce, Suit: c.Suit}
+	if slices.Contains(v.PlayedCards, ace) || slices.Contains(v.Hand, ace) || slices.Contains(v.KnownCards[(v.Seat+2)%4], ace) {
+		return false
+	}
+	for _, tc := range v.CurrentTrick {
+		if tc.Card == ace {
+			return false
+		}
+	}
+	return true
+}
+
 // chooseAdjusted picks the legal card with the highest adjusted mean, the lowest card index winning ties.
 func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool) {
 	var ten *game.Card
@@ -62,6 +86,7 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		ten = tenUnderAceCandidate(v, v.LegalCards, *v.TrumpSuit)
 	}
 	penaliseTrump := t.DefenderTrumpLeadBonus > 0 && defenderTrumpLeadConvention(v)
+	ctx := trickContextOf(v)
 	riskAdjustLead := t.LeadRiskLambda > 0 && len(v.CurrentTrick) == 0
 	var best game.Card
 	bestIdx, bestScore, found := 0, 0.0, false
@@ -77,6 +102,9 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		}
 		if ten != nil && c == *ten {
 			score += float64(t.TenUnderAceBonus)
+		}
+		if t.BlindTenPenalty > 0 && blindTen(v, c, ctx) {
+			score -= float64(t.BlindTenPenalty)
 		}
 		if penaliseTrump && isPenalisedDefenderTrump(c, *v.TrumpSuit) {
 			score -= float64(t.DefenderTrumpLeadBonus)

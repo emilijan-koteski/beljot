@@ -54,3 +54,15 @@ func DeferTrumpDrawForTest(v View, res search.Result, adjusted game.Card, t Sear
 func ChooseCardForTest(v View) game.Card {
 	return chooseCard(v)
 }
+
+func TrickContextOfForTest(v View) TrickContext {
+	return trickContextOf(v)
+}
+
+func BlindTenForTest(v View, c game.Card) bool {
+	return blindTen(v, c, trickContextOf(v))
+}
+
+func AvoidBlindTenForTest(v View, legal []game.Card, trump game.Suit, pick game.Card) game.Card {
+	return avoidBlindTen(v, legal, trump, pick)
+}

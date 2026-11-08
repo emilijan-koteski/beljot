@@ -45,6 +45,10 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t = bot.SearchTuning{}
 		t.SampleCaps[3], t.SampleCaps[4], t.SampleCaps[5] = 16, 30, 40
 	}
+	if f.On("phase3") {
+		t.OpeningSamples = 0
+		t.BlindTenPenalty = 0
+	}
 	switch {
 	case f.On("defTrump3"):
 		t.DefenderTrumpLeadBonus = 3
@@ -52,10 +56,22 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t.DefenderTrumpLeadBonus = 10
 	}
 	if f.On("defTrumpVeto") {
-		t.DefenderTrumpLeadBonus = bot.DefenderTrumpLeadVeto
+		t.DefenderTrumpLeadBonus = bot.ConventionVeto
 	}
 	if f.On("noDefTrump") {
 		t.DefenderTrumpLeadBonus = 0
+	}
+	switch {
+	case f.On("blindTen3"):
+		t.BlindTenPenalty = 3
+	case f.On("blindTen10"):
+		t.BlindTenPenalty = 10
+	}
+	if f.On("blindTenVeto") {
+		t.BlindTenPenalty = bot.ConventionVeto
+	}
+	if f.On("noBlindTen") {
+		t.BlindTenPenalty = 0
 	}
 	if f.On("tenUnder3") {
 		t.TenUnderAceBonus = 3

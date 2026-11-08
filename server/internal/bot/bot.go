@@ -166,7 +166,7 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		}
 	}
 	if len(nonTrump) > 0 {
-		return lowestValue(nonTrump, trump)
+		return avoidBlindTen(v, legal, trump, lowestValue(nonTrump, trump))
 	}
 
 	if c := highestOfSuit(legal, trump, game.TrumpRankOrder); c != nil {
@@ -237,7 +237,7 @@ func chooseFollow(v View, legal []game.Card) game.Card {
 		}
 		return *cheap
 	}
-	return lowestValue(legal, trump)
+	return avoidBlindTen(v, legal, trump, lowestValue(legal, trump))
 }
 
 // partnerTakesTrick reports whether the partner, playing last, is guaranteed to take the trick with
@@ -1166,6 +1166,25 @@ func highestPointsLedSuitWinner(v View, legal []game.Card, led, trump game.Suit)
 		}
 	}
 	return best
+}
+
+// avoidBlindTen replaces a blind Ten pick with the lowest-value legal card that is not one, and keeps it when it is the
+// only choice.
+func avoidBlindTen(v View, legal []game.Card, trump game.Suit, pick game.Card) game.Card {
+	ctx := trickContextOf(v)
+	if !blindTen(v, pick, ctx) {
+		return pick
+	}
+	var rest []game.Card
+	for _, c := range legal {
+		if !blindTen(v, c, ctx) {
+			rest = append(rest, c)
+		}
+	}
+	if len(rest) == 0 {
+		return pick
+	}
+	return lowestValue(rest, trump)
 }
 
 // lowestValue returns the lowest-point legal card, preferring non-trump on ties (preserve trump),
