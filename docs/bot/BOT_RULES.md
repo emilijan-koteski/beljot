@@ -113,14 +113,16 @@ direction of play (`seatsPassedBefore`): 0 for the first seat to speak,
 | 7 | 9 and Ace, exactly 3 cards | at least 1 | Bitola only |
 | 8 | Jack and Ace, exactly 2 cards | at least 1 | Bitola only |
 | 9 | Jack, exactly 2 cards | at least 2 | Bitola only |
-| 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | Bitola only |
-| 11 | Jack, exactly 2 cards | at least 1 | Bitola only, third seat to speak (position 2) |
+| 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | both |
+| 11 | Jack, exactly 2 cards | at least 1 | Bitola only, second or third seat to speak (position 1 or 2) |
 | 12 | Jack, exactly 2 cards | at least 1 | Croatian only, dealer's partner (position 1) |
+| 13 | the Ace, exactly 4 cards, no Jack or 9 | none (0) | Bitola only |
 
 Row 4 was retired by the recalibration under the search (`BOT_V2_LAB_RESULTS.md` §3.5); the
-row numbers are kept so the lab results still refer to them. Every other shape passes, for
+row numbers are kept so the lab results still refer to them. Rows 10, 11 and 13 were added or
+extended on the owner's approval of the shapes measured in §3.6. Every other shape passes, for
 example the Jack with one small trump and no side Ace, three small trumps without the Jack or
-the 9, or four small trumps with no side Ace.
+the 9, or four small trumps with no side Ace in Croatian.
 
 | Hand (incl. candidate) | Variant, position | Call? | Why |
 |---|---|---|---|
@@ -129,8 +131,11 @@ the 9, or four small trumps with no side Ace.
 | 7♥ 8♥ Q♥ K♥ + 7♠ 8♠ | Croatian | no | four small trumps, no side Ace |
 | 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Bitola | yes | row 7 |
 | 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Croatian | no | row 7 is Bitola only |
-| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Croatian | no | row 4 was retired, no side Ace |
-| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 2 (row 11) |
+| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Croatian | no | row 13 is Bitola only, row 4 was retired |
+| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Bitola | yes | row 13, four trumps with the Ace and no side Ace |
+| 9♥ 7♥ 8♥ + A♠ 7♣ 8♣ | Croatian | yes | row 10, now in both variants |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 1 or 2 (row 11) |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, second to speak | yes | row 11 |
 | J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, third to speak | yes | row 11 |
 
 ### 4.3 Choosing the suit, and the forced pick

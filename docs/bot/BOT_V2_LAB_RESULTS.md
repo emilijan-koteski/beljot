@@ -562,7 +562,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | B1 rank bounds from forced overplays (`RankBounds` into the sampler) | with minus without +0.60 ± 0.70 (z 0.9); Bitola +0.40 ± 0.90, Croatian +0.91 ± 1.13 | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (exactness; ships on its tests, the effect is reported, not gated) | 288ec0ae |
 | D6a the hand-end crossing in the stop-at-target race (`SettleTotals`, `HandEndDecided`) | `race` vs `noRace` before → after: Bitola +0.0225 ± 0.0071 → +0.0320 ± 0.0073, Croatian +0.0335 ± 0.0076 → +0.0525 ± 0.0079 | match edge per game, 1 000 deals per variant, `shipped:1` both sides, seeds 701/702 | ships (exactness; ships on its tests; not worse at 2 SE in either variant) | 86c3c757 → b4f4b3a4 |
 | D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
-| E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | E1 shapes measured; awaiting the owner | c8416aef |
+| E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added | c8416aef, f9ecf56f |
 
 #### D2 opening search
 
@@ -1402,6 +1402,11 @@ no 9, a side Ace" for the Bitola row-11 shape and "J without the Ace" for the de
 `noA` (a doubleton J with the Ace is row 8, already in the table). The two `pos1` cells are second to speak
 only; the other two pool every position the spec allows. All eight cells clear the criterion; the weakest
 is Bitola row 4 against the shipped bidder at 2.2 SE and +7.5.
+
+Owner's answers (2026-11-08): yes to all four shapes. Encoded as the smallest table change: the Bitola row-4
+shape becomes a new row 13 (row 4 stays retired); row 10 is extended to both variants; row 11 is extended to
+positions 1 and 2; the Croatian 9 with three trumps and exactly one side Ace second to speak is subsumed by
+the extended row 10 (any seat, one or more side Aces) and needs no row of its own.
 
 Commands (seeds 1161-1164 shipped bidder, 1165-1168 human-like bidder; Croatian rows add
 `-variant=croatia`, Bitola is the default; all `-a=shipped:1 -n=2000 -workers=6`). Wall clock is from each
