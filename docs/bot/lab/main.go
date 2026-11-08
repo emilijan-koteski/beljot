@@ -18,19 +18,21 @@ import (
 )
 
 var (
-	exp       = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
-	polA      = flag.String("a", "current", "policy A")
-	polB      = flag.String("b", "random", "policy B")
-	n         = flag.Int("n", 200, "deals")
-	seed      = flag.Uint64("seed", 1, "seed")
-	variant   = flag.String("variant", "bitola", "bitola|croatia")
-	flagsA    = flag.String("flagsA", "", "lab flags for A (comma list)")
-	flagsB    = flag.String("flagsB", "", "lab flags for B (comma list)")
-	workers   = flag.Int("workers", runtime.NumCPU(), "parallel workers")
-	seeds     = flag.Int("seeds", 5, "seed salts per position for stability")
-	csvOut    = flag.String("csv", "bidpos.csv", "csv output for bidpos")
-	events    = flag.Bool("events", false, "duplicate: count table events per policy")
-	shapeSpec = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
+	exp          = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability|bidpos|bidscore")
+	polA         = flag.String("a", "current", "policy A")
+	polB         = flag.String("b", "random", "policy B")
+	n            = flag.Int("n", 200, "deals")
+	seed         = flag.Uint64("seed", 1, "seed")
+	variant      = flag.String("variant", "bitola", "bitola|croatia")
+	flagsA       = flag.String("flagsA", "", "lab flags for A (comma list)")
+	flagsB       = flag.String("flagsB", "", "lab flags for B (comma list)")
+	workers      = flag.Int("workers", runtime.NumCPU(), "parallel workers")
+	seeds        = flag.Int("seeds", 5, "seed salts per position for stability")
+	csvOut       = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	events       = flag.Bool("events", false, "duplicate: count table events per policy")
+	scoreState   = flag.String("scoreState", "oppClose", "bidscore: oppClose|ownClose|bothClose|neither")
+	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
+	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
 func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
@@ -91,6 +93,8 @@ func main() {
 		bidtable(v)
 	case "stability":
 		stability(v)
+	case "bidscore":
+		bidscore(v)
 	case "bidpos":
 		bidpos(v, *csvOut)
 	case "shapecheck":

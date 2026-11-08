@@ -60,7 +60,7 @@ func raceGame(d raceDeal, v game.Variant, A, B botlab.Policy, g int, res *raceRe
 			pol[s] = B
 		}
 	}
-	out, err := botlab.PlayHand(botlab.NewDealStateWith(d.deal, v, d.scores, true), pol, nil)
+	out, err := botlab.PlayHand(botlab.NewDealStateWith(d.deal, v, d.scores, *stopAtTarget), pol, nil)
 	if err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)

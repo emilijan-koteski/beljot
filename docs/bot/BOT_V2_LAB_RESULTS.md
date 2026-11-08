@@ -69,6 +69,20 @@ CSV is valid for the targeted cell only, never for a call rate, a table-wide val
 total, and `bidpos` prints a warning line saying so. `-exp=shapecheck` prints 20 matching deals
 for eyeballing the predicate.
 
+`-exp=bidscore` (`docs/bot/lab/bidscore.go`) measures a bidding decision by the match result instead
+of the hand points. Each pair is one deal with match scores drawn from `-scoreState` against the
+target 1001, for the tested seat's team: `oppClose` (opponents 10-100 short, own side 200-600),
+`ownClose` (the mirror), `bothClose` (both 10-100) and `neither` (both 300-600). The tested seat is
+the first seat whose natural position fits `-shape`, or seat 0 without a shape; deals where the
+natural auction of `-a` does not reach it with a free choice are redrawn. The deal is played twice,
+the seat forcing a call (the candidate's suit in Bitola round 1, else the suit with the most
+trumps, ties by trump-order points, because `trumpSuitScore` is not exported) and forcing a pass,
+with policy `-a` on all seats and the natural bids of the other seats. An undecided match continues
+with fresh random deals (the same stream for both branches of a pair) up to 12 hands, then scores 0.
+The line is `bidscore <state>: n pairs, call-minus-pass match wins +x.xxx ± y.yyy, call wins a/n,
+pass wins b/n`, where "wins" counts the pairs in which the tested team won the match. `-stopAtTarget`
+(default true; also on `race`) set to false makes a match end only at a hand end.
+
 ### 1.5 Policies
 
 - `current`: production `bot.Decide`. At commit 2d70456 this was the v1 bot, and every table in
@@ -521,6 +535,11 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | policy | shape | variant | n | seed | commit | command | result |
 |---|---|---|---|---|---|---|---|
 | `shipped:3` | `A,c4,noJ,no9,sA0` | Bitola | 300 deals | 1101 | 37ccec7d | `-exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6` | 133 s; `class_table.py` cell `-A 4 0` n = 300 (gain +7.5 ± 9.3); 3 304 non-forced rows; 20 of 503 random deals carry a matching position |
+
+| policy | experiment | variant | n | seed | commit | command | result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | `race`, match decided at hand ends | Bitola | 100 deals x2 | 1105 | afcef2fd + bidscore.go | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
+| `shipped:3` | `bidscore oppClose` | Bitola | 100 pairs | 1106 | afcef2fd + bidscore.go | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.020 ± 0.020, call wins 3/100, pass wins 2/100`; 2.9 s, 0.03 s per pair (a 200-pair `neither` probe took 0.15 s per pair; sizes Task 13) |
 
 #### Counters at the phase-3 bot
 
@@ -1166,7 +1185,7 @@ server module.
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
 cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped,events}.go /tmp/lab/server/internal/botlab/
-cp docs/bot/lab/{main,bidtable,bidpos,stability,race,shape,shape_check}.go /tmp/lab/server/cmd/botlab/
+cp docs/bot/lab/{main,bidtable,bidpos,stability,race,shape,shape_check,bidscore}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
 ./botlab -exp=duplicate -a=current -b=lab -n=4000                     # phase 1 against the frozen v1, §3.4
@@ -1183,6 +1202,8 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
 ./botlab -exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6 && python3 -I class_table.py shape_probe.csv   # §2.10, targeted deals
 ./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6   # §2.10, table event counts
+./botlab -exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6   # §2.10, match decided at hand ends
+./botlab -exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6   # §2.10, match-score bidding probe
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1
