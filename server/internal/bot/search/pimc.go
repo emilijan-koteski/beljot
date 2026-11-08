@@ -56,11 +56,13 @@ type Result struct {
 	Classes [2]ClassStats
 }
 
-const OpeningSamples = 0
+const OpeningSamples = 12
 
 // SamplesForTrick is the number of deals to search at the given 1-based trick, or 0 where the bot should not search.
 func SamplesForTrick(trick int) int {
 	switch {
+	case trick < 1:
+		return 0
 	case trick < 3:
 		return OpeningSamples
 	case trick == 3:

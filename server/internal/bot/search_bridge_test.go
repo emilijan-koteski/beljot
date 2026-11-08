@@ -219,7 +219,7 @@ func TestSearchAppliesGates(t *testing.T) {
 	}{
 		{"trick 3 from trick 3", 3, func(v *bot.View) {}, true},
 		{"trick 2 from trick 3", 3, func(v *bot.View) { v.TrickNumber = 2 }, false},
-		{"trick 2 from trick 1 has no samples", 1, func(v *bot.View) { v.TrickNumber = 2 }, false},
+		{"trick 2 from trick 1", 1, func(v *bot.View) { v.TrickNumber = 2 }, true},
 		{"trick 3 from trick 1", 1, func(v *bot.View) {}, true},
 		{"from trick 0 never searches", 0, func(v *bot.View) {}, false},
 		{"one legal card", 3, func(v *bot.View) { v.LegalCards = v.LegalCards[:1] }, false},
@@ -282,8 +282,8 @@ func TestSearchCardPlaysALegalCardDeterministically(t *testing.T) {
 func TestSearchCardDeclinesWhereTheRulesPlay(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(2)
 	early := viewFromState(gs, 0, memoryOfMissingCards(gs))
-	_, ok := bot.SearchCard(early, time.Now().Add(5*time.Second))
-	assert.False(t, ok, "no samples are budgeted before trick 3")
+	_, ok := bot.SearchCardWith(early, time.Now().Add(5*time.Second), bot.SearchTuning{RaceObjective: true})
+	assert.False(t, ok, "no samples are budgeted before trick 3 without opening samples")
 
 	gs = testfixtures.NewGameMidPlay(5)
 	v := viewFromState(gs, 0, memoryOfMissingCards(gs))

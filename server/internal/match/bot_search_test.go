@@ -152,7 +152,7 @@ func TestDefaultBotSearchSettings(t *testing.T) {
 	assert.GreaterOrEqual(t, s.Workers, 1)
 	assert.LessOrEqual(t, s.Workers, 4)
 	assert.Equal(t, 500*time.Millisecond, s.Deadline)
-	assert.Equal(t, 3, s.FromTrick)
+	assert.Equal(t, 1, s.FromTrick)
 }
 
 func TestBuildBotViewCarriesDeclarationsEnabled(t *testing.T) {

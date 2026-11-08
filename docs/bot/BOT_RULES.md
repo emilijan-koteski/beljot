@@ -5,7 +5,7 @@ considers, and with examples, for both the Bitola and the Croatian variant. It r
 current logic including phases 1, 2 and 3 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
 memory facts, the hand-shape bidding table, the led-suit-secure take, the Ace cashed before the
 Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo search that
-plays the cards from trick 3 (§5), with the rule layer as the fallback. Phase 3 is the faster
+plays the cards from trick 3 (§5), with the rule layer as the fallback; phase 4 starts it at trick 1. Phase 3 is the faster
 solver, two table conventions and the match race inside the search (§5.10), larger sample counts,
 the own Belote in the settlement and a bidding table recalibrated under the search (§4.2). The
 rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
@@ -67,7 +67,7 @@ Every time it is the bot's turn, it checks these in strict priority:
 3. **Belote / Rebelote pending** (+20) -> always announce. Unconditional value.
 4. **Awaiting declaration** -> always declare. The engine auto-detects melds; declaring
    always maximizes points.
-5. **Otherwise** -> `chooseCard` (Scenario B). From trick 3 the match layer first offers a card
+5. **Otherwise** -> `chooseCard` (Scenario B). From trick 1 the match layer first offers a card
    play to the search (§5); `chooseCard` then plays only when the search does not apply or does
    not deliver in time.
 
@@ -163,17 +163,17 @@ the 9, or four small trumps with no side Ace.
 
 ---
 
-## 5. The search layer (from trick 3)
+## 5. The search layer (from trick 1)
 
-From the third trick on, a bot seat does not run `chooseCard`. It plays the card found by a Monte
+From the first trick on, a bot seat does not run `chooseCard`. It plays the card found by a Monte
 Carlo search: draw complete deals that agree with everything the seat knows, solve each one
 exactly as if every hand were open, settle the result the way the engine scores a hand, and play
-the card with the best average for the seat's team. Bidding, declarations, Belote, surrender and
-tricks 1 and 2 stay with the rule layer (§3, §4, §6), and the rule layer is also the fallback
-whenever the search does not deliver a card. The search is the phase-2 design of
-`BOT_V2_PROPOSAL.md` §4.7; the lab measurements behind the start at trick 3 are in
-`BOT_V2_LAB_RESULTS.md` §2.2 (searching tricks 1 and 2 as well was worth between 0 and +5 at 12
-samples and costs seconds per decision with the current solver).
+the card with the best average for the seat's team. Bidding, declarations, Belote and surrender
+stay with the rule layer (§3, §4, §6), and the rule layer is also the fallback
+whenever the search does not deliver a card, which on tricks 1 and 2 happens for the slowest
+positions (§5.4). The search is the phase-2 design of
+`BOT_V2_PROPOSAL.md` §4.7; tricks 1 and 2 joined it in phase 4, measured at 4 000 deals per
+variant in `BOT_V2_LAB_RESULTS.md` §2.10 (D2).
 
 `Decide` never calls the search. The search is a separate entry point in
 `server/internal/bot/search_bridge.go` (`SearchApplies`, `SearchCard`, `DecideWith`) that the
@@ -183,7 +183,7 @@ match layer drives (5.5), so `Decide` stays pure and the rule layer needs no sea
 
 All of these must hold, otherwise the rule layer plays:
 
-- the first searched trick (`BELJOT_BOT_SEARCH_FROM_TRICK`, default 3) is above 0 and the current
+- the first searched trick (`BELJOT_BOT_SEARCH_FROM_TRICK`, default 1) is above 0 and the current
   trick (`View.TrickNumber`, 1 to 8) has reached it;
 - the phase is playing, the trump suit is known and it is the seat's own turn;
 - nothing else is pending for the seat: no Belote announcement, no declaration, no partner
@@ -244,7 +244,7 @@ how the seats bid or by what they led or discarded (see 5.9).
 
 | Trick | Samples (at most) |
 |---|---|
-| 1 and 2 | none (rule layer) |
+| 1 and 2 | 12 (`search.OpeningSamples`) |
 | 3 | 32 |
 | 4 | 60 |
 | 5 | 80 |
@@ -256,11 +256,12 @@ four-run pooled duplicate gain was +0.79 ± 0.21 per hand (z 3.8, `BOT_V2_LAB_RE
 they live in `search.SamplesForTrick`, and `SearchTuning.SampleCaps` (all 0 in production)
 overrides them for experiments.
 
-The opening search (tricks 1 and 2 at 12 samples, `search.OpeningSamples`) is measured and off
-(`OpeningSamples = 0`, so `BELJOT_BOT_SEARCH_FROM_TRICK` below 3 still behaves like 3). The
-trick-1 benchmark is 318.5 ms on average and 574 ms at most, over the 500 ms deadline for the
-worst positions, and the duplicate gain against the search from trick 3 is +0.83 ± 0.99 per hand
-(Bitola -0.54 ± 1.33, Croatian +2.56 ± 1.49, z 0.8), under the 2 SE a strength change must clear.
+The opening search (tricks 1 and 2 at 12 samples, `search.OpeningSamples`) ships in phase 4. The
+trick-1 benchmark is 330 ms on average and 604 ms at most, so the slowest positions pass the 500 ms
+deadline and the rule layer plays them (§5.5). The duplicate gain against the search from trick 3
+is +1.90 ± 0.48 per hand over 4 000 deals per variant (Bitola +1.40 ± 0.64, Croatian +2.52 ± 0.71,
+z 4.0), past the 2 SE a strength change must clear; the 1 000-deal measurement of phase 3 was
++0.83 ± 0.99.
 
 The search stops early once at least 8 samples are in and the best card leads the runner-up by
 more than one standard error. The standard error is that of the per-sample difference between
@@ -304,11 +305,10 @@ Read once in `server/internal/config` and passed to `SetBotSearch`:
 |---|---|---|
 | `BELJOT_BOT_SEARCH_WORKERS` | `0` | worker count; 0 or less means automatic, `max(1, min(4, GOMAXPROCS/2))` |
 | `BELJOT_BOT_SEARCH_DEADLINE` | `500ms` | time one search may take, from queueing; 0 or less means the default |
-| `BELJOT_BOT_SEARCH_FROM_TRICK` | `3` | first trick the search plays; 0 or less turns the search off |
+| `BELJOT_BOT_SEARCH_FROM_TRICK` | `1` | first trick the search plays; 0 or less turns the search off |
 
-A value below 3 behaves like 3, because no sample count is defined for tricks 1 and 2:
-`SearchApplies` is false there, so no job is queued and the rules play. Phase 3 changed no
-setting: the tuning constants of 5.10 live in `bot.DefaultSearchTuning()`, not in the
+A value of 3 turns the opening search off again (tricks 1 and 2 play by the rules). Phases 3 and 4
+added no setting: the tuning constants of 5.10 live in `bot.DefaultSearchTuning()`, not in the
 environment.
 
 ### 5.7 Determinism
@@ -361,10 +361,9 @@ hands, identical on three repeated runs); its gate stays 60%.
   cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
   not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
   Capot, a fall) is valued in points, not as a decided match. In a Bitola trick 1 with declarations
-  still open the engine checks the target only at the end of the trick; the search never runs on
-  tricks 1 and 2, so that case is not modelled.
-- **No bidding, declaration, Belote or surrender decisions**, and no search on tricks 1 and 2
-  (the opening search was measured and left off, 5.4).
+  still open the engine checks the target only at the end of the trick; the search does not model
+  that case on tricks 1 and 2.
+- **No bidding, declaration, Belote or surrender decisions.**
 
 ### 5.10 Conventions and risk inside the search
 
@@ -381,7 +380,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `LeadRiskLambda` | 0 | risk5 +0.06 ± 0.18, risk10 -0.17 ± 0.30 | Would rank leads by mean minus lambda times the spread; not better at 2 SE, the code stays and the constant is 0 |
 | `TrumpDrawConditional` | false | -0.05 ± 0.32 (deferred about 2% of decisions) | Would hand a trump draw that depends on where the top trump sits to the rule layer; not better at 2 SE, the code stays off |
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
-| `OpeningSamples` | 0 | +0.83 ± 0.99 per hand | 5.4 |
+| `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
@@ -554,9 +553,9 @@ keep the K; the partner overtrumps with J/9.
 Example (step 4): trump ♥, opponent called. Hand 7♦ K♦ 9♣, partner void in ♦ -> lead **7♦**
 so the partner ruffs.
 
-Note: from trick 3 the search plays the lead, and it carries the Ten-under-Ace convention of B3
+Note: the search plays the lead, and it carries the Ten-under-Ace convention of B3
 as a bonus of 3 on the Ten when the values are close, and a penalty of 10 on a defender's
-non-J/9 trump lead (5.10). The rules above are the fallback and the tricks 1 and 2 play.
+non-J/9 trump lead (5.10). The rules above are the fallback, and they play tricks 1 and 2 when the opening search misses its deadline.
 
 ### B3. Following a trick (`chooseFollow`)
 
@@ -874,7 +873,7 @@ No bearing on which card, only when:
 - Game decisions: uniform random delay in `[botDelayMin, botDelayMax]`.
 - Score-reveal acknowledgements: a single short beat.
 - Generation/context guards ensure the bot never double-acts or acts on a stale decision point.
-- Card plays from trick 3: the search job is queued when the think timer is armed, so the think
+- Card plays: the search job is queued when the think timer is armed, so the think
   delay is the time the search has to finish. A result that is ready and still valid when the
   timer fires is played, otherwise the rule layer plays (§5.5).
 
@@ -908,11 +907,11 @@ By impact:
 7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
 8. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
 9. The search: the `BELJOT_BOT_SEARCH_*` settings, `search.SamplesForTrick` and the early-stop
-   constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength from trick 3
+   constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength
    against CPU time (§5.4, §5.6). Change them only with the simulation gates and the duplicate
    comparison of §5.8.
 
-Blind spots if you want a stronger bot. These belong to the rule layer, which from trick 3 plays
+Blind spots if you want a stronger bot. These belong to the rule layer, which plays
 only as the fallback; the search's own limits are in §5.9. (The first four are logged in
 `_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass.)
 

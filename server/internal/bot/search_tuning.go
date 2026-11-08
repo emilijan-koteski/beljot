@@ -24,7 +24,7 @@ type SearchTuning struct {
 
 // DefaultSearchTuning is the tuning the bot ships with.
 func DefaultSearchTuning() SearchTuning {
-	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true}
+	return SearchTuning{DefenderTrumpLeadBonus: 10, TenUnderAceBonus: 3, RaceObjective: true, OpeningSamples: search.OpeningSamples}
 }
 
 // samplesFor is the deal count at a trick: a non-zero cap in SampleCaps wins over the opening samples and the schedule.
@@ -32,7 +32,7 @@ func samplesFor(trick int, t SearchTuning) int {
 	if trick >= 1 && trick < len(t.SampleCaps) && t.SampleCaps[trick] != 0 {
 		return t.SampleCaps[trick]
 	}
-	if trick < 3 && t.OpeningSamples > 0 {
+	if trick >= 1 && trick < 3 {
 		return t.OpeningSamples
 	}
 	return search.SamplesForTrick(trick)

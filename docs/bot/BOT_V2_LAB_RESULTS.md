@@ -554,6 +554,31 @@ built from. The summary is kept at the top; the rows below it carry command, see
 
 | item | pooled effect ± SE | metric | decision | commit |
 |---|---|---|---|---|
+| D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | see git log, `feat(bot): search the opening tricks` |
+
+#### D2 opening search
+
+A is `shipped:1` with `-flagsA=opening12`, B is `shipped:3` (production before this change). No
+phase-4 tuning exists yet, so the baseline is the tree at 90bbb688. Lab built from 90bbb688 with
+`mk41`-style copy (every file of `docs/bot/lab/`), the two runs one after the other on an otherwise
+idle machine.
+
+| Variant | Seed | Commit | Command | Advantage per hand | Counts | Time |
+|---|---|---|---|---|---|---|
+| Bitola | 1111 | 90bbb688 | `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3 -n=4000 -seed=1111 -workers=6` | +1.40 ± 0.64 (A share 50.4%, 698812 / 687634) | A applied 68957 / decided 68957; B 48685 / 48685; A called 3494 (made 83%), B 3494 (82%), passed out 1012 / 8000 | 681 s |
+| Croatian | 1112 | 90bbb688 | `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3 -n=4000 -seed=1112 -workers=6 -variant=croatia` | +2.52 ± 0.71 (A share 50.6%, 797772 / 777618) | A applied 77739 / decided 77739; B 54482 / 54482; A called 4000 (made 80%), B 4000 (78%) | 778 s |
+
+Pooling by weights 1/SE²: w1 = 1/0.64² = 2.441, w2 = 1/0.71² = 1.984; (1.40 · 2.441 + 2.52 · 1.984) /
+4.425 = +1.90; SE = 1 / √4.425 = 0.475; z = 4.0. Both variants are positive; neither is opposite at
+2 SE. Rule: pooled mean 1.90 > 2 SE = 0.95, met.
+
+Trick-1 benchmark (`TestSearchTrick1StaysUnderTheDeadline`, `OpeningSamples` set to 12 in a scratch
+copy of `server/` at 90bbb688, `go test -tags nodynamic -count=1 -run TestSearchTrick1StaysUnderTheDeadline -v
+./internal/bot/search/`, idle machine): means 333.8, 328.8 and 328.6 ms (median 328.8 ms); maxima
+604.6, 598.6 and 604.9 ms. Mean is under 400 ms: met.
+
+Verdict: both conditions met, the opening search ships (`OpeningSamples = 12`, default from-trick 1).
+`BELJOT_BOT_SEARCH_FROM_TRICK` in `.env.example` must change from 3 to 1.
 
 #### Sanity
 

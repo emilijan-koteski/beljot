@@ -319,13 +319,11 @@ func TestChooseRefusesWhatItCannotAnswer(t *testing.T) {
 }
 
 func TestSamplesForTrickSchedule(t *testing.T) {
-	want := map[int]int{0: 0, 1: 0, 2: 0, 3: 32, 4: 60, 5: 80, 6: 60, 7: 60, 8: 60}
+	want := map[int]int{0: 0, 1: 12, 2: 12, 3: 32, 4: 60, 5: 80, 6: 60, 7: 60, 8: 60}
 	for trick, samples := range want {
 		assert.Equal(t, samples, search.SamplesForTrick(trick), "trick %d", trick)
 	}
-	assert.Equal(t, search.OpeningSamples, search.SamplesForTrick(1))
-	assert.Equal(t, search.OpeningSamples, search.SamplesForTrick(2))
-}
+	}
 
 func TestChooseReportsPerCardStatistics(t *testing.T) {
 	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
