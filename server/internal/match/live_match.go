@@ -143,6 +143,7 @@ type Manager struct {
 	botDelayMin      time.Duration
 	botDelayMax      time.Duration
 	botSearch        BotSearchSettings
+	botTuning        bot.SearchTuning
 	searchPool       *searchPool
 	dealGraceEnabled bool
 	mu               sync.RWMutex
@@ -157,6 +158,7 @@ func NewManager(hub Broadcaster, matchRepo MatchRepository) *Manager {
 		matchRepo:        matchRepo,
 		botDelayMin:      time.Second,
 		botDelayMax:      2500 * time.Millisecond,
+		botTuning:        bot.DefaultSearchTuning(),
 		dealGraceEnabled: true,
 	}
 }

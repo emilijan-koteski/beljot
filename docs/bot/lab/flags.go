@@ -53,6 +53,7 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t.BlindTenPenalty = 0
 		t.CashHighWinnerBonus = 0
 		t.DecidingHand = false
+		t.BeloteSkipMargin = 0
 	}
 	switch {
 	case f.On("defTrump3"):
@@ -131,6 +132,12 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noCaps") {
 		t.SampleCaps = [9]int{}
+	}
+	if f.On("beloteGate5") {
+		t.BeloteSkipMargin = 5
+	}
+	if f.On("noBeloteGate") {
+		t.BeloteSkipMargin = 0
 	}
 	return t
 }

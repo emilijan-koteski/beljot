@@ -3,6 +3,7 @@ package search_test
 import (
 	"math"
 	"math/rand/v2"
+	"slices"
 	"testing"
 	"time"
 
@@ -362,4 +363,59 @@ func TestChooseSeedSaltChangesTheSamplesNotTheInformation(t *testing.T) {
 	again, _ := search.Choose(c.in, c.pos, c.legal, c.settle, salted, farFuture())
 	assert.Equal(t, b, again)
 	assert.NotEqual(t, a.Cards, b.Cards)
+}
+
+func TestEvaluateMatchesChooseOnAForcedCard(t *testing.T) {
+	junk := game.Card{Suit: game.SuitClubs, Rank: game.Rank7}
+	master := game.Card{Suit: game.SuitHearts, Rank: game.RankJack}
+	unseen := unseenWithClubs(rand.New(rand.NewPCG(9, 4)))
+	own := search.MaskOf([]game.Card{junk, master})
+	trick := []int{cardOf(game.SuitClubs, game.RankAce)}
+	in := search.Information{Seat: 2, Own: own, Unseen: unseen, Need: [4]int{2, 1, 0, 2}}
+	pos := search.Position{Trump: hearts, Leader: 1, Trick: trick, Capot: search.CapotFlag([2]int{3, 2})}
+	require.Equal(t, []game.Card{junk}, legalFor(pos, own))
+	settle := settlementOver(hearts, trick, own, unseen)
+	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1}
+
+	chosen, ok := search.Choose(in, pos, []game.Card{junk}, settle, opts, farFuture())
+	require.True(t, ok)
+	mean, se, made, ok := search.Evaluate(in, pos, settle, opts, farFuture())
+	require.True(t, ok)
+
+	assert.Equal(t, 24, chosen.Samples)
+	assert.InDelta(t, chosen.Mean, mean, 1e-9)
+	assert.InDelta(t, chosen.Cards[search.CardIdx(junk)].SE, se, 1e-9)
+	assert.InDelta(t, chosen.CallerMade, made, 1e-9)
+}
+
+func TestEvaluateValuesAClosedTrick(t *testing.T) {
+	last := game.Card{Suit: game.SuitClubs, Rank: game.Rank8}
+	open := []int{cardOf(game.SuitClubs, game.RankAce), cardOf(game.SuitClubs, game.Rank7), cardOf(game.SuitClubs, game.RankKing)}
+	closed := append(slices.Clone(open), search.CardIdx(last))
+	settle := settlementOver(hearts, closed)
+	opts := search.Options{Samples: 4, EarlyStopAfter: 5, EarlyStopSE: 1}
+
+	before := search.Position{Trump: hearts, Leader: 1, Trick: open, Capot: search.CapotFlag([2]int{3, 4})}
+	chosen, ok := search.Choose(search.Information{Seat: 0, Own: search.MaskOf([]game.Card{last})}, before, []game.Card{last}, settle, opts, farFuture())
+	require.True(t, ok)
+	after := before
+	after.Trick = closed
+	mean, se, made, ok := search.Evaluate(search.Information{Seat: 0}, after, settle, opts, farFuture())
+	require.True(t, ok)
+
+	const takenByTeamB = -(11 + 0 + 4 + 0 + 10)
+	assert.InDelta(t, float64(search.Settle(settle, takenByTeamB)), mean, 1e-9)
+	assert.InDelta(t, chosen.Mean, mean, 1e-9)
+	assert.Zero(t, se)
+	assert.InDelta(t, 1.0, made, 1e-9)
+}
+
+func TestEvaluateTimesOut(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithoutClubs(rand.New(rand.NewPCG(1, 2))))
+	opts := search.Options{Samples: 8, EarlyStopAfter: 9, EarlyStopSE: 1}
+
+	_, _, _, ok := search.Evaluate(c.in, c.pos, c.settle, opts, farFuture())
+	require.True(t, ok)
+	_, _, _, ok = search.Evaluate(c.in, c.pos, c.settle, opts, time.Now().Add(-time.Second))
+	assert.False(t, ok)
 }

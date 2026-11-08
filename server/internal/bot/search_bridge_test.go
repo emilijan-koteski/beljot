@@ -617,3 +617,111 @@ func TestDecidingHandValuesAFallAsTheLostMatch(t *testing.T) {
 	const worstHandAward = 152 + 100
 	assert.Less(t, res.Cards[search.CardIdx(card("7D"))].Mean, -float64(worstHandAward), "some deals lose the match")
 }
+
+// beloteFallView is seat 0 of the calling team just after leading the Queen of trump at trick 7, holding the King,
+// with every unseen card worth nothing and the opponents far ahead, so the contract falls whatever is played.
+func beloteFallView() bot.View {
+	trump, caller := game.SuitHearts, 0
+	lead := game.SuitHearts
+	held := cards("KH", "QH", "7S", "8S", "7D", "8D", "7C", "8C")
+	var played []game.Card
+	for _, c := range game.NewDeck() {
+		if !slices.Contains(held, c) {
+			played = append(played, c)
+		}
+	}
+	return bot.View{
+		Seat: 0, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller, LeadSuit: &lead,
+		Hand: cards("KH"), LegalCards: cards("KH"), ActivePlayerSeat: 0, PendingBelot: true,
+		CurrentTrick: []game.TrickCard{{Card: card("QH"), PlayerSeat: 0}},
+		HandPoints:   [2]int{10, 135}, TricksWon: [2]int{1, 5}, TrickNumber: 7, MatchTarget: 1001,
+		DeclarationsEnabled: true, DeclarationsTransfer: true, PlayedCards: played, RankBounds: bot.NoRankBounds(),
+	}
+}
+
+func beloteGate() bot.SearchTuning {
+	t := bot.DefaultSearchTuning()
+	t.BeloteSkipMargin = 5
+	return t
+}
+
+func TestInformationFromViewAfterTheSeatPlayed(t *testing.T) {
+	in := bot.InformationFromForTest(beloteFallView())
+
+	assert.Equal(t, [4]int{0, 2, 2, 2}, in.Need)
+	assert.Equal(t, search.MaskOf(cards("7S", "8S", "7D", "8D", "7C", "8C")), in.Unseen)
+}
+
+func TestBeloteAnswerSkipsWhenTheFallIsCertain(t *testing.T) {
+	announce, ok := bot.BeloteAnswerWith(beloteFallView(), farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.False(t, announce, "skipping keeps the 20 from the opponents")
+
+	announce, ok = bot.BeloteAnswerWith(beloteFallView(), farFuture(), bot.DefaultSearchTuning())
+	assert.False(t, ok)
+	assert.True(t, announce, "a zero margin always announces")
+}
+
+func TestBeloteAnswerDefenderAlwaysAnnounces(t *testing.T) {
+	v := beloteFallView()
+	caller := 1
+	v.TrumpCallerSeat = &caller
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerTransferOffAlwaysAnnounces(t *testing.T) {
+	v := beloteFallView()
+	v.DeclarationsTransfer = false
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerMissedDeadlineAnnounces(t *testing.T) {
+	announce, ok := bot.BeloteAnswerWith(beloteFallView(), time.Now().Add(-time.Second), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerAnnouncesWhenTheBeloteDecidesTheRace(t *testing.T) {
+	v := beloteFallView()
+	v.StopAtTarget = true
+	v.TeamScores = [2]int{v.MatchTarget - 10 - 15, 0}
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok, "the race is decided before any search")
+	assert.True(t, announce)
+
+	v.TeamScores[0] -= 10
+	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.True(t, ok)
+	assert.False(t, announce, "five points short after the Belote, the fall still decides")
+}
+
+func TestBeloteAnswerIsDeterministic(t *testing.T) {
+	v := beloteFallView()
+	v.HandPoints = [2]int{60, 85}
+	first, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	second, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.Equal(t, first, second)
+}
+
+func TestDecideWithSkipsTheBeloteOnASearchedSkip(t *testing.T) {
+	v := beloteFallView()
+	skip := game.Action{Type: game.ActionSkipBelot, PlayerSeat: 0}
+	announce := game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: 0}
+
+	assert.Equal(t, announce, bot.Decide(v))
+	assert.Equal(t, announce, bot.DecideWith(v, nil))
+	assert.Equal(t, announce, bot.DecideWith(v, &bot.SearchResult{}))
+	assert.Equal(t, skip, bot.DecideWith(v, &bot.SearchResult{BeloteSkip: true}))
+
+	v.PendingBelot = false
+	assert.NotEqual(t, skip.Type, bot.DecideWith(v, &bot.SearchResult{BeloteSkip: true}).Type)
+}

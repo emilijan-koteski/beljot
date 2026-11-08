@@ -19,13 +19,14 @@ const (
 )
 
 // SearchResult is the card the search chose with the deals behind it, its lead over the runner-up and that lead's
-// standard error.
+// standard error, or for a pending Belote whether the search answered it with a skip.
 type SearchResult struct {
-	Card     game.Card
-	Samples  int
-	Margin   float64
-	SE       float64
-	Deferred bool
+	Card       game.Card
+	Samples    int
+	Margin     float64
+	SE         float64
+	Deferred   bool
+	BeloteSkip bool
 }
 
 // SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on and only where
@@ -130,14 +131,73 @@ func chooseSearch(v View, samples int, deadline time.Time, t SearchTuning, class
 	return search.Choose(informationFrom(v), positionFrom(v, t), v.LegalCards, settlementFrom(v), opts, deadline)
 }
 
-// DecideWith plays the searched card when it is still a legal play and nothing else is pending, otherwise it decides by
-// the rules.
+// DecideWith skips a pending Belote the search answered with a skip and plays the searched card when it is still a legal
+// play and nothing else is pending, otherwise it decides by the rules.
 func DecideWith(v View, pre *SearchResult) game.Action {
+	if pre != nil && pre.BeloteSkip && v.PendingBelot && !v.PartnerProposedSurrender {
+		return game.Action{Type: game.ActionSkipBelot, PlayerSeat: v.Seat}
+	}
 	if pre == nil || !canPlaySearchedCard(v, pre.Card) {
 		return Decide(v)
 	}
 	card := pre.Card
 	return game.Action{Type: game.ActionPlayCard, PlayerSeat: v.Seat, Card: &card}
+}
+
+// BeloteSearchApplies reports whether the seat's pending Belote is worth a search: its team called trump, declarations
+// transfer on a fall and the tuning has a skip margin.
+func BeloteSearchApplies(v View, t SearchTuning) bool {
+	if !v.PendingBelot || v.Phase != game.PhasePlaying || v.TrumpSuit == nil || !myTeamCalledTrump(v) {
+		return false
+	}
+	return v.DeclarationsTransfer && t.BeloteSkipMargin > 0 && samplesFor(v.TrickNumber, t) > 0
+}
+
+// BeloteAnswer answers the seat's pending Belote under the default tuning; ok reports that the search decided it.
+func BeloteAnswer(v View, deadline time.Time) (announce bool, ok bool) {
+	return BeloteAnswerWith(v, deadline, DefaultSearchTuning())
+}
+
+// BeloteAnswerWith skips the caller's Belote only when the hand searched without it beats the hand searched with it by
+// more than the skip margin. It announces when the search does not apply, the Belote decides the race or time runs out.
+func BeloteAnswerWith(v View, deadline time.Time, t SearchTuning) (announce bool, ok bool) {
+	if !BeloteSearchApplies(v, t) {
+		return true, false
+	}
+	announced := withOwnBelote(v)
+	if beloteDecidesTheRace(announced, t) {
+		return true, false
+	}
+	opts := search.Options{Samples: samplesFor(v.TrickNumber, t), SeedSalt: t.SeedSalt}
+	in := informationFrom(v)
+	withBelote, _, _, ok := search.Evaluate(in, positionFrom(announced, t), settlementFrom(announced), opts, deadline)
+	if !ok {
+		return true, false
+	}
+	withoutBelote, _, _, ok := search.Evaluate(in, positionFrom(v, t), settlementFrom(v), opts, deadline)
+	if !ok {
+		return true, false
+	}
+	teamSign := float64(1 - 2*game.TeamForSeat(v.Seat))
+	gain := teamSign * (withoutBelote - withBelote)
+	return gain <= float64(t.BeloteSkipMargin), true
+}
+
+// withOwnBelote is the view after the seat announces: its team's declarations carry the Belote's 20.
+func withOwnBelote(v View) View {
+	v.DeclPoints[game.TeamForSeat(v.Seat)] += beloteBonusPoints
+	return v
+}
+
+// beloteDecidesTheRace reports whether the announced Belote alone ends a stop-at-target match, whatever the tuning races.
+func beloteDecidesTheRace(announced View, t SearchTuning) bool {
+	t.RaceObjective = true
+	race := raceFor(announced, t)
+	if race == nil || race.DecidingHand {
+		return false
+	}
+	_, decided := search.RaceDecided(*race, [2]int{})
+	return decided
 }
 
 func canPlaySearchedCard(v View, card game.Card) bool {
@@ -201,11 +261,20 @@ func cardsAboveBounds(v View, seat int) uint32 {
 	return mask
 }
 
+// cardsHeldBy counts from the seat's own hand, which is one card short once the seat has played to the trick.
 func cardsHeldBy(v View, seat int) int {
-	if slices.ContainsFunc(v.CurrentTrick, func(tc game.TrickCard) bool { return tc.PlayerSeat == seat }) {
-		return len(v.Hand) - 1
+	held := len(v.Hand)
+	if playedToTrick(v, v.Seat) {
+		held++
 	}
-	return len(v.Hand)
+	if playedToTrick(v, seat) {
+		held--
+	}
+	return held
+}
+
+func playedToTrick(v View, seat int) bool {
+	return slices.ContainsFunc(v.CurrentTrick, func(tc game.TrickCard) bool { return tc.PlayerSeat == seat })
 }
 
 func trickMask(v View) uint32 {

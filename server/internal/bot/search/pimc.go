@@ -45,15 +45,17 @@ type ClassStats struct {
 }
 
 // Result is the chosen card, how many deals backed it, its mean settled value for the seat's team, its lead over
-// the runner-up and the standard error of that lead, plus per-card and per-class statistics.
+// the runner-up and the standard error of that lead, per-card and per-class statistics, and the chosen card's share
+// of deals in which the caller made the contract.
 type Result struct {
-	Card    game.Card
-	Samples int
-	Mean    float64
-	Margin  float64
-	SE      float64
-	Cards   map[int]CardStats
-	Classes [2]ClassStats
+	Card       game.Card
+	Samples    int
+	Mean       float64
+	Margin     float64
+	SE         float64
+	Cards      map[int]CardStats
+	Classes    [2]ClassStats
+	CallerMade float64
 }
 
 const OpeningSamples = 12
@@ -116,6 +118,50 @@ func Choose(
 	return votes.result(), true
 }
 
+// Evaluate values the position with no card to choose: the settled value for team A averaged over deals sampled from
+// the seat's information, its standard error and the share of deals the caller made, false as Choose reports false.
+func Evaluate(in Information, pos Position, s Settlement, opts Options, deadline time.Time) (mean, se, made float64, ok bool) {
+	if len(pos.Trick) > seats {
+		return 0, 0, 0, false
+	}
+	rng := rand.New(rand.NewPCG(in.Seed()^opts.SeedSalt, samplerStream))
+	solver := NewSolver(pos.Trump, pos.Clockwise)
+	solver.SetRace(pos.Race)
+	values := make([]int, 0, opts.Samples)
+	madeCount := 0
+	for len(values) < opts.Samples {
+		if time.Now().After(deadline) {
+			return 0, 0, 0, false
+		}
+		hands, sampled := Sample(rng, in)
+		if !sampled {
+			break
+		}
+		solver.Reset()
+		remainder := rootValue(solver, hands, pos)
+		values = append(values, settledValue(pos.Race, s, remainder))
+		if callerMadeIn(pos.Race, s, remainder) {
+			madeCount++
+		}
+	}
+	if len(values) == 0 {
+		return 0, 0, 0, false
+	}
+	stats := statsOf(values)
+	return stats.Mean, stats.SE, float64(madeCount) / float64(len(values)), true
+}
+
+// rootValue solves the position as it stands; a full trick is valued by replaying its last card, which closes it.
+func rootValue(solver *Solver, hands [4]uint32, pos Position) int {
+	n := len(pos.Trick)
+	if n < seats {
+		return solver.Value(hands, pos.Leader, pos.Trick, pos.Capot)
+	}
+	last := pos.Trick[n-1]
+	hands[solver.seatAt[pos.Leader][n-1]] |= 1 << uint(last)
+	return solver.play(hands, pos.Leader, pos.Trick[:n-1], last, pos.Capot, -inf, inf)
+}
+
 func legalIndexes(legal []game.Card) []int {
 	cards := make([]int, len(legal))
 	for i, card := range legal {
@@ -132,6 +178,7 @@ type tally struct {
 	cards  []int
 	values [NCards][]int
 	sums   [NCards]int
+	made   [NCards]int
 	n      int
 
 	classSums    [2][NCards]int
@@ -149,11 +196,14 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 		if !ok {
 			return false
 		}
-		settled[i] = teamSign * t.settledValue(s, remainder)
+		settled[i] = teamSign * settledValue(t.race, s, remainder)
 	}
 	for i, card := range t.cards {
 		t.values[card] = append(t.values[card], settled[i])
 		t.sums[card] += settled[i]
+		if callerMadeIn(t.race, s, remainders[card]) {
+			t.made[card]++
+		}
 	}
 	if class == 0 || class == 1 {
 		for i, card := range t.cards {
@@ -166,16 +216,25 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 }
 
 // settledValue is a root value as the hand's award, or ±RaceWin for a match decided mid-hand or by the settled hand.
-func (t *tally) settledValue(s Settlement, value int) int {
+func settledValue(race *Race, s Settlement, value int) int {
 	if value == RaceWin || value == -RaceWin {
 		return value
 	}
-	if t.race != nil {
-		if winner, decided := HandEndDecided(*t.race, SettleTotals(s, value)); decided {
+	if race != nil {
+		if winner, decided := HandEndDecided(*race, SettleTotals(s, value)); decided {
 			return raceValue(winner)
 		}
 	}
 	return Settle(s, value)
+}
+
+// callerMadeIn reports whether the caller made the hand behind a root value; a match decided mid-hand counts as made
+// when the caller's team won it.
+func callerMadeIn(race *Race, s Settlement, value int) bool {
+	if race != nil && (value == RaceWin || value == -RaceWin) {
+		return raceValue(s.CallerTeam) == value
+	}
+	return CallerMade(s, value)
 }
 
 // ranking returns the best card and the runner-up, preferring the lowest card index on equal sums.
@@ -217,13 +276,22 @@ func (t *tally) decided(stopSE float64) bool {
 }
 
 func (t *tally) cardStats(card int) CardStats {
-	n := float64(t.n)
-	mean := float64(t.sums[card]) / n
-	if t.n < 2 {
+	return statsOf(t.values[card])
+}
+
+// statsOf is the mean of the values and its standard error, 0 below two values.
+func statsOf(values []int) CardStats {
+	n := float64(len(values))
+	sum := 0
+	for _, v := range values {
+		sum += v
+	}
+	mean := float64(sum) / n
+	if len(values) < 2 {
 		return CardStats{Mean: mean}
 	}
 	squares := 0.0
-	for _, v := range t.values[card] {
+	for _, v := range values {
 		deviation := float64(v) - mean
 		squares += deviation * deviation
 	}
@@ -254,12 +322,13 @@ func (t *tally) result() Result {
 	margin, se := t.lead()
 	cards, classes := t.cardsAndClasses()
 	return Result{
-		Card:    IdxCard(best),
-		Samples: t.n,
-		Mean:    float64(t.sums[best]) / float64(t.n),
-		Margin:  margin,
-		SE:      se,
-		Cards:   cards,
-		Classes: classes,
+		Card:       IdxCard(best),
+		Samples:    t.n,
+		Mean:       float64(t.sums[best]) / float64(t.n),
+		Margin:     margin,
+		SE:         se,
+		Cards:      cards,
+		Classes:    classes,
+		CallerMade: float64(t.made[best]) / float64(t.n),
 	}
 }

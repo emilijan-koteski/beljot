@@ -23,6 +23,7 @@ type SearchTuning struct {
 	BlindTenPenalty        int
 	CashHighWinnerBonus    int
 	SampleCaps             [9]int
+	BeloteSkipMargin       int
 	SeedSalt               uint64
 }
 

@@ -56,3 +56,10 @@ func (s Settlement) wholeHand(cardPoints, winner int) int {
 	}
 	return cardPoints + s.DeclPoints[winner]
 }
+
+// CallerMade reports whether the trump caller's team keeps the hand whose remainder is worth remDiff: it banks more
+// than the opponents, so the contract neither falls nor ends in an opposing Capot.
+func CallerMade(s Settlement, remDiff int) bool {
+	totals := SettleTotals(s, remDiff)
+	return totals[s.CallerTeam] > totals[1-s.CallerTeam]
+}

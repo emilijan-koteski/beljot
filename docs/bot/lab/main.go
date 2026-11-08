@@ -33,6 +33,7 @@ var (
 	scoreState   = flag.String("scoreState", "oppClose", "bidscore: oppClose|ownClose|bothClose|neither")
 	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
 	oppSpec      = flag.String("opp", "", "duplicate: policy for seats 1/3 in both games; A and B alternate on seats 0/2 (uses flagsB)")
+	transfer     = flag.String("transfer", "on", "duplicate: on|off, the lab room's declarations-on-a-fall rule")
 	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
@@ -285,12 +286,14 @@ func addCounts(total *botlab.Counts, p botlab.Policy) bool {
 	total.Decided += got.Decided
 	total.Deferred += got.Deferred
 	total.DefenderTrumpLeads += got.DefenderTrumpLeads
+	total.BeloteSearches += got.BeloteSearches
+	total.BeloteSkips += got.BeloteSkips
 	return true
 }
 
 func printCounts(side string, c botlab.Counts) {
-	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d\n",
-		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads)
+	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d, belote searches %d, belote skips %d\n",
+		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads, c.BeloteSearches, c.BeloteSkips)
 }
 
 func duplicate(v game.Variant) {
@@ -356,6 +359,10 @@ func duplicate(v game.Variant) {
 						}
 					}
 					gs := botlab.NewDealState(deal, v)
+					if *transfer == "off" {
+						gs.Rules.DeclarationsTransfer = false
+						gs.DeclarationsTransfer = false
+					}
 					var hook botlab.PlayHook
 					if *events {
 						if opp != nil {

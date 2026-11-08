@@ -1,6 +1,7 @@
 package search_test
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"testing"
 
@@ -369,4 +370,70 @@ func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
 		}
 	}
 	assert.Positive(t, wholeHands)
+}
+
+func TestCallerMade(t *testing.T) {
+	tests := []struct {
+		name    string
+		settle  search.Settlement
+		remDiff int
+		want    bool
+	}{
+		{
+			name: "caller A scores more",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: game.TeamA, RemainingCardPoints: 40,
+			},
+			remDiff: -26, want: true,
+		},
+		{
+			name: "caller A ties and falls",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: game.TeamA, RemainingCardPoints: 40,
+			},
+			remDiff: -28, want: false,
+		},
+		{
+			name: "caller B makes on its declarations",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 72}, DeclPoints: [2]int{0, 50}, TricksWon: [2]int{3, 4},
+				CallerTeam: game.TeamB, RemainingCardPoints: 20,
+			},
+			remDiff: -30, want: true,
+		},
+		{
+			name: "caller B falls",
+			settle: search.Settlement{
+				HandPoints: [2]int{70, 42}, DeclPoints: [2]int{20, 50}, TricksWon: [2]int{4, 3},
+				CallerTeam: game.TeamB, RemainingCardPoints: 40,
+			},
+			remDiff: 30, want: false,
+		},
+		{
+			name: "caller A takes every trick",
+			settle: search.Settlement{
+				HandPoints: [2]int{120, 0}, TricksWon: [2]int{6, 0}, CallerTeam: game.TeamA, RemainingCardPoints: 42,
+			},
+			remDiff: 142, want: true,
+		},
+		{
+			name: "the opponents take every trick from caller A",
+			settle: search.Settlement{
+				HandPoints: [2]int{0, 120}, DeclPoints: [2]int{100, 0}, TricksWon: [2]int{0, 6},
+				CallerTeam: game.TeamA, RemainingCardPoints: 42,
+			},
+			remDiff: -142, want: false,
+		},
+	}
+	for _, tt := range tests {
+		for _, transfer := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s transfer %v", tt.name, transfer), func(t *testing.T) {
+				s := tt.settle
+				s.DeclarationsTransfer = transfer
+				assert.Equal(t, tt.want, search.CallerMade(s, tt.remDiff))
+			})
+		}
+	}
 }

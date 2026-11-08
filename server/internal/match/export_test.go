@@ -277,6 +277,11 @@ func (m *Manager) SetBotSearchForTest(s BotSearchSettings) {
 	m.SetBotSearch(s)
 }
 
+// SetBotTuningForTest replaces the search tuning the bots play under.
+func (m *Manager) SetBotTuningForTest(t bot.SearchTuning) {
+	m.botTuning = t
+}
+
 // BotSearchResultForTest returns a copy of the search result stored for the seat, or nil when there is none.
 func (m *Manager) BotSearchResultForTest(roomID uint, seat int) *bot.SearchResult {
 	m.mu.RLock()
