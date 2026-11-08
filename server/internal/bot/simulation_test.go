@@ -347,9 +347,7 @@ func TestSimulation_SearchBeatsRandomBaseline(t *testing.T) {
 	totalPoints := 0
 	handsPlayed := 0
 	for handsPlayed < handsTarget {
-		gs := newBitolaGame()
-		gs.DealerSeat = 0
-		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
+		gs := dealtGame(t, shuffledDeck(rng), 0)
 
 		result, ok := playOneHandWith(t, gs, bot.NewMemory(), rng, drive, nil)
 		if !ok {

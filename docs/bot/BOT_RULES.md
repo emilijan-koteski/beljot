@@ -340,8 +340,9 @@ Measured at the end of phase 3 (the settings above; lab rows in `BOT_V2_LAB_RESU
 The two simulation gates run only when `BELJOT_BOT_SIM=1` is set (CI sets it; `make test` skips
 them to stay fast), take about 9 s together, and need no database. The deadline test always runs.
 A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
-include passed-out deals. The search share against the random baseline moves with the engine's
-random dealer (64.9 to 84% on repeated runs), which is why its gate is 60%.
+include passed-out deals. The search share against the random baseline is deterministic: the deals come from a
+seeded deck (`rand.NewPCG(42, 1)`, dealer fixed at seat 0) and the share is 73.2% (8057 of 11010 points over 60
+hands, identical on three repeated runs); its gate stays 60%.
 
 ### 5.9 What the search does not model
 
