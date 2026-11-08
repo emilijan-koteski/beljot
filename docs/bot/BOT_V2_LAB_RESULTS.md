@@ -59,6 +59,16 @@ current bot on all seats. Each row: hand features, round, passes before, EV(call
 whether the bot would naturally call. Bitola: 60 000 deals → 502 021 rows. Croatian: 30 000 deals
 → 328 472 rows.
 
+Phase 4 adds `-shape=<list>` to `bidpos` and `duplicate` (`docs/bot/lab/shape.go`): deals are drawn
+until some seat's bidding position fits the shape, in the vocabulary of `class_table.py` (`c4`,
+`c4+`, `J`/`noJ`, `9`/`no9`, `A`/`noA`, `sA0`/`sA1`/`sA1+`/`sA2+`, `pos1` = passes before the
+seat), so a rare bidding row gets thousands of occurrences in minutes. `bidpos` also requires the
+natural auction of `-a` to reach the matching position, so every targeted deal yields at least one
+matching row; `duplicate` only requires the position to exist. Targeted deals are biased: the
+CSV is valid for the targeted cell only, never for a call rate, a table-wide value or a pooled
+total, and `bidpos` prints a warning line saying so. `-exp=shapecheck` prints 20 matching deals
+for eyeballing the predicate.
+
 ### 1.5 Policies
 
 - `current`: production `bot.Decide`. At commit 2d70456 this was the v1 bot, and every table in
@@ -497,6 +507,20 @@ the cards chosen on tricks 3 and 4 still change under a reseed, and the later tr
 before. The cheat gap is +27.18 ± 2.72 against +24.22 ± 2.94 before the schedule change; the
 difference (+2.96) is 0.7 SE of the difference between two runs on different seeds, and the
 bidding table changed in between, so it is not read as a change in play.
+
+### 2.10 Phase 4 measurements
+
+Rows use the `shipped` policy (§1.5), `-workers=6`, and the commit of the server code the lab was
+built from. The summary is kept at the top; the rows below it carry command, seed and commit.
+
+| item | pooled effect ± SE | metric | decision | commit |
+|---|---|---|---|---|
+
+#### Sanity
+
+| policy | shape | variant | n | seed | commit | command | result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | `A,c4,noJ,no9,sA0` | Bitola | 300 deals | 1101 | 37ccec7d | `-exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6` | 133 s; `class_table.py` cell `-A 4 0` n = 300 (gain +7.5 ± 9.3); 3 304 non-forced rows; 20 of 503 random deals carry a matching position |
 
 ## 3. Bidding calibration tables
 
@@ -1126,7 +1150,7 @@ server module.
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
 cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped}.go /tmp/lab/server/internal/botlab/
-cp docs/bot/lab/{main,bidtable,bidpos,stability,race}.go /tmp/lab/server/cmd/botlab/
+cp docs/bot/lab/{main,bidtable,bidpos,stability,race,shape,shape_check}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
 ./botlab -exp=duplicate -a=current -b=lab -n=4000                     # phase 1 against the frozen v1, §3.4
@@ -1141,6 +1165,7 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia
 ./botlab -exp=bidpos -a=lab -n=60000 -csv=bidpos_bitola.csv && python3 -I fit_bid.py bidpos_bitola.csv
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
+./botlab -exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6 && python3 -I class_table.py shape_probe.csv   # §2.10, targeted deals
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1

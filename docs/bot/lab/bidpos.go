@@ -18,8 +18,10 @@ func bidpos(v game.Variant, csvPath string) {
 	t0 := time.Now()
 	deals := make([]botlab.Deal, *n)
 	rng := rand.New(rand.NewPCG(*seed, 10))
+	shapeFor := shapeFilter()
+	reach := makePolicy(*polA, rand.New(rand.NewPCG(*seed, 499)), *flagsA)
 	for i := range deals {
-		deals[i] = botlab.RandomDeal(rng)
+		deals[i] = mustTargetedDeal(rng, v, shapeFor, reach)
 	}
 	f, err := os.Create(csvPath)
 	if err != nil {
@@ -145,6 +147,9 @@ func bidpos(v game.Variant, csvPath string) {
 	}
 	wg.Wait()
 	fmt.Printf("bidpos %s: %d deals in %.0fs -> %s\n", v, *n, time.Since(t0).Seconds(), csvPath)
+	if shapeFor != nil {
+		fmt.Printf("WARNING: targeted deals (-shape=%s): the CSV is valid only for the targeted cell, never for a rate or a pooled table\n", *shapeSpec)
+	}
 }
 
 func featureLine(v game.Variant, round, passes int, suit game.Suit, hand []game.Card, nat int, evCall, evPass float64) string {

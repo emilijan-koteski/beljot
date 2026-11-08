@@ -18,17 +18,18 @@ import (
 )
 
 var (
-	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
-	polA    = flag.String("a", "current", "policy A")
-	polB    = flag.String("b", "random", "policy B")
-	n       = flag.Int("n", 200, "deals")
-	seed    = flag.Uint64("seed", 1, "seed")
-	variant = flag.String("variant", "bitola", "bitola|croatia")
-	flagsA  = flag.String("flagsA", "", "lab flags for A (comma list)")
-	flagsB  = flag.String("flagsB", "", "lab flags for B (comma list)")
-	workers = flag.Int("workers", runtime.NumCPU(), "parallel workers")
-	seeds   = flag.Int("seeds", 5, "seed salts per position for stability")
-	csvOut  = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	exp       = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
+	polA      = flag.String("a", "current", "policy A")
+	polB      = flag.String("b", "random", "policy B")
+	n         = flag.Int("n", 200, "deals")
+	seed      = flag.Uint64("seed", 1, "seed")
+	variant   = flag.String("variant", "bitola", "bitola|croatia")
+	flagsA    = flag.String("flagsA", "", "lab flags for A (comma list)")
+	flagsB    = flag.String("flagsB", "", "lab flags for B (comma list)")
+	workers   = flag.Int("workers", runtime.NumCPU(), "parallel workers")
+	seeds     = flag.Int("seeds", 5, "seed salts per position for stability")
+	csvOut    = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	shapeSpec = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
 func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
@@ -91,6 +92,8 @@ func main() {
 		stability(v)
 	case "bidpos":
 		bidpos(v, *csvOut)
+	case "shapecheck":
+		shapecheck(v)
 	default:
 		fmt.Println("unknown exp")
 		os.Exit(1)
@@ -244,10 +247,10 @@ func (s *stat) se() float64 {
 }
 
 type dupResult struct {
-	pair                                     stat
-	aCalls, aCallWins, bCalls, bCallWins     int
+	pair                                       stat
+	aCalls, aCallWins, bCalls, bCallWins       int
 	passed, played, aPts, bPts, aFails, bFails int
-	aDecl, bDecl                             int
+	aDecl, bDecl                               int
 }
 
 func (r *dupResult) merge(o *dupResult) {
@@ -286,8 +289,9 @@ func duplicate(v game.Variant) {
 	t0 := time.Now()
 	deals := make([]botlab.Deal, *n)
 	rng := rand.New(rand.NewPCG(*seed, 4))
+	shapeFor := shapeFilter()
 	for i := range deals {
-		deals[i] = botlab.RandomDeal(rng)
+		deals[i] = mustTargetedDeal(rng, v, shapeFor, nil)
 	}
 	results := make([]dupResult, *workers)
 	var wg sync.WaitGroup
