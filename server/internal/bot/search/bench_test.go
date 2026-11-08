@@ -18,6 +18,7 @@ const (
 	trick1Positions = 10
 	trick1MeanLimit = 400 * time.Millisecond
 	trick1Samples   = 12
+	raceBenchScore  = 940
 )
 
 type trick3Position struct {
@@ -91,6 +92,40 @@ func TestSearchTrick3StaysUnderTheDeadline(t *testing.T) {
 	assert.Less(t, mean, trick3MeanLimit, "mean search time at trick 3")
 }
 
+func TestSearchTrick3RaceTiming(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 3))
+	opts := search.Options{Samples: search.SamplesForTrick(3), EarlyStopAfter: 8, EarlyStopSE: 1.0}
+
+	var total, worst time.Duration
+	for range trick3Positions {
+		p := randomTrick3Position(rng)
+		race := raceWithinReach(p)
+		p.pos.Race = &race
+		start := time.Now()
+		_, ok := search.Choose(p.in, p.pos, p.legal, p.settle, opts, farFuture())
+		elapsed := time.Since(start)
+		require.True(t, ok, "the search must reach a decision on a consistent position")
+		total += elapsed
+		worst = max(worst, elapsed)
+	}
+
+	t.Logf("trick 3 race search over %d positions: mean %v, max %v (logged, not asserted)",
+		trick3Positions, total/trick3Positions, worst)
+}
+
+// raceWithinReach puts both teams of a trick-3 position at raceBenchScore before the hand on a stop-at-target table,
+// each within reach of 1001, with the leader's Belote when it holds the trump King and Queen.
+func raceWithinReach(p trick3Position) search.Race {
+	race := search.Race{Target: 1001, Caller: p.settle.CallerTeam}
+	for team := range race.Banked {
+		race.Banked[team] = raceBenchScore + p.settle.HandPoints[team]
+	}
+	if pair := belotePair(p.pos.Trump); p.in.Own&pair == pair {
+		race.BeloteSeat, race.BeloteCards = p.in.Seat, pair
+	}
+	return race
+}
+
 // randomTrick1Position deals eight cards to each seat and leaves a random leader to open trick 1 under a random trump.
 func randomTrick1Position(rng *rand.Rand) trick3Position {
 	trump := rng.IntN(4)
@@ -115,6 +150,9 @@ func randomTrick1Position(rng *rand.Rand) trick3Position {
 }
 
 func TestSearchTrick1StaysUnderTheDeadline(t *testing.T) {
+	if search.OpeningSamples == 0 {
+		t.Skip("the opening search is off: production does not search tricks 1 and 2")
+	}
 	rng := rand.New(rand.NewPCG(1, 1))
 	opts := search.Options{Samples: trick1Samples, EarlyStopAfter: 8, EarlyStopSE: 1.0}
 
@@ -131,9 +169,5 @@ func TestSearchTrick1StaysUnderTheDeadline(t *testing.T) {
 
 	mean := total / trick1Positions
 	t.Logf("trick 1 search over %d positions: mean %v, max %v", trick1Positions, mean, worst)
-	if search.OpeningSamples == 0 {
-		t.Log("not asserted: opening search off")
-		return
-	}
 	assert.Less(t, mean, trick1MeanLimit, "mean search time at trick 1")
 }

@@ -96,6 +96,8 @@ func TestChooseAdjustedPenalisesTheDefendersTrumpLead(t *testing.T) {
 		{"the penalty moves the lead to the side card", []string{"8H", "7S"}, means(map[string]float64{"8H": 15, "7S": 12, "JH": 14}), 10, "7S"},
 		{"without the bonus the trump wins", []string{"8H", "7S"}, means(map[string]float64{"8H": 15, "7S": 12, "JH": 14}), 0, "8H"},
 		{"the Jack of trump is exempt", []string{"JH", "7S"}, means(map[string]float64{"JH": 13, "7S": 12}), 10, "JH"},
+		{"the Nine of trump is exempt", []string{"9H", "7S"}, means(map[string]float64{"9H": 13, "7S": 12}), 10, "9H"},
+		{"a side Jack or Nine is not penalised", []string{"8H", "JS", "9C"}, means(map[string]float64{"8H": 5, "JS": 13, "9C": 12}), 10, "JS"},
 		{"the veto loses to any side lead", []string{"8H", "7S"}, means(map[string]float64{"8H": 100, "7S": 1}), bot.DefenderTrumpLeadVeto, "7S"},
 		{"only trumps legal still chooses a card", []string{"8H", "7H"}, means(map[string]float64{"8H": 5, "7H": 3}), bot.DefenderTrumpLeadVeto, "8H"},
 	}

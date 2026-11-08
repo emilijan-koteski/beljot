@@ -64,6 +64,17 @@ func TestOptimisedSolverMatchesPlainOnFullHands(t *testing.T) {
 	}
 }
 
+func TestOptimisedSolverValueMatchesPlainAtAFreshDeal(t *testing.T) {
+	rng := rand.New(rand.NewPCG(83, 89))
+	for i := range 3 {
+		hands, leader, trump, clockwise := randomFullDeal(rng)
+		fast := NewSolver(trump, clockwise)
+		plain := NewSolver(trump, clockwise)
+		plain.plain = true
+		require.Equal(t, plain.Value(hands, leader, nil, capotNone), fast.Value(hands, leader, nil, capotNone), "deal %d", i)
+	}
+}
+
 func TestOptimisedSolverMatchesPlainWhenRacing(t *testing.T) {
 	rng := rand.New(rand.NewPCG(59, 61))
 	for i := range 40 {
