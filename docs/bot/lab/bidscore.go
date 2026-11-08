@@ -154,8 +154,9 @@ func forcedCall(gs *game.GameState, seat int) game.Action {
 }
 
 // bidScoreMatch plays the case with the tested seat's forced action and continues with fresh deals of the pair's own
-// stream until the match is decided; it returns +1, -1 or 0 for the tested team and the hands played.
-func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy, res *bidScoreResult) (float64, int) {
+// stream until the match is decided; it returns +1, -1 or 0 for the tested team, the hands played and whether the
+// forced pass was a passed-out hand.
+func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy) (result float64, hands int, passedOut bool) {
 	gs := botlab.NewDealStateWith(c.deal, v, c.scores, *stopAtTarget)
 	gs.Phase = game.PhaseBidding
 	game.RefreshDerivedFlags(gs)
@@ -172,14 +173,15 @@ func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy, r
 	var err error
 	switch {
 	case call:
+		candidate := gs.TrumpCandidate
 		forced, e := game.ApplyAction(gs, forcedCall(gs, c.seat))
 		if e != nil {
 			panic(e)
 		}
-		out, err = botlab.PlayHand(forced, pol, nil)
+		out, err = botlab.PlayHandFrom(forced, pol, nil, botlab.MemoryAfterForcedPick(candidate, c.seat))
 	case isLastReshuffleSeat(gs):
 		out = botlab.HandOutcome{Status: botlab.HandPassedOut}
-		res.passedOutForcedBranch++
+		passedOut = true
 	default:
 		passed, e := game.ApplyAction(gs, game.Action{Type: game.ActionPassTrump, PlayerSeat: c.seat})
 		if e != nil {
@@ -188,7 +190,7 @@ func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy, r
 		out, err = botlab.PlayHand(passed, pol, nil)
 	}
 	scores := c.scores
-	for hands := 1; ; hands++ {
+	for hands = 1; ; hands++ {
 		if err != nil {
 			fmt.Println("error:", err)
 			os.Exit(1)
@@ -198,12 +200,12 @@ func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy, r
 		scores[1] += b
 		if out.Winner != nil {
 			if *out.Winner == team {
-				return 1, hands
+				return 1, hands, passedOut
 			}
-			return -1, hands
+			return -1, hands, passedOut
 		}
 		if hands >= bidScoreHandCap {
-			return 0, hands
+			return 0, hands, passedOut
 		}
 		next := botlab.NewDealStateWith(botlab.RandomDeal(stream), v, scores, *stopAtTarget)
 		out, err = botlab.PlayHand(next, pol, nil)
@@ -255,8 +257,11 @@ func bidscore(v game.Variant) {
 			pol := [4]botlab.Policy{A, A, A, A}
 			res := &results[w]
 			for i := range next {
-				call, callHands := bidScoreMatch(cases[i], v, true, pol, res)
-				pass, passHands := bidScoreMatch(cases[i], v, false, pol, res)
+				call, callHands, _ := bidScoreMatch(cases[i], v, true, pol)
+				pass, passHands, passedOut := bidScoreMatch(cases[i], v, false, pol)
+				if passedOut {
+					res.passedOutForcedBranch++
+				}
 				res.diff.add(call - pass)
 				res.callHands += callHands
 				res.passHands += passHands
@@ -269,6 +274,10 @@ func bidscore(v game.Variant) {
 	var tot bidScoreResult
 	for w := range results {
 		tot.merge(&results[w])
+	}
+	if tot.diff.n == 0 {
+		fmt.Println("bidscore: no pairs")
+		return
 	}
 	fmt.Printf("bidscore %s: %d pairs, call-minus-pass match wins %+.3f ± %.3f, call wins %d/%d, pass wins %d/%d\n",
 		*scoreState, tot.diff.n, tot.diff.mean(), tot.diff.se(), tot.callWins, tot.diff.n, tot.passWins, tot.diff.n)

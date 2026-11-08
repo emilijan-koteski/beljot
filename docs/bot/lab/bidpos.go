@@ -95,11 +95,12 @@ func bidpos(v game.Variant, csvPath string) {
 							ss := s
 							act.Suit = &ss
 						}
+						candidate := gs.TrumpCandidate
 						forced, err := game.ApplyAction(gs, act)
 						if err != nil {
 							panic(err)
 						}
-						out, err := botlab.PlayHand(forced, pol, nil)
+						out, err := botlab.PlayHandFrom(forced, pol, nil, botlab.MemoryAfterForcedPick(candidate, seat))
 						if err != nil {
 							panic(err)
 						}

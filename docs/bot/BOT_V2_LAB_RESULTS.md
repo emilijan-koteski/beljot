@@ -79,6 +79,11 @@ the seat forcing a call (the candidate's suit in Bitola round 1, else the suit w
 trumps, ties by trump-order points, because `trumpSuitScore` is not exported) and forcing a pass,
 with policy `-a` on all seats and the natural bids of the other seats. An undecided match continues
 with fresh random deals (the same stream for both branches of a pair) up to 12 hands, then scores 0.
+The forced call starts the play with a memory that knows the candidate card went to the caller, as a
+natural call does (`PlayHandFrom`, also used by `bidpos`). A forced pass at the reshuffle seat
+(Bitola round 2, three passes) is scored as a passed-out hand. The walk and the recorded bids are
+made with neutral scores and replayed under the real scores (identical today, because bidding
+ignores the score).
 The line is `bidscore <state>: n pairs, call-minus-pass match wins +x.xxx ± y.yyy, call wins a/n,
 pass wins b/n`, where "wins" counts the pairs in which the tested team won the match. `-stopAtTarget`
 (default true; also on `race`) set to false makes a match end only at a hand end.
@@ -538,8 +543,10 @@ built from. The summary is kept at the top; the rows below it carry command, see
 
 | policy | experiment | variant | n | seed | commit | command | result |
 |---|---|---|---|---|---|---|---|
-| `shipped:3` | `race`, match decided at hand ends | Bitola | 100 deals x2 | 1105 | afcef2fd + bidscore.go | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
-| `shipped:3` | `bidscore oppClose` | Bitola | 100 pairs | 1106 | afcef2fd + bidscore.go | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.020 ± 0.020, call wins 3/100, pass wins 2/100`; 2.9 s, 0.03 s per pair (a 200-pair `neither` probe took 0.15 s per pair; sizes Task 13) |
+| `shipped:3` | `race`, match decided at hand ends | Bitola | 100 deals x2 | 1105 | e6442166 | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
+| `shipped:3` | `bidscore oppClose` | Bitola | 100 pairs | 1106 | e6442166 | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.020 ± 0.020, call wins 3/100, pass wins 2/100` (before the candidate-memory fix); 2.9 s, 0.03 s per pair (a 200-pair `neither` probe took 0.15 s per pair; sizes Task 13) |
+| `shipped:3` | `bidscore oppClose`, candidate observed after the forced call | Bitola | 100 pairs | 1106 | FIXSHA | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.000 ± 0.028, call wins 2/100, pass wins 2/100`; 3.0 s, 0.03 s per pair |
+| `shipped:3` | `race`, match decided at hand ends, same code | Bitola | 100 deals x2 | 1105 | FIXSHA | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
 
 #### Counters at the phase-3 bot
 

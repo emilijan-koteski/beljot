@@ -286,7 +286,21 @@ type HandOutcome struct {
 
 // PlayHand drives one deal to a scored hand with the given seat policies.
 func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, error) {
+	return PlayHandFrom(gs, pol, hook, NewMemory())
+}
+
+// MemoryAfterForcedPick is the memory a hand played on after a pick applied outside PlayHand starts with: the
+// candidate card, when there was one, is known to sit with the caller.
+func MemoryAfterForcedPick(candidate *game.Card, seat int) *Memory {
 	mem := NewMemory()
+	if candidate != nil {
+		mem.ObserveCandidate(seat, *candidate)
+	}
+	return mem
+}
+
+// PlayHandFrom is PlayHand starting from the given memory.
+func PlayHandFrom(gs *game.GameState, pol [4]Policy, hook PlayHook, mem *Memory) (HandOutcome, error) {
 	for steps := 0; steps < 600; steps++ {
 		switch gs.Phase {
 		case game.PhaseDealing:
