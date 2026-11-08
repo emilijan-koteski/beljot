@@ -22,11 +22,12 @@ func bidpos(v game.Variant, csvPath string) {
 	shapeFor := shapeFilter()
 	bGiven := flagGiven("b")
 	reach := makePolicy(*polA, rand.New(rand.NewPCG(*seed, 499)), *flagsA)
+	walkSource := rand.NewPCG(*seed, 498)
 	if bGiven {
-		reach = makePolicy(*polB, rand.New(rand.NewPCG(*seed, 498)), *flagsB)
+		reach = makePolicy(*polB, rand.New(walkSource), *flagsB)
 	}
 	for i := range deals {
-		deals[i] = mustTargetedDeal(rng, v, shapeFor, reach)
+		deals[i] = mustTargetedDeal(rng, v, shapeFor, reach, func() { walkSource.Seed(*seed, uint64(i)) })
 	}
 	f, err := os.Create(csvPath)
 	if err != nil {
@@ -50,12 +51,15 @@ func bidpos(v game.Variant, csvPath string) {
 		go func(w int) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(500+w))), *flagsA)
-			B := A
+			B, walker := A, A
+			walkSource := rand.NewPCG(*seed, 498)
 			if bGiven {
 				B = makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(600+w))), *flagsB)
+				walker = makePolicy(*polB, rand.New(walkSource), *flagsB)
 			}
 			var lines []string
 			for i := range next {
+				walkSource.Seed(*seed, uint64(i))
 				gs := botlab.NewDealState(deals[i], v)
 				gs.Phase = game.PhaseBidding
 				game.RefreshDerivedFlags(gs)
@@ -66,7 +70,7 @@ func bidpos(v game.Variant, csvPath string) {
 					natural := A.Decide(view)
 					walk := natural
 					if bGiven {
-						walk = B.Decide(view)
+						walk = walker.Decide(view)
 					}
 					pol := [4]botlab.Policy{B, B, B, B}
 					pol[seat] = A

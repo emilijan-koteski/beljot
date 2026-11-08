@@ -7,10 +7,9 @@ import (
 )
 
 const (
-	humanCallProbability  = 0.8
-	humanMinTrumpsAny     = 4
-	humanMinTrumpsWithJ9  = 3
-	humanLengthBonusScore = 10
+	humanCallProbability = 0.8
+	humanMinTrumpsAny    = 4
+	humanMinTrumpsWithJ9 = 3
 )
 
 // HumanBidder plays, declares and surrenders like Inner and bids by a simple human rule: it calls with probability 0.8 when the trump suit holds J or 9 with three trumps or any four trumps, the candidate counted.
@@ -51,7 +50,7 @@ func (h *HumanBidder) Decide(v View) game.Action {
 			continue
 		}
 		s := su
-		score := humanSuitScore(hand, s)
+		score := trumpSuitScore(hand, s)
 		if score > bestScore {
 			best, bestScore = &s, score
 		}
@@ -66,16 +65,6 @@ func (h *HumanBidder) Decide(v View) game.Action {
 		return game.Action{Type: game.ActionPickTrump, PlayerSeat: v.Seat, Suit: best}
 	}
 	return pass
-}
-
-func humanSuitScore(hand []game.Card, suit game.Suit) int {
-	score := 0
-	for _, c := range hand {
-		if c.Suit == suit {
-			score += game.TrumpCardPoints[c.Rank] + humanLengthBonusScore
-		}
-	}
-	return score
 }
 
 func humanQualifies(hand []game.Card, suit game.Suit) bool {

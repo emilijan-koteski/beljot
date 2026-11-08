@@ -178,14 +178,20 @@ func TargetedDeal(rng *rand.Rand, v game.Variant, s *Shape) (botlab.Deal, bool) 
 	return botlab.Deal{}, false
 }
 
-// TargetedDealReached is TargetedDeal that also requires the matching position to be reached by the natural auction of pol.
-func TargetedDealReached(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy) (botlab.Deal, bool) {
+// TargetedDealReached is TargetedDeal that also requires the matching position to be reached by the natural auction of pol; begin, when set, runs before each walk.
+func TargetedDealReached(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy, begin func()) (botlab.Deal, bool) {
 	if s == nil {
 		return botlab.RandomDeal(rng), true
 	}
 	for tries := 0; tries < 1_000_000; tries++ {
 		d := botlab.RandomDeal(rng)
-		if len(matchingPositions(botlab.NewDealState(d, v), *s)) > 0 && reachesMatch(botlab.NewDealState(d, v), *s, pol) {
+		if len(matchingPositions(botlab.NewDealState(d, v), *s)) == 0 {
+			continue
+		}
+		if begin != nil {
+			begin()
+		}
+		if reachesMatch(botlab.NewDealState(d, v), *s, pol) {
 			return d, true
 		}
 	}
@@ -204,13 +210,13 @@ func shapeFilter() *Shape {
 	return &s
 }
 
-func mustTargetedDeal(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy) botlab.Deal {
+func mustTargetedDeal(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy, begin func()) botlab.Deal {
 	var d botlab.Deal
 	var ok bool
 	if pol == nil {
 		d, ok = TargetedDeal(rng, v, s)
 	} else {
-		d, ok = TargetedDealReached(rng, v, s, pol)
+		d, ok = TargetedDealReached(rng, v, s, pol, begin)
 	}
 	if !ok {
 		fmt.Fprintln(os.Stderr, "no deal fits the shape")

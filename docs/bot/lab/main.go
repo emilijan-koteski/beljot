@@ -299,7 +299,7 @@ func duplicate(v game.Variant) {
 	rng := rand.New(rand.NewPCG(*seed, 4))
 	shapeFor := shapeFilter()
 	for i := range deals {
-		deals[i] = mustTargetedDeal(rng, v, shapeFor, nil)
+		deals[i] = mustTargetedDeal(rng, v, shapeFor, nil, nil)
 	}
 	results := make([]dupResult, *workers)
 	var wg sync.WaitGroup

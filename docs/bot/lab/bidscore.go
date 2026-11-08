@@ -221,7 +221,7 @@ func bidScoreCases(v game.Variant, shape *Shape) []bidCase {
 		if shape == nil {
 			d = botlab.RandomDeal(rng)
 		} else {
-			d = mustTargetedDeal(rng, v, shape, reach)
+			d = mustTargetedDeal(rng, v, shape, reach, nil)
 		}
 		prefix, seat, ok := bidScoreWalk(botlab.NewDealState(d, v), shape, reach)
 		if !ok {

@@ -51,6 +51,8 @@ and B (game 2) take seats 0/2, so the printed difference is A minus B against th
 the deals without a reachability policy). In `bidpos`, `-b=<policy>` puts B on the three seats
 other than the tested one (the tested seat plays A in the rollouts and sets the `natural` column);
 the natural auction that walks to later positions, and the reachability walk behind `-shape`, use B.
+B's random stream is reseeded from the deal index at the start of every walk, in the prefilter and in
+the run alike, so both games of a pair and the walk see the same human bids for a deal wherever it is processed.
 
 ### 1.3 Regret (`-exp=regret`)
 
@@ -564,12 +566,13 @@ built from. The summary is kept at the top; the rows below it carry command, see
 
 | policies | experiment | variant | n | seed | commit | command | result |
 |---|---|---|---|---|---|---|---|
-| `shipped:3` vs `shipped:3`, `-opp=human` | `duplicate`, identity of the three-policy pairing | Bitola | 100 deals x2 | 1107 | bc4d26c1 + humanbid.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6` | `A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)`; `points banked: A 10607  B 10607  (A share 50.0%)`; `A called 55 (made 87%), B called 55 (made 87%), passed out 14 / 200`; 3 s |
-| `shipped:3` vs `human` | `duplicate`, sanity | Bitola | 400 deals x2 | 1108 | bc4d26c1 + humanbid.go | `-exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6` | `A advantage per hand: +6.03 ± 2.61 (95% CI ±5.11)`; `points banked: A 69055  B 64231  (A share 51.8%)`; `A called 364 (made 82%), B called 309 (made 79%), passed out 127 / 800`; 13 s |
+| `shipped:3` vs `shipped:3`, `-opp=human` | `duplicate`, identity of the three-policy pairing | Bitola | 100 deals x2 | 1107 | b3004aee | `-exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6` | `A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)`; `points banked: A 10607  B 10607  (A share 50.0%)`; `A called 55 (made 87%), B called 55 (made 87%), passed out 14 / 200`; 3 s |
+| `shipped:3` vs `human` | `duplicate`, sanity | Bitola | 400 deals x2 | 1108 | b3004aee | `-exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6` | `A advantage per hand: +6.03 ± 2.61 (95% CI ±5.11)`; `points banked: A 69055  B 64231  (A share 51.8%)`; `A called 364 (made 82%), B called 309 (made 79%), passed out 127 / 800`; 13 s |
+| `shipped:3` tested seat, `human` on the other three | `bidpos -b`, targeted | Bitola | 100 deals | 1109 | b3004aee + the lab files committed with this row | `-exp=bidpos -a=shipped:3 -b=human -shape=A,c4,noJ,no9,sA0 -n=100 -seed=1109 -csv=probe_b.csv -workers=6` | `bidpos bitola: 100 deals in 12s`; 483 rows, of which 100 in the cell `A,c4,noJ,no9,sA0` (one reached position per targeted deal) |
 
 The simulation gate `TestSimulation_SearchBeatsRandomBaseline` now deals from `rand.NewPCG(42, 1)`:
 `BELJOT_BOT_SIM=1 go test -tags nodynamic -run TestSimulation_SearchBeatsRandomBaseline -count=3 -v ./internal/bot/`
-(from `server/`, commit bc4d26c1 + the test change) printed, on all three runs, `search share over 60 hands: 73.2% (8057/11010 points); search ran at 409 card plays and decided 409`.
+(from `server/`, commit 050a0f91) printed, on all three runs, `search share over 60 hands: 73.2% (8057/11010 points); search ran at 409 card plays and decided 409`.
 
 #### Counters at the phase-3 bot
 
