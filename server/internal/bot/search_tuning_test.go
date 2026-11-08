@@ -286,5 +286,5 @@ func TestChooseAdjustedKeepsTheOnlyLegalTen(t *testing.T) {
 }
 
 func TestDefaultSearchTuningBlindTenPenalty(t *testing.T) {
-	assert.Equal(t, 10, bot.DefaultSearchTuning().BlindTenPenalty)
+	assert.Equal(t, bot.ConventionVeto, bot.DefaultSearchTuning().BlindTenPenalty)
 }
