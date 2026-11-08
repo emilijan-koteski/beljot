@@ -562,6 +562,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | B1 rank bounds from forced overplays (`RankBounds` into the sampler) | with minus without +0.60 ± 0.70 (z 0.9); Bitola +0.40 ± 0.90, Croatian +0.91 ± 1.13 | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (exactness; ships on its tests, the effect is reported, not gated) | 288ec0ae |
 | D6a the hand-end crossing in the stop-at-target race (`SettleTotals`, `HandEndDecided`) | `race` vs `noRace` before → after: Bitola +0.0225 ± 0.0071 → +0.0320 ± 0.0073, Croatian +0.0335 ± 0.0076 → +0.0525 ± 0.0079 | match edge per game, 1 000 deals per variant, `shipped:1` both sides, seeds 701/702 | ships (exactness; ships on its tests; not worse at 2 SE in either variant) | 86c3c757 → b4f4b3a4 |
 | D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
+| E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | E1 shapes measured; awaiting the owner | c8416aef |
 
 #### D2 opening search
 
@@ -1378,6 +1379,63 @@ are reported here for the owner and not coded:
   side Aces +16.0 ± 4.1, n 1 662).
 - Croatian 9 with three trumps and exactly one side Ace, second to speak: +29.3 ± 7.0 (n 532; one
   or more side Aces +30.8 ± 6.6, n 575); without the side Ace +19.4 ± 4.5 (n 1 174).
+
+### 3.6 Targeted shape measurements for the owner (2026-11-08)
+
+The four cells that §3.5 left to the owner (row 4 and the three "findings that pass the numbers and are
+not applied"), each measured on deals drawn for the shape (`-exp=bidpos -shape=...`, Task 1) to n above
+2 000, against the production bot (`shipped:1` on every seat) and against the loose human-like bidder
+(`-b=human`, the other three seats bid like humans, reseeded per deal). Gain is EV(call) - EV(pass) per
+decision row of the cell, pooled over the rounds and positions the shape spec allows, ± SE over rows
+(rows of one deal are not independent, as in §3.5). Criterion: gain ≥ 2 SE and ≥ +5.
+Lab built from `c8416aef` (server code identical to the phase-4 branch at that commit), `-workers=6`.
+
+| shape in words | `-shape` spec | variant | seat | n (shipped / human) | vs shipped bidder | vs human-like bidder | criterion |
+|---|---|---|---|---|---|---|---|
+| Bitola row 4: the Ace with exactly four trumps, no Jack or 9, no side Ace | `A,c4,noJ,no9,sA0` | Bitola | any (round 1: 1 710 rows, round 2: 306) | 2 016 / 2 003 | +7.5 ± 3.4 (2.2 SE) | +10.6 ± 3.5 (3.0 SE) | passes against both |
+| Croatian row-10 shape: 9 with three trumps, no Jack or Ace, one or more side Aces | `9,c3,noJ,noA,sA1+` | Croatian | any (round 1 only; 869 first to speak, 650 second, 353 third, 209 dealer, shipped run) | 2 081 / 2 005 | +10.0 ± 3.5 (2.9 SE) | +13.3 ± 3.6 (3.7 SE) | passes against both |
+| Bitola row-11 shape: Jack with exactly two trumps, no 9 or Ace, one or more side Aces | `J,c2,no9,noA,sA1+,pos1` | Bitola | second to speak | 2 081 / 2 073 | +10.6 ± 3.2 (3.3 SE) | +11.8 ± 3.1 (3.8 SE) | passes against both |
+| Croatian 9 with three trumps, no Jack or Ace, exactly one side Ace | `9,c3,noJ,noA,sA1,pos1` | Croatian | second to speak | 2 000 / 2 000 | +18.3 ± 3.5 (5.2 SE) | +22.5 ± 3.5 (6.4 SE) | passes against both |
+
+Predicates are §3.5's in the lab vocabulary. One point goes beyond §3.5's wording: it says "J doubleton,
+no 9, a side Ace" for the Bitola row-11 shape and "J without the Ace" for the dealer line; the spec adds
+`noA` (a doubleton J with the Ace is row 8, already in the table). The two `pos1` cells are second to speak
+only; the other two pool every position the spec allows. All eight cells clear the criterion; the weakest
+is Bitola row 4 against the shipped bidder at 2.2 SE and +7.5.
+
+Commands (seeds 1161-1164 shipped bidder, 1165-1168 human-like bidder; Croatian rows add
+`-variant=croatia`, Bitola is the default; all `-a=shipped:1 -n=2000 -workers=6`). Wall clock is from each
+run's "deals in" line; the runs shared the 12 cores two to four at a time:
+
+| shape | bidder | command | wall |
+|---|---|---|---|
+| row 4 | shipped | `./botlab -exp=bidpos -a=shipped:1 -shape=A,c4,noJ,no9,sA0 -n=2000 -seed=1161 -csv=shape_r4_shipped.csv -workers=6` | 8 890 s |
+| row-10 Croatian | shipped | `./botlab -exp=bidpos -a=shipped:1 -shape=9,c3,noJ,noA,sA1+ -n=2000 -seed=1162 -csv=shape_c10_shipped.csv -workers=6 -variant=croatia` | 13 761 s |
+| row-11 Bitola | shipped | `./botlab -exp=bidpos -a=shipped:1 -shape=J,c2,no9,noA,sA1+,pos1 -n=2000 -seed=1163 -csv=shape_r11_shipped.csv -workers=6` | 10 296 s |
+| 9 + three, one Ace | shipped | `./botlab -exp=bidpos -a=shipped:1 -shape=9,c3,noJ,noA,sA1,pos1 -n=2000 -seed=1164 -csv=shape_c9_shipped.csv -workers=6 -variant=croatia` | 12 479 s |
+| row 4 | human | `./botlab -exp=bidpos -a=shipped:1 -shape=A,c4,noJ,no9,sA0 -n=2000 -seed=1165 -csv=shape_r4_human.csv -workers=6 -b=human` | 1 719 s |
+| row-10 Croatian | human | `./botlab -exp=bidpos -a=shipped:1 -shape=9,c3,noJ,noA,sA1+ -n=2000 -seed=1166 -csv=shape_c10_human.csv -workers=6 -variant=croatia -b=human` | 2 650 s |
+| row-11 Bitola | human | `./botlab -exp=bidpos -a=shipped:1 -shape=J,c2,no9,noA,sA1+,pos1 -n=2000 -seed=1167 -csv=shape_r11_human.csv -workers=6 -b=human` | 2 762 s |
+| 9 + three, one Ace | human | `./botlab -exp=bidpos -a=shipped:1 -shape=9,c3,noJ,noA,sA1,pos1 -n=2000 -seed=1168 -csv=shape_c9_human.csv -workers=6 -variant=croatia -b=human` | 3 060 s |
+
+The shipped-bidder runs cost roughly twice to four times the human-bidder ones (more auction rows per
+targeted deal, each searched). The deal set depends on `-a`, because a deal is kept only when the natural
+auction of `-a` reaches a matching position, so a CSV is valid only for its own cell and its own `-a`; the
+other rows in it are biased and are not used. The cell is cut from the CSV on the predicate columns
+(`count`, `J`, `9`, `A`, `sideA`, `passesBefore`), gain = mean(evCall - evPass), SE = std / sqrt(n).
+
+**Row 4 against §3.5.** The shipped-bidder cell is +7.5 ± 3.4 (n 2 016) against +7.0 ± 4.2 (n 1 424) in
+§3.5: a difference of +0.5, about 0.1 SE, so the two runs agree. Two lab fixes lie between them (a forced
+call records the candidate card in the lab memory, Task 3; a Bitola forced pass at the last round-2 seat is
+scored as a passed-out hand, Task 4). The second can touch only the 47 rows of the cell at round 2 with
+three passes before (2.3 % of the cell, gain +1.3 ± 20.5); without them the cell is +7.7 ± 3.5, so even a
+ten-point error on those rows would move the mean by 0.2. The first touches the round-1 rows (1 710 of
+2 016, +8.7 ± 3.7) and cannot be sized without rerunning the old lab build, which was not done; the
+observed +0.5 bounds its net effect together with the new deal set and lies inside the noise. The historic
+bias is small and not distinguishable from zero at these sizes. The human-like bidder gives +10.6 ± 3.5
+for the same shape.
+
+**Owner's answer.** Pending: one yes or no per shape.
 
 ## 4. Reproducing
 
