@@ -65,14 +65,19 @@ Every time it is the bot's turn, it checks these in strict priority:
 1. **Partner proposed surrender** -> always accept. The bot never initiates surrender and
    never responds to an opponent's proposal.
 2. **Bidding phase** -> `decideBid` (Scenario A).
-3. **Belote / Rebelote pending** (+20) -> always announce. Unconditional value.
+3. **Belote / Rebelote pending** (+20) -> announce. `Decide` always announces. The caller's side
+   can skip instead through the search (`BeloteAnswerWith`, phase 4): only when the seat's team
+   called trump, the room transfers declarations on a fall, `BeloteSkipMargin` is above 0, the
+   +20 does not end a stop-at-target match on the spot, and the hand searched without the Belote
+   (`search.Evaluate`, the same deals) beats the hand searched with it by more than the margin. A
+   missed deadline, a dropped job or a stale result announces. The shipped margin is in 5.10.
 4. **Awaiting declaration** -> always declare. The engine auto-detects melds; declaring
    always maximizes points.
 5. **Otherwise** -> `chooseCard` (Scenario B). From trick 1 the match layer first offers a card
    play to the search (§5); `chooseCard` then plays only when the search does not apply or does
    not deliver in time.
 
-Scenarios 1, 3, 4 are "always do it" with nothing to tune. The real intelligence is in
+Scenarios 1 and 4 are "always do it" with nothing to tune, and 3 is unless the Belote search skips. The real intelligence is in
 **bidding** and **card play**.
 
 ---
@@ -290,7 +295,8 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
 - When the bot's think timer is armed for a card play (`maybeScheduleBotAction`), the match
   layer builds the seat's view under the session lock and queues a search job. It does so only
   when the seat's turn is a plain card play: playing phase, no pending Belote or declaration, and
-  no open surrender proposal from anyone. The job itself runs on a pool worker without the lock.
+  no open surrender proposal from anyone. The one other job is the caller's Belote answer (§3
+  rule 3), queued the same way when its gate holds. The job itself runs on a pool worker without the lock.
   The pool has a fixed number of workers and a bounded queue (four jobs per worker). A full queue
   drops the new job, so a burst of bot turns never grows memory or blocks a timer goroutine.
 - The job has a deadline of `BELJOT_BOT_SEARCH_DEADLINE` (default 500 ms) counted from when it
@@ -381,7 +387,8 @@ hands, identical on three repeated runs); its gate stays 60%.
   away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement;
   in a Bitola trick 1 with declarations still open the engine checks the target only at the end of
   the trick, and the search does not model that case on tricks 1 and 2.
-- **No bidding, declaration, Belote or surrender decisions.**
+- **No bidding, declaration or surrender decisions.** The only Belote decision is the caller's
+  answer of rule 3, valued by `search.Evaluate` with and without the 20 on the same deals.
 
 ### 5.10 Conventions and risk inside the search
 
@@ -402,6 +409,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
 | `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
+| `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 **The blind-Ten rule.** A side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not
@@ -926,6 +934,10 @@ No bearing on which card, only when:
 - Card plays: the search job is queued when the think timer is armed, so the think
   delay is the time the search has to finish. A result that is ready and still valid when the
   timer fires is played, otherwise the rule layer plays (§5.5).
+- The bot's own Belote answer: a 150 ms beat and the announcement, except when a Belote search
+  job is queued (rule 3 of §3: its team called trump, transfer on, `BeloteSkipMargin` above 0).
+  Then the seat waits the play delay, the job runs through the same pool, deadline, generation
+  and context checks as a card search, and a missing or stale answer announces.
 
 ---
 
@@ -996,7 +1008,8 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
   search uses the hand points and tricks won only to score a sample, not to change its objective.
 - No signalling or inference from the **partner's** discards (only voids are used).
 - No forced pick in Bitola round 2 (weak hands just reshuffle).
-- Belote, declarations, and accepting surrender are unconditional (correct, nothing to tune).
+- Declarations and accepting surrender are unconditional (correct, nothing to tune); the Belote is
+  too unless the caller's Belote search skips it (§3 rule 3).
 
 ---
 
