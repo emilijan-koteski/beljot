@@ -525,18 +525,18 @@ built from. The summary is kept at the top; the rows below it carry command, see
 #### Counters at the phase-3 bot
 
 Both sides are `shipped:3`, so the A and B lines are identical by construction (each side plays one
-seat parity in each game of a pair). Commit aaec08b0, `-workers=6`, 400 deals per variant. Events:
+seat parity in each game of a pair). Server code at aaec08b0 plus `events.go` as committed with these rows, `-workers=6`, 400 deals per variant. Events:
 blind Ten (a non-trump Ten led, or played onto a trick an opponent is winning, while that suit's
 Ace is unplayed and neither in the hand nor known in the partner's); high kept then ruffed (last
-seat wins cheaply in the led suit while holding a higher Ace or Ten of it, which a trump later
-beats); capots made/conceded by the policy's team; caller belote then fell (caller team announced
+seat wins cheaply in the led suit while holding a higher Ace or Ten of it, which later lands on a
+non-trump-led trick won by an opponent's trump); capots made/conceded by the policy's team; caller belote then fell (caller team announced
 Belote, declarations transfer on, the hand fell). Belote is seen at the next card play, so a
 Belote announced with the very last card is not counted.
 
-| variant | seed | command | result |
-|---|---|---|---|
-| Bitola | 1103 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6` | `events A: decisions 11200, blind tens 164 (14.6 per 1000), high kept then ruffed 5 (0.4 per 1000), capots made/conceded 19/19, caller belote then fell 6` |
-| Croatian | 1104 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1104 -variant=croatia -workers=6` | `events A: decisions 12800, blind tens 168 (13.1 per 1000), high kept then ruffed 1 (0.1 per 1000), capots made/conceded 15/15, caller belote then fell 4` |
+| variant | seed | commit | command | result |
+|---|---|---|---|---|
+| Bitola | 1103 | aaec08b0 + events.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6` | `events A: decisions 11200, blind tens 164 (14.6 per 1000), high kept then ruffed 3 (0.3 per 1000), capots made/conceded 19/19, caller belote then fell 6` |
+| Croatian | 1104 | aaec08b0 + events.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1104 -variant=croatia -workers=6` | `events A: decisions 12800, blind tens 168 (13.1 per 1000), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 15/15, caller belote then fell 4` |
 
 ## 3. Bidding calibration tables
 

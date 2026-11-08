@@ -409,10 +409,10 @@ func duplicate(v game.Variant) {
 	}
 }
 
-func seatsOf(game, side int) [4]bool {
+func seatsOf(g, side int) [4]bool {
 	var seats [4]bool
 	for s := range seats {
-		seats[s] = (s+game)%2 == side
+		seats[s] = (s+g)%2 == side
 	}
 	return seats
 }

@@ -82,7 +82,7 @@ func (r *EventRecorder) Tally() EventTally { return r.tally }
 func (r *EventRecorder) Hook() PlayHook {
 	return func(gs *game.GameState, seat int, action game.Action, v View) {
 		if len(gs.CurrentTrick) == 0 {
-			r.closeTrick(gs)
+			r.closeTrick(*gs.TrumpSuit)
 		}
 		for team := range gs.BelotPoints {
 			if gs.BelotPoints[team] > 0 {
@@ -109,7 +109,7 @@ func (r *EventRecorder) FinishHand(out HandOutcome, gs *game.GameState) {
 	if out.Status != HandScored {
 		return
 	}
-	r.closeTrick(gs)
+	r.closeTrick(out.Trump)
 	if out.Score.Capot && out.Score.CapotTeam != nil {
 		if *out.Score.CapotTeam == r.team {
 			r.tally.CapotsMade++
@@ -129,12 +129,12 @@ func (r *EventRecorder) resetHand() {
 	r.belote = [2]bool{}
 }
 
-func (r *EventRecorder) closeTrick(gs *game.GameState) {
-	if len(r.trick) == 4 && gs.TrumpSuit != nil {
-		winner := trickWinnerCard(r.trick, *gs.TrumpSuit)
-		if winner.Suit == *gs.TrumpSuit {
+func (r *EventRecorder) closeTrick(trump game.Suit) {
+	if len(r.trick) == 4 && r.trick[0].Card.Suit != trump {
+		winnerSeat := trickWinnerSeat(r.trick, trump)
+		if winnerCard := trickWinnerCard(r.trick, trump); winnerCard.Suit == trump {
 			for _, k := range r.inFlight {
-				if k.card.Suit != *gs.TrumpSuit {
+				if winnerSeat%2 != k.seat%2 {
 					r.tally.HighKeptThenRuffed++
 				}
 			}
