@@ -368,7 +368,8 @@ Gates at `4198b4fe`: `go test -tags nodynamic ./internal/bot/...` passes;
 (8587/11510, search ran at 406 card plays) against the random baseline, and search minus rules
 +3.45 ± 4.62 per deal over 40 deals (search ran at 436 card plays).
 
-Stability and cheat gap after B, before the 32/60/80 schedule (lab at `4198b4fe` defaults, same sizes as the run before B):
+Stability and cheat gap after B, before the 32/60/80 schedule (lab at `4198b4fe` defaults, same
+sizes as the run before B):
 
 | Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
 |---|---|---|---|---|---|---|---|
@@ -409,6 +410,31 @@ Gates after shipping: `go test -tags nodynamic ./internal/bot/... ./internal/mat
 (8430/11690, 403 plays) and search minus rules +7.10 ± 5.35 per deal over 40 deals (434 plays).
 Those simulations play without stop at target, so the flag does not reach them; the search share
 moves with the engine's random dealer (78.5 %, 79.6 % and 83.7 % on three runs with the flag off).
+
+After the Belote-at-announcement fix (24b575bb). Until that commit the race banked the seat's own
+certain Belote at the root, so a seat holding the trump King and Queen could see its team at the
+target before a card was played and value almost every line as won. The solver now credits the
++20 when the seat plays the first card of the pair and checks the target at that moment, as the
+engine does at the announcement. The lab needed no change: `NewDealStateWith` plays with
+declarations on, the default of both variants, and the `shipped` policy answers the Belote prompt
+through `bot.Decide`, which always announces, as production does. The rows are re-run with the
+same commands and seeds on a lab built from 24b575bb and paired with the same lab built from
+ef2e3c42, the last commit before the fix. The ef2e3c42 rows differ from the 1c535a08 rows above
+because the bidding table was recalibrated in between (§3.5), which changes the deals that pass out.
+
+| Item (A vs B) | Variant | Seed | Commit | Command | Match edge per game | Decided |
+|---|---|---|---|---|---|---|
+| C2 `race` vs `noRace`, before the fix | Bitola | 701 | ef2e3c42 | `-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701 -workers=6` | +0.0150 ± 0.0062 (A won 630, B won 600) | 1230 / 2000 (61.5 %), 1023 mid-hand stops, 258 passed out; A searched 7457 |
+| C2 `race` vs `noRace`, after the fix | Bitola | 701 | 24b575bb | same | +0.0160 ± 0.0063 (A won 631, B won 599) | 1230 / 2000 (61.5 %), 1023 mid-hand stops, 258 passed out; A searched 7457 |
+| C2 `race` vs `noRace`, before the fix | Croatian | 702 | ef2e3c42 | `-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia` | +0.0335 ± 0.0062 (A won 769, B won 702) | 1471 / 2000 (73.5 %), 1230 mid-hand stops; A searched 8177 |
+| C2 `race` vs `noRace`, after the fix | Croatian | 702 | 24b575bb | same | +0.0335 ± 0.0062 (A won 769, B won 702) | 1471 / 2000 (73.5 %), 1230 mid-hand stops; A searched 8175 |
+
+Paired on the same deals, the fix moved the Bitola edge by +0.0010 (one match changed hands, A won
+630 then 631) and left the Croatian edge unchanged (the same wins; A's searched decisions went from
+8177 to 8175, so a few lines differ without changing a match). Against the shipped rows (+0.0150 ±
+0.0061 and +0.0315 ± 0.0061) the fixed bot is not worse at 2 SE in either variant, so the gate is
+met. The fix changes valuations only where the seat holds a certain Belote within reach of the
+target, which is rare in these rows.
 
 #### D. The opening search
 
@@ -451,10 +477,10 @@ the equivalence-tested solver speed-ups. Duplicate, 1000 deals (2000 hands), `-w
 
 Pooled by weights 1/SE²: w = 1/0.82² = 1.487 and 1/0.71² = 1.984; mean = (1.84 · 1.487 + 0.79 ·
 1.984) / 3.471 = **+1.24**, SE = 1/√3.471 = **0.54**, z = 2.3. Both variants are positive and A is
-not worse than B at 2 SE, so the gate is met. Both sides bid with the same table (the calls
-are equal in count), so the row measures the card play: the schedule, the two conventions and
-whatever else the tuning zeroes. The race objective reaches the row only where the lab room stops
-at the match target.
+not worse than B at 2 SE, so the gate is met. Both sides bid with the same table, since the
+tuning does not touch bidding, so the row measures the card play. Duplicate rooms never stop at
+the target (`NewDealState` passes `stopAtTarget=false`), so `RaceObjective` has no effect here and
+the row measures the schedule and the two conventions; the race is measured by `-exp=race` (C).
 
 Stability and cheat gap at the final defaults, same sizes as before B; the rows above ("before
 the 32/60/80 schedule") are the older measurements.
@@ -1037,13 +1063,13 @@ Croatian (rows marked "out" are shapes the table does not call in Croatia):
   10 is the narrowest (+6.7 ± 2.5). Croatian row 6, which had n 111 before, now has n 353 and
   passes. The position cells of Croatian row 12 hold (+15.9 ± 2.9 second to speak, −17.0 ± 2.8
   first, −9.3 ± 3.9 third).
-- **Row 5, Bitola: kept, its evidence cell fails.** The row's own evidence cell (exactly one side Ace,
-  no J/9/A) is now measurable (n 203) and does not pass (+4.4 ± 11.7). The clause calls every four-trump hand with a side
-  Ace, and the hands only it calls (four trumps, no Jack or 9, Ace allowed, side Ace) measure
-  +16.4 ± 6.4 (n 656, 2.6 SE), so the row stays; the no-Ace part of the hands the row calls is
-  +6.3 ± 11.5 (n 218); the pure cell is too small to separate from zero.
-  Croatian row 5 has n 85 in its cell (+55.3 ± 16.5) and +27.9 ± 10.0 (n 248, 2.8 SE) with the Ace
-  allowed.
+- **Row 5, Bitola: kept, its evidence cell fails.** The row's own evidence cell (exactly one side
+  Ace, no J/9/A) is now measurable (n 203) and does not pass (+4.4 ± 11.7). The clause calls every
+  four-trump hand with a side Ace, and the hands only it calls (four trumps, no Jack or 9, Ace
+  allowed, side Ace) measure +16.4 ± 6.4 (n 656, 2.6 SE), so the row stays; the no-Ace part of the
+  hands the row calls is +6.3 ± 11.5 (n 218); the pure cell is too small to separate from zero.
+  Croatian row 5 has n 85 in its cell (+55.3 ± 16.5) and +27.9 ± 10.0 (n 248, 2.8 SE) with the
+  Ace allowed.
 
 **Flips against the table shipped at 49f242f:**
 
@@ -1111,7 +1137,8 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -flagsB=phase2 -n=1000 -seed=1001 -workers=6   # §2.9 regression, phase 3 against the phase-2 bot
 ./botlab -exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=1003 -workers=6                       # §2.9 stability
 ./botlab -exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=1005 -workers=6                       # §2.9 cheat gap
-./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701   # §2.9 C
+./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701 -workers=6   # §2.9 C
+./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia
 ./botlab -exp=bidpos -a=lab -n=60000 -csv=bidpos_bitola.csv && python3 -I fit_bid.py bidpos_bitola.csv
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
 ```

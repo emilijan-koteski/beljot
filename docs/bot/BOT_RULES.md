@@ -8,13 +8,12 @@ Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo
 plays the cards from trick 3 (§5), with the rule layer as the fallback. Phase 3 is the faster
 solver, two table conventions and the match race inside the search (§5.10), larger sample counts,
 the own Belote in the settlement and a bidding table recalibrated under the search (§4.2). The
-rule layer also
-carries the earlier tuning: partner trump-draw with a declaration-inference abort when the
-opponents provably hold the master, boss preservation, uncuttable-boss last-trick retention,
-suppressing trump draws once the opponents are void of trump, leading into a partner's void,
-smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate and
-control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions, and
-never fighting a partner who is **forced to win a trump-led trick**.
+rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
+when the opponents provably hold the master, boss preservation, uncuttable-boss last-trick
+retention, suppressing trump draws once the opponents are void of trump, leading into a partner's
+void, smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate
+and control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions,
+and never fighting a partner who is **forced to win a trump-led trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -195,7 +194,7 @@ All of these must hold, otherwise the rule layer plays:
   target goes to the rule layer. The test adds each team's match score, hand points, declaration
   points and a certain own Belote, and compares the gap to the target with every card point still
   to play plus the +10 for the last trick. With the race objective on those hands are searched
-  too (5.10).
+  too (5.10), and the race credits that Belote only when the seat plays the first of the pair.
 
 ### 5.2 What is sampled
 
@@ -335,13 +334,14 @@ Measured at the end of phase 3 (the settings above; lab rows in `BOT_V2_LAB_RESU
 | the phase-2 duplicate comparison against the rule layer, 400 deals | +10.05 ± 1.76 per deal (phase 2) |
 | cheat gap (double-dummy on the true deal against the shipped bot, 400 deals) | +27.18 ± 2.72 per hand |
 | stability under a reseed (share of searched positions whose card changes) | tricks 3-4 about 45% (Bitola) and 49% (Croatian), tricks 5-8 about 18% and 21% |
-| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`) | mean about 54 ms, max about 190 ms on the reference machine (29.8 ms in an earlier session; the same test at the commit of the schedule change reads 54 ms now); gate: mean under 250 ms, max under 500 ms |
+| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`) | mean 29.8 ms when measured for the schedule decision; 54 ms in a later session on the same machine, load-dependent (max about 190 ms); gate: mean under 250 ms |
+| the same 20 positions as a race, both teams at 940 before the hand on a 1001 table, with the leader's Belote when it holds the pair (`TestSearchTrick3RaceTiming`) | mean 10.7 ms, max 31.5 ms on the reference machine in the session where the plain test read 55.6 ms; logged, not asserted |
 
 The two simulation gates run only when `BELJOT_BOT_SIM=1` is set (CI sets it; `make test` skips
 them to stay fast), take about 9 s together, and need no database. The deadline test always runs.
 A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
 include passed-out deals. The search share against the random baseline moves with the engine's
-random dealer (72 to 84% on repeated runs), which is why its gate is 60%.
+random dealer (65 to 84% on repeated runs), which is why its gate is 60%.
 
 ### 5.9 What the search does not model
 
@@ -355,12 +355,11 @@ random dealer (72 to 84% on repeated runs), which is why its gate is 60%.
 - **No partner conventions beyond the two of 5.10** (a defender's trump lead and the Ten under
   the Ace), and no objective other than the settled hand score, except on stop-at-target tables
   where the race of 5.10 applies.
-- **Race gaps.** The race is checked after tricks 1 to 7 only, since the engine never stops the
-  match after the eighth trick. The seat's own Belote is banked at the root (as +20 once the seat
-  holds both the King and the Queen), while the engine credits it at the announcement, so a race
-  that ends between the root and the announcement is valued slightly early. A hand that reaches
-  the target only in the hand scoring (the last-trick bonus, a Capot, a fall) is valued in points,
-  not as a decided match.
+- **Race gaps.** The race is checked after tricks 1 to 7 and when the seat plays the first card of
+  its own Belote, since the engine never stops the match after the eighth trick. A Belote the seat
+  cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
+  not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
+  Capot, a fall) is valued in points, not as a decided match.
 - **No bidding, declaration, Belote or surrender decisions**, and no search on tricks 1 and 2
   (the opening search was measured and left off, 5.4).
 
@@ -389,11 +388,11 @@ applies to the first two rows, the strength rule (ships only if better at 2 SE) 
 running total (match score, hand points, declarations, Belote) reaches the target after a trick,
 a declaration reveal or a Belote. With the objective on, the search does not hand such positions
 to the rules: the solver tracks the card points each team gains and values a trick that decides
-the match at plus or minus 1000, which the chooser keeps as it is. `View.DeclarationsEnabled` and
-the seat's own certain Belote (+20, trump King and Queen still in hand) count in the running totals
-and in the settlement. Tracking stops after the seventh trick (5.9). The gaps are in 5.9.
-
-
+the match at plus or minus 1000, which the chooser keeps as it is. The seat's own certain Belote
+(+20, trump King and Queen still in hand, counted only when `View.DeclarationsEnabled` is on) is in
+the settlement, and the race keeps it out of the root totals: the solver credits it when the seat
+plays the first card of the pair and checks the target at that moment, as the engine does at the
+announcement. Tracking stops after the seventh trick (5.9). The gaps are in 5.9.
 
 ---
 
