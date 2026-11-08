@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useActiveTheme } from "@/shared/hooks/useActiveTheme";
 import { getGoogleClientId, renderGoogleButton } from "@/shared/lib/googleIdentity";
 
 const GIS_MIN_BUTTON_WIDTH_PX = 200;
@@ -18,8 +19,8 @@ function gisButtonWidth(measuredSlotWidth: number): number {
 }
 
 /**
- * Renders the Google Identity Services button into a div slot, or nothing when VITE_GOOGLE_CLIENT_ID is unset.
- * Rendering is cancelled on unmount because the GIS initialize callback is global.
+ * Renders the Google Identity Services button (dark in brass mode), or nothing when VITE_GOOGLE_CLIENT_ID is unset.
+ * The slot keeps a light colour scheme so the browser paints no opaque box behind Google's light iframe.
  */
 export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
   const { i18n } = useTranslation();
@@ -31,6 +32,7 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
 
   const clientId = getGoogleClientId();
   const locale = i18n.language;
+  const gisTheme = useActiveTheme() === "brass" ? "filled_black" : "outline";
 
   useEffect(() => {
     const parent = slotRef.current;
@@ -41,6 +43,7 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
       clientId,
       parent,
       locale,
+      theme: gisTheme,
       width,
       cancelled: () => cancelled,
       onCredential: (credential) => onCredentialRef.current(credential),
@@ -48,7 +51,7 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
     return () => {
       cancelled = true;
     };
-  }, [clientId, locale]);
+  }, [clientId, locale, gisTheme]);
 
   if (clientId === "") return null;
 
@@ -56,6 +59,7 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
     <div
       ref={slotRef}
       className="flex min-h-11 justify-center"
+      style={{ colorScheme: "light" }}
       data-testid="google-signin-button"
     />
   );
