@@ -13,7 +13,7 @@ type User struct {
 	PasswordHash          string         `gorm:"not null" json:"-"`
 	LanguagePreference    string         `gorm:"default:en;not null" json:"languagePreference"`
 	CardDeckPreference    string         `gorm:"default:french;not null" json:"cardDeckPreference"`
-	ThemePreference       string         `gorm:"default:parchment;not null" json:"themePreference"`
+	ThemePreference       string         `gorm:"default:brass;not null" json:"themePreference"`
 	SoundEnabled          bool           `gorm:"default:true;not null" json:"soundEnabled"`
 	MusicEnabled          bool           `gorm:"default:true;not null" json:"musicEnabled"`
 	SoundVolume           int            `gorm:"default:70;not null" json:"soundVolume"`

@@ -1143,7 +1143,6 @@
         "loginFailed": "Prijava nije uspela. Pokušaj ponovo."
       },
       "eyebrow": "Dobrodošao nazad",
-      "subtitle": "Sedi ponovo za sto, tvoje mesto je još toplo.",
       "altPrompt": "Nov si na Beljotu?",
       "altCta": "Kreiraj nalog",
       "forgotLink": "Zaboravljena?"
@@ -1181,7 +1180,6 @@
         "registrationFailed": "Registracija nije uspela. Pokušaj ponovo."
       },
       "eyebrow": "Privuci stolicu",
-      "subtitle": "Izaberi ime, dobij mesto. Četiri igrača za stolom, dva u timu.",
       "altPrompt": "Već imaš nalog?",
       "altCta": "Prijavi se"
     },
@@ -1263,67 +1261,83 @@
   "landing": {
     "nav": {
       "login": "Prijava",
-      "signup": "Napravi besplatan nalog"
+      "signup": "Napravi besplatan nalog",
+      "rules": "Pravila"
     },
     "hero": {
-      "eyebrow": "Beljot Online · 2 na 2 · Besplatno",
-      "title1": "Sedi za",
-      "title2": "sto.",
-      "subtitle": "Bela je klasična kartaška igra za četvoro, dva tima, trka do 1001. Nađi sobu za nekoliko sekundi ili pozovi svoju četvorku kodom.",
+      "eyebrow": "2 na 2 · Besplatno",
+      "title": "Sedi za",
+      "titleAccent": "sto.",
+      "subtitle": "Bela za četvoro, u tvom pregledaču. Igraj sa prijateljima, strancima ili botovima.",
       "cta": "Napravi besplatan nalog",
-      "playing": "trenutno igra",
-      "openTables": "otvorenih soba"
+      "tableAlt": "Meč bele u toku",
+      "phoneAlt": "Isti sto na telefonu, hrvatske karte"
     },
-    "how": {
-      "eyebrow": "Tri koraka do prvog štiha",
-      "title": "U igri si pre nego što se kafa ohladi.",
-      "s1t": "Napravi besplatan nalog",
-      "s1b": "Izaberi ime, bez preuzimanja. Za minut si u lobiju.",
-      "s2t": "Zauzmi mesto",
-      "s2b": "Pritisni Brza igra i naći ćemo ti partnere, ili otvori sobu i podeli kod.",
-      "s3t": "Zovi aduta i igraj",
-      "s3b": "Zovi aduta, osvajaj štihove sa partnerom, trka do 1001."
+    "facts": {
+      "variants": "Bitola i Hrvatska",
+      "decks": "Francuske ili hrvatske karte",
+      "languages": "4 jezika",
+      "download": "Bez preuzimanja"
     },
-    "feat": {
-      "f1tag": "Predvorje · uživo",
-      "f1title": "Gledaj kako se sobe pune uživo",
-      "f1body": "Svaka otvorena soba i mesto, uživo. Filtriraj po tajmeru ili poenima, traži po kodu ili pritisni Brza igra.",
-      "f2tag": "Timovi · zlato protiv srebra",
-      "f2title": "To je partnerstvo, ne svako za sebe",
-      "f2body": "Dvoje protiv dvoje, partneri jedan naspram drugog, trka do 1001. Čet i emotikoni drže sto u razgovoru.",
-      "f3tag": "Profil · istorija mečeva",
-      "f3title": "Svaka ruka se računa u tvoj učinak",
-      "f3body": "Odigrani mečevi, procenat pobeda i istorija ruku po ruku. Vidi s kim pobeđuješ."
+    "lobby": {
+      "eyebrow": "Predvorje",
+      "title": "Nađi sto za par sekundi.",
+      "body": "Sve otvorene sobe, uživo, s pravilima na kartici. Ili neka te Brza igra smesti.",
+      "alt": "Predvorje sa otvorenim sobama"
     },
-    "room": {
-      "join": "Uđi",
-      "empty": "prazno",
-      "r1title": "Subotnja duga igra",
-      "r1meta": "Bitola · 1001 poen · 30s",
-      "r1ago": "pre 4 min",
-      "r2title": "Brza 501, bez tajmera",
-      "r2meta": "Hrvatska · 501 poen · opušteno",
-      "r2ago": "upravo sad"
+    "rules": {
+      "eyebrow": "Pravila",
+      "title1": "Dve varijante,",
+      "title2": "tvoja pravila.",
+      "body": "Svaka soba pokazuje svoja pravila pre nego što sedneš.",
+      "bitola": {
+        "title": "Bitola",
+        "b1": "Dva kruga licitacije na okrenutu kartu.",
+        "b2": "Zvanja se pokazuju od drugog štiha.",
+        "b3": "Bela na dami, Rebela na kralju."
+      },
+      "croatian": {
+        "title": "Hrvatska",
+        "b1": "Jedan krug licitacije na šest karata; dve ostaju zatvorene.",
+        "b2": "Svi pas? Delilac bira aduta.",
+        "b3": "Zvanja pre prvog štiha."
+      },
+      "room": {
+        "target": "1001 ili 501",
+        "timer": "Sa tajmerom ili opušteno",
+        "direction": "Oba smera",
+        "declarations": "Sa zvanjima ili bez",
+        "buyIn": "Ulog",
+        "honor": "Minimum časti"
+      },
+      "frenchDeck": "Francuske karte",
+      "croatianDeck": "Hrvatske karte"
     },
-    "vig": {
-      "trump": "Adut",
-      "opponent": "protivnik",
-      "partner": "partner"
+    "table": {
+      "eyebrow": "Sto",
+      "title": "Partneri preko puta.",
+      "body": "Mi u zlatu, oni u srebru. Zovi aduta, prijavi zvanja, zovi Belu.",
+      "alt": "Tvoj potez za stolom",
+      "score": "Rezultat",
+      "trump": "Adut: herc",
+      "turn": "Tvoj potez",
+      "legal": "Dozvoljene karte svetle",
+      "clockTitle": "Sat na svakom potezu",
+      "clockBody": "Istekne li vreme, igra igra umesto tebe.",
+      "fairTitle": "Fer stolovi",
+      "fairBody": "Izađeš li ili propustiš tri poteza, to košta novčića, XP-a i časti."
     },
-    "prof": {
-      "member": "Član od 2024",
-      "games": "mečevi",
-      "winrate": "uspešnost",
-      "wins": "pobede",
-      "recent": "Istorija mečeva",
-      "won": "Pobeda",
-      "lost": "Poraz",
-      "with": "sa"
+    "seasons": {
+      "eyebrow": "Sezone",
+      "title": "Penji se kroz sezonu.",
+      "body": "Pobede donose sezonske poene. Tvoj profil čuva svaki meč, saigrača i rivala.",
+      "profileAlt": "Tvoj profil",
+      "leaderboardAlt": "Sezonska rang lista"
     },
     "cta": {
-      "eyebrow": "Sto je postavljen",
-      "title": "Tvoja četvorka te čeka.",
-      "body": "Besplatno zauvek. Bez preuzimanja. Podeli prvu ruku večeras.",
+      "title1": "Tvoja četvorka",
+      "title2": "te čeka.",
+      "body": "Podeli prvu ruku večeras.",
       "cta": "Napravi besplatan nalog"
     },
     "foot": {
@@ -1331,6 +1345,7 @@
       "privacy": "Privatnost",
       "terms": "Uslovi",
       "contact": "Kontakt",
+      "support": "Podrži",
       "copyright": "© 2026 Beljot.online"
     },
     "contact": {

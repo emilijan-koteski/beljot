@@ -21,8 +21,11 @@
      JetBrains Mono is kept for micro-caps labels and genuinely monospaced
      content (room codes, aligned figures). --font-suit is NOT a UI font: it
      forces ♠♥♦♣ pips and the playing-card faces to render as serif text
-     glyphs (sans-serif risks colour-emoji fallback for ♥/♦). */
+     glyphs (sans-serif risks colour-emoji fallback for ♥/♦). The landing's
+     display headlines alone use Cormorant Garamond in caps (`font-display`),
+     which echoes the logo and, unlike Cinzel, covers Macedonian Cyrillic. */
   --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-suit: Georgia, "Times New Roman", "DejaVu Serif", serif;
 

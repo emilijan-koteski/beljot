@@ -14,6 +14,7 @@ import { Button } from "@/shared/components/ui/button";
 import { FormError } from "@/shared/components/ui/form-error";
 import { Input } from "@/shared/components/ui/input";
 import { useLoginMutation } from "@/shared/hooks/mutations/useAuth";
+import { reconcileThemePreference } from "@/shared/lib/themePreference";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -73,7 +74,10 @@ export function LoginPage() {
 
     try {
       const res = await loginMutation.mutateAsync({ email, password });
-      await reconcileLanguagePreference(res, i18n.language);
+      await Promise.all([
+        reconcileThemePreference(res),
+        reconcileLanguagePreference(res, i18n.language),
+      ]);
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
@@ -92,7 +96,6 @@ export function LoginPage() {
     <AuthCard
       eyebrow={t("auth.login.eyebrow")}
       title={t("auth.login.title")}
-      subtitle={t("auth.login.subtitle")}
       footer={
         <AltLink
           prompt={t("auth.login.altPrompt")}

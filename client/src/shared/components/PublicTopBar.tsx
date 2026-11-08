@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { WORDMARK_NAV_HEIGHT } from "@/shared/components/brand/brandSizes";
 import { BrandWordmark } from "@/shared/components/brand/BrandWordmark";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { buttonVariants } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -25,6 +26,7 @@ export function PublicTopBar() {
 
       <div className="ml-auto flex items-center gap-2.5 sm:gap-3.5">
         <LanguageSelector persistToServer={false} testIdPrefix="public-language" />
+        <ThemeToggle testId="public-theme-toggle" />
         <Link
           to="/login"
           data-testid="public-login"

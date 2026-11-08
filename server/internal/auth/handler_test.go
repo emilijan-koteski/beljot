@@ -501,13 +501,13 @@ func TestRegister_CardDeckPreference(t *testing.T) {
 
 			assert.Equal(t, tc.expectedLang, data.LanguagePreference)
 			assert.Equal(t, tc.expectedDeck, data.CardDeckPreference)
-			assert.Equal(t, user.ThemeParchment, data.ThemePreference)
+			assert.Equal(t, user.DefaultTheme, data.ThemePreference)
 
 			repo, ok := handler.userRepo.(*mockUserRepo)
 			require.True(t, ok)
 			require.Len(t, repo.users, 1)
 			assert.Equal(t, tc.expectedDeck, repo.users[0].CardDeckPreference)
-			assert.Equal(t, user.ThemeParchment, repo.users[0].ThemePreference)
+			assert.Equal(t, user.DefaultTheme, repo.users[0].ThemePreference)
 		})
 	}
 }

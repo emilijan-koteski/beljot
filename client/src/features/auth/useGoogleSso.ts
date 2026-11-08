@@ -7,6 +7,7 @@ import { reconcileLanguagePreference } from "@/features/auth/reconcileLanguage";
 import { FetchError } from "@/shared/api/axiosClient";
 import { useSSOLinkMutation, useSSOLoginMutation } from "@/shared/hooks/mutations/useAuth";
 import { decodeCredentialEmail } from "@/shared/lib/googleIdentity";
+import { reconcileThemePreference } from "@/shared/lib/themePreference";
 
 interface LinkDialogProps {
   open: boolean;
@@ -25,7 +26,7 @@ interface UseGoogleSsoResult {
 
 /**
  * Runs the Google SSO login, register, or link flow shared by LoginPage and RegisterPage.
- * Success paths reconcile the picked UI language and navigate to /lobby.
+ * Success paths reconcile the picked UI language and theme, then navigate to /lobby.
  */
 export function useGoogleSso(): UseGoogleSsoResult {
   const { t, i18n } = useTranslation();
@@ -43,7 +44,10 @@ export function useGoogleSso(): UseGoogleSsoResult {
     inFlightRef.current = true;
     try {
       const res = await ssoLoginMutation.mutateAsync({ provider: "google", credential });
-      await reconcileLanguagePreference(res, i18n.language);
+      await Promise.all([
+        reconcileThemePreference(res),
+        reconcileLanguagePreference(res, i18n.language),
+      ]);
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError && err.code === "SSO_LINK_REQUIRED") {
@@ -72,7 +76,10 @@ export function useGoogleSso(): UseGoogleSsoResult {
         password,
       });
       setLinkCredential(null);
-      await reconcileLanguagePreference(res, i18n.language);
+      await Promise.all([
+        reconcileThemePreference(res),
+        reconcileLanguagePreference(res, i18n.language),
+      ]);
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError && err.code === "INVALID_CREDENTIALS") {

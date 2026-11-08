@@ -47,7 +47,4 @@ export const queryKeys = {
       ["season", "leaderboard", limit, season] as const,
     leaderboardAll: () => ["season", "leaderboard"] as const,
   },
-  stats: {
-    public: ["stats", "public"] as const,
-  },
 } as const;

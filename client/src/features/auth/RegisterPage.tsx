@@ -13,6 +13,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useRegisterMutation } from "@/shared/hooks/mutations/useAuth";
 import { normalizeLanguage } from "@/shared/i18n/i18n";
+import { reconcileThemePreference } from "@/shared/lib/themePreference";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -92,12 +93,13 @@ export function RegisterPage() {
     setErrors({});
 
     try {
-      await registerMutation.mutateAsync({
+      const res = await registerMutation.mutateAsync({
         email,
         username,
         password,
         languagePreference: normalizeLanguage(i18n.language) ?? "en",
       });
+      await reconcileThemePreference(res);
       navigate("/lobby", { replace: true });
     } catch (err) {
       if (err instanceof FetchError) {
@@ -130,7 +132,6 @@ export function RegisterPage() {
     <AuthCard
       eyebrow={t("auth.register.eyebrow")}
       title={t("auth.register.title")}
-      subtitle={t("auth.register.subtitle")}
       footer={
         <AltLink
           prompt={t("auth.register.altPrompt")}

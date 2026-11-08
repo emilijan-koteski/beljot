@@ -9,6 +9,7 @@ import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { LevelRing } from "@/shared/components/LevelRing";
 import { HeaderRankChip } from "@/shared/components/season/HeaderRankChip";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { Avatar } from "@/shared/components/ui/avatar";
 import {
   DropdownMenu,
@@ -40,7 +41,7 @@ type TopBarProps = {
 };
 
 /**
- * App header with the brand, nav links, progression readouts, wallet, language picker and user menus.
+ * App header with the brand, nav links, progression readouts, wallet, language picker, theme toggle when signed out, and user menus.
  * The SupportDialog is mounted outside both dropdowns because a dropdown unmounts its subtree on select.
  */
 export function TopBar({
@@ -174,6 +175,7 @@ export function TopBar({
         )}
 
         <LanguageSelector persistToServer={persistLanguage} testIdPrefix={languageTestIdPrefix} />
+        {!user && <ThemeToggle testId="topbar-theme-toggle" />}
 
         {showUserMenu && user && (
           <DropdownMenu>
