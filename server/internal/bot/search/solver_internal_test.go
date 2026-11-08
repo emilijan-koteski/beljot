@@ -2,6 +2,7 @@ package search
 
 import (
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,5 +75,25 @@ func TestOptimisedSolverMatchesPlainWhenRacing(t *testing.T) {
 		plain.plain = true
 		plain.SetRace(race)
 		require.Equal(t, plain.RootValues(hands, leader, trick, capot), fast.RootValues(hands, leader, trick, capot), "position %d race %+v", i, *race)
+	}
+}
+
+func TestOptimisedSolverMatchesPlainWhenRacingWithABelote(t *testing.T) {
+	rng := rand.New(rand.NewPCG(73, 79))
+	for checked := 0; checked < 20; {
+		hands, leader, trick, trump, clockwise, capot := randomTrick3Deal(rng)
+		pair := MaskOf([]game.Card{{Rank: game.RankKing, Suit: suitList[trump]}, {Rank: game.RankQueen, Suit: suitList[trump]}})
+		race := &Race{Target: 1001, Banked: [2]int{960 + rng.IntN(40), 940 + rng.IntN(60)}, Caller: rng.IntN(2), BeloteCards: pair}
+		race.BeloteSeat = slices.IndexFunc(hands[:], func(hand uint32) bool { return hand&pair == pair })
+		if race.BeloteSeat < 0 {
+			continue
+		}
+		fast := NewSolver(trump, clockwise)
+		fast.SetRace(race)
+		plain := NewSolver(trump, clockwise)
+		plain.plain = true
+		plain.SetRace(race)
+		require.Equal(t, plain.RootValues(hands, leader, trick, capot), fast.RootValues(hands, leader, trick, capot), "position %d race %+v", checked, *race)
+		checked++
 	}
 }

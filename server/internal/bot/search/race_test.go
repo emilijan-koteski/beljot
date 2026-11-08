@@ -1,6 +1,7 @@
 package search_test
 
 import (
+	"math/bits"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -124,12 +125,14 @@ type raceBruteForce struct {
 	race search.Race
 }
 
-func (b raceBruteForce) value(hands [4]uint32, leader int, trick []int, won, gained [2]int) int {
+const beloteBonus = 20
+
+func (b raceBruteForce) value(hands [4]uint32, leader int, trick []int, won, gained, belote [2]int) int {
 	seat := game.StepSeat(leader, len(trick), b.clockwise)
 	maximize := seat%2 == 0
 	best, first := 0, true
 	for _, card := range search.CardsOf(b.solver.Legal(hands[seat], trick)) {
-		v := b.afterCard(hands, leader, trick, search.CardIdx(card), won, gained)
+		v := b.afterCard(hands, leader, trick, search.CardIdx(card), won, gained, belote)
 		if first || maximize && v > best || !maximize && v < best {
 			best, first = v, false
 		}
@@ -137,13 +140,19 @@ func (b raceBruteForce) value(hands [4]uint32, leader int, trick []int, won, gai
 	return best
 }
 
-func (b raceBruteForce) afterCard(hands [4]uint32, leader int, trick []int, card int, won, gained [2]int) int {
+func (b raceBruteForce) afterCard(hands [4]uint32, leader int, trick []int, card int, won, gained, belote [2]int) int {
 	seat := game.StepSeat(leader, len(trick), b.clockwise)
 	rest := hands
 	rest[seat] &^= 1 << uint(card)
+	if b.announcesBelote(hands[seat], seat, card) {
+		belote[game.TeamForSeat(seat)] = beloteBonus
+		if winner, decided := search.RaceDecided(b.race, addTotals(gained, belote)); decided {
+			return (1 - 2*winner) * search.RaceWin
+		}
+	}
 	played := append(slices.Clone(trick), card)
 	if len(played) < 4 {
-		return b.value(rest, leader, played, won, gained)
+		return b.value(rest, leader, played, won, gained, belote)
 	}
 	if rest == [4]uint32{} {
 		return gained[0] - gained[1] + b.bruteForce.afterCard(hands, leader, trick, card, won)
@@ -154,17 +163,37 @@ func (b raceBruteForce) afterCard(hands [4]uint32, leader int, trick []int, card
 		gained[team] += search.Points(c, b.trump)
 	}
 	won[team]++
-	if winner, decided := search.RaceDecided(b.race, gained); decided {
+	if winner, decided := search.RaceDecided(b.race, addTotals(gained, belote)); decided {
 		return (1 - 2*winner) * search.RaceWin
 	}
-	return b.value(rest, winnerSeat, nil, won, gained)
+	return b.value(rest, winnerSeat, nil, won, gained, belote)
+}
+
+// announcesBelote reports that the card is the first of the race's Belote pair its holder plays.
+func (b raceBruteForce) announcesBelote(hand uint32, seat, card int) bool {
+	pair := b.race.BeloteCards
+	return pair != 0 && seat == b.race.BeloteSeat && hand&pair == pair && pair&(1<<uint(card)) != 0
+}
+
+func addTotals(a, b [2]int) [2]int {
+	return [2]int{a[0] + b[0], a[1] + b[1]}
 }
 
 func TestSolverRaceMatchesBruteForce(t *testing.T) {
+	assertRaceMatchesBruteForce(t, 41, 43, false)
+}
+
+func TestSolverRaceWithABelotePairMatchesBruteForce(t *testing.T) {
+	assertRaceMatchesBruteForce(t, 67, 71, true)
+}
+
+// assertRaceMatchesBruteForce races random endgames near the target against the brute force, each with a seat
+// holding the trump King and Queen as its Belote when withBelote is set.
+func assertRaceMatchesBruteForce(t *testing.T, seed1, seed2 uint64, withBelote bool) {
 	const endgamesPerDirection = 150
 	for _, direction := range directions {
 		t.Run(direction.name, func(t *testing.T) {
-			rng := rand.New(rand.NewPCG(41, 43))
+			rng := rand.New(rand.NewPCG(seed1, seed2))
 			solvers := solversByTrump(direction.clockwise)
 			for i := 0; i < endgamesPerDirection; i++ {
 				trump := rng.IntN(4)
@@ -174,6 +203,14 @@ func TestSolverRaceMatchesBruteForce(t *testing.T) {
 					Target: 1001,
 					Banked: [2]int{1000 - rng.IntN(60), 1000 - rng.IntN(60)},
 					Caller: rng.IntN(2),
+				}
+				if withBelote {
+					var ok bool
+					if eg, race.BeloteSeat, ok = withBelotePair(rng, eg, trump); !ok {
+						i--
+						continue
+					}
+					race.BeloteCards = belotePair(trump)
 				}
 				reference := raceBruteForce{
 					bruteForce: bruteForce{solver: solver, trump: trump, clockwise: direction.clockwise},
@@ -185,15 +222,61 @@ func TestSolverRaceMatchesBruteForce(t *testing.T) {
 				roots := solver.RootValues(eg.hands, eg.leader, eg.trick, eg.capot)
 				for _, card := range search.CardsOf(solver.Legal(eg.hands[seat], eg.trick)) {
 					idx := search.CardIdx(card)
-					want := reference.afterCard(eg.hands, eg.leader, eg.trick, idx, won, [2]int{})
+					want := reference.afterCard(eg.hands, eg.leader, eg.trick, idx, won, [2]int{}, [2]int{})
 					require.Equal(t, want, roots[idx], "endgame %d card %d race %+v", i, idx, race)
 				}
-				want := reference.value(eg.hands, eg.leader, eg.trick, won, [2]int{})
+				want := reference.value(eg.hands, eg.leader, eg.trick, won, [2]int{}, [2]int{})
 				require.Equal(t, want, solver.Value(eg.hands, eg.leader, eg.trick, eg.capot), "endgame %d", i)
 				solver.SetRace(nil)
 			}
 		})
 	}
+}
+
+func belotePair(trump int) uint32 {
+	var pair uint32
+	for _, c := range game.NewDeck() {
+		if search.SuitIdx(c.Suit) == trump && (c.Rank == game.RankKing || c.Rank == game.RankQueen) {
+			pair |= 1 << uint(search.CardIdx(c))
+		}
+	}
+	return pair
+}
+
+// withBelotePair moves the trump King and Queen into a random seat holding at least two cards, swapping out cards
+// of that seat, and reports false when either is already in the open trick.
+func withBelotePair(rng *rand.Rand, eg endgame, trump int) (endgame, int, bool) {
+	pair := belotePair(trump)
+	for _, c := range eg.trick {
+		if pair&(1<<uint(c)) != 0 {
+			return eg, 0, false
+		}
+	}
+	var seats []int
+	for seat, hand := range eg.hands {
+		if bits.OnesCount32(hand) >= 2 {
+			seats = append(seats, seat)
+		}
+	}
+	if len(seats) == 0 {
+		return eg, 0, false
+	}
+	seat := seats[rng.IntN(len(seats))]
+	for m := pair; m != 0; m &= m - 1 {
+		card := uint32(1) << uint(bits.TrailingZeros32(m))
+		if eg.hands[seat]&card != 0 {
+			continue
+		}
+		others := search.CardsOf(eg.hands[seat] &^ pair)
+		victim := uint32(1) << uint(search.CardIdx(others[rng.IntN(len(others))]))
+		for other := range eg.hands {
+			if eg.hands[other]&card != 0 {
+				eg.hands[other] = eg.hands[other]&^card | victim
+			}
+		}
+		eg.hands[seat] = eg.hands[seat]&^victim | card
+	}
+	return eg, seat, true
 }
 
 func TestRaceBookkeepingMatchesTheEngine(t *testing.T) {
@@ -269,4 +352,141 @@ func raceDeal(rng *rand.Rand, scoreA, scoreB int) *game.GameState {
 		gs.Players[seat].Hand = slices.Clone(deck[seat*8 : (seat+1)*8])
 	}
 	return gs
+}
+
+// newBeloteRaceEndgame deals three tricks with hearts trump: seat 0 leads holding the King and Queen of hearts, 15
+// short of the target, while the opponents, 30 short, take 31 if it leads the seven of spades.
+func newBeloteRaceEndgame() (raceEndgame, [2]int) {
+	idx := func(code string) int { return search.CardIdx(cardFromCode(code)) }
+	pair := maskOfIndexes(idx("KH"), idx("QH"))
+	return raceEndgame{
+		hands: [4]uint32{
+			pair | maskOfIndexes(idx("7S")),
+			maskOfIndexes(idx("JH"), idx("9D"), idx("TD")),
+			maskOfIndexes(idx("AS"), idx("8D"), idx("8C")),
+			maskOfIndexes(idx("7C"), idx("9C"), idx("7D")),
+		},
+		race: search.Race{Target: 1001, Banked: [2]int{986, 971}, Caller: game.TeamA, BeloteSeat: 0, BeloteCards: pair},
+	}, [2]int{idx("KH"), idx("QH")}
+}
+
+func TestSolverRaceCreditsTheBeloteWhenItIsPlayed(t *testing.T) {
+	sevenOfSpades := search.CardIdx(cardFromCode("7S"))
+	for _, direction := range directions {
+		t.Run(direction.name, func(t *testing.T) {
+			eg, pair := newBeloteRaceEndgame()
+			solver := search.NewSolver(hearts, direction.clockwise)
+			solver.SetRace(&eg.race)
+			roots := solver.RootValues(eg.hands, 0, nil, 0)
+			assert.Equal(t, -search.RaceWin, roots[sevenOfSpades], "the opponents cross first")
+			assert.Equal(t, search.RaceWin, roots[pair[0]], "the King announces the Belote")
+			assert.Equal(t, search.RaceWin, roots[pair[1]], "the Queen announces the Belote")
+		})
+	}
+}
+
+func TestChooseAnnouncesTheBeloteThatWinsTheRace(t *testing.T) {
+	eg, pair := newBeloteRaceEndgame()
+	in := search.Information{Seat: 0, Own: eg.hands[0]}
+	for seat := 1; seat < 4; seat++ {
+		in.Known[seat] = eg.hands[seat]
+	}
+	pos := search.Position{Trump: hearts, Leader: 0, Race: &eg.race}
+	settle := settlementOver(hearts, nil, eg.hands[:]...)
+	res, ok := search.Choose(in, pos, legalFor(pos, eg.hands[0]), settle, search.Options{Samples: 4}, farFuture())
+	require.True(t, ok)
+	assert.Contains(t, []game.Card{search.IdxCard(pair[0]), search.IdxCard(pair[1])}, res.Card)
+}
+
+func TestRaceBeloteStopsWhereTheEngineDoes(t *testing.T) {
+	rng := rand.New(rand.NewPCG(79, 83))
+	var atAnnouncement, atTrick int
+	for i := range 150 {
+		gs, holder := raceBeloteDeal(rng)
+		trump := search.SuitIdx(*gs.TrumpSuit)
+		pair := belotePair(trump)
+		solver := search.NewSolver(trump, gs.Rules.Clockwise)
+		for gs.Phase == game.PhasePlaying {
+			seat := gs.ActivePlayerSeat
+			legal := game.LegalCards(gs, seat)
+			card := legal[rng.IntN(len(legal))]
+			idx := search.CardIdx(card)
+			hands := handMasks(gs)
+			leader := seat
+			if len(gs.CurrentTrick) > 0 {
+				leader = gs.CurrentTrick[0].PlayerSeat
+			}
+			race := engineRace(gs, holder, pair)
+			solver.SetRace(&race)
+			value := solver.RootValues(hands, leader, trickIndexes(gs), search.CapotFlag(gs.TricksWon))[idx]
+			announcing := seat == holder && hands[seat]&pair == pair && pair&(1<<uint(idx)) != 0
+			closing := len(gs.CurrentTrick) == 3
+
+			next, err := game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: seat, Card: &card})
+			require.NoError(t, err)
+			gs = next
+			if gs.PendingBelotSeat != nil {
+				require.True(t, announcing, "deal %d: the engine prompts only on the first of the pair", i)
+				gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: seat})
+				require.NoError(t, err)
+			}
+			if !gs.StoppedAtTarget {
+				continue
+			}
+			require.Equal(t, (1-2*(*gs.WinnerTeam))*search.RaceWin, value, "deal %d card %v race %+v", i, card, race)
+			if closing {
+				atTrick++
+			} else {
+				require.True(t, announcing, "deal %d: a stop mid-trick comes from the Belote", i)
+				atAnnouncement++
+			}
+		}
+	}
+	assert.Positive(t, atAnnouncement)
+	assert.Positive(t, atTrick)
+}
+
+// engineRace is the race the bridge builds from an engine state: running totals with every announced point, and the
+// holder's Belote while it still holds both cards.
+func engineRace(gs *game.GameState, holder int, pair uint32) search.Race {
+	race := search.Race{Target: game.MatchTarget(gs.MatchMode), Caller: game.TeamForSeat(*gs.TrumpCallerSeat)}
+	for team := range race.Banked {
+		race.Banked[team] = gs.TeamScores[team] + gs.HandPoints[team] + gs.DeclarationPoints[team] + gs.BelotPoints[team]
+	}
+	if search.MaskOf(gs.Players[holder].Hand)&pair == pair {
+		race.BeloteSeat, race.BeloteCards = holder, pair
+	}
+	return race
+}
+
+// raceBeloteDeal is a stop-at-target state at trick 5 with declarations on and resolved, random trump, caller,
+// direction and leader, and a random holder of the trump King and Queen whose team is 1 to 45 short of the target.
+func raceBeloteDeal(rng *rand.Rand) (*game.GameState, int) {
+	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameMidPlay(5))
+	gs.Rules.DeclarationsEnabled, gs.DeclarationsEnabled = true, true
+	gs.Rules.Clockwise = rng.IntN(2) == 1
+	gs.Clockwise = gs.Rules.Clockwise
+	gs.BelotAnnounced = false
+	trump := []game.Suit{game.SuitSpades, game.SuitHearts, game.SuitDiamonds, game.SuitClubs}[rng.IntN(4)]
+	gs.TrumpSuit = &trump
+	caller := rng.IntN(4)
+	gs.TrumpCallerSeat = &caller
+	gs.ActivePlayerSeat = rng.IntN(4)
+	holder := rng.IntN(4)
+
+	king, queen := game.Card{Rank: game.RankKing, Suit: trump}, game.Card{Rank: game.RankQueen, Suit: trump}
+	deck := slices.DeleteFunc(game.NewDeck(), func(c game.Card) bool { return c == king || c == queen })
+	rng.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
+	deck = append([]game.Card{king, queen}, deck...)
+	for k := range gs.Players {
+		gs.Players[(holder+k)%4].Hand = slices.Clone(deck[k*4 : (k+1)*4])
+	}
+
+	target := game.MatchTarget(gs.MatchMode)
+	short := [2]int{1 + rng.IntN(60), 1 + rng.IntN(60)}
+	short[game.TeamForSeat(holder)] = 1 + rng.IntN(45)
+	for team := range gs.TeamScores {
+		gs.TeamScores[team] = target - short[team] - gs.HandPoints[team]
+	}
+	return gs, holder
 }

@@ -502,7 +502,7 @@ func TestSearchAppliesWithRaceObjective(t *testing.T) {
 	assert.Nil(t, bot.PositionFromForTest(v, racing).Race)
 }
 
-func TestRaceBankCountsTheBotsOwnBelote(t *testing.T) {
+func TestRaceCarriesTheBotsOwnBeloteApartFromTheBank(t *testing.T) {
 	trump, caller := game.SuitHearts, 1
 	v := bot.View{
 		Seat: 2, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller,
@@ -512,6 +512,14 @@ func TestRaceBankCountsTheBotsOwnBelote(t *testing.T) {
 	}
 	pos := bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true})
 	require.NotNil(t, pos.Race)
-	assert.Equal(t, [2]int{980, 925}, pos.Race.Banked)
+	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
 	assert.Equal(t, game.TeamB, pos.Race.Caller)
+	assert.Equal(t, 2, pos.Race.BeloteSeat)
+	assert.Equal(t, search.MaskOf(cards("KH", "QH")), pos.Race.BeloteCards)
+
+	v.Hand = cards("KH", "7S")
+	pos = bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true})
+	require.NotNil(t, pos.Race)
+	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
+	assert.Zero(t, pos.Race.BeloteCards)
 }

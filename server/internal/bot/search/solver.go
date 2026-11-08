@@ -327,6 +327,11 @@ func (s *Solver) remember(key memoKey, best, bestCard, windowLow, windowHigh int
 func (s *Solver) play(hands [4]uint32, leader int, trick []int, card int, capot int8, alpha, beta int) int {
 	seat := s.seatAt[leader][len(trick)]
 	hands[seat] &^= 1 << uint(card)
+	if s.race != nil && s.race.announcesBelote(seat, card, hands[seat]) {
+		if winner, decided := RaceDecided(*s.race, s.race.totals(s.gained, hands)); decided {
+			return raceValue(winner)
+		}
+	}
 	var played [4]int
 	n := copy(played[:], trick)
 	played[n] = card
@@ -354,7 +359,7 @@ func (s *Solver) raceAfterTrick(hands [4]uint32, winnerSeat, gain int, capot int
 	saved := s.gained
 	team := game.TeamForSeat(winnerSeat)
 	s.gained[team] += (1 - 2*team) * gain
-	winner, decided := RaceDecided(*s.race, s.gained)
+	winner, decided := RaceDecided(*s.race, s.race.totals(s.gained, hands))
 	value := raceValue(winner)
 	if !decided {
 		value = s.search(hands, winnerSeat, nil, capot, alpha, beta)

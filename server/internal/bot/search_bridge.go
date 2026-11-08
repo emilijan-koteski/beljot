@@ -62,19 +62,29 @@ func withinStopAtTargetReach(v View) bool {
 
 // runningTotal is what the team would bank if the match stopped now, the bot's own certain Belote included.
 func runningTotal(v View, team int) int {
-	return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team] + ownBelotePoints(v, team)
+	return bankedTotal(v, team) + ownBelotePoints(v, team)
+}
+
+// bankedTotal is the team's running total from what the engine has already credited.
+func bankedTotal(v View, team int) int {
+	return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team]
 }
 
 // raceFor is the stop-at-target race the search plays when the tuning races and a team is within reach, else nil.
+// The bot's own certain Belote stays out of the bank: the solver credits it when the first of the pair is played.
 func raceFor(v View, t SearchTuning) *search.Race {
 	if !t.RaceObjective || !withinStopAtTargetReach(v) {
 		return nil
 	}
-	return &search.Race{
+	race := &search.Race{
 		Target: v.MatchTarget,
-		Banked: [2]int{runningTotal(v, game.TeamA), runningTotal(v, game.TeamB)},
+		Banked: [2]int{bankedTotal(v, game.TeamA), bankedTotal(v, game.TeamB)},
 		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
 	}
+	if ownBeloteCertain(v) {
+		race.BeloteSeat, race.BeloteCards = v.Seat, search.MaskOf(belotePair(*v.TrumpSuit))
+	}
+	return race
 }
 
 // SearchCard runs the search for the seat's card, reporting false when it reached no decision and the rules should play.
@@ -224,9 +234,12 @@ func ownBeloteCertain(v View) bool {
 	if !v.DeclarationsEnabled || v.TrumpSuit == nil {
 		return false
 	}
-	king := game.Card{Rank: game.RankKing, Suit: *v.TrumpSuit}
-	queen := game.Card{Rank: game.RankQueen, Suit: *v.TrumpSuit}
-	return slices.Contains(v.Hand, king) && slices.Contains(v.Hand, queen)
+	pair := belotePair(*v.TrumpSuit)
+	return slices.Contains(v.Hand, pair[0]) && slices.Contains(v.Hand, pair[1])
+}
+
+func belotePair(trump game.Suit) []game.Card {
+	return []game.Card{{Rank: game.RankKing, Suit: trump}, {Rank: game.RankQueen, Suit: trump}}
 }
 
 // remainingCardPoints sums the trump-aware points of the seat's hand, the unseen and located cards and the current
