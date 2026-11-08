@@ -122,7 +122,7 @@ Row 4 was retired by the recalibration under the search (`BOT_V2_LAB_RESULTS.md`
 row numbers are kept so the lab results still refer to them. Rows 10, 11 and 13 were added or
 extended on the owner's approval of the shapes measured in §3.6. Every other shape passes, for
 example the Jack with one small trump and no side Ace, three small trumps without the Jack or
-the 9, or four small trumps with no side Ace in Croatian.
+the 9, or four small trumps without the Ace.
 
 | Hand (incl. candidate) | Variant, position | Call? | Why |
 |---|---|---|---|
