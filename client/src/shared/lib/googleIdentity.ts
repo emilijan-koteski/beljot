@@ -91,6 +91,7 @@ interface RenderGoogleButtonOptions {
   clientId: string;
   parent: HTMLElement;
   locale?: string;
+  theme?: "outline" | "filled_black";
   width?: number;
   cancelled?: () => boolean;
   onCredential: (credential: string) => void;
@@ -113,7 +114,7 @@ export async function renderGoogleButton(options: RenderGoogleButtonOptions): Pr
   options.parent.replaceChildren();
   gsi.renderButton(options.parent, {
     type: "standard",
-    theme: "outline",
+    theme: options.theme ?? "outline",
     size: "large",
     text: "continue_with",
     shape: "pill",
