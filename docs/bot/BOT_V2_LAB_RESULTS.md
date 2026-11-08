@@ -52,8 +52,10 @@ the deals without a reachability policy). In `bidpos`, `-b=<policy>` puts B on t
 other than the tested one (the tested seat plays A in the rollouts and sets the `natural` column);
 the natural auction that walks to later positions, and the reachability walk behind `-shape`, use B.
 In `bidpos -b`, B's random stream is reseeded from the deal index before the reachability walk, before the
-run's walk, and before every forced-call and forced-pass rollout, so the walk, the prefilter and both rollouts of a deal
-see the same human bids wherever the deal is processed (the CSV rows are the same under any `-workers`, up to row order).
+run's walk, before the forced-pass rollout and before every forced-call rollout. With a deterministic `-a`
+(`shipped`), the walk, the prefilter and the forced-pass rollout and every forced-call rollout of a deal therefore see
+the same human bids for B wherever the deal is processed, so the CSV rows are identical under any `-workers` up to row
+order; with a stochastic `-a` (`random`, `pimc`) A keeps a per-worker stream and the rows still depend on worker order.
 The forced pass of the last round-2 seat, which the game scores as a passed-out hand, now gets evPass 0 instead of a rollout of the engine's unseeded reshuffle.
 
 ### 1.3 Regret (`-exp=regret`)
@@ -570,7 +572,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 |---|---|---|---|---|---|---|---|
 | `shipped:3` vs `shipped:3`, `-opp=human` | `duplicate`, identity of the three-policy pairing | Bitola | 100 deals x2 | 1107 | b3004aee | `-exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6` | `A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)`; `points banked: A 10607  B 10607  (A share 50.0%)`; `A called 55 (made 87%), B called 55 (made 87%), passed out 14 / 200`; 3 s |
 | `shipped:3` vs `human` | `duplicate`, sanity | Bitola | 400 deals x2 | 1108 | b3004aee | `-exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6` | `A advantage per hand: +6.03 ± 2.61 (95% CI ±5.11)`; `points banked: A 69055  B 64231  (A share 51.8%)`; `A called 364 (made 82%), B called 309 (made 79%), passed out 127 / 800`; 13 s |
-| `shipped:3` tested seat, `human` on the other three | `bidpos -b`, targeted | Bitola | 100 deals | 1109 | a52fe367 | `-exp=bidpos -a=shipped:3 -b=human -shape=A,c4,noJ,no9,sA0 -n=100 -seed=1109 -csv=probe_b.csv -workers=6` | `bidpos bitola: 100 deals in 12s`; 483 rows, of which 100 in the cell `A,c4,noJ,no9,sA0` (one reached position per targeted deal) |
+| `shipped:3` tested seat, `human` on the other three | `bidpos -b`, targeted | Bitola | 100 deals | 1109 | a52fe367 | `-exp=bidpos -a=shipped:3 -b=human -shape=A,c4,noJ,no9,sA0 -n=100 -seed=1109 -csv=probe_b1.csv -workers=1` and the same with `-csv=probe_b6.csv -workers=6` | `bidpos bitola: 100 deals in 12s`; 483 rows, of which 100 in the cell `A,c4,noJ,no9,sA0` (one reached position per targeted deal); reproducibility: 484 rows in each CSV, identical after sorting the data rows (`cmp` of the raw files differs only in row order); 52 s with `-workers=1`, 12 s with `-workers=6` |
 
 The simulation gate `TestSimulation_SearchBeatsRandomBaseline` now deals from `rand.NewPCG(42, 1)`:
 `BELJOT_BOT_SIM=1 go test -tags nodynamic -run TestSimulation_SearchBeatsRandomBaseline -count=3 -v ./internal/bot/`
