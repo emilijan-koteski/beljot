@@ -510,13 +510,13 @@ func TestGormUserRepository_ThemePreference_DefaultsToParchmentAndUpdates(t *tes
 
 	reloaded, err := repo.FindByID(u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, ThemeParchment, reloaded.ThemePreference)
+	assert.Equal(t, DefaultTheme, reloaded.ThemePreference)
 
-	brass := ThemeBrass
-	require.NoError(t, repo.UpdatePreferences(u.ID, PreferencesUpdate{ThemePreference: &brass}))
+	parchment := ThemeParchment
+	require.NoError(t, repo.UpdatePreferences(u.ID, PreferencesUpdate{ThemePreference: &parchment}))
 	reloaded, err = repo.FindByID(u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, ThemeBrass, reloaded.ThemePreference)
+	assert.Equal(t, ThemeParchment, reloaded.ThemePreference)
 	assert.Equal(t, "hr", reloaded.LanguagePreference, "a theme update must not touch the language")
 	assert.Equal(t, CardDeckFrench, reloaded.CardDeckPreference)
 }

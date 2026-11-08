@@ -118,6 +118,9 @@ const (
 	ThemeBrass     = "brass"
 )
 
+// DefaultTheme is the look a new account starts with.
+const DefaultTheme = ThemeBrass
+
 // IsSupportedLanguage reports whether code is one of the registered UI languages.
 func IsSupportedLanguage(code string) bool {
 	_, ok := supportedLanguages[code]

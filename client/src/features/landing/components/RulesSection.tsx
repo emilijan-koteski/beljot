@@ -23,13 +23,13 @@ const DECKS = [
 
 const PANEL = "bg-background ring-border rounded-[22px] ring-1 ring-inset";
 
-/** Both rulebooks, the room options a host can set, and both decks, with Dama pointing at the title. */
+/** Both variants, the room rules a host can set, and both decks, with Dama leaning in from behind the variant cards. */
 export function RulesSection() {
   const { t } = useTranslation();
   return (
     <section className="bg-surface py-18 md:py-30" data-testid="landing-rules">
       <div className="mx-auto max-w-310 px-4 md:px-7">
-        <div className="grid items-end gap-10 lg:grid-cols-[1fr_300px]">
+        <div className="grid items-end gap-10 lg:grid-cols-[1fr_360px]">
           <SectionHeading
             eyebrow={t("landing.rules.eyebrow")}
             title={
@@ -42,11 +42,11 @@ export function RulesSection() {
             body={t("landing.rules.body")}
           />
           <div className="relative hidden h-62.5 lg:block">
-            <Dama pose="pointing" className="absolute right-2.5 -bottom-11.5 h-82.5 -scale-x-100" />
+            <Dama pose="pointing" className="absolute right-0 -bottom-18 h-80 -scale-x-100" />
           </div>
         </div>
 
-        <div className="mt-11 grid gap-5 md:grid-cols-2">
+        <div className="relative z-10 mt-11 grid gap-5 md:grid-cols-2">
           {VARIANTS.map((variant) => (
             <article key={variant} className={`${PANEL} p-6 md:p-7`}>
               <h3 className="font-display text-ink m-0 text-[30px] leading-none font-semibold tracking-[0.03em] uppercase">
@@ -69,7 +69,7 @@ export function RulesSection() {
         <div
           className={`${PANEL} mt-5 grid items-center gap-3 p-6 md:grid-cols-[240px_1fr] md:px-7`}
         >
-          <h3 className="text-ink m-0 text-base font-semibold">{t("landing.rules.room.title")}</h3>
+          <h3 className="text-ink m-0 text-base font-semibold">{t("roomRules.roomSection")}</h3>
           <ul className="flex flex-wrap gap-2">
             {ROOM_RULES.map(({ key, icon: Icon }) => (
               <li

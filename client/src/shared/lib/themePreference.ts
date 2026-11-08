@@ -8,6 +8,9 @@ export const THEME_PICKED_KEY = "beljot.theme.picked";
 
 let latestRequest = 0;
 
+/** The theme for anyone who has not chosen one. */
+export const DEFAULT_THEME: ThemePreference = "brass";
+
 /**
  * Puts the theme on <html>, so portalled dialogs and toasts follow it too.
  * It is mirrored to localStorage so index.html can paint it before the session restores.
@@ -15,11 +18,7 @@ let latestRequest = 0;
 export function applyTheme(theme: ThemePreference): void {
   document.documentElement.classList.toggle(BRASS_MODE_CLASS, theme === "brass");
   try {
-    if (theme === "brass") {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } else {
-      window.localStorage.removeItem(THEME_STORAGE_KEY);
-    }
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     return;
   }
@@ -50,12 +49,13 @@ export async function persistTheme(
   }
 }
 
-/** The theme last shown in this browser, or parchment on a first visit. */
+/** The theme last shown in this browser, or the default on a first visit. */
 export function readStoredTheme(): ThemePreference {
   try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY) === "brass" ? "brass" : "parchment";
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "parchment" || stored === "brass" ? stored : DEFAULT_THEME;
   } catch {
-    return "parchment";
+    return DEFAULT_THEME;
   }
 }
 

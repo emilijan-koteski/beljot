@@ -1287,8 +1287,8 @@
     },
     "rules": {
       "eyebrow": "Rules",
-      "title1": "Two rulebooks.",
-      "title2": "Your table.",
+      "title1": "Two variants,",
+      "title2": "your rules.",
       "body": "Every room shows its rules before you sit down.",
       "bitola": {
         "title": "Bitola",
@@ -1303,7 +1303,6 @@
         "b3": "Declarations before the first trick."
       },
       "room": {
-        "title": "Your room, your rules",
         "target": "1001 or 501",
         "timer": "Timed or relaxed",
         "direction": "Either direction",

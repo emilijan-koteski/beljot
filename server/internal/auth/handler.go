@@ -233,7 +233,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		PasswordHash:          hash,
 		LanguagePreference:    lang,
 		CardDeckPreference:    deck,
-		ThemePreference:       user.ThemeParchment,
+		ThemePreference:       user.DefaultTheme,
 		AllowNonFriendInvites: true,
 		WalletBalance:         5000,
 		LoginStreakDays:       0,

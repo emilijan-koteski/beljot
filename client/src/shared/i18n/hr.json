@@ -1287,8 +1287,8 @@
     },
     "rules": {
       "eyebrow": "Pravila",
-      "title1": "Dva pravilnika.",
-      "title2": "Tvoj stol.",
+      "title1": "Dvije varijante,",
+      "title2": "tvoja pravila.",
       "body": "Svaka soba pokazuje svoja pravila prije nego što sjedneš.",
       "bitola": {
         "title": "Bitola",
@@ -1303,7 +1303,6 @@
         "b3": "Zvanja prije prvog štiha."
       },
       "room": {
-        "title": "Tvoja soba, tvoja pravila",
         "target": "1001 ili 501",
         "timer": "S tajmerom ili opušteno",
         "direction": "Oba smjera",

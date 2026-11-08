@@ -134,23 +134,28 @@ function mockApi(page, theme, deck) {
   });
 }
 
-/** Re-encodes an image as WebP at the given width with the browser's own encoder. */
-async function encodeWebp(page, bytes, mime, width, quality) {
+/** Re-encodes an image, or the `crop` box of it in fractions, as WebP at the given width. */
+async function encodeWebp(page, bytes, mime, width, quality, crop = [0, 0, 1, 1]) {
   const dataUrl = await page.evaluate(
-    async ({ b64, mime, width, quality }) => {
+    async ({ b64, mime, width, quality, crop }) => {
       const img = new Image();
       img.src = `data:${mime};base64,${b64}`;
       await img.decode();
-      const height = Math.round((img.height * width) / img.width);
+      const [x0, y0, x1, y1] = crop;
+      const sx = img.width * x0;
+      const sy = img.height * y0;
+      const sw = img.width * (x1 - x0);
+      const sh = img.height * (y1 - y0);
+      const height = Math.round((sh * width) / sw);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
       ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
       return canvas.toDataURL("image/webp", quality);
     },
-    { b64: Buffer.from(bytes).toString("base64"), mime, width, quality },
+    { b64: Buffer.from(bytes).toString("base64"), mime, width, quality, crop },
   );
   return Buffer.from(dataUrl.split(",")[1], "base64");
 }
@@ -190,9 +195,7 @@ async function imageSize(page, bytes, mime) {
   );
 }
 
-const server = await createServer({ root: clientDir, logLevel: "silent", server: { port: 5199 } });
-await server.listen();
-const base = server.resolvedUrls.local[0].replace(/\/$/, "");
+const mascotsOnly = process.argv.includes("--mascots");
 const browser = await chromium.launch();
 const encoder = await browser.newPage();
 
@@ -207,22 +210,33 @@ for (const theme of ["parchment", "brass"]) {
   shots.push([`profile-phone-${theme}`, { path: "/profile", viewport: "phone", theme }, 580]);
   shots.push([`leaderboard-phone-${theme}`, { path: "/leaderboard", viewport: "phone", theme }, 580]);
 }
-for (const [name, options, width] of shots) {
-  const png = await capture(browser, base, options);
-  const webp = await encodeWebp(encoder, png, "image/png", width, 0.82);
-  writeFileSync(join(landingOut, `${name}.webp`), webp);
-  console.log(`landing/${name}.webp`, `${Math.round(webp.length / 1024)} KB`);
+if (!mascotsOnly) {
+  const server = await createServer({ root: clientDir, logLevel: "silent", server: { port: 5199 } });
+  await server.listen();
+  const base = server.resolvedUrls.local[0].replace(/\/$/, "");
+  for (const [name, options, width] of shots) {
+    const png = await capture(browser, base, options);
+    const webp = await encodeWebp(encoder, png, "image/png", width, 0.82);
+    writeFileSync(join(landingOut, `${name}.webp`), webp);
+    console.log(`landing/${name}.webp`, `${Math.round(webp.length / 1024)} KB`);
+  }
+  await server.close();
 }
 
-const mascots = [["dama-signature", 1480], ["dama-win-half", 1400], ["dama-pointing", 680]];
-for (const [name, height] of mascots) {
+const mascots = [
+  ["dama-signature", 1480],
+  ["dama-win-half", 1400],
+  ["dama-pointing", 680, [0.28, 0, 1, 0.46]],
+];
+for (const [name, height, crop = [0, 0, 1, 1]] of mascots) {
   const bytes = readFileSync(join(mascotSrc, `${name}.webp`));
   const [srcWidth, srcHeight] = await imageSize(encoder, bytes, "image/webp");
-  const width = Math.round((srcWidth * height) / srcHeight);
-  const webp = await encodeWebp(encoder, bytes, "image/webp", width, 0.86);
+  const cropWidth = srcWidth * (crop[2] - crop[0]);
+  const cropHeight = srcHeight * (crop[3] - crop[1]);
+  const width = Math.round((cropWidth * height) / cropHeight);
+  const webp = await encodeWebp(encoder, bytes, "image/webp", width, 0.86, crop);
   writeFileSync(join(mascotOut, `${name}.webp`), webp);
   console.log(`mascot/${name}.webp`, `${width}x${height}`, `${Math.round(webp.length / 1024)} KB`);
 }
 
 await browser.close();
-await server.close();

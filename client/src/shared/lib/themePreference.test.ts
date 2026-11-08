@@ -40,12 +40,12 @@ describe("applyTheme", () => {
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("brass");
   });
 
-  it("clears both the class and the stored mirror for parchment", () => {
+  it("clears the class and remembers parchment, so the next load stays light", () => {
     applyTheme("brass");
     applyTheme("parchment");
 
     expect(document.documentElement).not.toHaveClass(BRASS_MODE_CLASS);
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("parchment");
   });
 });
 
@@ -90,12 +90,12 @@ describe("persistTheme", () => {
 });
 
 describe("readStoredTheme", () => {
-  it("returns parchment on a first visit and the stored theme after one is shown", () => {
-    expect(readStoredTheme()).toBe("parchment");
-
-    applyTheme("brass");
-
+  it("returns brass on a first visit and the stored theme after one is shown", () => {
     expect(readStoredTheme()).toBe("brass");
+
+    applyTheme("parchment");
+
+    expect(readStoredTheme()).toBe("parchment");
   });
 });
 
