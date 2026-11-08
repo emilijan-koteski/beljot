@@ -557,7 +557,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | item | pooled effect ± SE | metric | decision | commit |
 |---|---|---|---|---|
 | D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | 8a2d9b20 |
-| C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.73 ± 0.46 (z -1.6) | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 13.4 and 14.7 to 11.5 and 12.0 per 1 000 decisions against 19.0 and 20.2 without) | dbe7d5be |
+| C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
 
 #### D2 opening search
 
@@ -615,6 +615,28 @@ reaches 2 SE alone). The largest value that is not worse at 2 SE is the veto, so
 is negative; the penalty of 10 is the safer-looking pick (+0.16 ± 0.30) but the rule names the veto, and the veto is the only
 value that follows the owner's table rule as "never" (counters 11.5 and 12.0 against 13.4 and 14.7 at 10). The veto still leaves 11.5 and 12.0 blind Tens per 1 000 decisions; the counter
 also counts the forced ones, and the split was not measured.
+
+Extension. The veto's first two runs read -0.73 ± 0.46 (1.6 SE) and the three values trend down (+0.44, +0.16, -0.73), so
+two more runs of the veto (seeds 1127, 1128) and of 10 (seeds 1129, 1130) were run before the default was fixed. The lab was
+built from the tree at b7a4d23d plus `events.go` (197a0fa3), which now splits the blind-Ten counter into forced (the Ten was the only
+legal card) and free (another legal card existed); the rows above predate the split. Same command shape, `-workers=6`, two runs at a time.
+
+| Value | Variant | Seed | Command | Advantage per hand (A minus B) | Counters |
+|---|---|---|---|---|---|
+| veto | Bitola | 1127 | `-exp=duplicate -a=shipped:1 -flagsA=blindTenVeto -b=shipped:1 -flagsB=noBlindTen -events -n=1000 -seed=1127 -workers=6` | -0.17 ± 0.49 (A share 50.0%, 176563 / 176899), 714 s | A `events A: decisions 28416, blind tens 338 (11.9 per 1000; forced 338, free 0), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 60/61, caller belote then fell 10`; B `events B: decisions 28416, blind tens 553 (19.5 per 1000; forced 271, free 282), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 61/60, caller belote then fell 10` |
+| veto | Croatian | 1128 | same with `-seed=1128 -variant=croatia` | -0.03 ± 0.62 (A share 50.0%, 194715 / 194775), 648 s | A `events A: decisions 32000, blind tens 395 (12.3 per 1000; forced 393, free 2), high kept then ruffed 10 (0.3 per 1000), capots made/conceded 45/46, caller belote then fell 16`; B `events B: decisions 32000, blind tens 650 (20.3 per 1000; forced 326, free 324), high kept then ruffed 10 (0.3 per 1000), capots made/conceded 46/45, caller belote then fell 16` |
+| 10 | Bitola | 1129 | `-exp=duplicate -a=shipped:1 -flagsA=blindTen10 -b=shipped:1 -flagsB=noBlindTen -events -n=1000 -seed=1129 -workers=6` | +0.79 ± 0.48 (A share 50.2%, 174902 / 173330), 672 s | A `events A: decisions 28256, blind tens 411 (14.5 per 1000; forced 309, free 102), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 54/50, caller belote then fell 6`; B `events B: decisions 28256, blind tens 568 (20.1 per 1000; forced 276, free 292), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 50/54, caller belote then fell 5` |
+| 10 | Croatian | 1130 | same with `-seed=1130 -variant=croatia` | +0.26 ± 0.55 (A share 50.1%, 195198 / 194682), 678 s | A `events A: decisions 32000, blind tens 436 (13.6 per 1000; forced 323, free 113), high kept then ruffed 9 (0.3 per 1000), capots made/conceded 48/50, caller belote then fell 13`; B `events B: decisions 32000, blind tens 646 (20.2 per 1000; forced 291, free 355), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 50/48, caller belote then fell 14` |
+
+Pooled over four runs (weights 1/SE²):
+
+- veto: w = 2.041, 2.778, 4.165, 2.602 (sum 11.585); (-0.86 · 2.041 - 0.64 · 2.778 - 0.17 · 4.165 - 0.03 · 2.602) / 11.585 = -0.37; SE = 1 / √11.585 = 0.294; 2 SE = 0.59. The variant without is ahead by 1.3 SE, not at 2 SE.
+- 10: w = 7.304, 4.165, 4.340, 3.306 (sum 19.115); (-0.07 · 7.304 + 0.56 · 4.165 + 0.79 · 4.340 + 0.26 · 3.306) / 19.115 = +0.32; SE = 0.229.
+
+The veto passes the convention rule on its four-run pool, so it stays the default. Forced against free blind Tens (extension runs only):
+with the veto 338 + 393 forced and 0 + 2 free over 60 416 decisions (12.1 per 1 000, the residue is forced Tens, the only legal card);
+without the penalty 597 forced and 606 free (9.9 and 10.0 per 1 000). The veto removes the free blind Tens and the forced ones rise
+(731 against 597: a Ten that is kept longer is more often the only card left), so the 12.1 that remain are forced plays.
 
 #### Sanity
 
