@@ -257,6 +257,27 @@ func TestBotSearchDropsAStaleBeloteAnswer(t *testing.T) {
 	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "a stale answer is cleared when the timer fires")
 }
 
+func TestBotSearchDropsABeloteJobFinishedAfterTheBotActed(t *testing.T) {
+	logs := captureLogs(t)
+	mgr, _ := newBeloteMatch(t, beloteSkipTuning(), match.BotSearchSettings{Workers: 1, Deadline: 10 * time.Second, FromTrick: 1}, time.Millisecond)
+	release := mgr.HoldBotSearchPoolForTest()
+
+	mgr.BotSchedule(searchRoomID)
+	st := awaitBeloteAnswer(t, mgr)
+	assert.True(t, st.BelotAnnounced, "with the job still queued the bot announces at the end of its delay")
+
+	drained := mgr.BotSearchesDrainedForTest()
+	release()
+	select {
+	case <-drained:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the queued Belote job must run")
+	}
+	assert.Len(t, logs.matched(searchRoomID, "bot: stale search result dropped"), 1, "the job ran and its store was refused")
+	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "the late skip is dropped when it is stored")
+	assert.True(t, mgr.GetStateSnapshot(searchRoomID).BelotAnnounced)
+}
+
 func TestBotBeloteWithoutASkipMarginQueuesNoSearch(t *testing.T) {
 	mgr, _ := newBeloteMatch(t, bot.DefaultSearchTuning(), match.BotSearchSettings{Workers: 1, Deadline: 10 * time.Second, FromTrick: 1}, time.Second)
 	mgr.SetBotDelayForTest(time.Second, 2*time.Second)

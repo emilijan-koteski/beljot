@@ -282,6 +282,20 @@ func (m *Manager) SetBotTuningForTest(t bot.SearchTuning) {
 	m.botTuning = t
 }
 
+// HoldBotSearchPoolForTest occupies one search worker until release is called, so jobs queued meanwhile wait.
+func (m *Manager) HoldBotSearchPoolForTest() (release func()) {
+	gate := make(chan struct{})
+	m.searchPool.submit(func() { <-gate })
+	return func() { close(gate) }
+}
+
+// BotSearchesDrainedForTest is closed once every search job queued before the call has run, on a one-worker pool.
+func (m *Manager) BotSearchesDrainedForTest() <-chan struct{} {
+	done := make(chan struct{})
+	m.searchPool.submit(func() { close(done) })
+	return done
+}
+
 // BotSearchResultForTest returns a copy of the search result stored for the seat, or nil when there is none.
 func (m *Manager) BotSearchResultForTest(roomID uint, seat int) *bot.SearchResult {
 	m.mu.RLock()

@@ -261,7 +261,7 @@ func cardsAboveBounds(v View, seat int) uint32 {
 	return mask
 }
 
-// cardsHeldBy counts from the seat's own hand, which is one card short once the seat has played to the trick.
+// cardsHeldBy counts from the bot's own hand, which is one card short once the bot has played to the trick.
 func cardsHeldBy(v View, seat int) int {
 	held := len(v.Hand)
 	if playedToTrick(v, v.Seat) {

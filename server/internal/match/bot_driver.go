@@ -124,6 +124,7 @@ func (s *LiveMatch) storeBotSearchResult(seat int, generation uint64, ctx botDec
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.botActionGenerations[seat] != generation {
+		slog.Debug("bot: stale search result dropped", "roomID", s.roomID, "seat", seat)
 		return
 	}
 	s.botSearchResults[seat] = &botSearchEntry{generation: generation, ctx: ctx, result: result}

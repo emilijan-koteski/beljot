@@ -388,6 +388,30 @@ func TestEvaluateMatchesChooseOnAForcedCard(t *testing.T) {
 	assert.InDelta(t, chosen.CallerMade, made, 1e-9)
 }
 
+func TestEvaluateValuesForTeamAWhenTeamBIsForced(t *testing.T) {
+	junk := game.Card{Suit: game.SuitClubs, Rank: game.Rank7}
+	master := game.Card{Suit: game.SuitHearts, Rank: game.RankJack}
+	unseen := unseenWithClubs(rand.New(rand.NewPCG(5, 8)))
+	own := search.MaskOf([]game.Card{junk, master})
+	trick := []int{cardOf(game.SuitClubs, game.RankAce)}
+	in := search.Information{Seat: 1, Own: own, Unseen: unseen, Need: [4]int{1, 0, 2, 2}}
+	pos := search.Position{Trump: hearts, Leader: 0, Trick: trick, Capot: search.CapotFlag([2]int{3, 2})}
+	require.Equal(t, []game.Card{junk}, legalFor(pos, own))
+	settle := settlementOver(hearts, trick, own, unseen)
+	settle.CallerTeam = game.TeamB
+	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1}
+
+	chosen, ok := search.Choose(in, pos, []game.Card{junk}, settle, opts, farFuture())
+	require.True(t, ok)
+	mean, se, made, ok := search.Evaluate(in, pos, settle, opts, farFuture())
+	require.True(t, ok)
+
+	require.NotZero(t, chosen.Mean)
+	assert.InDelta(t, -chosen.Mean, mean, 1e-9, "Choose scores for the seat's team, Evaluate for team A")
+	assert.InDelta(t, chosen.Cards[search.CardIdx(junk)].SE, se, 1e-9)
+	assert.InDelta(t, chosen.CallerMade, made, 1e-9)
+}
+
 func TestEvaluateValuesAClosedTrick(t *testing.T) {
 	last := game.Card{Suit: game.SuitClubs, Rank: game.Rank8}
 	open := []int{cardOf(game.SuitClubs, game.RankAce), cardOf(game.SuitClubs, game.Rank7), cardOf(game.SuitClubs, game.RankKing)}
