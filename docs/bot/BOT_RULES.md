@@ -370,7 +370,7 @@ hands, identical on three repeated runs); its gate stays 60%.
 
 `SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the
 search. `bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`,
-`TenUnderAceBonus 3`, `RaceObjective true`, and 0 or false for the rest. The chooser takes the
+`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 10000` (the veto), and 0 or false for the rest. The chooser takes the
 card with the best adjusted mean, ties to the lower card index. Every row is in
 `BOT_V2_LAB_RESULTS.md` §2.9, duplicate, 1000 deals per variant, pooled by inverse variance.
 
@@ -381,11 +381,11 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `LeadRiskLambda` | 0 | risk5 +0.06 ± 0.18, risk10 -0.17 ± 0.30 | Would rank leads by mean minus lambda times the spread; not better at 2 SE, the code stays and the constant is 0 |
 | `TrumpDrawConditional` | false | -0.05 ± 0.32 (deferred about 2% of decisions) | Would hand a trump draw that depends on where the top trump sits to the rule layer; not better at 2 SE, the code stays off |
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
-| `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
+| `BlindTenPenalty` | 10000 (`ConventionVeto`) | with minus without -0.73 ± 0.46 per hand (3 +0.44 ± 0.28, 10 +0.16 ± 0.30), `BOT_V2_LAB_RESULTS.md` §2.10 | The table rule "never throw a Ten without knowing where the Ace is": a side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not in the hand, not known with the partner and not in the trick, loses 10000 from its score, so any other legal card beats it and a Ten that is the only legal card is still played. A convention ships unless worse at 2 SE and the veto is 1.6 SE; blind Tens per 1 000 decisions 14.6 (Bitola) and 13.1 (Croatian) at the phase-3 bot, with the opening search 19.0 and 20.2 without the penalty and 11.5 and 12.0 with it |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
-applies to the first two rows, the strength rule (ships only if better at 2 SE) to the rest.
+applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.
 
 **The race objective.** On a stop-at-target table the engine ends the match the moment a team's
 running total (match score, hand points, declarations, Belote) reaches the target after a trick,
@@ -556,8 +556,9 @@ so the partner ruffs.
 
 Note: the search plays the lead, and it carries the Ten-under-Ace convention of B3
 as a bonus of 3 on the Ten when the values are close, and a penalty of 10 on a defender's
-non-J/9 trump lead (5.10). The rules above are the fallback, and they play tricks 1 and 2
-when the opening search misses its deadline.
+non-J/9 trump lead and a veto on a blind Ten (5.10). The rules above are the fallback, and they play tricks 1 and 2
+when the opening search misses its deadline. In that fallback the lead-safe pick passes through `avoidBlindTen`,
+which swaps a blind Ten for the lowest-value other legal card and keeps it when it is the only one.
 
 ### B3. Following a trick (`chooseFollow`)
 
@@ -754,7 +755,7 @@ gamble.
   last -> play **A♠**; the Queen would lose to the last player's King or Ten and the kept Ace would
   be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead,
   leaves it inert.
-- Cannot win: **discard** the lowest value, preserving trump.
+- Cannot win: **discard** the lowest value, preserving trump. A pick that is a blind Ten (5.10) becomes the lowest-value other legal card, and stays when it is the only legal card (`avoidBlindTen`).
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
 sites (safe smear, risk-smear, partner-takes-trick). Among non-overtaking legal cards it picks
