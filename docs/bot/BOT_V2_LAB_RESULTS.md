@@ -78,7 +78,8 @@ whether the bot would naturally call. Bitola: 60 000 deals → 502 021 rows. Cro
   `bidInfer`, `contract` (capot-correct since revision 2), `riskNN` (rank by mean − NN/10 · SE).
 - `shipped[:T]`: the production search path from trick `T` (default 3): `bot.SearchAppliesWith`,
   `bot.SearchCardWith`, `bot.DecideWith`, with no deadline, otherwise `bot.Decide`. The tuning is
-  `bot.DefaultSearchTuning()` plus the flags `phase2` (zero tuning), `defTrump3`, `defTrump10`,
+  `bot.DefaultSearchTuning()` plus the flags `phase2` (zero tuning and the phase-2 sample caps
+  16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.

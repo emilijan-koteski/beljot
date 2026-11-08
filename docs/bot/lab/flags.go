@@ -43,6 +43,7 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	t := bot.DefaultSearchTuning()
 	if f.On("phase2") {
 		t = bot.SearchTuning{}
+		t.SampleCaps[3], t.SampleCaps[4], t.SampleCaps[5] = 16, 30, 40
 	}
 	switch {
 	case f.On("defTrump3"):
