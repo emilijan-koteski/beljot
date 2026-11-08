@@ -67,7 +67,7 @@ func toBotView(v View) bot.View {
 		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
-		DeclarationsEnabled: v.DeclarationsEnabled,
+		DeclarationsEnabled: v.DeclarationsEnabled, RankBounds: v.RankBounds,
 	}
 }
 
@@ -223,6 +223,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
+		RankBounds:           bot.NoRankBounds(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -235,6 +236,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownVoidsWithTrump = mem.KnownVoidsWithTrump()
+		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
 	}
@@ -357,12 +359,13 @@ func PlayHandFrom(gs *game.GameState, pol [4]Policy, hook PlayHook, mem *Memory)
 				hook(gs, seat, action, v)
 			}
 			oldLead := gs.LeadSuit
+			oldTrick := slices.Clone(gs.CurrentTrick)
 			next, err := game.ApplyAction(gs, action)
 			if err != nil {
 				return HandOutcome{}, fmt.Errorf("playing seat %d %s %v: %w", seat, action.Type, action.Card, err)
 			}
 			if action.Type == game.ActionPlayCard {
-				mem.ObservePlay(seat, *action.Card, oldLead)
+				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit, oldTrick)
 				mem.ObserveDiscard(seat, *action.Card, oldLead, gs.TrumpSuit)
 			}
 			if action.Type == game.ActionAnnounceBelot && next.TrumpSuit != nil {

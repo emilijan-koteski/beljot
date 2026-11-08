@@ -162,8 +162,29 @@ func cannotHold(v View, seat int) uint32 {
 			mask |= search.SuitMask(suit)
 		}
 	}
+	mask |= cardsAboveBounds(v, seat)
 	for c := range cardsProvablyAbsent(v, seat) {
 		mask |= 1 << uint(search.CardIdx(c))
+	}
+	return mask
+}
+
+func cardsAboveBounds(v View, seat int) uint32 {
+	if v.TrumpSuit == nil {
+		return 0
+	}
+	var mask uint32
+	for _, suit := range game.AllSuits {
+		bound := v.RankBounds[seat][SuitIndex(suit)]
+		if bound < 0 {
+			continue
+		}
+		for _, rank := range game.AllRanks {
+			c := game.Card{Rank: rank, Suit: suit}
+			if strengthOf(c, *v.TrumpSuit) > bound {
+				mask |= 1 << uint(search.CardIdx(c))
+			}
+		}
 	}
 	return mask
 }

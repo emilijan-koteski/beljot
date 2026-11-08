@@ -48,6 +48,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
 		PlayedCards:          mem.PlayedCards(),
 		KnownVoids:           mem.KnownVoids(),
+		RankBounds:           mem.RankBounds(),
 		KnownCards:           mem.KnownCards(),
 		DeclaredCards:        mem.DeclaredCards(),
 	}
@@ -645,7 +646,7 @@ func TestDecide_CardPlay(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit, nil)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -721,10 +722,10 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 			mem := bot.NewMemory()
 			if tt.partnerVoidDiam {
-				mem.ObservePlay(2, card("8C"), &lead, nil)
+				mem.ObservePlay(2, card("8C"), &lead, nil, nil)
 			}
 			for _, id := range tt.playedHearts {
-				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit, nil)
 			}
 			mem.ObserveDeclarations(gs.Players)
 
@@ -828,7 +829,7 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit, nil)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -886,7 +887,7 @@ func viewForTweakCase(tt playTweakCase) bot.View {
 
 	mem := bot.NewMemory()
 	for _, o := range tt.observes {
-		mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
+		mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit, nil)
 	}
 	for seat, ids := range tt.located {
 		for _, id := range ids {
@@ -1763,16 +1764,16 @@ func TestMemory_VoidInference(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
 
-	mem.ObservePlay(2, card("7H"), &lead, nil)
+	mem.ObservePlay(2, card("7H"), &lead, nil, nil)
 	voids := mem.KnownVoids()
 	assert.True(t, voids[2][bot.SuitIndex(game.SuitSpades)])
 	assert.False(t, voids[2][bot.SuitIndex(game.SuitHearts)])
 
-	mem.ObservePlay(3, card("9S"), &lead, nil)
+	mem.ObservePlay(3, card("9S"), &lead, nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[3][bot.SuitIndex(game.SuitSpades)])
 
-	mem.ObservePlay(0, card("AC"), nil, nil)
+	mem.ObservePlay(0, card("AC"), nil, nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[0][bot.SuitIndex(game.SuitClubs)])
 
@@ -1797,7 +1798,7 @@ func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mem := bot.NewMemory()
 			lead := tt.lead
-			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts)
+			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts, nil)
 			voids := mem.KnownVoids()
 			for _, s := range game.AllSuits {
 				want := slices.Contains(tt.wantVoids, s)
@@ -1810,7 +1811,7 @@ func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
 func TestMemory_SyncHandResets(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
-	mem.ObservePlay(2, card("7H"), &lead, nil)
+	mem.ObservePlay(2, card("7H"), &lead, nil, nil)
 	require.NotEmpty(t, mem.PlayedCards())
 
 	mem.SyncHand(1)

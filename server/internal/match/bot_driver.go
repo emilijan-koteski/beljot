@@ -256,6 +256,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
+		RankBounds:           bot.NoRankBounds(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -267,6 +268,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
 		v.KnownVoids = mem.KnownVoids()
+		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
 	}
@@ -298,7 +300,7 @@ func (m *Manager) observeBotMemoryLocked(session *LiveMatch, oldState, newState 
 		return
 	}
 	if action.Type == game.ActionPlayCard && action.Card != nil {
-		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit)
+		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit, oldState.CurrentTrick)
 	}
 	mem.SyncHand(newState.HandNumber)
 	if action.Type == game.ActionPickTrump && oldState.TrumpCandidate != nil {

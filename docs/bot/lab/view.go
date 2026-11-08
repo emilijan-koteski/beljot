@@ -49,6 +49,7 @@ type View struct {
 
 	DeclPoints          [2]int
 	KnownVoidsWithTrump [4][4]bool
+	RankBounds          [4][4]int
 	BidRound   int
 	Passed     [4]PassInfo
 	ForcedCall bool

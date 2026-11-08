@@ -355,7 +355,7 @@ func (m *Manager) RecordBotPlaysForTest(roomID uint, cards []game.Card) {
 		return
 	}
 	for _, c := range cards {
-		lm.botMemory.ObservePlay(0, c, nil, lm.gameState.TrumpSuit)
+		lm.botMemory.ObservePlay(0, c, nil, lm.gameState.TrumpSuit, nil)
 	}
 }
 

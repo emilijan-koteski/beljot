@@ -43,6 +43,7 @@ type View struct {
 	KnownVoids    [4][4]bool
 	KnownCards    [4][]game.Card
 	DeclaredCards [4][]game.Card
+	RankBounds    [4][4]int
 }
 
 // SuitIndex maps a suit to its index in KnownVoids' second dimension.

@@ -38,12 +38,12 @@ func memoryOfMissingCards(gs *game.GameState, discards ...earlierDiscard) *bot.M
 	}
 	for _, d := range discards {
 		lead := d.lead
-		mem.ObservePlay(d.seat, card(d.card), &lead, gs.TrumpSuit)
+		mem.ObservePlay(d.seat, card(d.card), &lead, gs.TrumpSuit, nil)
 		held[card(d.card)] = true
 	}
 	for _, c := range game.NewDeck() {
 		if !held[c] {
-			mem.ObservePlay(0, c, nil, gs.TrumpSuit)
+			mem.ObservePlay(0, c, nil, gs.TrumpSuit, nil)
 		}
 	}
 	return mem
@@ -522,4 +522,24 @@ func TestRaceCarriesTheBotsOwnBeloteApartFromTheBank(t *testing.T) {
 	require.NotNil(t, pos.Race)
 	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
 	assert.Zero(t, pos.Race.BeloteCards)
+}
+
+func TestCannotHoldIncludesCardsAboveTheBound(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.Equal(t, game.SuitHearts, *v.TrumpSuit)
+	v.RankBounds[1][bot.SuitIndex(game.SuitSpades)] = game.NonTrumpRankOrder[game.RankKing]
+	v.RankBounds[1][bot.SuitIndex(game.SuitHearts)] = game.TrumpRankOrder[game.Rank9]
+
+	in := bot.InformationFromForTest(v)
+
+	cannot := func(id string) bool { return in.CannotHold[1]&(1<<uint(search.CardIdx(card(id)))) != 0 }
+	assert.True(t, cannot("AS"))
+	assert.True(t, cannot("TS"))
+	assert.False(t, cannot("KS"))
+	assert.False(t, cannot("7S"))
+	assert.True(t, cannot("JH"))
+	assert.False(t, cannot("9H"))
+	assert.False(t, cannot("AH"))
+	assert.Zero(t, in.CannotHold[2]&search.SuitMask(search.SuitIdx(game.SuitSpades)))
 }

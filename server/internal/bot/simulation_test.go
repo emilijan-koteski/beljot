@@ -86,12 +86,13 @@ func playOneHandWith(
 				observe(t, gs, seat, action)
 			}
 			oldLead := gs.LeadSuit
+			oldTrick := slices.Clone(gs.CurrentTrick)
 			oldCandidate := gs.TrumpCandidate
 			next, err := game.ApplyAction(gs, action)
 			require.NoError(t, err,
 				"ApplyAction must never reject a simulated action (seat %d, %s)", seat, action.Type)
 			if action.Type == game.ActionPlayCard {
-				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit)
+				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit, oldTrick)
 			}
 			if action.Type == game.ActionPickTrump && oldCandidate != nil {
 				mem.ObserveLocatedCard(seat, *oldCandidate)

@@ -15,6 +15,9 @@ type Flags struct {
 
 func (f Flags) On(name string) bool { return f.set[name] }
 
+// ClearsBounds reports whether the policy plays without the rank bounds: noBounds, or phase3 whose bot had none.
+func (f Flags) ClearsBounds() bool { return f.On("noBounds") || f.On("phase3") }
+
 func ParseFlags(list string) Flags {
 	f := Flags{set: map[string]bool{}, Text: list}
 	for _, p := range strings.Split(list, ",") {

@@ -47,6 +47,9 @@ func (s *ShippedBot) Counts() Counts {
 
 func (s *ShippedBot) Decide(v View) game.Action {
 	bv := toBotView(v)
+	if s.Flags.ClearsBounds() {
+		bv.RankBounds = bot.NoRankBounds()
+	}
 	if !bot.SearchAppliesWith(bv, s.FromTrick, s.Tuning) {
 		return bot.Decide(bv)
 	}

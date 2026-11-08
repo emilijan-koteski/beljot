@@ -3,6 +3,7 @@ package botlab
 import (
 	"slices"
 
+	"github.com/emilijan/beljot/server/internal/bot"
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
@@ -15,11 +16,12 @@ type Memory struct {
 	trumpVoids [4][4]bool
 	declared   [4][]game.Card
 	located    [4][]game.Card
+	bounds     *bot.Memory
 }
 
 // NewMemory returns a Memory primed for the first hand.
 func NewMemory() *Memory {
-	return &Memory{handNumber: 1}
+	return &Memory{handNumber: 1, bounds: bot.NewMemory()}
 }
 
 // SyncHand resets the per-hand sets when the hand number advances (or, on a
@@ -34,11 +36,13 @@ func (m *Memory) SyncHand(handNumber int) {
 		m.declared = [4][]game.Card{}
 		m.located = [4][]game.Card{}
 	}
+	m.bounds.SyncHand(handNumber)
 }
 
-// ObservePlay records a resolved play and marks the seat void when it did not follow leadSuit.
-// leadSuit is the pre-play lead suit, nil when this card led the trick.
-func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit *game.Suit) {
+// ObservePlay records a resolved play and marks the seat void when it did not follow leadSuit; the rank bounds come
+// from the production memory. leadSuit and trick are the pre-play lead suit and trick, nil when this card led.
+func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit, trump *game.Suit, trick []game.TrickCard) {
+	m.bounds.ObservePlay(seat, card, leadSuit, trump, trick)
 	m.played = append(m.played, card)
 	if leadSuit != nil && card.Suit != *leadSuit && seat >= 0 && seat < 4 {
 		if idx := SuitIndex(*leadSuit); idx >= 0 {
@@ -58,6 +62,9 @@ func (m *Memory) ObserveDiscard(seat int, card game.Card, leadSuit *game.Suit, t
 		}
 	}
 }
+
+// RankBounds returns the per-seat, per-suit rank bounds the follow duties prove, -1 for none.
+func (m *Memory) RankBounds() [4][4]int { return m.bounds.RankBounds() }
 
 // KnownVoidsWithTrump returns the void matrix including trump voids proven by discards.
 func (m *Memory) KnownVoidsWithTrump() [4][4]bool {
