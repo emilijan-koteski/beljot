@@ -2093,6 +2093,11 @@ func TestChooseFollowNeverDiscardsABlindTen(t *testing.T) {
 }
 
 func TestChooseLeadNeverLeadsABlindTen(t *testing.T) {
+	v := viewForTweakCase(playTweakCase{hand: cards("TS", "AD", "7H"), callerSeat: 1})
+	assert.Equal(t, "AD", bot.ChooseCardForTest(v).String())
+}
+
+func TestChooseLeadKeepsTheOnlySideTen(t *testing.T) {
 	v := viewForTweakCase(playTweakCase{hand: cards("TS", "7H"), callerSeat: 1})
-	assert.Equal(t, "7H", bot.ChooseCardForTest(v).String())
+	assert.Equal(t, "TS", bot.ChooseCardForTest(v).String())
 }

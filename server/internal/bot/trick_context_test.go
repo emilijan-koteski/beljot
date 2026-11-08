@@ -54,6 +54,7 @@ func TestBlindTen(t *testing.T) {
 		{"ace unknown, opponent winning", []string{"TS", "7C"}, opponentLed, nil, "TS", true},
 		{"partner winning", []string{"TS", "7C"}, []game.TrickCard{{Card: card("8D"), PlayerSeat: 2}, {Card: card("7D"), PlayerSeat: 3}}, nil, "TS", false},
 		{"ace in the current trick", []string{"TS", "7C"}, []game.TrickCard{{Card: card("AS"), PlayerSeat: 1}}, nil, "TS", false},
+		{"opponent cut with a trump", []string{"TS", "7C"}, []game.TrickCard{{Card: card("8D"), PlayerSeat: 1}, {Card: card("7H"), PlayerSeat: 2}, {Card: card("QH"), PlayerSeat: 3}}, nil, "TS", true},
 		{"trump ten", []string{"TH", "7D"}, nil, nil, "TH", false},
 		{"not a ten", []string{"KS", "7D"}, nil, nil, "KS", false},
 	}

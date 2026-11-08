@@ -381,8 +381,15 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `LeadRiskLambda` | 0 | risk5 +0.06 ± 0.18, risk10 -0.17 ± 0.30 | Would rank leads by mean minus lambda times the spread; not better at 2 SE, the code stays and the constant is 0 |
 | `TrumpDrawConditional` | false | -0.05 ± 0.32 (deferred about 2% of decisions) | Would hand a trump draw that depends on where the top trump sits to the rule layer; not better at 2 SE, the code stays off |
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
-| `BlindTenPenalty` | 10000 (`ConventionVeto`) | with minus without -0.37 ± 0.29 per hand over four runs (3 +0.44 ± 0.28 over two, 10 +0.32 ± 0.23 over four), `BOT_V2_LAB_RESULTS.md` §2.10 | The table rule "never throw a Ten without knowing where the Ace is": a side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not in the hand, not known with the partner and not in the trick, loses 10000 from its score, so any other legal card beats it and a Ten that is the only legal card is still played. A convention ships unless worse at 2 SE and the veto is 1.3 SE; blind Tens per 1 000 decisions 14.6 (Bitola) and 13.1 (Croatian) at the phase-3 bot, with the opening search 19.5 and 20.3 without the penalty and 11.9 and 12.3 with it, of which forced (the Ten the only legal card) 12.1 and free 0.03 per 1 000 against 9.9 forced and 10.0 free without it |
+| `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
+| `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
+
+**The blind-Ten rule.** A side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not
+in the hand, not known with the partner and not in the trick, loses 10000 from its score, so any other legal card beats it and a
+Ten that is the only legal card is still played. Blind Tens per 1 000 decisions (Bitola, Croatian): 14.6 and 13.1 at the phase-3
+bot; with the opening search 19.5 and 20.3 without the penalty and 11.9 and 12.3 with it. With the veto 731 of 60 416 decisions are
+forced Tens (12.1 per 1 000) and 2 are free; without it 597 forced and 606 free (9.9 and 10.0).
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
 applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.
@@ -557,8 +564,7 @@ so the partner ruffs.
 Note: the search plays the lead, and it carries the Ten-under-Ace convention of B3
 as a bonus of 3 on the Ten when the values are close, and a penalty of 10 on a defender's
 non-J/9 trump lead and a veto on a blind Ten (5.10). The rules above are the fallback, and they play tricks 1 and 2
-when the opening search misses its deadline. In that fallback the lead-safe pick passes through `avoidBlindTen`,
-which swaps a blind Ten for the lowest-value other legal card and keeps it when it is the only one.
+when the opening search misses its deadline. In that fallback the lead-safe pick passes through `avoidBlindTen` over the non-trump cards, which keeps a blind Ten only when it is the only choice.
 
 ### B3. Following a trick (`chooseFollow`)
 

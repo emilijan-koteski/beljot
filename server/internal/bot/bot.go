@@ -166,7 +166,7 @@ func chooseLead(v View, legal []game.Card) game.Card {
 		}
 	}
 	if len(nonTrump) > 0 {
-		return avoidBlindTen(v, legal, trump, lowestValue(nonTrump, trump))
+		return avoidBlindTen(v, nonTrump, trump, lowestValue(nonTrump, trump))
 	}
 
 	if c := highestOfSuit(legal, trump, game.TrumpRankOrder); c != nil {
