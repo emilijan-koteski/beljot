@@ -44,6 +44,14 @@ hand including passed-out ones; divide by the played fraction for "per played ha
 PIMC rows below had 21% pass-outs, so +9.9 per deal is +12.5 per played hand). Both policies receive exactly the
 `View` that `match.buildBotView` constructs, from one shared public `Memory`.
 
+`-opp=<policy>` makes it a three-policy run: `-opp` plays seats 1/3 in both games while A (game 1)
+and B (game 2) take seats 0/2, so the printed difference is A minus B against the same opponents.
+`-opp` uses `-flagsB`, is reseeded from the deal index before each game so identical A and B give
++0.00 ± 0.00, and has no event recorder (`-events` counts A and B only; `-shape` still prefilters
+the deals without a reachability policy). In `bidpos`, `-b=<policy>` puts B on the three seats
+other than the tested one (the tested seat plays A in the rollouts and sets the `natural` column);
+the natural auction that walks to later positions, and the reachability walk behind `-shape`, use B.
+
 ### 1.3 Regret (`-exp=regret`)
 
 One policy on all four seats; at every card decision with more than one legal card, the solver
@@ -112,6 +120,12 @@ pass wins b/n`, where "wins" counts the pairs in which the tested team won the m
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
+- `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
+  and surrender come from the inner policy. Bidding: with probability 0.8 it calls when a suit holds J
+  or 9 with at least three trumps, or at least four trumps of any ranks (the candidate counted in
+  Bitola, both rounds); round 1 considers the candidate suit only, round 2 the qualifying suit with
+  the best `trumpSuitScore`; otherwise it passes, and a forced dealer picks the best suit. The call
+  draw comes from the policy's `Rng`.
 - `random`: uniform over legal options.
 
 ## 2. Results
@@ -547,6 +561,15 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | `shipped:3` | `bidscore oppClose` | Bitola | 100 pairs | 1106 | e6442166 | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.020 ± 0.020, call wins 3/100, pass wins 2/100` (before the candidate-memory fix); 2.9 s, 0.03 s per pair (a 200-pair `neither` probe took 0.15 s per pair; sizes Task 13) |
 | `shipped:3` | `bidscore oppClose`, candidate observed after the forced call | Bitola | 100 pairs | 1106 | cc52ce9a | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.000 ± 0.028, call wins 2/100, pass wins 2/100`; 3.0 s, 0.03 s per pair |
 | `shipped:3` | `race`, match decided at hand ends, same code | Bitola | 100 deals x2 | 1105 | cc52ce9a | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
+
+| policies | experiment | variant | n | seed | commit | command | result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` vs `shipped:3`, `-opp=human` | `duplicate`, identity of the three-policy pairing | Bitola | 100 deals x2 | 1107 | bc4d26c1 + humanbid.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6` | `A advantage per hand: +0.00 ± 0.00 (95% CI ±0.00)`; `points banked: A 10607  B 10607  (A share 50.0%)`; `A called 55 (made 87%), B called 55 (made 87%), passed out 14 / 200`; 3 s |
+| `shipped:3` vs `human` | `duplicate`, sanity | Bitola | 400 deals x2 | 1108 | bc4d26c1 + humanbid.go | `-exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6` | `A advantage per hand: +6.03 ± 2.61 (95% CI ±5.11)`; `points banked: A 69055  B 64231  (A share 51.8%)`; `A called 364 (made 82%), B called 309 (made 79%), passed out 127 / 800`; 13 s |
+
+The simulation gate `TestSimulation_SearchBeatsRandomBaseline` now deals from `rand.NewPCG(42, 1)`:
+`BELJOT_BOT_SIM=1 go test -tags nodynamic -run TestSimulation_SearchBeatsRandomBaseline -count=3 -v ./internal/bot/`
+(from `server/`, commit bc4d26c1 + the test change) printed, on all three runs, `search share over 60 hands: 73.2% (8057/11010 points); search ran at 409 card plays and decided 409`.
 
 #### Counters at the phase-3 bot
 
@@ -1191,7 +1214,7 @@ server module.
 ```
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
-cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped,events}.go /tmp/lab/server/internal/botlab/
+cp docs/bot/lab/{dd,sim,humanbid,pimc,flags,bidev,labbot,view,memory,shipped,events}.go /tmp/lab/server/internal/botlab/
 cp docs/bot/lab/{main,bidtable,bidpos,stability,race,shape,shape_check,bidscore}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
@@ -1211,6 +1234,8 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6   # §2.10, table event counts
 ./botlab -exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6   # §2.10, match decided at hand ends
 ./botlab -exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6   # §2.10, match-score bidding probe
+./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -opp=human -n=100 -seed=1107 -workers=6   # §2.10, three-policy identity run
+./botlab -exp=duplicate -a=shipped:3 -b=human -n=400 -seed=1108 -workers=6   # §2.10, shipped bot against the human-like bidder
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1

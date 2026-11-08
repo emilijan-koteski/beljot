@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -19,7 +20,11 @@ func bidpos(v game.Variant, csvPath string) {
 	deals := make([]botlab.Deal, *n)
 	rng := rand.New(rand.NewPCG(*seed, 10))
 	shapeFor := shapeFilter()
+	bGiven := flagGiven("b")
 	reach := makePolicy(*polA, rand.New(rand.NewPCG(*seed, 499)), *flagsA)
+	if bGiven {
+		reach = makePolicy(*polB, rand.New(rand.NewPCG(*seed, 498)), *flagsB)
+	}
 	for i := range deals {
 		deals[i] = mustTargetedDeal(rng, v, shapeFor, reach)
 	}
@@ -45,7 +50,10 @@ func bidpos(v game.Variant, csvPath string) {
 		go func(w int) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(500+w))), *flagsA)
-			pol := [4]botlab.Policy{A, A, A, A}
+			B := A
+			if bGiven {
+				B = makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(600+w))), *flagsB)
+			}
 			var lines []string
 			for i := range next {
 				gs := botlab.NewDealState(deals[i], v)
@@ -56,6 +64,12 @@ func bidpos(v game.Variant, csvPath string) {
 					team := seat % 2
 					view := botlab.BuildView(gs, seat, botlab.NewMemory())
 					natural := A.Decide(view)
+					walk := natural
+					if bGiven {
+						walk = B.Decide(view)
+					}
+					pol := [4]botlab.Policy{B, B, B, B}
+					pol[seat] = A
 					hand := view.Hand
 					var suits []game.Suit
 					switch {
@@ -118,13 +132,13 @@ func bidpos(v game.Variant, csvPath string) {
 						}
 						lines = append(lines, featureLine(v, gs.BiddingRound, gs.BiddingPassCount, s, hand, nat, evCall, evPass))
 					}
-					if natural.Type == game.ActionPickTrump || !canPass {
+					if walk.Type == game.ActionPickTrump || !canPass {
 						break
 					}
 					if gs.Rules.AllPassOutcome == game.AllPassReshuffleAndRotate && gs.BiddingRound == 2 && gs.BiddingPassCount == 3 {
 						break
 					}
-					nextState, err := game.ApplyAction(gs, natural)
+					nextState, err := game.ApplyAction(gs, walk)
 					if err != nil {
 						panic(err)
 					}
@@ -151,6 +165,16 @@ func bidpos(v game.Variant, csvPath string) {
 	if shapeFor != nil {
 		fmt.Printf("WARNING: targeted deals (-shape=%s): the CSV is valid only for the targeted cell, never for a rate or a pooled table\n", *shapeSpec)
 	}
+}
+
+func flagGiven(name string) bool {
+	given := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			given = true
+		}
+	})
+	return given
 }
 
 func featureLine(v game.Variant, round, passes int, suit game.Suit, hand []game.Card, nat int, evCall, evPass float64) string {

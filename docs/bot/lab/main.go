@@ -32,6 +32,7 @@ var (
 	events       = flag.Bool("events", false, "duplicate: count table events per policy")
 	scoreState   = flag.String("scoreState", "oppClose", "bidscore: oppClose|ownClose|bothClose|neither")
 	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
+	oppSpec      = flag.String("opp", "", "duplicate: policy for seats 1/3 in both games; A and B alternate on seats 0/2 (uses flagsB)")
 	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
@@ -51,6 +52,8 @@ func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
 			from, _ = strconv.Atoi(t)
 		}
 		return botlab.NewShippedBot(from, botlab.ParseFlags(labFlags))
+	case name == "human":
+		return &botlab.HumanBidder{Inner: botlab.NewShippedBot(3, botlab.ParseFlags(labFlags)), Rng: rng}
 	case strings.HasPrefix(name, "pimcs:"):
 		var sched []int
 		for _, part := range strings.Split(strings.TrimPrefix(name, "pimcs:"), ",") {
@@ -317,6 +320,11 @@ func duplicate(v game.Variant) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(100+w))), *flagsA)
 			B := makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(200+w))), *flagsB)
+			oppSource := rand.NewPCG(*seed, uint64(300+w))
+			var opp botlab.Policy
+			if *oppSpec != "" {
+				opp = makePolicy(*oppSpec, rand.New(oppSource), *flagsB)
+			}
 			recA, recB := botlab.NewEventRecorder(A.Name()), botlab.NewEventRecorder(B.Name())
 			if w == 0 {
 				nameA, nameB = A.Name(), B.Name()
@@ -335,19 +343,28 @@ func duplicate(v game.Variant) {
 				deal := deals[i]
 				total := 0.0
 				for g := 0; g < 2; g++ {
+					oppSource.Seed(*seed, uint64(i))
 					var pol [4]botlab.Policy
 					for s := 0; s < 4; s++ {
-						if (s+g)%2 == 0 {
+						switch {
+						case opp != nil && s%2 == 1:
+							pol[s] = opp
+						case opp != nil && g == 0, opp == nil && (s+g)%2 == 0:
 							pol[s] = A
-						} else {
+						default:
 							pol[s] = B
 						}
 					}
 					gs := botlab.NewDealState(deal, v)
 					var hook botlab.PlayHook
 					if *events {
-						recA.SetSeats(seatsOf(g, 0))
-						recB.SetSeats(seatsOf(g, 1))
+						if opp != nil {
+							recA.SetSeats(oppSeatsOf(g, 0))
+							recB.SetSeats(oppSeatsOf(g, 1))
+						} else {
+							recA.SetSeats(seatsOf(g, 0))
+							recB.SetSeats(seatsOf(g, 1))
+						}
 						hook = chainHooks(recA.Hook(), recB.Hook())
 					}
 					out, err := botlab.PlayHand(gs, pol, hook)
@@ -365,6 +382,10 @@ func duplicate(v game.Variant) {
 					}
 					res.played++
 					a, b := botlab.Award(out)
+					if opp != nil {
+						scoreAgainstOpp(res, out, g, a, b, &total)
+						continue
+					}
 					aTeam := g % 2
 					if aTeam == 0 {
 						total += float64(a - b)
@@ -411,6 +432,35 @@ func duplicate(v game.Variant) {
 		fmt.Println("  " + eventsA.Line("A"))
 		fmt.Println("  " + eventsB.Line("B"))
 	}
+}
+
+func scoreAgainstOpp(res *dupResult, out botlab.HandOutcome, g, a, b int, total *float64) {
+	if g == 0 {
+		*total += float64(a - b)
+		res.aPts += a
+	} else {
+		*total -= float64(a - b)
+		res.bPts += a
+	}
+	if out.Caller%2 != 0 {
+		return
+	}
+	calls, wins := &res.aCalls, &res.aCallWins
+	if g == 1 {
+		calls, wins = &res.bCalls, &res.bCallWins
+	}
+	*calls++
+	if !out.Score.FailedContract {
+		*wins++
+	}
+}
+
+func oppSeatsOf(g, side int) [4]bool {
+	var seats [4]bool
+	if g == side {
+		seats[0], seats[2] = true, true
+	}
+	return seats
 }
 
 func seatsOf(g, side int) [4]bool {
