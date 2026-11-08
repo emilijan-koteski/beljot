@@ -341,7 +341,7 @@ The two simulation gates run only when `BELJOT_BOT_SIM=1` is set (CI sets it; `m
 them to stay fast), take about 9 s together, and need no database. The deadline test always runs.
 A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
 include passed-out deals. The search share against the random baseline moves with the engine's
-random dealer (65 to 84% on repeated runs), which is why its gate is 60%.
+random dealer (64.9 to 84% on repeated runs), which is why its gate is 60%.
 
 ### 5.9 What the search does not model
 
@@ -359,7 +359,9 @@ random dealer (65 to 84% on repeated runs), which is why its gate is 60%.
   its own Belote, since the engine never stops the match after the eighth trick. A Belote the seat
   cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
   not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
-  Capot, a fall) is valued in points, not as a decided match.
+  Capot, a fall) is valued in points, not as a decided match. In a Bitola trick 1 with declarations
+  still open the engine checks the target only at the end of the trick; the search never runs on
+  tricks 1 and 2, so that case is not modelled.
 - **No bidding, declaration, Belote or surrender decisions**, and no search on tricks 1 and 2
   (the opening search was measured and left off, 5.4).
 
