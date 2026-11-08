@@ -14,6 +14,7 @@ const (
 	searchEarlyStopSE    = 1.0
 	lastTrickBonusPoints = 10
 	beloteBonusPoints    = 20
+	capotBonusPoints     = 100
 	allCards             = uint32(1<<search.NCards - 1)
 )
 
@@ -70,21 +71,32 @@ func bankedTotal(v View, team int) int {
 	return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team]
 }
 
-// raceFor is the stop-at-target race the search plays when the tuning races and a team is within reach, else nil.
-// The bot's own certain Belote stays out of the bank: the solver credits it when the first of the pair is played.
+// raceFor is the race the search plays, else nil: a stop-at-target race when the tuning races and a team is within
+// reach, or a deciding-hand race on a table that ends only at a hand's end when the tuning decides and a team could.
 func raceFor(v View, t SearchTuning) *search.Race {
-	if !t.RaceObjective || !withinStopAtTargetReach(v) {
+	deciding := !v.StopAtTarget && t.DecidingHand && couldDecideThisHand(v)
+	if !deciding && (!t.RaceObjective || !withinStopAtTargetReach(v)) {
 		return nil
 	}
 	race := &search.Race{
-		Target: v.MatchTarget,
-		Banked: [2]int{bankedTotal(v, game.TeamA), bankedTotal(v, game.TeamB)},
-		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
+		Target:       v.MatchTarget,
+		Banked:       [2]int{bankedTotal(v, game.TeamA), bankedTotal(v, game.TeamB)},
+		Scores:       v.TeamScores,
+		Caller:       game.TeamForSeat(*v.TrumpCallerSeat),
+		DecidingHand: deciding,
 	}
 	if ownBeloteCertain(v) {
 		race.BeloteSeat, race.BeloteCards = v.Seat, search.MaskOf(belotePair(*v.TrumpSuit))
 	}
 	return race
+}
+
+// couldDecideThisHand is a loose upper bound: some team's match score plus every card point of the hand, a Capot, all
+// declarations and a Belote yet to come reaches the target.
+func couldDecideThisHand(v View) bool {
+	most := v.HandPoints[game.TeamA] + v.HandPoints[game.TeamB] + remainingCardPoints(v) + capotBonusPoints +
+		v.DeclPoints[game.TeamA] + v.DeclPoints[game.TeamB] + beloteBonusPoints
+	return max(v.TeamScores[game.TeamA], v.TeamScores[game.TeamB])+most >= v.MatchTarget
 }
 
 // SearchCard runs the search for the seat's card, reporting false when it reached no decision and the rules should play.

@@ -494,6 +494,7 @@ func TestSearchAppliesWithRaceObjective(t *testing.T) {
 	assert.Equal(t, search.Race{
 		Target: v.MatchTarget,
 		Banked: [2]int{v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0], v.TeamScores[1] + v.HandPoints[1] + v.DeclPoints[1]},
+		Scores: v.TeamScores,
 		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
 	}, *pos.Race)
 	assert.Nil(t, bot.PositionFromForTest(v, bot.SearchTuning{}).Race)
@@ -542,4 +543,77 @@ func TestCannotHoldIncludesCardsAboveTheBound(t *testing.T) {
 	assert.False(t, cannot("9H"))
 	assert.False(t, cannot("AH"))
 	assert.Zero(t, in.CannotHold[2]&search.SuitMask(search.SuitIdx(game.SuitSpades)))
+}
+
+// shortOfTarget is seat 0's view of a default-table state with each team's running total the given points short of
+// the target.
+func shortOfTarget(t *testing.T, gs *game.GameState, shortA, shortB int) bot.View {
+	t.Helper()
+	require.False(t, gs.Rules.StopAtTarget)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	short := [2]int{shortA, shortB}
+	for team := range v.TeamScores {
+		v.TeamScores[team] = v.MatchTarget - short[team] - v.HandPoints[team] - v.DeclPoints[team]
+	}
+	return v
+}
+
+func TestRaceForTheDecidingHand(t *testing.T) {
+	v := shortOfTarget(t, testfixtures.NewGameMidPlay(3), 500, 60)
+	deciding := bot.SearchTuning{DecidingHand: true}
+	pos := bot.PositionFromForTest(v, deciding)
+	require.NotNil(t, pos.Race)
+	assert.True(t, pos.Race.DecidingHand)
+	assert.Equal(t, v.MatchTarget, pos.Race.Target)
+	assert.Equal(t, v.TeamScores, pos.Race.Scores)
+	assert.Equal(t, game.TeamForSeat(*v.TrumpCallerSeat), pos.Race.Caller)
+
+	assert.Nil(t, bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true}).Race)
+
+	v.StopAtTarget = true
+	assert.Nil(t, bot.PositionFromForTest(v, deciding).Race, "a stop-at-target table out of reach does not race")
+}
+
+func TestNoRaceWhenNobodyCanCross(t *testing.T) {
+	v := shortOfTarget(t, testfixtures.NewGameMidPlay(3), 500, 500)
+	deciding := bot.DefaultSearchTuning()
+	deciding.DecidingHand = true
+	noDeciding := deciding
+	noDeciding.DecidingHand = false
+	assert.Nil(t, bot.PositionFromForTest(v, deciding).Race)
+
+	with, ok := bot.SearchCardWith(v, farFuture(), deciding)
+	require.True(t, ok)
+	without, ok := bot.SearchCardWith(v, farFuture(), noDeciding)
+	require.True(t, ok)
+	assert.Equal(t, without, with)
+}
+
+func TestDecidingHandValuesAFallAsTheLostMatch(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(7)
+	caller := 2
+	gs.TrumpCallerSeat = &caller
+	gs.Players[0].Hand = cards("TC", "7D")
+	gs.Players[1].Hand = cards("TS", "9C")
+	gs.Players[2].Hand = cards("QD", "AS")
+	gs.Players[3].Hand = cards("7H", "8C")
+	gs.HandPoints, gs.TricksWon = [2]int{75, 43}, [2]int{3, 3}
+	v := shortOfTarget(t, gs, 500, 100)
+	deciding := bot.DefaultSearchTuning()
+	deciding.DecidingHand = true
+	noDeciding := deciding
+	noDeciding.DecidingHand = false
+
+	points, ok := bot.SearchCardWith(v, farFuture(), noDeciding)
+	require.True(t, ok)
+	require.Equal(t, card("7D"), points.Card, "for points the seven risks the fall")
+	match, ok := bot.SearchCardWith(v, farFuture(), deciding)
+	require.True(t, ok)
+	assert.Equal(t, card("TC"), match.Card)
+
+	res, ok := bot.ChooseSearchForTest(v, deciding)
+	require.True(t, ok)
+	assert.Less(t, res.Cards[search.CardIdx(card("7D"))].Mean, res.Cards[search.CardIdx(card("TC"))].Mean)
+	const worstHandAward = 152 + 100
+	assert.Less(t, res.Cards[search.CardIdx(card("7D"))].Mean, -float64(worstHandAward), "some deals lose the match")
 }

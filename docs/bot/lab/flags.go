@@ -52,6 +52,7 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t.OpeningSamples = 0
 		t.BlindTenPenalty = 0
 		t.CashHighWinnerBonus = 0
+		t.DecidingHand = false
 	}
 	switch {
 	case f.On("defTrump3"):
@@ -112,6 +113,12 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noRace") {
 		t.RaceObjective = false
+	}
+	if f.On("deciding") {
+		t.DecidingHand = true
+	}
+	if f.On("noDeciding") {
+		t.DecidingHand = false
 	}
 	if f.On("opening12") {
 		t.OpeningSamples = 12

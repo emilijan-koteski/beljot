@@ -392,3 +392,7 @@ func TestChooseAdjustedCashesTheAceAtRisk(t *testing.T) {
 func TestDefaultSearchTuningCashHighWinnerBonus(t *testing.T) {
 	assert.Equal(t, bot.ConventionVeto, bot.DefaultSearchTuning().CashHighWinnerBonus)
 }
+
+func TestDefaultSearchTuningDecidingHand(t *testing.T) {
+	assert.False(t, bot.DefaultSearchTuning().DecidingHand, "D6b was not better at 2 SE")
+}

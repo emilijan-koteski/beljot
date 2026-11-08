@@ -70,7 +70,11 @@ func (s *Solver) Reset() {
 }
 
 // SetRace makes the solver race for the match: a trick that decides it is worth ±RaceWin, and nil turns that off.
+// A deciding-hand race has no mid-hand stops, so the solver plays it for points and leaves the hand's end to Choose.
 func (s *Solver) SetRace(r *Race) {
+	if r != nil && r.DecidingHand {
+		r = nil
+	}
 	s.race = r
 	clear(s.memo)
 }

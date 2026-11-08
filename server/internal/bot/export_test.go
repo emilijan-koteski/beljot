@@ -74,3 +74,7 @@ func SuitAtRiskForTest(v View, suit game.Suit, trump game.Suit) bool {
 func CashHighWinnerForTest(v View, c game.Card) bool {
 	return cashHighWinner(v, c, trickContextOf(v))
 }
+
+func ChooseSearchForTest(v View, t SearchTuning) (search.Result, bool) {
+	return chooseSearch(v, samplesFor(v.TrickNumber, t), time.Now().Add(time.Hour), t, trumpDrawClass(v, t))
+}

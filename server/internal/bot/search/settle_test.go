@@ -266,3 +266,107 @@ func TestSettleMatchesEngineAtTheLastTrick(t *testing.T) {
 		stats.hands, stats.failedContracts, stats.failedTransferOn, stats.failedTransferOff, stats.capots,
 		stats.withDeclarations)
 }
+
+func randomSettlement(rng *rand.Rand) (search.Settlement, int) {
+	remaining := rng.IntN(153)
+	handA := rng.IntN(153 - remaining)
+	decl := []int{0, 20, 50, 70, 100}
+	s := search.Settlement{
+		HandPoints:           [2]int{handA, 152 - remaining - handA},
+		DeclPoints:           [2]int{decl[rng.IntN(len(decl))], decl[rng.IntN(len(decl))]},
+		TricksWon:            [2]int{rng.IntN(5), rng.IntN(4)},
+		CallerTeam:           rng.IntN(2),
+		DeclarationsTransfer: rng.IntN(2) == 0,
+		RemainingCardPoints:  remaining,
+	}
+	winner := rng.IntN(2)
+	if rng.IntN(4) == 0 {
+		s.TricksWon[1-winner] = 0
+		s.HandPoints[winner], s.HandPoints[1-winner] = 152-remaining, 0
+		if rng.IntN(2) == 0 {
+			return s, (1 - 2*winner) * (remaining + 100)
+		}
+	}
+	remA := rng.IntN(remaining + 11)
+	return s, 2*remA - remaining - 10
+}
+
+// expectedTotals is the engine's hand award worked out by hand: the whole hand to a Capot or to the side of a failed
+// contract, with both sides' declarations when they transfer and the winner's own otherwise, else each side's total.
+func expectedTotals(s search.Settlement, remDiff int) [2]int {
+	cards, wholeTo := 152+10, -1
+	if remDiff == s.RemainingCardPoints+100 || remDiff == -(s.RemainingCardPoints+100) {
+		cards += 90
+		wholeTo = game.TeamA
+		if remDiff < 0 {
+			wholeTo = game.TeamB
+		}
+	}
+	remA := (s.RemainingCardPoints + 10 + remDiff) / 2
+	full := [2]int{
+		s.HandPoints[game.TeamA] + remA + s.DeclPoints[game.TeamA],
+		s.HandPoints[game.TeamB] + s.RemainingCardPoints + 10 - remA + s.DeclPoints[game.TeamB],
+	}
+	if wholeTo < 0 && full[s.CallerTeam] <= full[1-s.CallerTeam] {
+		wholeTo = 1 - s.CallerTeam
+	}
+	if wholeTo < 0 {
+		return full
+	}
+	var totals [2]int
+	totals[wholeTo] = cards + s.DeclPoints[wholeTo]
+	if s.DeclarationsTransfer {
+		totals[wholeTo] += s.DeclPoints[1-wholeTo]
+	}
+	return totals
+}
+
+func TestSettleTotalsAgreesWithSettle(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1151, 9))
+	var capots, falls, splits int
+	for i := range 20000 {
+		s, remDiff := randomSettlement(rng)
+		totals := search.SettleTotals(s, remDiff)
+		require.Equal(t, search.Settle(s, remDiff), totals[game.TeamA]-totals[game.TeamB], "case %d %+v remDiff %d", i, s, remDiff)
+		require.Equal(t, expectedTotals(s, remDiff), totals, "case %d %+v remDiff %d", i, s, remDiff)
+		switch {
+		case remDiff == s.RemainingCardPoints+100 || remDiff == -(s.RemainingCardPoints+100):
+			capots++
+		case totals[game.TeamA] == 0 || totals[game.TeamB] == 0:
+			falls++
+		default:
+			splits++
+		}
+	}
+	assert.Positive(t, capots)
+	assert.Positive(t, falls)
+	assert.Positive(t, splits)
+}
+
+func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1152, 11))
+	var hands, wholeHands int
+	for attempts := 0; hands < 200; attempts++ {
+		require.Less(t, attempts, 400, "too many deals ended before the last trick")
+		variant := game.VariantBitola
+		if hands%2 == 1 {
+			variant = game.VariantCroatia
+		}
+		gs := game.NewGame(
+			[4]uint{}, [4]string{}, [4]bool{true, true, true, true},
+			variant, "1001", 1, true, false, hands/2%2 == 0, hands/4%2 == 1,
+		)
+		hand, ok := playUntilSettled(t, gs, rng, rng.IntN(2))
+		if !ok {
+			continue
+		}
+		want := [2]int{hand.result.TeamAHandTotal, hand.result.TeamBHandTotal}
+		require.Equal(t, want, search.SettleTotals(hand.settlement, hand.value), "settlement %+v value %d result %+v",
+			hand.settlement, hand.value, *hand.result)
+		hands++
+		if hand.result.Capot || hand.result.FailedContract {
+			wholeHands++
+		}
+	}
+	assert.Positive(t, wholeHands)
+}

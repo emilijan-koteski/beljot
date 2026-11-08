@@ -84,7 +84,7 @@ func Choose(
 	if len(cards) == 0 || game.StepSeat(pos.Leader, len(pos.Trick), pos.Clockwise) != in.Seat {
 		return Result{}, false
 	}
-	votes := newTally(cards)
+	votes := newTally(cards, pos.Race)
 	teamSign := 1 - 2*game.TeamForSeat(in.Seat)
 	rng := rand.New(rand.NewPCG(in.Seed()^opts.SeedSalt, samplerStream))
 	solver := NewSolver(pos.Trump, pos.Clockwise)
@@ -125,8 +125,10 @@ func legalIndexes(legal []game.Card) []int {
 	return slices.Compact(cards)
 }
 
-// tally keeps, per candidate card, the settled value of every sample so far and their sum.
+// tally keeps, per candidate card, the settled value of every sample so far and their sum, valuing the hand's end as
+// the match when it races.
 type tally struct {
+	race   *Race
 	cards  []int
 	values [NCards][]int
 	sums   [NCards]int
@@ -136,8 +138,8 @@ type tally struct {
 	classSamples [2]int
 }
 
-func newTally(cards []int) *tally {
-	return &tally{cards: cards}
+func newTally(cards []int, race *Race) *tally {
+	return &tally{cards: cards, race: race}
 }
 
 func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) bool {
@@ -147,7 +149,7 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 		if !ok {
 			return false
 		}
-		settled[i] = teamSign * settledValue(s, remainder)
+		settled[i] = teamSign * t.settledValue(s, remainder)
 	}
 	for i, card := range t.cards {
 		t.values[card] = append(t.values[card], settled[i])
@@ -163,10 +165,15 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 	return true
 }
 
-// settledValue is a root value as the hand's award, except a match the race already decided, which stays ±RaceWin.
-func settledValue(s Settlement, value int) int {
+// settledValue is a root value as the hand's award, or ±RaceWin for a match decided mid-hand or by the settled hand.
+func (t *tally) settledValue(s Settlement, value int) int {
 	if value == RaceWin || value == -RaceWin {
 		return value
+	}
+	if t.race != nil {
+		if winner, decided := HandEndDecided(*t.race, SettleTotals(s, value)); decided {
+			return raceValue(winner)
+		}
 	}
 	return Settle(s, value)
 }

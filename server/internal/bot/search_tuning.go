@@ -18,6 +18,7 @@ type SearchTuning struct {
 	LeadRiskLambda         float64
 	TrumpDrawConditional   bool
 	RaceObjective          bool
+	DecidingHand           bool
 	OpeningSamples         int
 	BlindTenPenalty        int
 	CashHighWinnerBonus    int
