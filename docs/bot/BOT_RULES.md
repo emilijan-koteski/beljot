@@ -76,7 +76,7 @@ Scenarios 1, 3, 4 are "always do it" with nothing to tune. The real intelligence
 
 ## 4. Scenario A: Bidding (choosing trump)
 
-The bot calls a suit when its **bid hand** fits one of nine hand shapes in a table
+The bot calls a suit when its **bid hand** fits one of eleven hand shapes in a table
 (`matchesBidTable` in `server/internal/bot/bidding.go`). It reads the variant from
 `View.HasTrumpCandidate`, never from a variant name. The rows come from the simulation
 calibration in `BOT_V2_LAB_RESULTS.md` §3.
@@ -104,27 +104,29 @@ direction of play (`seatsPassedBefore`): 0 for the first seat to speak,
 | 1 | Jack and 9 | any | both |
 | 2 | Jack, 3 or more cards | any | both |
 | 3 | the 9, 4 or more cards | any | both |
-| 4 | retired in the search recalibration (the Ace, 4 or more cards, no side Ace) | | |
+| 4 | retired (was: the Ace, 4 or more cards, no side Ace) | | |
 | 5 | 4 or more cards | at least 1 | both |
 | 6 | 5 or more cards | any | both |
-| 7 | retired in the search recalibration (9 and Ace, exactly 3 cards) | | |
-| 8 | retired in the search recalibration (Jack and Ace, exactly 2 cards) | | |
+| 7 | 9 and Ace, exactly 3 cards | at least 1 | Bitola only |
+| 8 | Jack and Ace, exactly 2 cards | at least 1 | Bitola only |
 | 9 | Jack, exactly 2 cards | at least 2 | Bitola only |
 | 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | Bitola only |
 | 11 | Jack, exactly 2 cards | at least 1 | Bitola only, third seat to speak (position 2) |
 | 12 | Jack, exactly 2 cards | at least 1 | Croatian only, dealer's partner (position 1) |
 
-Rows 4, 7 and 8 were retired by the recalibration under the search (`BOT_V2_LAB_RESULTS.md` §3.5);
-the row numbers are kept so the lab results still refer to them. Every other shape passes, for example the Jack with one small trump and no side Ace, three small
-trumps without the Jack or the 9, or four small trumps with no side Ace.
+Row 4 was retired by the recalibration under the search (`BOT_V2_LAB_RESULTS.md` §3.5); the
+row numbers are kept so the lab results still refer to them. Every other shape passes, for
+example the Jack with one small trump and no side Ace, three small trumps without the Jack or
+the 9, or four small trumps with no side Ace.
 
 | Hand (incl. candidate) | Variant, position | Call? | Why |
 |---|---|---|---|
 | J♥ 9♥ + 7♠ 8♠ 9♠ Q♦ | Bitola | yes | row 1, no side Ace needed |
 | 7♥ 8♥ Q♥ K♥ + A♠ 7♣ | Bitola | yes | row 5, four trumps with a side Ace |
 | 7♥ 8♥ Q♥ K♥ + 7♠ 8♠ | Croatian | no | four small trumps, no side Ace |
-| 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Bitola | no | row 7 was retired; row 10 excludes the Ace |
-| 9♥ 7♥ 8♥ + A♠ 7♣ 8♣ | Bitola | yes | row 10 |
+| 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Bitola | yes | row 7 |
+| 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Croatian | no | row 7 is Bitola only |
+| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Croatian | no | row 4 was retired, no side Ace |
 | J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 2 (row 11) |
 | J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, third to speak | yes | row 11 |
 
