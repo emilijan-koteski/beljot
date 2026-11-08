@@ -11,6 +11,7 @@ import (
 type EventTally struct {
 	Decisions            int
 	BlindTens            int
+	ForcedBlindTens      int
 	HighKeptThenRuffed   int
 	CapotsMade           int
 	CapotsConceded       int
@@ -21,6 +22,7 @@ type EventTally struct {
 func (e *EventTally) Merge(o *EventTally) {
 	e.Decisions += o.Decisions
 	e.BlindTens += o.BlindTens
+	e.ForcedBlindTens += o.ForcedBlindTens
 	e.HighKeptThenRuffed += o.HighKeptThenRuffed
 	e.CapotsMade += o.CapotsMade
 	e.CapotsConceded += o.CapotsConceded
@@ -37,8 +39,8 @@ func (e EventTally) PerThousand(count int) float64 {
 
 // Line formats the tally as one printed line for the named side.
 func (e EventTally) Line(side string) string {
-	return fmt.Sprintf("events %s: decisions %d, blind tens %d (%.1f per 1000), high kept then ruffed %d (%.1f per 1000), capots made/conceded %d/%d, caller belote then fell %d",
-		side, e.Decisions, e.BlindTens, e.PerThousand(e.BlindTens), e.HighKeptThenRuffed, e.PerThousand(e.HighKeptThenRuffed),
+	return fmt.Sprintf("events %s: decisions %d, blind tens %d (%.1f per 1000; forced %d, free %d), high kept then ruffed %d (%.1f per 1000), capots made/conceded %d/%d, caller belote then fell %d",
+		side, e.Decisions, e.BlindTens, e.PerThousand(e.BlindTens), e.ForcedBlindTens, e.BlindTens-e.ForcedBlindTens, e.HighKeptThenRuffed, e.PerThousand(e.HighKeptThenRuffed),
 		e.CapotsMade, e.CapotsConceded, e.CallerBeloteThenFell)
 }
 
@@ -98,6 +100,9 @@ func (r *EventRecorder) Hook() PlayHook {
 		r.tally.Decisions++
 		if isBlindTen(gs, seat, card, v) {
 			r.tally.BlindTens++
+			if len(v.LegalCards) == 1 {
+				r.tally.ForcedBlindTens++
+			}
 		}
 		r.keepHighCards(gs, seat, card, v)
 	}
