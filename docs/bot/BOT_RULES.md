@@ -370,7 +370,7 @@ hands, identical on three repeated runs); its gate stays 60%.
 
 `SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the
 search. `bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`,
-`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 10000` (the veto), and 0 or false for the rest. The chooser takes the
+`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 10000` (the veto), `CashHighWinnerBonus 10000` (the veto), and 0 or false for the rest. The chooser takes the
 card with the best adjusted mean, ties to the lower card index. Every row is in
 `BOT_V2_LAB_RESULTS.md` §2.9, duplicate, 1000 deals per variant, pooled by inverse variance.
 
@@ -383,6 +383,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
 | `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
 | `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
+| `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, two runs (3 +0.01 ± 0.01, 10 0.00 ± 0.00) | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 **The blind-Ten rule.** A side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not
@@ -393,6 +394,13 @@ forced Tens (12.1 per 1 000) and 2 are free; without it 597 forced and 606 free 
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
 applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.
+
+**The cash-high rule.** Last to play with at least two legal led-suit cards that beat the trick, no trump cut and the led suit not
+trump, the Ace or Ten that wins (never the King or Queen) gains `CashHighWinnerBonus` when the suit will not run, because the high card
+will be ruffed before it cashes. The suit will not run when the seat holds three or more cards of it, any seat declared three or more of it, or an
+opponent is known void in it and not void in trumps (`suitAtRisk`; the last trigger is the design's addition to the owner's two).
+With one winner, or after a cut, the search's card stands. The rule fires about once in a thousand decisions, so the counter "high
+kept then ruffed" moves little (13 against 18 over 59 424 decisions).
 
 **The race objective.** On a stop-at-target table the engine ends the match the moment a team's
 running total (match score, hand points, declarations, Belote) reaches the target after a trick,
@@ -567,6 +575,8 @@ non-J/9 trump lead and a veto on a blind Ten (5.10). The rules above are the fal
 when the opening search misses its deadline. In that fallback the lead-safe pick passes through `avoidBlindTen` over the non-trump cards, which keeps a blind Ten only when it is the only choice.
 
 ### B3. Following a trick (`chooseFollow`)
+
+The search carries the cash-high rule of 5.10: last to play with a choice of winners in a suit that will not run, it takes with the Ace or Ten, not the King or Queen. The rules below are the fallback.
 
 First it computes who currently wins. Branches:
 

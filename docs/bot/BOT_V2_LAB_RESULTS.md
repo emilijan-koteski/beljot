@@ -125,8 +125,8 @@ pass wins b/n`, where "wins" counts the pairs in which the tested team won the m
   16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`, and the phase-4 flags `blindTen3`,
-  `blindTen10`, `blindTenVeto`, `noBlindTen`. The flag `phase3` plays the phase-3 bot: the default tuning with
-  `OpeningSamples = 0` and every phase-4 field at its off value (today `BlindTenPenalty = 0`). `duplicate` prints the
+  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`. The flag `phase3` plays the phase-3 bot: the default tuning with
+  `OpeningSamples = 0` and every phase-4 field at its off value (today `BlindTenPenalty = 0` and `CashHighWinnerBonus = 0`). `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
   and surrender come from the inner policy. Bidding: with probability 0.8 it calls when a suit holds J
@@ -558,6 +558,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 |---|---|---|---|---|
 | D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | 8a2d9b20 |
 | C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
+| C2 cash the Ace or Ten, veto (`CashHighWinnerBonus 10000`) | with minus without -0.04 ± 0.03 (z -1.3), two runs (3 +0.01 ± 0.01, 10 0.00 ± 0.00) | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; the rule fires about once in a thousand decisions, the counter does not move) | d562fef2 |
 
 #### D2 opening search
 
@@ -637,6 +638,36 @@ The veto passes the convention rule on its four-run pool, so it stays the defaul
 with the veto 338 + 393 forced and 0 + 2 free over 60 416 decisions (12.1 per 1 000, the residue is forced Tens, the only legal card);
 without the penalty 597 forced and 606 free (9.9 and 10.0 per 1 000). The veto removes the free blind Tens and the forced ones rise
 (731 against 597: a Ten that is kept longer is more often the only card left), so the 12.1 that remain are forced plays.
+
+#### C2 cash the Ace or Ten
+
+A is `shipped:1` with the bonus variant, B is `shipped:1` with `-flagsB=noCashHigh`, the cumulative baseline (opening search and
+the blind-Ten veto on both sides, the cash-high bonus the only difference). The opening search shipped before this task, so the
+convention lives in the search only and has no rule-layer half. Server code at the C2 predicates and flags (default still 0; the
+default was set to the veto afterwards, in d562fef2), `-events`, `-workers=6`, two runs at a time.
+
+| Value | Variant | Seed | Command | Advantage per hand (A minus B) | Counters |
+|---|---|---|---|---|---|
+| 10 | Bitola | 1131 | `-exp=duplicate -a=shipped:1 -flagsA=cashHigh10 -b=shipped:1 -flagsB=noCashHigh -events -n=1000 -seed=1131 -workers=6` | +0.00 ± 0.00 (A share 50.0%, 175720 / 175720), 553 s | A `events A: decisions 28480, blind tens 359 (12.6 per 1000; forced 358, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 50/50, caller belote then fell 6`; B `events B: decisions 28480, blind tens 361 (12.7 per 1000; forced 360, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 50/50, caller belote then fell 6` |
+| 10 | Croatian | 1132 | same with `-seed=1132 -variant=croatia` | -0.02 ± 0.14 (A share 50.0%, 194364 / 194396), 648 s | A `events A: decisions 32000, blind tens 403 (12.6 per 1000; forced 403, free 0), high kept then ruffed 11 (0.3 per 1000), capots made/conceded 44/44, caller belote then fell 23`; B `events B: decisions 32000, blind tens 401 (12.5 per 1000; forced 401, free 0), high kept then ruffed 13 (0.4 per 1000), capots made/conceded 44/44, caller belote then fell 23` |
+| 3 | Bitola | 1133 | `-exp=duplicate -a=shipped:1 -flagsA=cashHigh3 -b=shipped:1 -flagsB=noCashHigh -events -n=1000 -seed=1133 -workers=6` | -0.10 ± 0.10 (A share 50.0%, 176389 / 176583), 555 s | A `events A: decisions 28416, blind tens 330 (11.6 per 1000; forced 328, free 2), high kept then ruffed 7 (0.2 per 1000), capots made/conceded 52/52, caller belote then fell 11`; B the same line |
+| 3 | Croatian | 1134 | same with `-seed=1134 -variant=croatia` | +0.01 ± 0.01 (A share 50.0%, 196427 / 196413), 664 s | A `events A: decisions 32000, blind tens 376 (11.8 per 1000; forced 374, free 2), high kept then ruffed 8 (0.2 per 1000), capots made/conceded 54/54, caller belote then fell 11`; B the same line |
+| veto | Bitola | 1135 | `-exp=duplicate -a=shipped:1 -flagsA=cashHighVeto -b=shipped:1 -flagsB=noCashHigh -events -n=1000 -seed=1135 -workers=6` | -0.03 ± 0.03 (A share 50.0%, 170574 / 170634), 544 s | A `events A: decisions 27424, blind tens 369 (13.5 per 1000; forced 367, free 2), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 49/49, caller belote then fell 10`; B `events B: decisions 27424, blind tens 367 (13.4 per 1000; forced 366, free 1), high kept then ruffed 7 (0.3 per 1000), capots made/conceded 49/49, caller belote then fell 10` |
+| veto | Croatian | 1136 | same with `-seed=1136 -variant=croatia` | -0.16 ± 0.12 (A share 50.0%, 194049 / 194371), 511 s | A `events A: decisions 32000, blind tens 408 (12.8 per 1000; forced 405, free 3), high kept then ruffed 8 (0.2 per 1000), capots made/conceded 43/43, caller belote then fell 17`; B `events B: decisions 32000, blind tens 406 (12.7 per 1000; forced 403, free 3), high kept then ruffed 11 (0.3 per 1000), capots made/conceded 43/43, caller belote then fell 17` |
+
+The rule changes few decisions: the two sides' card counts differ by 0 to 5 decisions in 17 000 to 19 000, and the Bitola run
+of 10 banked the same points on both sides (175 720), so its standard error prints as 0.00.
+
+Pooling by weights 1/SE², with minus without as the sign (printed two-decimal values):
+
+- 10: the Bitola run has no spread (identical points), so the pool is that run: 0.00; the Croatian run alone is -0.02 ± 0.14.
+- 3: w = 1/0.10² = 100 and 1/0.01² = 10 000; (-0.10 · 100 + 0.01 · 10 000) / 10 100 = +0.01; SE = 1 / √10 100 = 0.010.
+- veto: w = 1/0.03² = 1 111 and 1/0.12² = 69.4; (-0.03 · 1 111 - 0.16 · 69.4) / 1 180.6 = -0.04; SE = 1 / √1 180.6 = 0.029; z = -1.3, 2 SE = 0.058.
+
+Rule (a convention ships unless the variant without it is better at 2 SE): none of the three is worse at 2 SE; the largest, the
+veto, ships. The veto's pooled estimate is -1.3 SE, the same sign as the blind-Ten veto, and the three values do not trend
+monotonically (0.00, +0.01, -0.04). "High kept then ruffed" with the veto against without: 5 against 7 (Bitola) and 8 against 11
+(Croatian), 13 against 18 over 59 424 decisions; the counter is too rare to read as a gain.
 
 #### Sanity
 
