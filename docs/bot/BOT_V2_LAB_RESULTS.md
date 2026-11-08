@@ -545,8 +545,8 @@ built from. The summary is kept at the top; the rows below it carry command, see
 |---|---|---|---|---|---|---|---|
 | `shipped:3` | `race`, match decided at hand ends | Bitola | 100 deals x2 | 1105 | e6442166 | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
 | `shipped:3` | `bidscore oppClose` | Bitola | 100 pairs | 1106 | e6442166 | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.020 ± 0.020, call wins 3/100, pass wins 2/100` (before the candidate-memory fix); 2.9 s, 0.03 s per pair (a 200-pair `neither` probe took 0.15 s per pair; sizes Task 13) |
-| `shipped:3` | `bidscore oppClose`, candidate observed after the forced call | Bitola | 100 pairs | 1106 | FIXSHA | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.000 ± 0.028, call wins 2/100, pass wins 2/100`; 3.0 s, 0.03 s per pair |
-| `shipped:3` | `race`, match decided at hand ends, same code | Bitola | 100 deals x2 | 1105 | FIXSHA | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
+| `shipped:3` | `bidscore oppClose`, candidate observed after the forced call | Bitola | 100 pairs | 1106 | cc52ce9a | `-exp=bidscore -a=shipped:3 -scoreState=oppClose -n=100 -seed=1106 -workers=6` | `bidscore oppClose: 100 pairs, call-minus-pass match wins +0.000 ± 0.028, call wins 2/100, pass wins 2/100`; 3.0 s, 0.03 s per pair |
+| `shipped:3` | `race`, match decided at hand ends, same code | Bitola | 100 deals x2 | 1105 | cc52ce9a | `-exp=race -a=shipped:3 -b=shipped:3 -stopAtTarget=false -n=100 -seed=1105 -workers=6` | `decided 118 / 200 games (59.0%): A won 59, B won 59; mid-hand stops 0, passed out 38`; 3 s |
 
 #### Counters at the phase-3 bot
 
