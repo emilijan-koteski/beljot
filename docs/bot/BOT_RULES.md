@@ -206,7 +206,7 @@ All of these must hold, otherwise the rule layer plays:
 | own cards | the seat's hand |
 | gone | cards played this hand and the cards in the current trick |
 | known per seat | the seat's declared and located cards that are still unplayed (`KnownCards`), minus the seat's own hand |
-| cannot hold per seat | every card of a suit the seat is known void in (including a trump void proven by a discard), plus the cards just outside a revealed run (`cardsProvablyAbsent`), minus the known cards |
+| cannot hold per seat | every card of a suit the seat is known void in (including a trump void proven by a discard), every card above a rank bound (`RankBounds`, §7), plus the cards just outside a revealed run (`cardsProvablyAbsent`), minus the known cards |
 | need per seat | the cards the seat still holds (the hand size, one less for a seat that already played to this trick) minus its known cards |
 | unseen | the whole deck minus own, gone and every known card |
 
@@ -840,6 +840,15 @@ what a human in that seat could:
   the led suit is marked void in it (`ObservePlay`). A seat that plays neither the led suit nor
   a trump is void in trump as well: it would have had to cut. Voids are tracked for **all 4
   seats** (including the partner, used by the lead-into-void and smear rules).
+- **Rank bounds** (`RankBounds[seat][suit]`, from `Memory`): the strength index (`NonTrumpRankOrder`,
+  `TrumpRankOrder` for the trump suit) of the highest card the seat can still hold in that suit, -1
+  for no bound, only ever lowered. Two exact facts feed it, each following from a follow rule of the
+  engine (`validation.go`): a seat that followed the led suit with a card that did not beat the
+  highest led-suit card, while the led suit could still win (it is trump, or no trump is in the
+  trick), holds nothing higher in that suit (`applyMustOverplayLedSuit`); a seat void in the led
+  suit that played a trump below the highest trump on the table holds no higher trump
+  (`applyOverTrump`). A low follow after a trump has cut the trick proves nothing and records
+  nothing.
 - **Known cards per seat** (`KnownCards` = declared ∪ located). Declared cards
   (`DeclaredCards`) come from the public declaration reveal, and only the winning declaration
   team's cards; the run inference below reads these alone. Located cards are public too: the
@@ -876,7 +885,7 @@ Reasoning helpers (all pure, in `bot.go`):
 What the search sampler consumes (§5.2): the same View and nothing more. It reads the cards played
 and those in the current trick, the void matrix (including trump voids), the known cards per seat
 (declared and located cards, which it puts into that seat's hand and removes from the unseen
-pool), the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand) and
+pool), the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand), the rank bounds (every card above a bound is forbidden in that seat's hand) and
 each seat's remaining card count. These are hard facts: a deal that contradicts one is never
 drawn. Everything else is unknown, and the sampler treats it as uniform. Which unseen cards sit
 with which seat is equally likely under every deal that fits the facts, so no conclusion is drawn

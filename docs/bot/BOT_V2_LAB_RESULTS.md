@@ -125,8 +125,8 @@ pass wins b/n`, where "wins" counts the pairs in which the tested team won the m
   16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`, and the phase-4 flags `blindTen3`,
-  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`. The flag `phase3` plays the phase-3 bot: the default tuning with
-  `OpeningSamples = 0` and every phase-4 field at its off value (today `BlindTenPenalty = 0` and `CashHighWinnerBonus = 0`). `duplicate` prints the
+  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
+  `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0` and `CashHighWinnerBonus = 0`) and the bounds cleared. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
   and surrender come from the inner policy. Bidding: with probability 0.8 it calls when a suit holds J
@@ -559,6 +559,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | 8a2d9b20 |
 | C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
 | C2 cash the Ace or Ten, veto (`CashHighWinnerBonus 10000`) | with minus without -0.04 ± 0.03 (z -1.3), six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; every estimate is within noise of zero | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; the rule fires about once in a thousand decisions, the counter does not move) | d562fef2 |
+| B1 rank bounds from forced overplays (`RankBounds` into the sampler) | with minus without +0.60 ± 0.70 (z 0.9); Bitola +0.40 ± 0.90, Croatian +0.91 ± 1.13 | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (exactness; ships on its tests, the effect is reported, not gated) | 288ec0ae |
 
 #### D2 opening search
 
@@ -708,6 +709,20 @@ Belote announced with the very last card is not counted.
 |---|---|---|---|---|
 | Bitola | 1103 | aaec08b0 + events.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6` | `events A: decisions 11200, blind tens 164 (14.6 per 1000), high kept then ruffed 3 (0.3 per 1000), capots made/conceded 19/19, caller belote then fell 6` |
 | Croatian | 1104 | aaec08b0 + events.go | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1104 -variant=croatia -workers=6` | `events A: decisions 12800, blind tens 168 (13.1 per 1000), high kept then ruffed 2 (0.2 per 1000), capots made/conceded 15/15, caller belote then fell 4` |
+
+#### B1 rank bounds
+
+A is `shipped:1`, B is `shipped:1` with `-flagsB=noBounds`, the cumulative baseline (the opening search, the blind-Ten veto and
+the cash-high veto are on both sides; the bounds are the only difference). Server code at 288ec0ae, `-workers=6`. The bounds
+are exact facts (`TestMemoryBoundsMatchTheTrueHands`, 300 random engine games), so the item ships on its tests; the effect is reported.
+
+| Variant | Seed | Command | Advantage per hand (A minus B) | Counts |
+|---|---|---|---|---|
+| Bitola | 1141 | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsB=noBounds -n=1000 -seed=1141 -workers=6` | +0.40 ± 0.90 (A share 50.1%, 171349 / 170557), 318 s | A applied 16949 / decided 16949; B 16925 / 16925; A called 869 (made 83%), B 869 (82%), passed out 262 / 2000 |
+| Croatian | 1142 | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsB=noBounds -n=1000 -seed=1142 -variant=croatia -workers=6` | +0.91 ± 1.13 (A share 50.2%, 197110 / 195300), 410 s | A applied 19260 / decided 19260; B 19275 / 19275; A called 1000 (made 81%), B 1000 (80%) |
+
+Pooling by weights 1/SE²: w = 1/0.90² = 1.235 and 1/1.13² = 0.783; (0.40 · 1.235 + 0.91 · 0.783) / 2.018 = +0.60; SE = 1 / √2.018 = 0.70; z = 0.9.
+Both variants are positive and within noise of zero.
 
 ## 3. Bidding calibration tables
 
