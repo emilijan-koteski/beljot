@@ -262,6 +262,23 @@ player meets. Every tuning is measured against the cumulative baseline, the bot 
 previous step, never against the phase-2 snapshot alone. Duplicate, 400 deals per row unless noted;
 advantage is per hand, ± is one standard error, commit is the server code the lab was built from.
 
+Summary. Pooled is inverse-variance over the two variants. The commit is the code the measured
+rows reproduce at (the flags that select the item belong to the command in its row below).
+
+| Item | Pooled effect ± SE | Decision | Commit |
+|---|---|---|---|
+| A. Solver speed (five optimisations) | no strength change (identical `shipped:3` vs `current` result before and after); trick-1 12-sample mean 889 to 341 ms, trick-3 41 to 20.5 ms | ships | abbce774, b9159346 |
+| B1. `DefenderTrumpLeadBonus` | -0.19 ± 0.21 (bonus 10); bonus 3 -0.09 ± 0.14; veto -1.16 ± 0.37 | ships at 10 under the convention rule; veto worse at 2 SE | c5567547 |
+| B2. `TenUnderAceBonus` | -0.00 ± 0.04 | ships at 3 under the convention rule | c5567547 |
+| B3. `LeadRiskLambda` | risk5 +0.06 ± 0.18; risk10 -0.17 ± 0.30 | off (0), not better at 2 SE | c5567547 |
+| B4. `TrumpDrawConditional` | -0.05 ± 0.32 | off, not better at 2 SE | c5567547 |
+| Sample caps 32/60/80 on tricks 3/4/5 | +0.79 ± 0.21 (z 3.8, four runs) | ships | 3cec38ef |
+| C1. Own Belote in the settlement | no measurement row: a correctness fix pinned by tests | ships | 9d0b5a2a |
+| C2. `RaceObjective` | +0.0233 ± 0.0043 match edge per game (z 5.4) | ships on | 1c535a08 |
+| D. Opening search (`OpeningSamples` 12) | +0.83 ± 0.99 (z 0.8) | not shipped, `OpeningSamples = 0` | 2b241506 |
+| E. Bidding table under the search | see §3.5 (row 4 retired, rows 7 and 8 kept) | ships | 3960d458, 0cbbd083 |
+| Phase regression, `shipped:3` vs the phase-2 bot | +1.24 ± 0.54 (z 2.3) | gate met | 1ed9c60d |
+
 | Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
 |---|---|---|---|---|---|---|---|
 | `shipped:3` | `shipped:3` | Bitola | 40 | 1 | d3bdf40 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -n=40 -seed=1` | +0.00 ± 0.00; counts of A and B equal (applied 492, decided 492, deferred 0) |
@@ -269,7 +286,7 @@ advantage is per hand, ± is one standard error, commit is the server code the l
 | `shipped:3` | `current` | Croatian | 400 | 302 | d3bdf40 | `-exp=duplicate -a=shipped:3 -b=current -n=400 -seed=302 -workers=6 -variant=croatia` | +10.96 ± 2.24 (A share 52.8%); decided 5513, deferred 0, defender trump leads 62 |
 | `shipped:3` | `current` | Bitola | 400 | 301 | abbce77 | `-exp=duplicate -a=shipped:3 -b=current -n=400 -seed=301 -workers=6` | +12.02 ± 1.90 (A share 53.5%); decided 4838, deferred 0, defender trump leads 55; identical to d3bdf40 after the solver speed-up, wall 10 s before and 4 s after (`-workers=6`) |
 
-#### Stability and the cheat gap, before B
+#### Stability and the cheat gap, before B (16/30/40 schedule)
 
 Stability: `shipped:3` plays all four seats; at every position where the search ran, the search is
 re-run with sampler seed salts 0..4 and the position counts as changed if any salted card differs
@@ -292,41 +309,39 @@ Every A/B is cumulative: the baseline is the bot with every earlier shipped item
 item under test varies through flags. Croatian rows use the Bitola seed plus one, except B3 (the
 two λ rows already use 631 and 632, so Croatian uses 731 and 732). Pooled is inverse-variance
 (weight 1/SE² per variant). Rows built before `4198b4fe` carry the defaults of the step in the
-commit column (the defaults were edited and the lab rebuilt between steps). Every row is
-`-exp=duplicate -a=shipped:3 -flagsA=<A> -b=shipped:3 -flagsB=<B> -n=1000 -seed=<seed> -workers=6`
-with `-variant=croatia` for the Croatian rows and an empty B for "none".
+commit column (the defaults were edited and the lab rebuilt between steps): the shipped
+defaults at c5567547 are the zero tuning, so the command names the earlier items as flags
+(`defTrump10`, `tenUnder3`) on both sides. Croatian rows add `-variant=croatia`.
 
 Frequency (B1), both sides `shipped:3`, all phase-3 flags off, seed 601:
 
 | Variant | Commit | Command | Result |
 |---|---|---|---|
 | Bitola | c5567547 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -n=1000 -seed=601 -workers=6` | +0.00 ± 0.00; decided 12460, defender trump leads 152 (1.2 % of decisions) |
-| Croatian | c5567547 | same, `-variant=croatia` | +0.00 ± 0.00; decided 13724, defender trump leads 168 (1.2 %) |
+| Croatian | c5567547 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -n=1000 -seed=601 -workers=6 -variant=croatia` | +0.00 ± 0.00; decided 13724, defender trump leads 168 (1.2 %) |
 
-| Item (A vs B) | Variant | Seed | Commit | Advantage | Pooled (z) | Decision |
-|---|---|---|---|---|---|---|
-| B1 `defTrump3` vs none | Bitola | 611 | c5567547 | -0.06 ± 0.23 (trump leads 103 vs 143) | | |
-| B1 `defTrump3` vs none | Croatian | 612 | c5567547 | -0.10 ± 0.17 (120 vs 186) | -0.09 ± 0.14 (-0.6) | not worse |
-| B1 `defTrump10` vs none | Bitola | 611 | c5567547 | -0.21 ± 0.33 (75 vs 143) | | |
-| B1 `defTrump10` vs none | Croatian | 612 | c5567547 | -0.17 ± 0.28 (82 vs 186) | -0.19 ± 0.21 (-0.9) | not worse, **largest such, ships (10)** |
-| B1 `defTrumpVeto` vs none | Bitola | 611 | c5567547 | -0.81 ± 0.50 (0 vs 143) | | |
-| B1 `defTrumpVeto` vs none | Croatian | 612 | c5567547 | -1.60 ± 0.56 (0 vs 186) | -1.16 ± 0.37 (-3.1) | worse at 2 SE (Croatian alone -2.9), not shipped |
-| B2 `tenUnder3` vs `noTenUnder` | Bitola | 621 | c5567547 + B1=10 | +0.02 ± 0.05 | | |
-| B2 `tenUnder3` vs `noTenUnder` | Croatian | 622 | c5567547 + B1=10 | -0.07 ± 0.09 | -0.00 ± 0.04 (0.0) | not worse, **ships (3)** |
-| B3 `risk5` vs `noRisk` | Bitola | 631 | c5567547 + B1, B2 | +0.06 ± 0.24 | | |
-| B3 `risk5` vs `noRisk` | Croatian | 731 | c5567547 + B1, B2 | +0.05 ± 0.28 | +0.06 ± 0.18 (+0.3) | not better at 2 SE, not shipped |
-| B3 `risk10` vs `noRisk` | Bitola | 632 | c5567547 + B1, B2 | -0.36 ± 0.34 | | |
-| B3 `risk10` vs `noRisk` | Croatian | 732 | c5567547 + B1, B2 | +0.44 ± 0.60 | -0.17 ± 0.30 (-0.6) | not better at 2 SE, not shipped |
-| B4 `drawCond` vs `noDrawCond` | Bitola | 641 | c5567547 + B1, B2 | +0.14 ± 0.45 (deferred 267 of 12271 = 2.2 %) | | |
-| B4 `drawCond` vs `noDrawCond` | Croatian | 642 | c5567547 + B1, B2 | -0.24 ± 0.46 (deferred 344 of 13634 = 2.5 %) | -0.05 ± 0.32 (-0.1) | not better at 2 SE, not shipped |
-| Caps `caps2x` (32/60/80 on tricks 3/4/5) vs `noCaps` | Bitola | 661 | c5567547 + B1, B2 | +0.68 ± 0.59 | | |
-| Caps `caps2x` vs `noCaps` | Croatian | 662 | c5567547 + B1, B2 | +0.78 ± 0.56 | +0.73 ± 0.41 (+1.8) | below 2 SE, sent to a confirmation run |
-| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Bitola | 663 | 3cec38ef | +0.91 ± 0.31 | | |
-| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Croatian | 664 | 3cec38ef | +0.65 ± 0.39 | four runs pooled **+0.79 ± 0.21 (+3.8)** | better at 2 SE, no opposite sign, **ships (32/60/80 on tricks 3/4/5 in `search.SamplesForTrick`)** |
+| Item (A vs B) | Variant | Seed | Commit | Advantage | Pooled (z) | Decision | Command |
+|---|---|---|---|---|---|---|---|
+| B1 `defTrump3` vs none | Bitola | 611 | c5567547 | -0.06 ± 0.23 (trump leads 103 vs 143) |  |  | `-exp=duplicate -a=shipped:3 -flagsA=defTrump3 -b=shipped:3 -n=1000 -seed=611 -workers=6` |
+| B1 `defTrump3` vs none | Croatian | 612 | c5567547 | -0.10 ± 0.17 (120 vs 186) | -0.09 ± 0.14 (-0.6) | not worse | `-exp=duplicate -a=shipped:3 -flagsA=defTrump3 -b=shipped:3 -n=1000 -seed=612 -workers=6 -variant=croatia` |
+| B1 `defTrump10` vs none | Bitola | 611 | c5567547 | -0.21 ± 0.33 (75 vs 143) |  |  | `-exp=duplicate -a=shipped:3 -flagsA=defTrump10 -b=shipped:3 -n=1000 -seed=611 -workers=6` |
+| B1 `defTrump10` vs none | Croatian | 612 | c5567547 | -0.17 ± 0.28 (82 vs 186) | -0.19 ± 0.21 (-0.9) | not worse, **largest such, ships (10)** | `-exp=duplicate -a=shipped:3 -flagsA=defTrump10 -b=shipped:3 -n=1000 -seed=612 -workers=6 -variant=croatia` |
+| B1 `defTrumpVeto` vs none | Bitola | 611 | c5567547 | -0.81 ± 0.50 (0 vs 143) |  |  | `-exp=duplicate -a=shipped:3 -flagsA=defTrumpVeto -b=shipped:3 -n=1000 -seed=611 -workers=6` |
+| B1 `defTrumpVeto` vs none | Croatian | 612 | c5567547 | -1.60 ± 0.56 (0 vs 186) | -1.16 ± 0.37 (-3.1) | worse at 2 SE (Croatian alone -2.9), not shipped | `-exp=duplicate -a=shipped:3 -flagsA=defTrumpVeto -b=shipped:3 -n=1000 -seed=612 -workers=6 -variant=croatia` |
+| B2 `tenUnder3` vs `noTenUnder` | Bitola | 621 | c5567547 | +0.02 ± 0.05 |  |  | `-exp=duplicate -a=shipped:3 -flagsA=tenUnder3,defTrump10 -b=shipped:3 -flagsB=noTenUnder,defTrump10 -n=1000 -seed=621 -workers=6` |
+| B2 `tenUnder3` vs `noTenUnder` | Croatian | 622 | c5567547 | -0.07 ± 0.09 | -0.00 ± 0.04 (0.0) | not worse, **ships (3)** | `-exp=duplicate -a=shipped:3 -flagsA=tenUnder3,defTrump10 -b=shipped:3 -flagsB=noTenUnder,defTrump10 -n=1000 -seed=622 -workers=6 -variant=croatia` |
+| B3 `risk5` vs `noRisk` | Bitola | 631 | c5567547 | +0.06 ± 0.24 |  |  | `-exp=duplicate -a=shipped:3 -flagsA=risk5,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noRisk,defTrump10,tenUnder3 -n=1000 -seed=631 -workers=6` |
+| B3 `risk5` vs `noRisk` | Croatian | 731 | c5567547 | +0.05 ± 0.28 | +0.06 ± 0.18 (+0.3) | not better at 2 SE, not shipped | `-exp=duplicate -a=shipped:3 -flagsA=risk5,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noRisk,defTrump10,tenUnder3 -n=1000 -seed=731 -workers=6 -variant=croatia` |
+| B3 `risk10` vs `noRisk` | Bitola | 632 | c5567547 | -0.36 ± 0.34 |  |  | `-exp=duplicate -a=shipped:3 -flagsA=risk10,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noRisk,defTrump10,tenUnder3 -n=1000 -seed=632 -workers=6` |
+| B3 `risk10` vs `noRisk` | Croatian | 732 | c5567547 | +0.44 ± 0.60 | -0.17 ± 0.30 (-0.6) | not better at 2 SE, not shipped | `-exp=duplicate -a=shipped:3 -flagsA=risk10,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noRisk,defTrump10,tenUnder3 -n=1000 -seed=732 -workers=6 -variant=croatia` |
+| B4 `drawCond` vs `noDrawCond` | Bitola | 641 | c5567547 | +0.14 ± 0.45 (deferred 267 of 12271 = 2.2 %) |  |  | `-exp=duplicate -a=shipped:3 -flagsA=drawCond,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noDrawCond,defTrump10,tenUnder3 -n=1000 -seed=641 -workers=6` |
+| B4 `drawCond` vs `noDrawCond` | Croatian | 642 | c5567547 | -0.24 ± 0.46 (deferred 344 of 13634 = 2.5 %) | -0.05 ± 0.32 (-0.1) | not better at 2 SE, not shipped | `-exp=duplicate -a=shipped:3 -flagsA=drawCond,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noDrawCond,defTrump10,tenUnder3 -n=1000 -seed=642 -workers=6 -variant=croatia` |
+| Caps `caps2x` (32/60/80 on tricks 3/4/5) vs `noCaps` | Bitola | 661 | c5567547 | +0.68 ± 0.59 |  |  | `-exp=duplicate -a=shipped:3 -flagsA=caps2x,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noCaps,defTrump10,tenUnder3 -n=1000 -seed=661 -workers=6` |
+| Caps `caps2x` vs `noCaps` | Croatian | 662 | c5567547 | +0.78 ± 0.56 | +0.73 ± 0.41 (+1.8) | below 2 SE, sent to a confirmation run | `-exp=duplicate -a=shipped:3 -flagsA=caps2x,defTrump10,tenUnder3 -b=shipped:3 -flagsB=noCaps,defTrump10,tenUnder3 -n=1000 -seed=662 -workers=6 -variant=croatia` |
+| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Bitola | 663 | 3cec38ef | +0.91 ± 0.31 |  |  | `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 -flagsB=noCaps -n=3000 -seed=663 -workers=6` |
+| Caps `caps2x` vs `noCaps`, confirmation (3000 deals) | Croatian | 664 | 3cec38ef | +0.65 ± 0.39 | four runs pooled **+0.79 ± 0.21 (+3.8)** | better at 2 SE, no opposite sign, **ships (32/60/80 on tricks 3/4/5 in `search.SamplesForTrick`)** | `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 -flagsB=noCaps -n=3000 -seed=664 -workers=6 -variant=croatia` |
 
-Confirmation commands: `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 -flagsB=noCaps
--n=3000 -seed=663 -workers=6` and the same with `-variant=croatia -seed=664`, lab built from
-3cec38ef. Four-run pool by weights 1/SE²: (0.68·2.87 + 0.78·3.19 + 0.91·10.41 + 0.65·6.58) / 23.04
+Four-run pool by weights 1/SE²: (0.68·2.87 + 0.78·3.19 + 0.91·10.41 + 0.65·6.58) / 23.04
 = +0.79, SE 1/√23.04 = 0.21.
 
 | Item | Result |
@@ -338,19 +353,22 @@ Confirmation commands: `-exp=duplicate -a=shipped:3 -flagsA=caps2x -b=shipped:3 
 | Sample caps | ships: `search.SamplesForTrick` is 32/60/80 on tricks 3/4/5 (60 from trick 6), `SampleCaps` stays 0 |
 | `RaceObjective` (C2) | ships on, see C below |
 
+B1 ships by the convention rule although its pooled point estimate is -0.19 ± 0.21: it is the
+largest bonus that is not worse at 2 SE, and the veto (the only stronger form) is worse at 3.1 SE
+pooled.
+
 Gates after the schedule change (f32985b0): the trick-3 benchmark mean is 29.8 ms (max 89.9 ms,
 limit 250 ms); search share 82.0 % over 60 hands (9250/11280, 412 plays); search minus rules
-+7.10 ± 5.35 per deal over 40 deals (434 plays). The gate values below are those before the
-schedule change. B1 ships
-by the convention rule although its pooled point estimate is -0.19 ± 0.21: it is the largest bonus
-that is not worse at 2 SE, and the veto (the only stronger form) is worse at 3.1 SE pooled.
++7.10 ± 5.35 per deal over 40 deals (434 plays). The benchmark mean is machine dependent: at the
+final HEAD it reads 52 to 54 ms, and the same test at f32985b0 reads 54 ms on the same machine
+(three runs each, nothing else loading it).
 
 Gates at `4198b4fe`: `go test -tags nodynamic ./internal/bot/...` passes;
 `BELJOT_BOT_SIM=1 ... -run TestSimulation_Search` gives search share 74.6 % over 60 hands
 (8587/11510, search ran at 406 card plays) against the random baseline, and search minus rules
 +3.45 ± 4.62 per deal over 40 deals (search ran at 436 card plays).
 
-Stability and cheat gap after B (lab at `4198b4fe` defaults, same sizes as the run before B):
+Stability and cheat gap after B, before the 32/60/80 schedule (lab at `4198b4fe` defaults, same sizes as the run before B):
 
 | Policy A | Policy B | Variant | Deals | Seed | Commit | Flags / command | Result |
 |---|---|---|---|---|---|---|---|
@@ -373,14 +391,12 @@ stop there), so the solver keeps the plain remainder for it.
 `-exp=race` (`race.go`): per deal, one random team starts 10 to 160 short of 1001 and the other
 10 to 400 short, stop at target on; duplicate pairing with the scores fixed to the teams; each game
 scores +1 when A's team wins the match, -1 when it loses, 0 when the hand leaves it open; the
-result is the mean of the per-deal pair average. Command:
-`-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=<seed> -workers=6`
-with `-variant=croatia` for Croatian, lab built from 1c535a08 (B1, B2 and the sample caps on).
+result is the mean of the per-deal pair average. Lab built from 1c535a08 (B1, B2 and the sample caps on).
 
-| Item (A vs B) | Variant | Seed | Commit | Match edge per game | Decided | Pooled (z) | Decision |
-|---|---|---|---|---|---|---|---|
-| C2 `race` vs `noRace` | Bitola | 701 | 1c535a08 | +0.0150 ± 0.0061 (A won 635, B won 605) | 1240 / 2000 (62.0 %), 1032 mid-hand stops, 248 passed out | | |
-| C2 `race` vs `noRace` | Croatian | 702 | 1c535a08 | +0.0315 ± 0.0061 (A won 767, B won 704) | 1471 / 2000 (73.5 %), 1230 mid-hand stops | **+0.0233 ± 0.0043 (+5.4)** | better at 2 SE in both variants, **ships (`RaceObjective: true`)** |
+| Item (A vs B) | Variant | Seed | Commit | Command | Match edge per game | Decided | Pooled (z) | Decision |
+|---|---|---|---|---|---|---|---|---|
+| C2 `race` vs `noRace` | Bitola | 701 | 1c535a08 | `-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701 -workers=6` | +0.0150 ± 0.0061 (A won 635, B won 605) | 1240 / 2000 (62.0 %), 1032 mid-hand stops, 248 passed out | | |
+| C2 `race` vs `noRace` | Croatian | 702 | 1c535a08 | `-exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia` | +0.0315 ± 0.0061 (A won 767, B won 704) | 1471 / 2000 (73.5 %), 1230 mid-hand stops | **+0.0233 ± 0.0043 (+5.4)** | better at 2 SE in both variants, **ships (`RaceObjective: true`)** |
 
 Pooled by weights 1/SE²: the two SEs are equal, so the mean is (0.0150 + 0.0315) / 2 = +0.0233 and
 the SE 0.0061 / √2 = 0.0043. A match edge of +0.023 per game is about 1.2 points of match-win
@@ -399,13 +415,12 @@ moves with the engine's random dealer (78.5 %, 79.6 % and 83.7 % on three runs w
 D, searching tricks 1 and 2 as well (`SearchTuning.OpeningSamples = 12`, flag `opening12`). A is
 `shipped:1` with the flag, B is `shipped:3` (production: search from trick 3); both carry the
 shipped defaults (`DefenderTrumpLeadBonus 10`, `TenUnderAceBonus 3`, `RaceObjective true`).
-Lab built from 2b241506. Commands: `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3
--n=1000 -seed=<seed> -workers=6`, with `-variant=croatia` for Croatian.
+Lab built from 2b241506.
 
-| Item (A vs B) | Variant | Seed | Commit | Advantage per hand | Applied / Decided (A) | Pooled (z) | Decision |
-|---|---|---|---|---|---|---|---|
-| D `shipped:1[opening12]` vs `shipped:3` | Bitola | 801 | 2b241506 | -0.54 ± 1.33 (A share 49.8%) | 17571 / 17571 (B: 12369) | | |
-| D `shipped:1[opening12]` vs `shipped:3` | Croatian | 802 | 2b241506 | +2.56 ± 1.49 (A share 50.6%) | 19416 / 19416 (B: 13564) | **+0.83 ± 0.99 (+0.8)** | |
+| Item (A vs B) | Variant | Seed | Commit | Command | Advantage per hand | Applied / Decided (A) | Pooled (z) | Decision |
+|---|---|---|---|---|---|---|---|---|
+| D `shipped:1[opening12]` vs `shipped:3` | Bitola | 801 | 2b241506 | `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3 -n=1000 -seed=801 -workers=6` | -0.54 ± 1.33 (A share 49.8%) | 17571 / 17571 (B: 12369) | | |
+| D `shipped:1[opening12]` vs `shipped:3` | Croatian | 802 | 2b241506 | `-exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3 -n=1000 -seed=802 -workers=6 -variant=croatia` | +2.56 ± 1.49 (A share 50.6%) | 19416 / 19416 (B: 13564) | **+0.83 ± 0.99 (+0.8)** | |
 
 Pooled by weights 1/SE²: (-0.54 / 1.33² + 2.56 / 1.49²) / (1/1.33² + 1/1.49²) = +0.83, SE
 1 / √(1/1.33² + 1/1.49²) = 0.99, z = 0.84.
@@ -417,6 +432,45 @@ machine): means 318.4, 319.3 and 318.5 ms (median 318.5 ms); maxima 574.4, 578.3
 Gate conditions: (1) benchmark mean at most 400 ms: met (318.5 ms). (2) pooled gain positive at
 2 SE with no variant opposite at 2 SE: not met (+0.83 ± 0.99, z = 0.8; Bitola -0.54 is the
 opposite sign but well inside 2 SE). The decision is the controller's and the owner's.
+
+#### Final defaults: regression, stability and the cheat gap
+
+Run at the end of phase 3 on the lab built from 1ed9c60d (server code identical to 0cbbd083, the
+shipped defaults `DefenderTrumpLeadBonus 10`, `TenUnderAceBonus 3`, `RaceObjective true`, caps
+32/60/80 on tricks 3/4/5, `OpeningSamples 0`, bidding recalibrated under the search).
+
+Regression against the phase-2 bot. A is `shipped:3`. B is `shipped:3` with the flag `phase2`:
+zero tuning and the phase-2 caps 16/30/40 on tricks 3/4/5 (§1.5), so B is the phase-2 bot of
+fc49e0d except for two things that stay on both sides: the own-Belote settlement fix (9d0b5a2a) and
+the equivalence-tested solver speed-ups. Duplicate, 1000 deals (2000 hands), `-workers=6`.
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | `shipped:3[phase2]` | Bitola | 1000 | 1001 | 1ed9c60d | `-exp=duplicate -a=shipped:3 -b=shipped:3 -flagsB=phase2 -n=1000 -seed=1001 -workers=6` | **+1.84 ± 0.82** (A share 50.5 %); A called 873 (made 81 %), B called 873 (made 79 %), passed out 254 / 2000; A defender trump leads 69, B 137 |
+| `shipped:3` | `shipped:3[phase2]` | Croatian | 1000 | 1002 | 1ed9c60d | `-exp=duplicate -a=shipped:3 -b=shipped:3 -flagsB=phase2 -n=1000 -seed=1002 -workers=6 -variant=croatia` | **+0.79 ± 0.71** (A share 50.2 %); A called 1000 (made 78 %), B called 1000 (made 77 %); A defender trump leads 88, B 184 |
+
+Pooled by weights 1/SE²: w = 1/0.82² = 1.487 and 1/0.71² = 1.984; mean = (1.84 · 1.487 + 0.79 ·
+1.984) / 3.471 = **+1.24**, SE = 1/√3.471 = **0.54**, z = 2.3. Both variants are positive and A is
+not worse than B at 2 SE, so the gate is met. Both sides bid with the same table (the calls
+are equal in count), so the row measures the card play: the schedule, the two conventions and
+whatever else the tuning zeroes. The race objective reaches the row only where the lab room stops
+at the match target.
+
+Stability and cheat gap at the final defaults, same sizes as before B; the rows above ("before
+the 32/60/80 schedule") are the older measurements.
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:3` | (self-play) | Bitola | 300 | 1003 | 1ed9c60d | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=1003 -workers=6` | positions per trick 3..7: 739 / 699 / 690 / 727 / 747; changed 48.0% / 42.2% / 32.0% / 17.5% / 5.6%; pooled tricks 3-4 **45.2%** (1438), tricks 5-8 **18.0%** (2164) |
+| `shipped:3` | (self-play) | Croatian | 300 | 1004 | 1ed9c60d | `-exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=1004 -workers=6 -variant=croatia` | positions per trick 3..7: 803 / 767 / 803 / 795 / 862; changed 52.3% / 46.3% / 36.9% / 21.5% / 5.2%; pooled tricks 3-4 **49.4%** (1570), tricks 5-8 **20.8%** (2460) |
+| `cheat` | `shipped:3` | Bitola | 400 | 1005 | 1ed9c60d | `-exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=1005 -workers=6` | **+27.18 ± 2.72** (A share 58.7%); A made 95% of 243 calls, B 77% of 380; 177/800 passed out |
+
+Reading: doubling the samples on tricks 3 to 5 lowered the instability only a little (tricks 3-4:
+49.5 % to 45.2 % in Bitola, 49.8 % to 49.4 % in Croatian, on different seeds), so about half of
+the cards chosen on tricks 3 and 4 still change under a reseed, and the later tricks settle as
+before. The cheat gap is +27.18 ± 2.72 against +24.22 ± 2.94 before the schedule change; the
+difference (+2.96) is 0.7 SE of the difference between two runs on different seeds, and the
+bidding table changed in between, so it is not read as a change in play.
 
 ## 3. Bidding calibration tables
 
@@ -773,7 +827,8 @@ to about 930 000 rollouts at the phase-1 call rate (9.7 and 11.7 per deal, count
 above), which is roughly 40 CPU-hours, several hours on six workers. That is an estimate from the
 gate timings, not a run. The phase-3 solver speed-ups (`BOT_V2_PROPOSAL.md` §4.7) are what make
 repeating it routine, and until then the table is calibrated under the rule layer while the
-search plays only the cards from trick 3. §3.5 is that repeat, at the sizes of the original calibration.
+search plays only the cards from trick 3. §3.5 is that repeat, at the sizes of the original
+calibration.
 
 ### 3.5 Recalibration under the search (2026-11-07)
 
@@ -785,8 +840,9 @@ objective on). It applies the numeric half of the proposal's criterion only (gai
 and at least +5 per hand, n at least 150). Whether a human partner would accept a shape is the
 owner's call at PR review, so every cell that passes the numbers is in the table and every flip
 is listed with its hand shape. Rows 4 (Croatian) and 7 (Bitola), which the owner kept by decision
-on 2026-10-26, are governed by the same numeric criterion this time; they stay kept by the
-owner's decision of 2026-10-26 unless this recalibration says otherwise.
+on 2026-10-26, are governed by the same numeric criterion this time; the owner's decision of
+2026-10-26 keeps Croatian row 4 (now retired, see the verdicts) and Bitola row 7 (now confirmed)
+unless this recalibration says otherwise.
 
 **Instrument.** The lab snapshot of `docs/bot/lab/` (including `shipped.go`) built over the
 server at commit 49f242f3 (branch `feat/bot-v2-phase3`, the bidding table of twelve rows as
@@ -981,6 +1037,13 @@ Croatian (rows marked "out" are shapes the table does not call in Croatia):
   10 is the narrowest (+6.7 ± 2.5). Croatian row 6, which had n 111 before, now has n 353 and
   passes. The position cells of Croatian row 12 hold (+15.9 ± 2.9 second to speak, −17.0 ± 2.8
   first, −9.3 ± 3.9 third).
+- **Row 5, Bitola: kept, its evidence cell fails.** The row's own evidence cell (exactly one side Ace,
+  no J/9/A) is now measurable (n 203) and does not pass (+4.4 ± 11.7). The clause calls every four-trump hand with a side
+  Ace, and the hands only it calls (four trumps, no Jack or 9, Ace allowed, side Ace) measure
+  +16.4 ± 6.4 (n 656, 2.6 SE), so the row stays; the no-Ace part of the hands the row calls is
+  +6.3 ± 11.5 (n 218); the pure cell is too small to separate from zero.
+  Croatian row 5 has n 85 in its cell (+55.3 ± 16.5) and +27.9 ± 10.0 (n 248, 2.8 SE) with the Ace
+  allowed.
 
 **Flips against the table shipped at 49f242f:**
 
@@ -1023,15 +1086,10 @@ are reported here for the owner and not coded:
   3.2 SE), a row the table calls in Bitola only. It sat at +11.9 ± 6.5 in the first step.
 - Bitola row 11 shape (J doubleton, no 9, a side Ace) at the other seats: second to speak
   +12.3 ± 2.5 (n 3 383, 5.0 SE), first to speak −6.6 ± 2.3, third to speak +14.1 ± 2.9 (the
-  current row), dealer (J without the Ace) +12.8 ± 4.4 (n 1 444).
-- Croatian 9 with three trumps and a side Ace, second to speak: +29.3 ± 7.0 (n 532); without the
-  side Ace +19.4 ± 4.5 (n 1 174).
-- Bitola row 5 as its own evidence cell (exactly one side Ace, no J/9/A) is now measurable
-  (n 203) and does not pass (+4.4 ± 11.7). The clause calls every four-trump hand with a side
-  Ace, and the hands only it calls (four trumps, no Jack or 9, Ace allowed, side Ace) measure
-  +16.4 ± 6.4 (n 656, 2.6 SE), so the row stays; the pure cell is too small to separate from zero.
-  Croatian row 5 has n 85 in its cell (+55.3 ± 16.5) and +27.9 ± 10.0 (n 248, 2.8 SE) with the Ace
-  allowed.
+  current row), dealer (J without the Ace, exactly one side Ace) +12.8 ± 4.4 (n 1 444; one or more
+  side Aces +16.0 ± 4.1, n 1 662).
+- Croatian 9 with three trumps and exactly one side Ace, second to speak: +29.3 ± 7.0 (n 532; one
+  or more side Aces +30.8 ± 6.6, n 575); without the side Ace +19.4 ± 4.5 (n 1 174).
 
 ## 4. Reproducing
 
@@ -1049,6 +1107,10 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=duplicate -a=pimc:12 -b=lab -n=120                      # §2.2: `lab` is the old `current`
 ./botlab -exp=duplicate -a=lab -flagsA=bidEV -b=lab -n=4000 -variant=croatia
 ./botlab -exp=regret -a=lab -n=600
+./botlab -exp=duplicate -a=shipped:3 -b=current -n=400 -seed=301 -workers=6                  # §2.9, the `shipped` policy
+./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -flagsB=phase2 -n=1000 -seed=1001 -workers=6   # §2.9 regression, phase 3 against the phase-2 bot
+./botlab -exp=stability -a=shipped:3 -n=300 -seeds=5 -seed=1003 -workers=6                       # §2.9 stability
+./botlab -exp=duplicate -a=cheat -b=shipped:3 -n=400 -seed=1005 -workers=6                       # §2.9 cheat gap
 ./botlab -exp=race -a=shipped:3 -flagsA=race -b=shipped:3 -flagsB=noRace -n=1000 -seed=701   # §2.9 C
 ./botlab -exp=bidpos -a=lab -n=60000 -csv=bidpos_bitola.csv && python3 -I fit_bid.py bidpos_bitola.csv
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
