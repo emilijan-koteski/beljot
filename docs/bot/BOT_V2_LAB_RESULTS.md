@@ -522,6 +522,22 @@ built from. The summary is kept at the top; the rows below it carry command, see
 |---|---|---|---|---|---|---|---|
 | `shipped:3` | `A,c4,noJ,no9,sA0` | Bitola | 300 deals | 1101 | 37ccec7d | `-exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6` | 133 s; `class_table.py` cell `-A 4 0` n = 300 (gain +7.5 ± 9.3); 3 304 non-forced rows; 20 of 503 random deals carry a matching position |
 
+#### Counters at the phase-3 bot
+
+Both sides are `shipped:3`, so the A and B lines are identical by construction (each side plays one
+seat parity in each game of a pair). Commit aaec08b0, `-workers=6`, 400 deals per variant. Events:
+blind Ten (a non-trump Ten led, or played onto a trick an opponent is winning, while that suit's
+Ace is unplayed and neither in the hand nor known in the partner's); high kept then ruffed (last
+seat wins cheaply in the led suit while holding a higher Ace or Ten of it, which a trump later
+beats); capots made/conceded by the policy's team; caller belote then fell (caller team announced
+Belote, declarations transfer on, the hand fell). Belote is seen at the next card play, so a
+Belote announced with the very last card is not counted.
+
+| variant | seed | command | result |
+|---|---|---|---|
+| Bitola | 1103 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6` | `events A: decisions 11200, blind tens 164 (14.6 per 1000), high kept then ruffed 5 (0.4 per 1000), capots made/conceded 19/19, caller belote then fell 6` |
+| Croatian | 1104 | `-exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1104 -variant=croatia -workers=6` | `events A: decisions 12800, blind tens 168 (13.1 per 1000), high kept then ruffed 1 (0.1 per 1000), capots made/conceded 15/15, caller belote then fell 4` |
+
 ## 3. Bidding calibration tables
 
 ### 3.1 By round and position (Bitola; rows are decision points × allowed suits)
@@ -1149,7 +1165,7 @@ server module.
 ```
 git worktree add /tmp/lab HEAD --detach
 mkdir -p /tmp/lab/server/internal/botlab /tmp/lab/server/cmd/botlab
-cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped}.go /tmp/lab/server/internal/botlab/
+cp docs/bot/lab/{dd,sim,pimc,flags,bidev,labbot,view,memory,shipped,events}.go /tmp/lab/server/internal/botlab/
 cp docs/bot/lab/{main,bidtable,bidpos,stability,race,shape,shape_check}.go /tmp/lab/server/cmd/botlab/
 cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=ddcheck -n=300
@@ -1166,6 +1182,7 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=bidpos -a=lab -n=60000 -csv=bidpos_bitola.csv && python3 -I fit_bid.py bidpos_bitola.csv
 ./botlab -exp=bidpos -a=current -n=20000 -seed=41 -csv=recal_bitola.csv -workers=6 && python3 -I class_table.py recal_bitola.csv
 ./botlab -exp=bidpos -a=shipped:3 -shape=A,c4,noJ,no9,sA0 -n=300 -seed=1101 -csv=shape_probe.csv -workers=6 && python3 -I class_table.py shape_probe.csv   # §2.10, targeted deals
+./botlab -exp=duplicate -a=shipped:3 -b=shipped:3 -events -n=400 -seed=1103 -workers=6   # §2.10, table event counts
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1

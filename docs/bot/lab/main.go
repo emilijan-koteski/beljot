@@ -29,6 +29,7 @@ var (
 	workers   = flag.Int("workers", runtime.NumCPU(), "parallel workers")
 	seeds     = flag.Int("seeds", 5, "seed salts per position for stability")
 	csvOut    = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	events    = flag.Bool("events", false, "duplicate: count table events per policy")
 	shapeSpec = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
@@ -305,18 +306,23 @@ func duplicate(v game.Variant) {
 	var nameA, nameB string
 	var countsA, countsB botlab.Counts
 	var countingA, countingB bool
+	var eventsA, eventsB botlab.EventTally
 	for w := 0; w < *workers; w++ {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(100+w))), *flagsA)
 			B := makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(200+w))), *flagsB)
+			recA, recB := botlab.NewEventRecorder(A.Name()), botlab.NewEventRecorder(B.Name())
 			if w == 0 {
 				nameA, nameB = A.Name(), B.Name()
 			}
 			defer func() {
 				countsMu.Lock()
 				defer countsMu.Unlock()
+				tallyA, tallyB := recA.Tally(), recB.Tally()
+				eventsA.Merge(&tallyA)
+				eventsB.Merge(&tallyB)
 				countingA = addCounts(&countsA, A) || countingA
 				countingB = addCounts(&countsB, B) || countingB
 			}()
@@ -334,10 +340,20 @@ func duplicate(v game.Variant) {
 						}
 					}
 					gs := botlab.NewDealState(deal, v)
-					out, err := botlab.PlayHand(gs, pol, nil)
+					var hook botlab.PlayHook
+					if *events {
+						recA.SetSeats(seatsOf(g, 0))
+						recB.SetSeats(seatsOf(g, 1))
+						hook = chainHooks(recA.Hook(), recB.Hook())
+					}
+					out, err := botlab.PlayHand(gs, pol, hook)
 					if err != nil {
 						fmt.Println("error:", err)
 						os.Exit(1)
+					}
+					if *events {
+						recA.FinishHand(out, gs)
+						recB.FinishHand(out, gs)
 					}
 					if out.Status != botlab.HandScored {
 						res.passed++
@@ -386,6 +402,26 @@ func duplicate(v game.Variant) {
 	}
 	if countingB {
 		printCounts("B", countsB)
+	}
+	if *events {
+		fmt.Println("  " + eventsA.Line("A"))
+		fmt.Println("  " + eventsB.Line("B"))
+	}
+}
+
+func seatsOf(game, side int) [4]bool {
+	var seats [4]bool
+	for s := range seats {
+		seats[s] = (s+game)%2 == side
+	}
+	return seats
+}
+
+func chainHooks(hooks ...botlab.PlayHook) botlab.PlayHook {
+	return func(gs *game.GameState, seat int, action game.Action, v botlab.View) {
+		for _, h := range hooks {
+			h(gs, seat, action, v)
+		}
 	}
 }
 
