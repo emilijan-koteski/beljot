@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|regret")
+	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
 	polA    = flag.String("a", "current", "policy A")
 	polB    = flag.String("b", "random", "policy B")
 	n       = flag.Int("n", 200, "deals")
@@ -27,6 +27,7 @@ var (
 	flagsA  = flag.String("flagsA", "", "lab flags for A (comma list)")
 	flagsB  = flag.String("flagsB", "", "lab flags for B (comma list)")
 	workers = flag.Int("workers", runtime.NumCPU(), "parallel workers")
+	seeds   = flag.Int("seeds", 5, "seed salts per position for stability")
 	csvOut  = flag.String("csv", "bidpos.csv", "csv output for bidpos")
 )
 
@@ -40,6 +41,12 @@ func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
 		return botlab.CheatBot{Fallback: botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}}
 	case name == "lab":
 		return botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}
+	case name == "shipped" || strings.HasPrefix(name, "shipped:"):
+		from := 3
+		if t, ok := strings.CutPrefix(name, "shipped:"); ok {
+			from, _ = strconv.Atoi(t)
+		}
+		return botlab.NewShippedBot(from, botlab.ParseFlags(labFlags))
 	case strings.HasPrefix(name, "pimcs:"):
 		var sched []int
 		for _, part := range strings.Split(strings.TrimPrefix(name, "pimcs:"), ",") {
@@ -74,10 +81,14 @@ func main() {
 		ddcheck2()
 	case "duplicate":
 		duplicate(v)
+	case "race":
+		race(v)
 	case "regret":
 		regret(v)
 	case "bidtable":
 		bidtable(v)
+	case "stability":
+		stability(v)
 	case "bidpos":
 		bidpos(v, *csvOut)
 	default:
@@ -251,6 +262,26 @@ func (r *dupResult) merge(o *dupResult) {
 	r.bPts += o.bPts
 }
 
+var countsMu sync.Mutex
+
+func addCounts(total *botlab.Counts, p botlab.Policy) bool {
+	c, ok := p.(botlab.Counting)
+	if !ok {
+		return false
+	}
+	got := c.Counts()
+	total.Applied += got.Applied
+	total.Decided += got.Decided
+	total.Deferred += got.Deferred
+	total.DefenderTrumpLeads += got.DefenderTrumpLeads
+	return true
+}
+
+func printCounts(side string, c botlab.Counts) {
+	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d\n",
+		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads)
+}
+
 func duplicate(v game.Variant) {
 	t0 := time.Now()
 	deals := make([]botlab.Deal, *n)
@@ -268,6 +299,8 @@ func duplicate(v game.Variant) {
 		close(next)
 	}()
 	var nameA, nameB string
+	var countsA, countsB botlab.Counts
+	var countingA, countingB bool
 	for w := 0; w < *workers; w++ {
 		wg.Add(1)
 		go func(w int) {
@@ -277,6 +310,12 @@ func duplicate(v game.Variant) {
 			if w == 0 {
 				nameA, nameB = A.Name(), B.Name()
 			}
+			defer func() {
+				countsMu.Lock()
+				defer countsMu.Unlock()
+				countingA = addCounts(&countsA, A) || countingA
+				countingB = addCounts(&countsB, B) || countingB
+			}()
 			res := &results[w]
 			for i := range next {
 				deal := deals[i]
@@ -338,6 +377,12 @@ func duplicate(v game.Variant) {
 	fmt.Printf("  points banked: A %d  B %d  (A share %.1f%%)\n", tot.aPts, tot.bPts, 100*float64(tot.aPts)/float64(tot.aPts+tot.bPts))
 	fmt.Printf("  A called %d (made %.0f%%), B called %d (made %.0f%%), passed out %d / %d\n",
 		tot.aCalls, pct(tot.aCallWins, tot.aCalls), tot.bCalls, pct(tot.bCallWins, tot.bCalls), tot.passed, tot.played+tot.passed)
+	if countingA {
+		printCounts("A", countsA)
+	}
+	if countingB {
+		printCounts("B", countsB)
+	}
 }
 
 func pct(a, b int) float64 {

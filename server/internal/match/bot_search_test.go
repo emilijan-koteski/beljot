@@ -154,3 +154,24 @@ func TestDefaultBotSearchSettings(t *testing.T) {
 	assert.Equal(t, 500*time.Millisecond, s.Deadline)
 	assert.Equal(t, 3, s.FromTrick)
 }
+
+func TestBuildBotViewCarriesDeclarationsEnabled(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		gs   *game.GameState
+		want bool
+	}{
+		{"default rules", testfixtures.NewGameMidPlay(5), true},
+		{"declarations off", testfixtures.WithoutDeclarations(testfixtures.NewGameMidPlay(5)), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
+			require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+			t.Cleanup(func() { mgr.RemoveSession(searchRoomID) })
+			mgr.SetGameStateForTest(searchRoomID, markBots(tt.gs, searchBotSeat))
+			mgr.CancelBotTimersForTest(searchRoomID)
+
+			assert.Equal(t, tt.want, mgr.BuildBotViewForTest(searchRoomID, searchBotSeat).DeclarationsEnabled)
+		})
+	}
+}

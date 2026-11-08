@@ -158,7 +158,7 @@ func TestPositionFromViewListsTheTrickInPlayOrder(t *testing.T) {
 	gs.Rules.Clockwise = false
 	hearts := search.SuitIdx(game.SuitHearts)
 
-	empty := bot.PositionFromForTest(viewFromState(gs, 0, memoryOfMissingCards(gs)))
+	empty := bot.PositionFromForTest(viewFromState(gs, 0, memoryOfMissingCards(gs)), bot.SearchTuning{})
 	assert.Equal(t, 0, empty.Leader)
 	assert.Empty(t, empty.Trick)
 	assert.Equal(t, hearts, empty.Trump)
@@ -168,7 +168,7 @@ func TestPositionFromViewListsTheTrickInPlayOrder(t *testing.T) {
 	gs.Rules.Clockwise = true
 	playToTrick(t, gs, 1, card("9S"))
 	playToTrick(t, gs, 0, card("AS"))
-	opened := bot.PositionFromForTest(viewFromState(gs, 3, memoryOfMissingCards(gs)))
+	opened := bot.PositionFromForTest(viewFromState(gs, 3, memoryOfMissingCards(gs)), bot.SearchTuning{})
 	assert.Equal(t, 1, opened.Leader)
 	assert.Equal(t, []int{search.CardIdx(card("9S")), search.CardIdx(card("AS"))}, opened.Trick)
 	assert.True(t, opened.Clockwise)
@@ -184,7 +184,7 @@ func TestSettlementFromViewCarriesTheHandAndCountsTheCardsInPlay(t *testing.T) {
 	s := bot.SettlementFromForTest(v)
 
 	assert.Equal(t, gs.HandPoints, s.HandPoints)
-	assert.Equal(t, [2]int{50, 40}, s.DeclPoints)
+	assert.Equal(t, [2]int{70, 40}, s.DeclPoints)
 	assert.Equal(t, gs.TricksWon, s.TricksWon)
 	assert.Equal(t, game.TeamForSeat(*gs.TrumpCallerSeat), s.CallerTeam)
 	assert.True(t, s.DeclarationsTransfer)
@@ -206,6 +206,8 @@ func TestSearchAppliesGates(t *testing.T) {
 	remaining := bot.RemainingCardPointsForTest(base)
 	require.Greater(t, remaining, 10)
 
+	withoutRace := bot.DefaultSearchTuning()
+	withoutRace.RaceObjective = false
 	banked := func(v bot.View, team int) int {
 		return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team]
 	}
@@ -256,7 +258,7 @@ func TestSearchAppliesGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := base
 			tt.mutate(&v)
-			assert.Equal(t, tt.want, bot.SearchApplies(v, tt.fromTrick))
+			assert.Equal(t, tt.want, bot.SearchAppliesWith(v, tt.fromTrick, withoutRace))
 		})
 	}
 }
@@ -291,6 +293,52 @@ func TestSearchCardDeclinesWhereTheRulesPlay(t *testing.T) {
 	v.TrumpSuit = nil
 	_, ok = bot.SearchCard(v, time.Now().Add(5*time.Second))
 	assert.False(t, ok, "no trump yields no decision")
+}
+
+func farFuture() time.Time { return time.Now().Add(time.Hour) }
+
+func TestSearchCardWithZeroTuningMatchesTheChooser(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	checked := 0
+	for seat := range 4 {
+		v := viewFromState(gs, seat, memoryOfMissingCards(gs))
+		if !bot.SearchApplies(v, 3) {
+			continue
+		}
+		want, okWant := bot.ChooserResultForTest(v, farFuture())
+		got, okGot := bot.SearchCardWith(v, farFuture(), bot.SearchTuning{})
+		require.Equal(t, okWant, okGot)
+		assert.Equal(t, want.Card, got.Card)
+		assert.Equal(t, want.Samples, got.Samples)
+		assert.Equal(t, want.Margin, got.Margin)
+		assert.Equal(t, want.SE, got.SE)
+		checked++
+	}
+	assert.Positive(t, checked)
+}
+
+func TestSearchCardWithSeedSaltIsDeterministic(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.True(t, bot.SearchApplies(v, 3))
+	salted := bot.SearchTuning{SeedSalt: 7}
+
+	first, ok := bot.SearchCardWith(v, farFuture(), salted)
+	require.True(t, ok)
+	second, ok := bot.SearchCardWith(v, farFuture(), salted)
+	require.True(t, ok)
+
+	assert.Equal(t, first, second)
+	assert.Contains(t, v.LegalCards, first.Card)
+}
+
+func TestSearchAppliesWithOpeningSamples(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	v.TrickNumber = 1
+	assert.False(t, bot.SearchAppliesWith(v, 1, bot.SearchTuning{}))
+	assert.True(t, bot.SearchAppliesWith(v, 1, bot.SearchTuning{OpeningSamples: 12}))
+	assert.False(t, bot.SearchAppliesWith(v, 3, bot.SearchTuning{OpeningSamples: 12}))
 }
 
 func TestDecideWithFallsBackToTheRules(t *testing.T) {
@@ -339,4 +387,139 @@ func TestDecideWithFallsBackToTheRules(t *testing.T) {
 			assert.Equal(t, tt.want, bot.DecideWith(v, tt.pre))
 		})
 	}
+}
+
+func TestSearchCardWithDefersAGuessedTrumpDraw(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	checked := 0
+	for seat := range 4 {
+		v := viewFromState(gs, seat, memoryOfMissingCards(gs))
+		if !bot.SearchApplies(v, 3) {
+			continue
+		}
+		got, ok := bot.SearchCardWith(v, farFuture(), bot.SearchTuning{TrumpDrawConditional: true})
+		require.True(t, ok)
+		assert.Contains(t, v.LegalCards, got.Card)
+		if got.Deferred {
+			assert.Equal(t, bot.ChooseCardForTest(v), got.Card)
+		}
+		checked++
+	}
+	assert.Positive(t, checked)
+}
+
+func TestSettlementFromViewCountsTheBotsOwnBelote(t *testing.T) {
+	base := func() bot.View {
+		trump, caller := game.SuitHearts, 1
+		return bot.View{
+			Seat: 0, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller,
+			DeclarationsEnabled: true, DeclPoints: [2]int{20, 50},
+			Hand: cards("KH", "QH", "7S"),
+		}
+	}
+	tests := []struct {
+		name   string
+		mutate func(v *bot.View)
+		want   [2]int
+	}{
+		{"king and queen of trump", func(v *bot.View) {}, [2]int{40, 50}},
+		{"queen already played", func(v *bot.View) { v.Hand = cards("KH", "7S") }, [2]int{20, 50}},
+		{"declarations disabled", func(v *bot.View) { v.DeclarationsEnabled = false }, [2]int{20, 50}},
+		{"king and queen of a side suit", func(v *bot.View) { v.Hand = cards("KS", "QS", "7S") }, [2]int{20, 50}},
+		{"the seat of team B", func(v *bot.View) { v.Seat = 3 }, [2]int{20, 70}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := base()
+			tt.mutate(&v)
+			assert.Equal(t, tt.want, bot.SettlementFromForTest(v).DeclPoints)
+		})
+	}
+}
+
+func TestOwnBeloteSettlementMatchesTheEngine(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(7)
+	gs.BelotAnnounced = false
+	gs.Players[0].Hand = cards("KH", "QH")
+	gs.Players[1].Hand = cards("JS", "9S")
+	gs.Players[2].Hand = cards("AD", "TD")
+	gs.Players[3].Hand = cards("JD", "9D")
+	gs.ActivePlayerSeat = 0
+	require.True(t, gs.Rules.DeclarationsEnabled)
+
+	var hands [4]uint32
+	for seat := range hands {
+		hands[seat] = search.MaskOf(gs.Players[seat].Hand)
+	}
+	view := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.True(t, view.DeclarationsEnabled)
+	pos := bot.PositionFromForTest(view, bot.SearchTuning{})
+	remainder := search.NewSolver(pos.Trump, pos.Clockwise).Value(hands, pos.Leader, pos.Trick, pos.Capot)
+	predicted := search.Settle(bot.SettlementFromForTest(view), remainder)
+
+	for range 8 {
+		if gs.Phase != game.PhasePlaying {
+			break
+		}
+		seat := gs.ActivePlayerSeat
+		next, err := game.ApplyAction(gs, game.Action{
+			Type: game.ActionPlayCard, PlayerSeat: seat, Card: &game.LegalCards(gs, seat)[0],
+		})
+		require.NoError(t, err)
+		gs = next
+		if gs.PendingBelotSeat != nil {
+			require.Equal(t, 0, *gs.PendingBelotSeat)
+			gs, err = game.ApplyAction(gs, game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: 0})
+			require.NoError(t, err)
+		}
+	}
+
+	require.NotNil(t, gs.LastHandResult, "the two tricks must end the hand")
+	assert.Equal(t, 20, gs.BelotPoints[game.TeamA])
+	assert.Equal(t, predicted, gs.LastHandResult.TeamAHandTotal-gs.LastHandResult.TeamBHandTotal)
+}
+
+func TestSearchAppliesWithRaceObjective(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	v.StopAtTarget = true
+	v.MatchTarget = v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0] + 20
+
+	racing := bot.SearchTuning{RaceObjective: true}
+	assert.False(t, bot.SearchAppliesWith(v, 3, bot.SearchTuning{}))
+	assert.True(t, bot.SearchAppliesWith(v, 3, racing))
+
+	pos := bot.PositionFromForTest(v, racing)
+	require.NotNil(t, pos.Race)
+	assert.Equal(t, search.Race{
+		Target: v.MatchTarget,
+		Banked: [2]int{v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0], v.TeamScores[1] + v.HandPoints[1] + v.DeclPoints[1]},
+		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
+	}, *pos.Race)
+	assert.Nil(t, bot.PositionFromForTest(v, bot.SearchTuning{}).Race)
+
+	v.StopAtTarget = false
+	assert.Nil(t, bot.PositionFromForTest(v, racing).Race)
+}
+
+func TestRaceCarriesTheBotsOwnBeloteApartFromTheBank(t *testing.T) {
+	trump, caller := game.SuitHearts, 1
+	v := bot.View{
+		Seat: 2, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller,
+		DeclarationsEnabled: true, StopAtTarget: true, MatchTarget: 1001,
+		TeamScores: [2]int{950, 900}, HandPoints: [2]int{10, 5}, DeclPoints: [2]int{0, 20},
+		Hand: cards("KH", "QH", "7S"),
+	}
+	pos := bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true})
+	require.NotNil(t, pos.Race)
+	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
+	assert.Equal(t, game.TeamB, pos.Race.Caller)
+	assert.Equal(t, 2, pos.Race.BeloteSeat)
+	assert.Equal(t, search.MaskOf(cards("KH", "QH")), pos.Race.BeloteCards)
+
+	v.Hand = cards("KH", "7S")
+	pos = bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true})
+	require.NotNil(t, pos.Race)
+	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
+	assert.Zero(t, pos.Race.BeloteCards)
 }
