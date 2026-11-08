@@ -323,7 +323,7 @@ func TestSamplesForTrickSchedule(t *testing.T) {
 	for trick, samples := range want {
 		assert.Equal(t, samples, search.SamplesForTrick(trick), "trick %d", trick)
 	}
-	}
+}
 
 func TestChooseReportsPerCardStatistics(t *testing.T) {
 	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))

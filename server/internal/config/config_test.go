@@ -168,7 +168,7 @@ func TestConfigReadsBotSearchSettings(t *testing.T) {
 		}
 		cfg := Load()
 		if cfg.BotSearchWorkers != 0 || cfg.BotSearchDeadline != 500*time.Millisecond || cfg.BotSearchFromTrick != 1 {
-			t.Errorf("bot search = %d workers, %v deadline, from trick %d; want the defaults 0, 500ms, 3",
+			t.Errorf("bot search = %d workers, %v deadline, from trick %d; want the defaults 0, 500ms, 1",
 				cfg.BotSearchWorkers, cfg.BotSearchDeadline, cfg.BotSearchFromTrick)
 		}
 	})

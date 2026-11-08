@@ -554,7 +554,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 
 | item | pooled effect ± SE | metric | decision | commit |
 |---|---|---|---|---|
-| D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | see git log, `feat(bot): search the opening tricks` |
+| D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | 8a2d9b20 |
 
 #### D2 opening search
 
@@ -974,7 +974,7 @@ to about 930 000 rollouts at the phase-1 call rate (9.7 and 11.7 per deal, count
 above), which is roughly 40 CPU-hours, several hours on six workers. That is an estimate from the
 gate timings, not a run. The phase-3 solver speed-ups (`BOT_V2_PROPOSAL.md` §4.7) are what make
 repeating it routine, and until then the table is calibrated under the rule layer while the
-search plays only the cards from trick 3. §3.5 is that repeat, at the sizes of the original
+search plays only the cards from trick 3 (the state when this was written; phase 4 later started the search at trick 1, §2.10). §3.5 is that repeat, at the sizes of the original
 calibration.
 
 ### 3.5 Recalibration under the search (2026-11-07)

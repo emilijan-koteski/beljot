@@ -2,12 +2,13 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples, for both the Bitola and the Croatian variant. It reflects the
-current logic including phases 1, 2 and 3 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
+current logic including phases 1 to 4 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
 memory facts, the hand-shape bidding table, the led-suit-secure take, the Ace cashed before the
 Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo search that
-plays the cards from trick 3 (§5), with the rule layer as the fallback; phase 4 starts it at trick 1. Phase 3 is the faster
+plays the cards (§5), with the rule layer as the fallback. Phase 3 is the faster
 solver, two table conventions and the match race inside the search (§5.10), larger sample counts,
-the own Belote in the settlement and a bidding table recalibrated under the search (§4.2). The
+the own Belote in the settlement and a bidding table recalibrated under the search (§4.2).
+Phase 4 starts the search at trick 1, so it now plays every card from the first trick. The
 rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
 when the opponents provably hold the master, boss preservation, uncuttable-boss last-trick
 retention, suppressing trump draws once the opponents are void of trump, leading into a partner's
@@ -555,7 +556,8 @@ so the partner ruffs.
 
 Note: the search plays the lead, and it carries the Ten-under-Ace convention of B3
 as a bonus of 3 on the Ten when the values are close, and a penalty of 10 on a defender's
-non-J/9 trump lead (5.10). The rules above are the fallback, and they play tricks 1 and 2 when the opening search misses its deadline.
+non-J/9 trump lead (5.10). The rules above are the fallback, and they play tricks 1 and 2
+when the opening search misses its deadline.
 
 ### B3. Following a trick (`chooseFollow`)
 
