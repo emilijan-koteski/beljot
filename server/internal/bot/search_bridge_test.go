@@ -754,10 +754,10 @@ func TestBeloteAnswerAnnouncesWhenTheTwentyMakesTheContract(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, announce, "77 card points fall against 85, the Belote's 20 makes the contract")
 
-	v.HandPoints = [2]int{75, 70}
+	v.HandPoints = [2]int{40, 85}
 	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
 	require.True(t, ok)
-	assert.True(t, announce, "a contract made either way keeps its Belote")
+	assert.False(t, announce, "57 card points plus the 20 still fall against 85, the Belote would only go to the opponents")
 }
 
 func TestBeloteAnswerIsDeterministic(t *testing.T) {
