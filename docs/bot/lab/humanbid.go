@@ -12,7 +12,8 @@ const (
 	humanMinTrumpsWithJ9 = 3
 )
 
-// HumanBidder plays, declares and surrenders like Inner and bids by a simple human rule: it calls with probability 0.8 when the trump suit holds J or 9 with three trumps or any four trumps, the candidate counted.
+// HumanBidder plays, declares and surrenders like Inner and bids by a simple human rule: it calls with probability 0.8
+// when the trump suit holds J or 9 with three trumps or any four trumps, the candidate counted.
 type HumanBidder struct {
 	Inner Policy
 	Rng   *rand.Rand

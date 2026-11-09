@@ -89,8 +89,9 @@ func validClass(class string) bool {
 	return false
 }
 
-// classCall returns the call action of the tested seat when its position is in the class: the natural call for table,
-// core and edge (a call in a suit that is not core), and for below the ruleA suit with the best forcedSuitScore (the candidate itself in Bitola round 1).
+// classCall returns the tested seat's call when its position is in the class: the natural call for table, core and
+// edge (a call in a non-core suit), and for below the ruleA suit with the best forcedSuitScore (Bitola round 1: the
+// candidate).
 func classCall(class string, gs *game.GameState, step, seat int, natural game.Action) (game.Action, bool) {
 	naturalCall := natural.Type == game.ActionPickTrump
 	switch class {

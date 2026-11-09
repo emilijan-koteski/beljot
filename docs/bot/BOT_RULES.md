@@ -28,7 +28,7 @@ Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, 
 | Bidding (the hand-shape table) | `server/internal/bot/bidding.go` | `decideBid`, `matchesBidTable` |
 | What the bot is allowed to know | `server/internal/bot/view.go` | Redacted, seat-local snapshot |
 | What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations, located cards |
-| Search layer: solver, belief sampler, settlement, chooser, sample schedule | `server/internal/bot/search/` | `solver.go`, `sampler.go`, `settle.go`, `pimc.go` (`Choose`, `SamplesForTrick`), `cards.go` |
+| Search layer: solver, belief sampler, settlement, chooser, sample schedule | `server/internal/bot/search/` | `solver.go`, `solver_prune.go`, `sampler.go`, `settle.go`, `pimc.go` (`Choose`, `SamplesForTrick`), `cards.go` |
 | View to search input, when the search applies, the searched card | `server/internal/bot/search_bridge.go` | `SearchApplies`, `SearchCard`, `DecideWith` |
 | Worker pool, search settings | `server/internal/match/search_pool.go` | `BotSearchSettings`, bounded queue, panic recovery |
 | Search settings from the environment | `server/internal/config/config.go` | `BELJOT_BOT_SEARCH_*` (§5.6) |
@@ -239,21 +239,24 @@ Every deal that satisfies the hard facts is equally likely when the rejection dr
 constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
 what the seats led or discarded (see 5.9).
 
-**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `search_bridge.go`; off in production, see
-5.10). When it is on and the
-hand's auction is recorded (`View.Bids`, §7), the chooser and the Belote evaluation pass `search.Options.SampleFilter`,
-which rejects a sampled deal in which another seat's auction action contradicts the bid table of §4.2. A seat's eight
-cards are its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card in the current trick. It bid
-on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick, two for the caller), six in
-Croatian (the two face-down cards join after the pick), and which ones is unknown, so the filter tries every bid-time
-hand those eight cards allow (`matchesBidTable` with the recorded passes before the action as the position):
+**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `bid_consistency.go`; off in production, see
+5.10). When it is on and the hand's auction is recorded (`View.Bids`, §7), the chooser and the Belote evaluation pass
+`search.Options.SampleFilter`, which rejects a sampled deal in which another seat's auction action contradicts the bid
+table of §4.2. A seat's eight cards are its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card
+in the current trick. It bid on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick, two
+for the caller), six in Croatian (the two face-down cards join after the pick), and which ones is unknown, so the filter
+tries every bid-time hand those eight cards allow (`matchesBidTable` with the recorded passes before the action as the
+position):
 
 - a pass is explained when at least one bid-time hand matches no suit the seat could call (Bitola round 1: the
   candidate's suit; Bitola round 2: the other three; Croatian: all four); a deal where every bid-time hand matches is
   rejected;
 - a call is explained when at least one bid-time hand matches the called suit; in Bitola the hands are five of the
   caller's cards other than the candidate, plus the candidate; Croatian's forced dealer pick (three passes before it)
-  proves nothing and is not checked;
+  proves nothing and is not checked (a call after three passes with no candidate is taken as that pick, which holds
+  because the shipped Croatian rules make the dealer pick);
+- a seat with fewer cards in sight and sampled than a bid-time hand is accepted unchecked (never in production, where
+  every seat has a full hand in sight or sampled);
 - the bot's own actions are not checked, and a Bitola auction with no recorded candidate is not filtered.
 
 A rejected deal is never solved and does not count as a sample; the sampler draws again, up to four draws per requested
@@ -391,10 +394,11 @@ hands, identical on three repeated runs); its gate stays 60%.
 
 ### 5.9 What the search does not model
 
-- **No play inference beyond the hard facts of 5.2, and bidding only as a hard filter.** Deals are not weighed by what
-  the seats led, discarded or signalled. The auction enters only through the bidding-consistency filter of 5.2, which
-  assumes every seat bids by the bot's own table and keeps or rejects a deal outright (no weighting). The phase-1 lab
-  measured a weighting at −1.9 ± 1.9 (`BOT_V2_LAB_RESULTS.md` §2.6); the filter's measurement is in §2.10 (D1).
+- **No play or bidding inference beyond the hard facts of 5.2.** Deals are not weighed by what the seats led,
+  discarded or signalled, and in production the auction does not shape the samples. The bidding-consistency filter of
+  5.2 is measured and off (`BidConsistency false`); when the lab turns it on it assumes every seat bids by the bot's
+  own table and keeps or rejects a deal outright (no weighting). The phase-1 lab measured a weighting at −1.9 ± 1.9
+  (`BOT_V2_LAB_RESULTS.md` §2.6); the filter's measurement is in §2.10 (D1).
 - **Open-hand solving of each sample.** Every sampled deal is solved as if all four players saw
   all cards, for the opponents too. A card that is best only because the seat would know the
   exact deal later (strategy fusion) can be overrated, and a card that hides information is not
@@ -827,7 +831,9 @@ gamble.
   last -> play **A♠**; the Queen would lose to the last player's King or Ten and the kept Ace would
   be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead,
   leaves it inert.
-- Cannot win: **discard** the lowest value, preserving trump. A pick that is a blind Ten (5.10) becomes the lowest-value other legal card, and stays when it is the only legal card (`avoidBlindTen`).
+- Cannot win: **discard** the lowest value, preserving trump. A pick that is a blind Ten (5.10)
+  becomes the lowest-value other legal card (`avoidBlindTen`). It stays when it is the only legal
+  card.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
 sites (safe smear, risk-smear, partner-takes-trick). Among non-overtaking legal cards it picks
@@ -946,13 +952,13 @@ Reasoning helpers (all pure, in `bot.go`):
 
 What the search sampler consumes (§5.2): the same View and nothing more. It reads the cards played
 and those in the current trick, the void matrix (including trump voids), the known cards per seat
-(declared and located cards, which it puts into that seat's hand and removes from the unseen
-pool), the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand), the rank bounds (every card above a bound is forbidden in that seat's hand) and
-each seat's remaining card count. These are hard facts: a deal that contradicts one is never
-drawn. Everything else is unknown, and the sampler treats it as uniform. Which unseen cards sit
-with which seat is equally likely under every deal that fits the facts, so no conclusion is drawn
-from how a seat bid or passed, what it led or discarded, or what it signalled, and the scores do
-not shape the samples.
+(declared and located cards, which it puts into that seat's hand and removes from the unseen pool),
+the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand), the rank
+bounds (every card above a bound is forbidden in that seat's hand) and each seat's remaining card
+count. These are hard facts: a deal that contradicts one is never drawn. Everything else is unknown,
+and the sampler treats it as uniform. Which unseen cards sit with which seat is equally likely under
+every deal that fits the facts, so no conclusion is drawn from how a seat bid or passed, what it led
+or discarded, or what it signalled, and the scores do not shape the samples.
 
 ---
 
