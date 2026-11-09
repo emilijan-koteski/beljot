@@ -34,7 +34,7 @@ var (
 	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
 	oppSpec      = flag.String("opp", "", "duplicate: policy for seats 1/3 in both games; A and B alternate on seats 0/2 (uses flagsB)")
 	transfer     = flag.String("transfer", "on", "duplicate: on|off, the lab room's declarations-on-a-fall rule")
-	classSpec    = flag.String("class", "", "bidscore: below|table|core, test the first seat of the natural auction whose position is in this hand class")
+	classSpec    = flag.String("class", "", "bidscore: below|table|core|edge, test the first seat of the natural auction whose position is in this hand class")
 	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 

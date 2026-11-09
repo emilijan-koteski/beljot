@@ -13,6 +13,7 @@ const (
 	classBelow = "below"
 	classTable = "table"
 	classCore  = "core"
+	classEdge  = "edge"
 )
 
 type trumpHolding struct {
@@ -82,14 +83,14 @@ func suitsWhere(gs *game.GameState, step, seat int, pred func(trumpHolding) bool
 
 func validClass(class string) bool {
 	switch class {
-	case "", classBelow, classTable, classCore:
+	case "", classBelow, classTable, classCore, classEdge:
 		return true
 	}
 	return false
 }
 
-// classCall returns the call action of the tested seat when its position is in the class: the natural call for table
-// and core, and for below the ruleA suit with the best forcedSuitScore (the candidate itself in Bitola round 1).
+// classCall returns the call action of the tested seat when its position is in the class: the natural call for table,
+// core and edge (a call in a suit that is not core), and for below the ruleA suit with the best forcedSuitScore (the candidate itself in Bitola round 1).
 func classCall(class string, gs *game.GameState, step, seat int, natural game.Action) (game.Action, bool) {
 	naturalCall := natural.Type == game.ActionPickTrump
 	switch class {
@@ -97,6 +98,8 @@ func classCall(class string, gs *game.GameState, step, seat int, natural game.Ac
 		return natural, naturalCall
 	case classCore:
 		return natural, naturalCall && len(suitsWhere(gs, step, seat, coreHolding)) > 0
+	case classEdge:
+		return natural, naturalCall && !coreHolding(holdingOf(classCards(gs, seat), calledSuit(gs, natural)))
 	case classBelow:
 		suits := suitsWhere(gs, step, seat, ruleA)
 		if naturalCall || len(suits) == 0 {
@@ -105,6 +108,13 @@ func classCall(class string, gs *game.GameState, step, seat int, natural game.Ac
 		return belowCall(gs, seat, suits), true
 	}
 	return game.Action{}, false
+}
+
+func calledSuit(gs *game.GameState, call game.Action) game.Suit {
+	if call.Suit == nil {
+		return gs.TrumpCandidate.Suit
+	}
+	return *call.Suit
 }
 
 func belowCall(gs *game.GameState, seat int, suits []game.Suit) game.Action {
@@ -159,7 +169,7 @@ func classcheck(v game.Variant) {
 	fmt.Printf("classcheck ruleA: %d/%d truth-table cases agree\n", len(ruleACases)-bad, len(ruleACases))
 	rng := rand.New(rand.NewPCG(*seed, 78))
 	pol := makePolicy(*polA, rand.New(rand.NewPCG(*seed, 499)), *flagsA)
-	var positions, table, below, core, corePassed int
+	var positions, table, below, core, edge, both, corePassed int
 	for i := 0; i < *n; i++ {
 		gs := botlab.NewDealState(botlab.RandomDeal(rng), v)
 		gs.Phase = game.PhaseBidding
@@ -178,8 +188,16 @@ func classcheck(v game.Variant) {
 			if _, ok := classCall(classBelow, gs, step, seat, natural); ok {
 				below++
 			}
-			if _, ok := classCall(classCore, gs, step, seat, natural); ok {
+			_, inCore := classCall(classCore, gs, step, seat, natural)
+			_, inEdge := classCall(classEdge, gs, step, seat, natural)
+			if inCore {
 				core++
+			}
+			if inEdge {
+				edge++
+			}
+			if inCore && inEdge {
+				both++
 			}
 			if isCore && natural.Type != game.ActionPickTrump {
 				corePassed++
@@ -195,6 +213,7 @@ func classcheck(v game.Variant) {
 			gs = next
 		}
 	}
-	fmt.Printf("classcheck %s -a=%s: %d deals, %d free positions: table %d, below %d, core %d, core positions the policy passes %d\n",
-		v, *polA, *n, positions, table, below, core, corePassed)
+	fmt.Printf("classcheck %s -a=%s: %d deals, %d free positions: table %d, below %d, core %d, edge %d, core and edge %d, core positions the policy passes %d\n",
+		v, *polA, *n, positions, table, below, core, edge, both, corePassed)
+	fmt.Printf("classcheck table = core + edge - both: %t\n", table == core+edge-both)
 }

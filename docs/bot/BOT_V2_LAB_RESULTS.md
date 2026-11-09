@@ -101,15 +101,17 @@ ignores the score).
 The line is `bidscore <state>: n pairs, call-minus-pass match wins +x.xxx ± y.yyy, call wins a/n,
 pass wins b/n`, where "wins" counts the pairs in which the tested team won the match. `-stopAtTarget`
 (default true; also on `race`) set to false makes a match end only at a hand end.
-`-class=below|table|core` (`class.go`; excludes `-shape`) picks the tested seat by hand class instead:
+`-class=below|table|core|edge` (`class.go`; excludes `-shape`) picks the tested seat by hand class instead:
 the first seat of the natural auction of `-a` whose position is in the class with a free choice. `table`
 is a position where `-a` calls; `core` a `table` position with J and 9 and two trumps or more, J and four
-or more, or five or more in a bidding suit; `below` a position where `-a` passes and the Go port of
+or more, or five or more in a bidding suit; `edge` a `table` position whose called suit (the candidate's in
+Bitola round 1) is not a core suit; `below` a position where `-a` passes and the Go port of
 `class_table.py`'s `ruleA` holds for a bidding suit (Bitola round 1 the candidate's suit, else any suit
 but a refused candidate, the candidate counted in the hand). The call branch plays the natural call for
-`table` and `core`, and for `below` the `ruleA` suit with the best `forcedSuitScore` (the candidate in
+`table`, `core` and `edge`, and for `below` the `ruleA` suit with the best `forcedSuitScore` (the candidate in
 Bitola round 1). The classes depend on `-a`. `-exp=classcheck` checks `ruleA` against a truth table and
-counts the free positions per class over `-n` random deals of the natural auction of `-a`.
+counts the free positions per class over `-n` random deals of the natural auction of `-a`, with a line checking
+table = core + edge - (positions in both: a non-core call while another suit is core).
 
 ### 1.5 Policies
 
@@ -573,7 +575,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
 | E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added | c8416aef, f9ecf56f, fc1e0984 |
 | D4 the Belote answer as the caller (`BeloteSkipMargin 5`) | with minus without -0.02 ± 0.04 (z -0.4); Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17; transfer off +0.00 ± 0.00 in both (no-op, as required) | duplicate advantage per hand, 1 000 deals per variant (400 with transfer off), `shipped:1` both sides | does not ship (strength; not better at 2 SE; `BeloteSkipMargin 0`, the code stays) | d9e20b2f |
-| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; awaiting the owner (no rule proposed: neither loosen nor tighten passes at 2 SE) | 853f5421 (server), lab in this commit |
+| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; awaiting the owner (no rule proposed: the loosen is not positive at 2 SE; tighten measured on edge hands, calls win, no rule) | 853f5421 (server), lab a228fe80 and the `edge` commit |
 
 #### D2 opening search
 
@@ -867,22 +869,28 @@ shipped policy); **below** = the natural decision is a pass and the Go port of `
 least one bidding suit (Bitola round 1 the candidate's suit with the candidate in the hand; otherwise any suit but a
 refused candidate); `ruleA(count, J, 9, A, sideAces)` is J and 9 with two trumps or more, J with three or more, four or
 more with J, 9 or A, five or more, 9 and A with three or more and a side Ace, or J with exactly two and two side Aces;
-**core** = J and 9 with two or more, J with four or more, or five or more, at a `table` position. Suit of the call
-branch: for `table` (and `core`) the policy's own natural call; for `below` the `ruleA` suit with the best
+**core** = J and 9 with two or more, J with four or more, or five or more, at a `table` position; **edge** = a `table`
+position whose called suit (the candidate's in Bitola round 1) is not a core suit, the hands a tighten to `core` would
+stop calling. Suit of the call branch: for `table`, `core` and `edge` the policy's own natural call; for `below` the `ruleA` suit with the best
 `forcedSuitScore` (length, then trump-order points; the candidate itself in Bitola round 1), the same scoring as
 `forcedCall`.
 
-`-exp=classcheck -a=shipped:1 -n=20000 -seed=1190` (both variants) confirms the port and shows that the Bitola `below`
+`-exp=classcheck -a=shipped:1 -n=20000 -seed=1190` and the same with `-variant=croatia` confirm the port and shows that the Bitola `below`
 class is empty: the shipped Bitola table already calls at every `ruleA` position it reaches (no `core` position is
 passed either), so the three Bitola `below` cells (seeds 1191, 1193, 1195) were not run, a run would
 never find a deal. In Croatian `below` is 3.3% of the free positions (1 356 of 40 784).
 
 ```
 classcheck ruleA: 15/15 truth-table cases agree
-classcheck bitola -a=shipped:1: 20000 deals, 75428 free positions: table 17956, below 0, core 6263, core positions the policy passes 0
+classcheck bitola -a=shipped:1: 20000 deals, 75428 free positions: table 17956, below 0, core 6263, edge 11704, core and edge 11, core positions the policy passes 0
+classcheck table = core + edge - both: true
 classcheck ruleA: 15/15 truth-table cases agree
-classcheck croatia -a=shipped:1: 20000 deals, 40784 free positions: table 15162, below 1356, core 6129, core positions the policy passes 0
+classcheck croatia -a=shipped:1: 20000 deals, 40784 free positions: table 15162, below 1356, core 6129, edge 9142, core and edge 109, core positions the policy passes 0
+classcheck table = core + edge - both: true
 ```
+
+`core` and `edge` overlap at the positions where the bot calls a non-core suit while another suit is core (11 Bitola, 109
+Croatian of the 20 000 deals); `edge` keeps them, because a tighten to the called suit's core would not call there.
 
 Sizes: a 50-pair probe of `neither` cost 3.5 s per pair with two runs at a time (`-class=table -n=50 -seed=1195`, Bitola:
 `bidscore neither: 50 pairs, call-minus-pass match wins +0.000 ± 0.099, call wins 27/50, pass wins 27/50`; Croatian
@@ -908,6 +916,11 @@ the close states reach 0.016 to 0.023; `neither` stays at 0.035 to 0.040 (5 s pe
 | `ownClose` | `table` | Croatian | 1200 | 500 | +0.048 ± 0.016 | 497/500 / 485/500 | 540s |
 | `neither` | `below` | Croatian | 1201 | 500 | -0.052 ± 0.040 | 255/500 / 268/500 | 2598s |
 | `neither` | `table` | Croatian | 1202 | 500 | +0.120 ± 0.035 | 283/500 / 253/500 | 2581s |
+| `ownClose` | `edge` | Bitola | 1207 | 500 | +0.012 ± 0.017 | 492/500 / 489/500 | 384s |
+| `ownClose` | `edge` | Croatian | 1208 | 500 | +0.044 ± 0.019 | 489/500 / 478/500 | 358s |
+
+The two `edge` rows were added after review: the `table` cell mixes `core` hands (35-40% of `table` positions) with the
+hands a tighten would drop, so it cannot show the tighten by itself.
 
 Pooled by inverse variance over the variants (w = 1/SE²):
 
@@ -915,6 +928,8 @@ Pooled by inverse variance over the variants (w = 1/SE²):
 - `oppClose` `table`: w = 1/0.023² = 1890 each; (+0.048 + 0.048)/2 = +0.048 ± 0.016 (z 2.9).
 - `ownClose` `table`: w = 1/0.021² = 2268 and 1/0.016² = 3906; (0.060 · 2268 + 0.048 · 3906) / 6174 = +0.052;
   SE = 1/√6174 = 0.013 (z 4.1).
+- `ownClose` `edge`: w = 1/0.017² = 3460 and 1/0.019² = 2770; (0.012 · 3460 + 0.044 · 2770) / 6230 = +0.026; SE =
+  1/√6230 = 0.013 (z 2.1). Neither variant is opposite (both positive).
 - `ownClose` `below`: Croatian only, +0.020 ± 0.016 (z 1.3).
 - `neither` `table`: w = 1/0.039² = 657 and 1/0.035² = 816; (0.112 · 657 + 0.120 · 816) / 1473 = +0.116; SE =
   1/√1473 = 0.026 (z 4.5).
@@ -925,9 +940,9 @@ Proposed rules (a rule is proposed only when it passes at 2 SE pooled):
 - `oppClose`, Bitola: no rule proposed; the `below` class is empty under the shipped table, so there is nothing to loosen.
 - `oppClose`, Croatian: no rule proposed; calling on `below` hands when the opponents are one hand from the target is
   -0.036 ± 0.023 match wins (the wrong sign, z -1.6), so the loosen is not positive at 2 SE.
-- `ownClose`, both variants: no rule proposed; calling on `table` hands when the own side is one hand from the target is
-  +0.060 ± 0.021 (Bitola) and +0.048 ± 0.016 (Croatian), pooled +0.052 ± 0.013, positive at 4 SE, so tightening to
-  `core` would give up match wins; no `core` cell was needed.
+- `ownClose`, both variants (tighten: when the own side is within one hand of the target, call only on core hands):
+  tighten measured: edge cell +0.026 ± 0.013 pooled (Bitola +0.012 ± 0.017, Croatian +0.044 ± 0.019), calls win, no
+  rule. The `neither` `edge` control (seeds 1209/1210) was not run, because the `ownClose` `edge` cell is positive.
 - `neither` (control): no rule fires; `table` +0.116 ± 0.026 pooled, `below` -0.052 ± 0.040 (Croatian).
 
 The design expected a modest loosen when the opponents are close; the measurement does not support it: the shipped
@@ -935,8 +950,8 @@ table already covers `ruleA` in Bitola, and calling the Croatian hands below it 
 -0.036 ± 0.023, not better (within 2 SE of zero, on the losing side). The shipped (score-blind) bidder stays as it is
 unless the owner decides otherwise.
 
-Commands (lab built from `docs/bot/lab/` at this commit, server 853f5421; each 500-pair line verbatim, with the 200-pair
-first pass on the same seed):
+Commands (lab built from `docs/bot/lab/` at a228fe80 for the first twelve rows and at the commit adding `edge` for the
+two `edge` rows, server 853f5421 throughout; each 500-pair line verbatim, with the 200-pair first pass on the same seed):
 
 Seed 1192 (Bitola, `oppClose`, `table`), `./botlab -exp=bidscore -a=shipped:1 -scoreState=oppClose -class=table -n=500 -seed=1192 -workers=6` (320s for the 200-pair first pass, `bidscore oppClose: 200 pairs, call-minus-pass match wins +0.040 ± 0.032, call wins 13/200, pass wins 9/200`):
 
@@ -999,6 +1014,20 @@ Seed 1202 (Croatian, `neither`, `table`), `./botlab -exp=bidscore -a=shipped:1 -
 ```
 bidscore neither: 500 pairs, call-minus-pass match wins +0.120 ± 0.035, call wins 283/500, pass wins 253/500
   croatia, class=table, stopAtTarget=true, open after 12 hands: call 0, pass 0; mean hands per match: call 4.02, pass 3.99; forced pass at the reshuffle seat 0; 2581.6s (5.16s per pair)
+```
+
+Seed 1207 (Bitola, `ownClose`, `edge`), `./botlab -exp=bidscore -a=shipped:1 -scoreState=ownClose -class=edge -n=500 -seed=1207 -workers=6` (384s, the two run in parallel):
+
+```
+bidscore ownClose: 500 pairs, call-minus-pass match wins +0.012 ± 0.017, call wins 492/500, pass wins 489/500
+  bitola, class=edge, stopAtTarget=true, open after 12 hands: call 0, pass 0; mean hands per match: call 1.11, pass 1.61; forced pass at the reshuffle seat 14; 383.3s (0.77s per pair)
+```
+
+Seed 1208 (Croatian, `ownClose`, `edge`), `./botlab -exp=bidscore -a=shipped:1 -scoreState=ownClose -class=edge -n=500 -seed=1208 -variant=croatia -workers=6` (358s, the two run in parallel):
+
+```
+bidscore ownClose: 500 pairs, call-minus-pass match wins +0.044 ± 0.019, call wins 489/500, pass wins 478/500
+  croatia, class=edge, stopAtTarget=true, open after 12 hands: call 0, pass 0; mean hands per match: call 1.12, pass 1.27; forced pass at the reshuffle seat 0; 358.1s (0.72s per pair)
 ```
 
 ## 3. Bidding calibration tables
@@ -1716,8 +1745,10 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=race -a=shipped:1 -flagsA=race -b=shipped:1 -flagsB=noRace -n=1000 -seed=702 -workers=6 -variant=croatia
 ./botlab -exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1151 -workers=6   # §2.10 D6b
 ./botlab -exp=race -a=shipped:1 -flagsA=deciding -b=shipped:1 -flagsB=noDeciding -stopAtTarget=false -n=1000 -seed=1152 -workers=6 -variant=croatia
-./botlab -exp=classcheck -a=shipped:1 -n=20000 -seed=1190 -variant=croatia   # §2.10 D5, the hand classes per position
-./botlab -exp=bidscore -a=shipped:1 -scoreState=oppClose -class=below -n=500 -seed=1197 -variant=croatia -workers=6   # §2.10 D5, -class=below|table|core
+./botlab -exp=classcheck -a=shipped:1 -n=20000 -seed=1190   # §2.10 D5, the hand classes per position
+./botlab -exp=classcheck -a=shipped:1 -n=20000 -seed=1190 -variant=croatia
+./botlab -exp=bidscore -a=shipped:1 -scoreState=oppClose -class=below -n=500 -seed=1197 -variant=croatia -workers=6   # §2.10 D5, -class=below|table|core|edge
+./botlab -exp=bidscore -a=shipped:1 -scoreState=ownClose -class=edge -n=500 -seed=1207 -workers=6   # §2.10 D5, the tighten on edge hands
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1

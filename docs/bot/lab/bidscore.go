@@ -246,8 +246,12 @@ func bidscore(v game.Variant) {
 		fmt.Fprintf(os.Stderr, "-scoreState must be oppClose, ownClose, bothClose or neither, got %q\n", *scoreState)
 		os.Exit(1)
 	}
-	if !validClass(*classSpec) || (*classSpec != "" && *shapeSpec != "") {
-		fmt.Fprintf(os.Stderr, "-class must be below, table or core and excludes -shape, got %q\n", *classSpec)
+	if !validClass(*classSpec) {
+		fmt.Fprintf(os.Stderr, "-class must be below, table, core or edge, got %q\n", *classSpec)
+		os.Exit(1)
+	}
+	if *classSpec != "" && *shapeSpec != "" {
+		fmt.Fprintln(os.Stderr, "-class and -shape cannot be combined")
 		os.Exit(1)
 	}
 	t0 := time.Now()
@@ -294,12 +298,19 @@ func bidscore(v game.Variant) {
 	}
 	fmt.Printf("bidscore %s: %d pairs, call-minus-pass match wins %+.3f ± %.3f, call wins %d/%d, pass wins %d/%d\n",
 		*scoreState, tot.diff.n, tot.diff.mean(), tot.diff.se(), tot.callWins, tot.diff.n, tot.passWins, tot.diff.n)
-	fmt.Printf("  %s, class=%s, stopAtTarget=%t, open after %d hands: call %d, pass %d; mean hands per match: call %.2f, pass %.2f; forced pass at the reshuffle seat %d; %.1fs (%.2fs per pair)\n",
-		v, *classSpec, *stopAtTarget, bidScoreHandCap, tot.callOpen, tot.passOpen, float64(tot.callHands)/float64(tot.diff.n),
+	fmt.Printf("  %s%s, stopAtTarget=%t, open after %d hands: call %d, pass %d; mean hands per match: call %.2f, pass %.2f; forced pass at the reshuffle seat %d; %.1fs (%.2fs per pair)\n",
+		v, classField(), *stopAtTarget, bidScoreHandCap, tot.callOpen, tot.passOpen, float64(tot.callHands)/float64(tot.diff.n),
 		float64(tot.passHands)/float64(tot.diff.n), tot.passedOutForcedBranch, time.Since(t0).Seconds(), time.Since(t0).Seconds()/float64(tot.diff.n))
 	if shape != nil {
 		fmt.Printf("WARNING: targeted deals (-shape=%s): the result is valid only for the targeted cell\n", *shapeSpec)
 	}
+}
+
+func classField() string {
+	if *classSpec == "" {
+		return ""
+	}
+	return ", class=" + *classSpec
 }
 
 func tally(result float64, wins, open *int) {
