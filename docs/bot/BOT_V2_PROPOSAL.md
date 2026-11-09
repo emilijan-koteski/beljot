@@ -534,8 +534,8 @@ after phase 4 closes each item; the rows are in `BOT_V2_LAB_RESULTS.md` §2.9 an
    suit for a ruff; lead the suit where the partner can hold the Ace; lead trump through the
    caller only with J or 9.
    **Status:** skipped by ruling: covered by the search once D2 shipped, as item 2; the rule layer
-   plays tricks 1 and 2 only as the deadline fallback since phase 4. That fallback carries the rule-layer half of the
-   owner's blind-Ten rule (`avoidBlindTen`, `BOT_RULES.md` B2 and B3).
+   plays tricks 1 and 2 only as the deadline fallback since phase 4. That fallback carries the
+   rule-layer half of the owner's blind-Ten rule (`avoidBlindTen`, `BOT_RULES.md` B2 and B3).
 4. **Partner-type awareness** (v2 bot, v1 bot, human) for which conventions are reliable.
    **Status:** not measurable: the lab has no model of human card play. Its substitute is the
    human-like bidder of item 7, so bidding inferences are not tuned to the bot's own bidding.

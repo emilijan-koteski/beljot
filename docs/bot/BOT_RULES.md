@@ -570,9 +570,12 @@ over 5,374 two-card information sets lost **2.54 points per changed decision**, 
 fully legal hands was 11 better / 23 worse, and sweeping the threshold showed *never contesting*
 scored best. `TestDecide_TrickSevenRetentionBeatsContesting` pins this — **do not add a contest
 guard here.** Known gaps that a future change might legitimately address (capot, leading trick 7,
-the non-trump over-ruff) are logged in `deferred-work.md`.
+the non-trump over-ruff) are superseded: since phase 4 the search plays every trick and the rule layer
+runs only after a missed deadline. Their entries in
+`_bmad-output/implementation-artifacts/deferred-work.md` are closed.
 
-analogue — a spare that gets over-ruffed — is logged in `deferred-work.md`, not fixed here.
+analogue — a spare that gets over-ruffed — is superseded the same way: since phase 4 the search plays every trick and the rule layer
+runs only after a missed deadline (closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
 
 **Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
 (`isUncuttableBoss`): a non-trump card that is the boss of its suit **and** cannot be ruffed
@@ -1067,8 +1070,10 @@ By impact:
    only with a lab row under the decision rule its row in §5.10 names.
 
 Blind spots if you want a stronger bot. These belong to the rule layer, which plays
-only as the fallback; the search's own limits are in §5.9. (The first four are logged in
-`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass.)
+only as the fallback; the search's own limits are in §5.9. (The first four were logged in
+`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass; they are
+superseded, since phase 4 the search plays every trick and the rule layer runs only after a missed
+deadline, and the entries are closed there.)
 
 - **Addressed** — the stake gate used to have no cost/benefit weighing (any > 0 stake could
   spend a 20-point master to secure a 3-point trick). `trumpEconomyTake` now gates a control
@@ -1089,7 +1094,8 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
 - There is **no** general arbitration between spending a master mid-hand and last-trick control —
   the two sites simply do not interact, because retention short-circuits before `chooseFollow` at
   two cards. `retainLastTrickWinner` also ignores **capot** (a swept hand makes the last trick
-  worth +100, not +10) and can lead a spare into an over-ruff; both are in `deferred-work.md`.
+  worth +100, not +10) and can lead a spare into an over-ruff; both are superseded: since phase 4 the search plays every trick and the rule layer
+  runs only after a missed deadline (entries closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
 - The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
   for sure only when the bot itself leads it.
 - `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like

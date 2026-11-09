@@ -63,6 +63,9 @@ func ParseShape(spec string) (Shape, error) {
 	if (s.J && s.NoJ) || (s.Has9 && s.No9) || (s.A && s.NoA) {
 		return Shape{}, fmt.Errorf("contradictory shape %q", spec)
 	}
+	if (s.Count != shapeAny && s.Count < s.CountMin) || (s.SideAces != shapeAny && s.SideAces < s.SideAcesMin) {
+		return Shape{}, fmt.Errorf("contradictory shape %q: an exact count below its at-least bound", spec)
+	}
 	return s, nil
 }
 
