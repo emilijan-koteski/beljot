@@ -379,3 +379,17 @@ func (m *Manager) RecordBotPlaysForTest(roomID uint, cards []game.Card) {
 }
 
 var errNoSession = errors.New("match: no live session for room")
+
+// RecordBotSearchForTest counts one submitted bot search at the given trick, and its miss when missed is set.
+func (m *Manager) RecordBotSearchForTest(roomID uint, trick int, missed bool) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.botSearchStats.noteSubmitted()
+	if missed {
+		lm.botSearchStats.noteMissed(trick)
+	}
+}

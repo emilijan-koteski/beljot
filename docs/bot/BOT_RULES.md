@@ -355,6 +355,26 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   default 1 to 2.5 s for a play), if it was dropped, timed out, or panicked (the pool recovers and
   logs it), or if the position changed, the rule layer plays the card. A late result is
   discarded.
+- A search that reaches no decision logs at Debug level only:
+  `bot: search reached no decision; rules played` (card search) or
+  `bot: Belote search reached no decision; announced` (Belote search), each with `roomID`, `seat`
+  and `trick`. A full queue logs `bot: search queue full; rules played` or
+  `bot: search queue full; Belote announced` at Debug, with the same fields.
+- Each match counts its searches on the session (`botSearchStats` in
+  `match/bot_search_stats.go`): searches queued (card and Belote), searches that reached no
+  decision, and those of them at tricks 1 and 2. When the match ends, normally or by abandonment,
+  after its row is persisted, the server logs once at Info level:
+
+  ```text
+  bot: search summary roomID=<room> matchID=<match> searches=<n> missed=<m> missedOpening=<k>
+  ```
+
+  (text form; the message is `bot: search summary` with the fields `roomID`, `matchID`,
+  `searches`, `missed`, `missedOpening`). `matchID` is 0 when persisting the match failed. A
+  match that queued no search, such as a human-only table or one with the search off, logs no
+  summary. A dropped job (full queue) is neither a search nor a miss. To judge the host after a
+  deploy, grep the logs for `bot: search summary` and compare `missed` and `missedOpening` with
+  `searches`.
 
 Only `server/cmd/api/main.go` enables the search, through `Manager.SetBotSearch`. A `Manager`
 that never calls it plays every card by the rules.

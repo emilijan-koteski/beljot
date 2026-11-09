@@ -69,7 +69,9 @@ func (m *Manager) submitCardSearch(session *LiveMatch, seat int, generation uint
 	tuning := m.botTuning
 	if !m.searchPool.submit(func() { runBotSearch(session, view, generation, ctx, deadline, tuning) }) {
 		slog.Debug("bot: search queue full; rules played", "roomID", session.roomID, "seat", seat, "trick", view.TrickNumber)
+		return
 	}
+	session.botSearchStats.noteSubmitted()
 }
 
 // submitBeloteSearch queues the caller's Belote valuation and reports whether it did; a seat with nothing queued
@@ -85,6 +87,7 @@ func (m *Manager) submitBeloteSearch(session *LiveMatch, seat int, generation ui
 		slog.Debug("bot: search queue full; Belote announced", "roomID", session.roomID, "seat", seat, "trick", view.TrickNumber)
 		return false
 	}
+	session.botSearchStats.noteSubmitted()
 	return true
 }
 
@@ -103,7 +106,8 @@ func isOwnBeloteDecision(gs *game.GameState, seat int) bool {
 func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time, t bot.SearchTuning) {
 	result, ok := bot.SearchCardWith(view, deadline, t)
 	if !ok {
-		slog.Info("bot: search reached no decision; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		slog.Debug("bot: search reached no decision; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		session.botSearchStats.noteMissed(view.TrickNumber)
 		return
 	}
 	session.storeBotSearchResult(view.Seat, generation, ctx, result)
@@ -113,7 +117,8 @@ func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botD
 func runBeloteSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time, t bot.SearchTuning) {
 	announce, ok := bot.BeloteAnswerWith(view, deadline, t)
 	if !ok {
-		slog.Info("bot: Belote search reached no decision; announced", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		slog.Debug("bot: Belote search reached no decision; announced", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		session.botSearchStats.noteMissed(view.TrickNumber)
 		return
 	}
 	session.storeBotSearchResult(view.Seat, generation, ctx, bot.SearchResult{BeloteSkip: !announce})
