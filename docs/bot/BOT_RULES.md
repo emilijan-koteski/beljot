@@ -8,18 +8,20 @@ Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo
 plays the cards (§5), with the rule layer as the fallback. Phase 3 is the faster
 solver, two table conventions and the match race inside the search (§5.10), larger sample counts,
 the own Belote in the settlement and a bidding table recalibrated under the search (§4.2).
-Phase 4 starts the search at trick 1, so it now plays every card from the first trick; it adds
-the owner's two table rules as vetoes inside the search (no blind Ten; cash the Ace or Ten when
-the suit will not run, §5.10), the rank bounds that forced overplays and over-trumps prove (§7),
-the auction in the memory (§7), the hand's end inside the stop-at-target race (§5.10) and three
-bidding rows the owner approved (§4.2). Four phase-4 items were measured and do not ship: the
-deciding hand, the caller's Belote answer and the auction filter (each off in §5.10), and
-score-aware bidding (§4.4). The rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
-when the opponents provably hold the master, boss preservation, uncuttable-boss last-trick
-retention, suppressing trump draws once the opponents are void of trump, leading into a partner's
-void, smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate
-and control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions,
-and never fighting a partner who is **forced to win a trump-led trick**.
+Phase 4 starts the search at trick 1, so it now plays every card from the first trick. It adds the
+owner's two table rules as vetoes inside the search (no blind Ten; cash the Ace or Ten when the suit
+will not run, §5.10) and the rank bounds that forced overplays and over-trumps prove (§7). It also
+records the auction in the memory (§7), values the hand's end inside the stop-at-target race (§5.10)
+and adds three bidding rows the owner approved (§4.2). Three phase-4 items were measured and do not
+ship: the deciding hand, the caller's Belote answer and the auction filter (each off in §5.10).
+Score-aware bidding (§4.4): measured; no rule proposed; owner checkpoint sent 2026-11-09, answer
+pending. The rule layer also carries the earlier tuning: partner trump-draw with a
+declaration-inference abort when the opponents provably hold the master, boss preservation,
+uncuttable-boss last-trick retention, suppressing trump draws once the opponents are void of trump,
+leading into a partner's void, smearing onto a partner's boss, seat-aware **secure trick takes**
+with a material-stake gate and control-trump economy, the **boss-preserving smear** with its
+endgame/dead-suit exceptions, and never fighting a partner who is **forced to win a trump-led
+trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -246,30 +248,34 @@ Every deal that satisfies the hard facts is equally likely when the rejection dr
 constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
 what the seats led or discarded (see 5.9).
 
-**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `bid_consistency.go`; off in production, see
-5.10). When it is on and the hand's auction is recorded (`View.Bids`, §7), the chooser and the Belote evaluation pass
-`search.Options.SampleFilter`, which rejects a sampled deal in which another seat's auction action contradicts the bid
-table of §4.2. A seat's eight cards are its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card
-in the current trick. It bid on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick, two
-for the caller), six in Croatian (the two face-down cards join after the pick), and which ones is unknown, so the filter
-tries every bid-time hand those eight cards allow (`matchesBidTable` with the recorded passes before the action as the
-position):
+**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `bid_consistency.go`; off
+in production, see 5.10). When it is on and the hand's auction is recorded (`View.Bids`, §7), the
+chooser and the Belote evaluation pass `search.Options.SampleFilter`, which rejects a sampled deal
+in which another seat's auction action contradicts the bid table of §4.2. A seat's eight cards are
+its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card in the current
+trick. It bid on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick,
+two for the caller), six in Croatian (the two face-down cards join after the pick), and which ones
+is unknown, so the filter tries every bid-time hand those eight cards allow (`matchesBidTable` with
+the recorded passes before the action as the position):
 
-- a pass is explained when at least one bid-time hand matches no suit the seat could call (Bitola round 1: the
-  candidate's suit; Bitola round 2: the other three; Croatian: all four); a deal where every bid-time hand matches is
-  rejected;
-- a call is explained when at least one bid-time hand matches the called suit; in Bitola the hands are five of the
-  caller's cards other than the candidate, plus the candidate; Croatian's forced dealer pick (three passes before it)
-  proves nothing and is not checked (a call after three passes with no candidate is taken as that pick, which holds
-  because the shipped Croatian rules make the dealer pick);
-- a seat with fewer cards in sight and sampled than a bid-time hand is accepted unchecked (never in production, where
-  every seat has a full hand in sight or sampled);
-- the bot's own actions are not checked, and a Bitola auction with no recorded candidate is not filtered.
+- a pass is explained when at least one bid-time hand matches no suit the seat could call (Bitola
+  round 1: the candidate's suit; Bitola round 2: the other three; Croatian: all four); a deal where
+  every bid-time hand matches is rejected;
+- a call is explained when at least one bid-time hand matches the called suit; in Bitola the hands
+  are five of the caller's cards other than the candidate, plus the candidate; Croatian's forced
+  dealer pick (three passes before it) proves nothing and is not checked (a call after three passes
+  with no candidate is taken as that pick, which holds because the shipped Croatian rules make the
+  dealer pick);
+- a seat with fewer cards in sight and sampled than a bid-time hand is accepted unchecked (never in
+  production, where every seat has a full hand in sight or sampled);
+- the bot's own actions are not checked, and a Bitola auction with no recorded candidate is not
+  filtered.
 
-A rejected deal is never solved and does not count as a sample; the sampler draws again, up to four draws per requested
-sample. When no deal is accepted the search runs once more without the filter on the same seed, so an auction no
-table-consistent deal explains (a human bids differently) plays exactly as the unfiltered search would. The filter
-leaves the random stream unchanged when it rejects nothing.
+A rejected deal is never solved and does not count as a sample; the sampler draws again, up to four
+draws per requested sample. When no deal is accepted the search runs once more without the filter on
+the same seed, so an auction no table-consistent deal explains (a human bids differently) plays
+exactly as the unfiltered search would. The filter leaves the random stream unchanged when it
+rejects nothing.
 
 ### 5.3 How a sample is solved and settled
 
@@ -310,11 +316,11 @@ they live in `search.SamplesForTrick`, and `SearchTuning.SampleCaps` (all 0 in p
 overrides them for experiments.
 
 The opening search (tricks 1 and 2 at 12 samples, `search.OpeningSamples`) ships in phase 4. The
-trick-1 benchmark is about 332 ms on average and 594 to 624 ms at most (§5.8), so the slowest positions pass the
-500 ms deadline and the rule layer plays them (§5.5). The duplicate gain against the search from trick 3
-is +1.90 ± 0.48 per hand over 4 000 deals per variant (Bitola +1.40 ± 0.64, Croatian +2.52 ± 0.71,
-z 4.0), past the 2 SE a strength change must clear; the 1 000-deal measurement of phase 3 was
-+0.83 ± 0.99.
+trick-1 benchmark is about 332 ms on average and 594 to 624 ms at most (§5.8), so the slowest
+positions pass the 500 ms deadline and the rule layer plays them (§5.5). The duplicate gain against
+the search from trick 3 is +1.90 ± 0.48 per hand over 4 000 deals per variant (Bitola +1.40 ± 0.64,
+Croatian +2.52 ± 0.71, z 4.0), past the 2 SE a strength change must clear; the 1 000-deal
+measurement of phase 3 was +0.83 ± 0.99.
 
 The search stops early once at least 8 samples are in and the best card leads the runner-up by
 more than one standard error. The standard error is that of the per-sample difference between
@@ -379,8 +385,9 @@ loaded machine can turn a search into a rule-layer play.
 
 ### 5.8 Measured strength and the gates
 
-Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_RESULTS.md` §2.10, server code
-015a7211); the rows marked phase 3 or phase 2 are older measurements (§2.9) that phase 4 did not repeat:
+Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_RESULTS.md` §2.10,
+server code 015a7211); the rows marked phase 3 or phase 2 are older measurements (§2.9) that phase 4
+did not repeat:
 
 | Measurement | Result |
 |---|---|
@@ -393,20 +400,20 @@ Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_
 | cheat gap (double-dummy on the true deal against the shipped bot, 400 deals) | +19.86 ± 2.59 per hand (phase 3: +27.18 ± 2.72, another seed and bidding table) |
 | stability under a reseed (share of searched positions whose card changes) | tricks 1-2 about 55% (Bitola) and 53% (Croatian), tricks 3-4 about 44% and 46%, tricks 5-8 about 16% and 17% |
 | trick-1 search over 10 random positions (`TestSearchTrick1StaysUnderTheDeadline`, 12 samples) | mean 332.73, 331.41 and 332.80 ms on three runs (max 593.5, 623.7 and 602.2 ms), idle machine on the performance power profile; gate under `BELJOT_BOT_SIM=1`: mean under 400 ms |
-| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`) | mean 29.8 ms when measured for the schedule decision; 54 ms in a later session on the same machine, load-dependent (max about 190 ms); gate: mean under 250 ms |
-| the same 20 positions as a race, both teams at 940 before the hand on a 1001 table, with the leader's Belote when it holds the pair (`TestSearchTrick3RaceTiming`) | mean 10.7 ms, max 31.5 ms on the reference machine in the session where the plain test read 55.6 ms; logged, not asserted |
+| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`, phase 3) | mean 29.8 ms when measured for the schedule decision; 54 ms in a later session on the same machine, load-dependent (max about 190 ms); gate: mean under 250 ms |
+| the same 20 positions as a race, both teams at 940 before the hand on a 1001 table, with the leader's Belote when it holds the pair (`TestSearchTrick3RaceTiming`, phase 3) | mean 10.7 ms, max 31.5 ms on the reference machine in the session where the plain test read 55.6 ms; logged, not asserted |
 
-The two search simulation gates and the trick-1 mean assert only when `BELJOT_BOT_SIM=1` is set (CI sets it; `make
-test` skips the gates and only logs the trick-1 time), and need no database. With the two rule-layer simulations the
-four `TestSimulation` tests take about 10 s together. The search gates search from trick 3
-(`searchFromTrick` in `simulation_test.go`) while production searches from trick 1: from trick 1 the four take about
-74 s, too long for a gate CI runs on every push, and the production setting is measured by the phase regression
-above (`shipped:1`). The trick-3 deadline test always runs.
-A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
-include passed-out deals. The search share against the random baseline is deterministic: the deals come from a
-seeded deck (`rand.NewPCG(42, 1)`, dealer fixed at seat 0) and the share is 74.3% (8312 of 11190 points over 60
-hands, identical on two runs at 015a7211; 73.2% when the seeded deck came in, before the phase-4 play changes); its
-gate stays 60%.
+The two search simulation gates and the trick-1 mean assert only when `BELJOT_BOT_SIM=1` is set (CI
+sets it; `make test` skips the gates and only logs the trick-1 time), and need no database. With the
+two rule-layer simulations the four `TestSimulation` tests take about 10 s together. The search
+gates search from trick 3 (`searchFromTrick` in `simulation_test.go`) while production searches from
+trick 1: from trick 1 the four take about 74 s, too long for a gate CI runs on every push, and the
+production setting is measured by the phase regression above (`shipped:1`). The trick-3 deadline
+test always runs. A deal that passes out in bidding scores 0 in the duplicate comparison, so the
+per-deal figures include passed-out deals. The search share against the random baseline is
+deterministic: the deals come from a seeded deck (`rand.NewPCG(42, 1)`, dealer fixed at seat 0) and
+the share is 74.3% (8312 of 11190 points over 60 hands, identical on two runs at 015a7211; 73.2%
+when the seeded deck came in, before the phase-4 play changes); its gate stays 60%.
 
 ### 5.9 What the search does not model
 
@@ -426,7 +433,7 @@ gate stays 60%.
   its own Belote, since the engine never stops the match after the eighth trick. A Belote the seat
   cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
   not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
-  Capot, a fall) is valued as the decided match since phase 4 (5.10, the deciding hand). What
+  Capot, a fall) is valued as the decided match since phase 4 (5.10, the hand's end in the race). What
   remains: the race starts only when a running total is within the card points still to play plus
   10 of the target, so on a stop-at-target table a fall or a Capot that would carry a team over from
   further away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement;

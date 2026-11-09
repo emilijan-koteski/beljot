@@ -1,6 +1,6 @@
 # Beljot bot v2: analysis and proposal
 
-Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Phase 4 is implemented on branch `feat/bot-v2-phase4` (2026-11-09): the search plays from trick 1 (12 samples on tricks 1 and 2), the owner's two table rules (no blind Ten; cash the Ace or Ten when the suit will not run) ship as vetoes inside the search, the sampler uses the rank bounds of forced overplays, the memory records the auction, the race values the hand's end, and three bidding rows the owner approved are in the table; bidding-consistency sampling, the Belote answer as the caller, the deciding hand on default tables and score-aware bidding were measured and do not ship. Against the phase-3 bot it measured +1.32 ± 1.28 (Bitola) and +5.35 ± 1.44 (Croatian) per hand in duplicate, pooled +3.10 ± 0.96 (z 3.2; 1000 deals per variant). With phase 4 the proposal is complete: every item of §4.7 and §6 is shipped, measured and rejected, or recorded as not measurable. It is the output of a measurement-driven review of `server/internal/bot` for both
+Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Phase 4 is implemented on branch `feat/bot-v2-phase4` (2026-11-09): the search plays from trick 1 (12 samples on tricks 1 and 2), the owner's two table rules (no blind Ten; cash the Ace or Ten when the suit will not run) ship as vetoes inside the search, the sampler uses the rank bounds of forced overplays, the memory records the auction, the race values the hand's end, and three bidding rows the owner approved are in the table; bidding-consistency sampling, the Belote answer as the caller and the deciding hand on default tables were measured and do not ship; score-aware bidding: measured; no rule proposed; owner checkpoint sent 2026-11-09, answer pending. Against the phase-3 bot it measured +1.32 ± 1.28 (Bitola) and +5.35 ± 1.44 (Croatian) per hand in duplicate, pooled +3.10 ± 0.96 (z 3.2; 1000 deals per variant). With phase 4 the proposal is complete: every item of §4.7 and §6 is shipped, measured and rejected, skipped by ruling, recorded as not measurable, or (score-aware bidding) awaiting the owner. It is the output of a measurement-driven review of `server/internal/bot` for both
 variants (Bitola and Croatian). The numbers and the method are in `BOT_V2_LAB_RESULTS.md`; the
 code that produced them is in `docs/bot/lab/`; the review and what changed because of it is in
 `BOT_V2_REVIEW_LOG.md`.
@@ -487,8 +487,8 @@ the bot still always declares, announces and accepts: the Belote gate was measur
    and -0.61 ± 0.56 against a human-like bidder and does not ship. Score awareness: the hand's end
    inside the stop-at-target race ships (exact); the deciding hand on tables that decide at hand
    ends was measured at +0.0017 ± 0.0053 match edge per game and does not ship; score-aware bidding
-   was measured, no rule is proposed, and the owner checkpoint was sent on 2026-11-09, answer
-   pending. Phase 4 also ships the search on tricks 1 and 2 of item 3 (+1.90 ± 0.48 per hand).
+   measured; no rule proposed; owner checkpoint sent 2026-11-09, answer pending. Phase 4 also ships
+   the search on tricks 1 and 2 of item 3 (+1.90 ± 0.48 per hand).
 
 ---
 
@@ -527,14 +527,14 @@ after phase 4 closes each item; the rows are in `BOT_V2_LAB_RESULTS.md` §2.9 an
    tighten would drop win +0.026 ± 0.013); owner checkpoint sent 2026-11-09, answer pending.
 2. **Capot pursuit and defence** as explicit objectives (the exact `award` already prices them;
    the rule layer needs "take one trick early when the caller shows capot shape").
-   **Status:** not measurable as a rule-layer item. Since phase 4 the search plays every trick and
-   values the Capot exactly; the rule layer plays only a card whose search missed its deadline, too
-   rarely to measure a change there, so the item was closed as covered by the search.
+   **Status:** skipped by ruling: covered by the search once D2 shipped. Since phase 4 the search
+   plays every trick and values the Capot exactly; the rule layer plays only a card whose search
+   missed its deadline.
 3. **Defender leads in the rule layer** (for any trick the search does not run): lead a short
    suit for a ruff; lead the suit where the partner can hold the Ace; lead trump through the
    caller only with J or 9.
-   **Status:** not measurable, for the same reason as item 2: the rule layer plays tricks 1 and 2
-   only as the deadline fallback since phase 4. That fallback carries the rule-layer half of the
+   **Status:** skipped by ruling: covered by the search once D2 shipped, as item 2; the rule layer
+   plays tricks 1 and 2 only as the deadline fallback since phase 4. That fallback carries the rule-layer half of the
    owner's blind-Ten rule (`avoidBlindTen`, `BOT_RULES.md` B2 and B3).
 4. **Partner-type awareness** (v2 bot, v1 bot, human) for which conventions are reliable.
    **Status:** not measurable: the lab has no model of human card play. Its substitute is the
