@@ -1,6 +1,6 @@
 # Beljot bot v2: analysis and proposal
 
-Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Nothing else in this document is implemented. It is the output of a measurement-driven review of `server/internal/bot` for both
+Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Phase 4 is implemented on branch `feat/bot-v2-phase4` (2026-11-09): the search plays from trick 1 (12 samples on tricks 1 and 2), the owner's two table rules (no blind Ten; cash the Ace or Ten when the suit will not run) ship as vetoes inside the search, the sampler uses the rank bounds of forced overplays, the memory records the auction, the race values the hand's end, and three bidding rows the owner approved are in the table; bidding-consistency sampling, the Belote answer as the caller, the deciding hand on default tables and score-aware bidding were measured and do not ship. Against the phase-3 bot it measured +1.32 ± 1.28 (Bitola) and +5.35 ± 1.44 (Croatian) per hand in duplicate, pooled +3.10 ± 0.96 (z 3.2; 1000 deals per variant). With phase 4 the proposal is complete: every item of §4.7 and §6 is shipped, measured and rejected, or recorded as not measurable. It is the output of a measurement-driven review of `server/internal/bot` for both
 variants (Bitola and Croatian). The numbers and the method are in `BOT_V2_LAB_RESULTS.md`; the
 code that produced them is in `docs/bot/lab/`; the review and what changed because of it is in
 `BOT_V2_REVIEW_LOG.md`.
@@ -439,7 +439,9 @@ prices the bonus inside the search before it ships; in the rule layer the cost m
 ### 4.5 Declarations, Belote, surrender
 
 Unchanged in the first delivery: always declare, always announce, accept the partner's surrender.
-Later (§6): gate Belote as caller on P(make); propose surrender on hopeless hands.
+Later (§6): gate Belote as caller on P(make); propose surrender on hopeless hands. After phase 4
+the bot still always declares, announces and accepts: the Belote gate was measured and rejected
+(§6 item 6), and the owner ruled out surrender proposals (§5 question 6).
 
 ### 4.6 Testing
 
@@ -479,6 +481,14 @@ Later (§6): gate Belote as caller on P(make); propose surrender on hopeless han
    the conventions bonus, measured; then the search on tricks 1–2 with ≥ 12 samples, which the
    lab prices at +0 to +5 (pooled +2.9 ± 1.6), measured before it ships.
 4. **Soft inferences and score awareness**, each gated by a lab measurement with ≥ 400 deals.
+   Status (phase 4, `BOT_V2_LAB_RESULTS.md` §2.10): the exact inferences ship (rank bounds from
+   forced overplays and over-trumps, the auction in memory); the soft inference, sampling only deals
+   consistent with the auction, was measured at +1.03 ± 0.73 per hand against the bot's own bidder
+   and -0.61 ± 0.56 against a human-like bidder and does not ship. Score awareness: the hand's end
+   inside the stop-at-target race ships (exact); the deciding hand on tables that decide at hand
+   ends was measured at +0.0017 ± 0.0053 match edge per game and does not ship; score-aware bidding
+   was measured, no rule is proposed, and the owner checkpoint was sent on 2026-11-09, answer
+   pending. Phase 4 also ships the search on tricks 1 and 2 of item 3 (+1.90 ± 0.48 per hand).
 
 ---
 
@@ -492,26 +502,52 @@ Later (§6): gate Belote as caller on P(make); propose surrender on hopeless han
    criterion under the phase-1 rule layer; kept by the owner's decision of 2026-10-26).
 4. ~~The rules file says "both cross ⇒ the taker wins"~~ — answered: the engine is right;
    `.claude/rules/game-rules.md` now states "higher total wins; an exact tie goes to the taker".
-5. Is a visible "bot strength" setting wanted later? It falls out of the deadline for free.
-6. Should bots propose surrender on hopeless hands once P(make) exists?
+5. ~~Is a visible "bot strength" setting wanted later?~~ — answered (owner, 2026-11-08): no, one
+   strength; nothing visible changes at the table, and the think time stays within its current
+   bound (1 to 2.5 s with the 500 ms search deadline inside it).
+6. ~~Should bots propose surrender on hopeless hands once P(make) exists?~~ — answered (owner,
+   2026-11-08): no; bots never propose surrender and always accept the partner's proposal.
 
 ---
 
-## 6. Additions raised by the review, not yet measured
+## 6. Additions raised by the review
 
-In rough order of expected value; each is a lab afternoon before it is a code change.
+In rough order of expected value; each is a lab afternoon before it is a code change. The status
+after phase 4 closes each item; the rows are in `BOT_V2_LAB_RESULTS.md` §2.9 and §2.10.
 
 1. **Match-score awareness** in bidding and play: the engine's both-cross rule (higher total,
    tie to the caller) near the target; `StopAtTarget` as a race; the two obvious bidding cells
    (opponents one hand from the target; own side one hand from it).
+   **Status:** shipped in part. The race on stop-at-target tables ships (phase 3, +0.0233 ± 0.0043
+   match edge per game) and values the hand's end since phase 4 (exact; after the change +0.0320 ±
+   0.0073 Bitola, +0.0525 ± 0.0079 Croatian). Measured and rejected: the deciding hand on tables
+   that decide at hand ends, +0.0017 ± 0.0053 match edge per game. The two bidding cells: measured;
+   no rule proposed (calling below the table with the opponents close -0.036 ± 0.023 match wins per
+   decision, Croatian, the Bitola class is empty; with the own side close, calls on the hands a
+   tighten would drop win +0.026 ± 0.013); owner checkpoint sent 2026-11-09, answer pending.
 2. **Capot pursuit and defence** as explicit objectives (the exact `award` already prices them;
    the rule layer needs "take one trick early when the caller shows capot shape").
+   **Status:** not measurable as a rule-layer item. Since phase 4 the search plays every trick and
+   values the Capot exactly; the rule layer plays only a card whose search missed its deadline, too
+   rarely to measure a change there, so the item was closed as covered by the search.
 3. **Defender leads in the rule layer** (for any trick the search does not run): lead a short
    suit for a ruff; lead the suit where the partner can hold the Ace; lead trump through the
    caller only with J or 9.
+   **Status:** not measurable, for the same reason as item 2: the rule layer plays tricks 1 and 2
+   only as the deadline fallback since phase 4. That fallback carries the rule-layer half of the
+   owner's blind-Ten rule (`avoidBlindTen`, `BOT_RULES.md` B2 and B3).
 4. **Partner-type awareness** (v2 bot, v1 bot, human) for which conventions are reliable.
+   **Status:** not measurable: the lab has no model of human card play. Its substitute is the
+   human-like bidder of item 7, so bidding inferences are not tuned to the bot's own bidding.
 5. **Surrender proposals and difficulty-proportional think time**: the search yields P(make) and
    the EV gap for free.
+   **Status:** not shipped, by the owner's answers to §5 questions 5 and 6 (one strength, no
+   surrender proposals, think time within its bound); nothing to measure. The search result carries
+   P(make) (`Result.CallerMade`) for the lab; no production decision reads it.
 6. **Belote gating as caller** on P(make).
+   **Status:** measured and rejected. Built as two valuations on the same deals (announce against
+   skip, skip when it is worth more than 5 points): -0.02 ± 0.04 per hand (z -0.4), so the margin
+   ships at 0 (always announce) and the code stays for the lab.
 7. **A looser, human-like bidder policy in the lab**, so bidding inferences and the table are
    tested against a table that does not bid like the current bot.
+   **Status:** shipped in the lab (the `human` policy, phase 4); it never ships in production.

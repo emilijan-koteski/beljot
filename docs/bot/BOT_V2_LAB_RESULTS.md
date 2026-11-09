@@ -5,7 +5,8 @@ Companion to `BOT_V2_PROPOSAL.md`. Everything here was produced by the throwaway
 `server/internal/botlab` + `server/cmd/botlab`, against the real engine and the real bot).
 Date: 2026-10-25, commit 2d70456. §3.4 was run on 2026-10-25/26 on branch `feat/bot-v2-phase2`
 at `dd4ec76`, after the lab snapshot was updated to the phase-1 `View` (§1.5, §4). §3.5 was run on 2026-11-07 on
-branch `feat/bot-v2-phase3` at `49f242f3`, with the shipped search on every seat.
+branch `feat/bot-v2-phase3` at `49f242f3`, with the shipped search on every seat. §2.10 and §3.6 were run on
+2026-11-08/09 on branch `feat/bot-v2-phase4`, each row with its commit.
 
 ## 1. Instruments
 
@@ -62,6 +63,9 @@ Without `-opp`, `duplicate` gives A and B one random stream per worker and the d
 workers in no fixed order, so a run with a stochastic A or B (`human`, `random`, `pimc`) is not
 reproducible from its seed; the §2.10 sanity row on seed 1108 (`-b=human`) is such a run. A pair of
 deterministic policies (`shipped` against `shipped`) reproduces exactly.
+
+`-transfer=on|off` (default `on`) sets the lab room's rule that a caller who falls also loses its
+declarations to the defenders (`DeclarationsTransfer`); D4 of §2.10 runs it off as a no-op check.
 
 ### 1.3 Regret (`-exp=regret`)
 
@@ -142,7 +146,7 @@ table = core + edge - (positions in both: a non-core call while another suit is 
   16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`, and the phase-4 flags `blindTen3`,
-  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, `deciding`, `noDeciding` (`DecidingHand`), `bidInfer`, `noBidInfer` (`BidConsistency`), and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
+  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, `deciding`, `noDeciding` (`DecidingHand`), `beloteGate5`, `noBeloteGate` (`BeloteSkipMargin` 5 or 0), `bidInfer`, `noBidInfer` (`BidConsistency`), and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
   `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0`, `CashHighWinnerBonus = 0`, `DecidingHand = false`, `BeloteSkipMargin = 0` and `BidConsistency = false`) and the bounds cleared. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
@@ -571,18 +575,35 @@ bidding table changed in between, so it is not read as a change in play.
 Rows use the `shipped` policy (§1.5), `-workers=6`, and the commit of the server code the lab was
 built from. The summary is kept at the top; the rows below it carry command, seed and commit.
 
+In the summary the commit cell names the code the item's rows measured, and the decision cell names
+the commit that set the shipped default when that is a later one. D2 is the one exception in form:
+its rows ran on 90bbb688 with `opening12`, which is exactly the default 8a2d9b20 shipped, so its
+commit cell names 8a2d9b20. An item that was closed without a measurement has no commit.
+
 | item | pooled effect ± SE | metric | decision | commit |
 |---|---|---|---|---|
+| A1 targeted deals (`-shape`, §1.4) | no strength effect (lab only); probe cell n 300, +7.5 ± 9.3 | sanity row below | ships in the lab | aaec08b0 |
+| A2 match-score bidding (`-exp=bidscore`, `-scoreState`, `-stopAtTarget`, later `-class`) | no strength effect (lab only) | sanity rows below | ships in the lab | e6442166, cc52ce9a |
+| A3 table event counters (`-events`) | no strength effect (lab only); phase-3 bot 14.6 and 13.1 blind Tens per 1 000 decisions | counters below | ships in the lab | afcef2fd |
+| A4 human-like bidder (`human`, `-opp`, `bidpos -b`) | no strength effect (lab only); `shipped:3` against it +6.03 ± 2.61 | sanity rows below | ships in the lab; never in production | b3004aee, a52fe367 |
+| A5 P(make) in the search result (`Result.CallerMade`) | no measurement row | | ships in the result; no production decision reads it, and since Task 16 it is counted only with `Options.TrackCallerMade` | d9e20b2f |
+| A6 the seeded random-baseline gate (`rand.NewPCG(42, 1)`) | 73.2% (8057 / 11010 points) on three runs at 050a0f91; 74.3% (8312 / 11190) at 015a7211, after the phase-4 play changes | search share against random, 60 hands | ships (test only; the gate stays 60%) | 050a0f91 |
 | D2 opening search (`OpeningSamples 12`, from trick 1) | +1.90 ± 0.48 (z 4.0) | duplicate advantage per hand vs `shipped:3`, 4 000 deals per variant | ships (benchmark mean 330 ms) | 8a2d9b20 |
-| C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
+| C1 blind Ten, veto (`BlindTenPenalty 10000`) | with minus without -0.37 ± 0.29 (z -1.3), four runs; first two runs alone -0.73 ± 0.46 | duplicate advantage per hand, 1 000 deals per run, `shipped:1` both sides | ships in 5770098c (convention; largest value not worse at 2 SE; blind Tens 11.9 to 12.3 per 1 000 decisions against 19.5 to 20.3 without, the residue forced) | dbe7d5be, 197a0fa3 |
 | C2 cash the Ace or Ten, veto (`CashHighWinnerBonus 10000`) | with minus without -0.04 ± 0.03 (z -1.3), six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; every estimate is within noise of zero | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (convention; largest value not worse at 2 SE; the rule fires about once in a thousand decisions, the counter does not move) | d562fef2 |
 | B1 rank bounds from forced overplays (`RankBounds` into the sampler) | with minus without +0.60 ± 0.70 (z 0.9); Bitola +0.40 ± 0.90, Croatian +0.91 ± 1.13 | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | ships (exactness; ships on its tests, the effect is reported, not gated) | 288ec0ae |
-| D6a the hand-end crossing in the stop-at-target race (`SettleTotals`, `HandEndDecided`) | `race` vs `noRace` before → after: Bitola +0.0225 ± 0.0071 → +0.0320 ± 0.0073, Croatian +0.0335 ± 0.0076 → +0.0525 ± 0.0079 | match edge per game, 1 000 deals per variant, `shipped:1` both sides, seeds 701/702 | ships (exactness; ships on its tests; not worse at 2 SE in either variant) | 86c3c757 → b4f4b3a4 |
+| D6a the hand-end crossing in the stop-at-target race (`SettleTotals`, `HandEndDecided`) | `race` vs `noRace` before → after: Bitola +0.0225 ± 0.0071 → +0.0320 ± 0.0073, Croatian +0.0335 ± 0.0076 → +0.0525 ± 0.0079 | match edge per game, 1 000 deals per variant, `shipped:1` both sides, seeds 701/702 | ships in b4f4b3a4 (exactness; ships on its tests; not worse at 2 SE in either variant) | 86c3c757 → b4f4b3a4 |
 | D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
-| E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added | c8416aef, f9ecf56f, fc1e0984 |
+| E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added; ships in fc1e0984 | c8416aef, f9ecf56f |
 | D4 the Belote answer as the caller (`BeloteSkipMargin 5`) | with minus without -0.02 ± 0.04 (z -0.4); Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17; transfer off +0.00 ± 0.00 in both (no-op, as required) | duplicate advantage per hand, 1 000 deals per variant (400 with transfer off), `shipped:1` both sides | does not ship (strength; not better at 2 SE; `BeloteSkipMargin 0`, the code stays) | d9e20b2f |
-| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; awaiting the owner (no rule proposed: the loosen is not positive at 2 SE; tighten measured on edge hands, calls win, no rule) | 853f5421 (server), lab a228fe80 and 2f63a9eb |
+| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; no rule proposed; owner checkpoint sent 2026-11-09, answer pending (the loosen is not positive at 2 SE; tighten measured on edge hands, calls win) | 853f5421 (server), lab a228fe80 and 2f63a9eb |
 | D1 bidding-consistency sampling (`BidConsistency`, a sampled deal is rejected when another seat's auction action contradicts the bid table on every bid-time hand its cards allow) | vs the shipped bidder +1.03 ± 0.73 (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder (`-opp=human`) -0.61 ± 0.56 (z -1.1; Bitola -0.16 ± 0.79, Croatian -1.04 ± 0.78) | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE against the shipped bidder; `BidConsistency false`, the code stays for the lab) | a2decb2f |
+| B2 the auction in memory (`Memory.ObserveBid`, `View.Bids`) | no measurement row: bookkeeping | | ships; read only by `BidConsistency` (D1), which is off, so no behaviour changes | e199898f |
+| C3 defender leads in the rule layer, tricks 1-2 | not measured | | closed: covered by the search once D2 shipped (the rule layer plays tricks 1-2 only after a missed deadline); C1's rule-layer half is the fallback's `avoidBlindTen`, C2 has none | none |
+| D3 capot defence and pursuit in the rule layer, tricks 1-2 | not measured | | closed for the same reason as C3 (Task 12 skipped) | none |
+| E2 the deferred minors of phases 1 to 4 | no strength change (tests, docs, refactors) | | each done or dropped with its reason ("Closed minors (Task 16)") | 704390b4, 8ab1c977, 53e9f484, 38b7be20, de5aa0b7, 015a7211 |
+| E3 phase regression, `shipped:1` against the phase-3 bot (`shipped:3` with `phase3`) | +3.10 ± 0.96 (z 3.2); Bitola +1.32 ± 1.28, Croatian +5.35 ± 1.44 | duplicate advantage per hand, 1 000 deals per variant | gate met (not worse at 2 SE) | 015a7211 |
+| E3 stability and the cheat gap at the final defaults | stability, cards changed under a reseed: tricks 1-2 55.7% / 54.8% (Bitola), 53.5% / 51.7% (Croatian); tricks 3-4 43.9% and 46.2%; tricks 5-8 16.4% and 17.1%; cheat gap +19.86 ± 2.59 | `-exp=stability`, 300 hands per variant, 5 seeds; cheat gap: duplicate advantage per hand of `cheat` over `shipped:1`, 400 deals, Bitola | reported, not gated | 015a7211 |
 
 #### D2 opening search
 
@@ -1197,6 +1218,126 @@ done or dropped with its reason.
 - E3 done — both tests assert `Nil` explicitly.
 - E4 done — BOT_RULES 5.9 says the auction filter is measured and off; the 5.2 paragraph is rewrapped.
 - E5 done — `BeloteAnswerWith` builds the filter once and passes it to both evaluations.
+
+#### E3 final defaults: regression, stability and the cheat gap
+
+Run at the end of phase 4 on the lab built from 015a7211 (the `mk41` copy of every file of `docs/bot/lab/`), the
+shipped defaults: `OpeningSamples 12` from trick 1, `BlindTenPenalty` and `CashHighWinnerBonus` at the veto, the rank
+bounds in the sampler, `DecidingHand false`, `BeloteSkipMargin 0`, `BidConsistency false`, bidding rows 10, 11 and 13.
+`-workers=6`, two runs at a time.
+
+Regression against the phase-3 bot. A is `shipped:1`, the bot as it ships. B is `shipped:3` with the flag `phase3`
+(§1.5): search from trick 3, every phase-4 tuning field off and the rank bounds cleared. Both sides bid with the same
+table (rows 10, 11 and 13 have no lab switch), the auction memory reads nothing with `BidConsistency false`, and
+duplicate rooms never stop at the target, so the row measures the card play of phase 4: the opening search, the two
+vetoes and the bounds. `-events` adds the counters of "Counters at the phase-3 bot".
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:1` | `shipped:3[phase3]` | Bitola | 1000 | 1221 | 015a7211 | `-exp=duplicate -a=shipped:1 -b=shipped:3 -flagsB=phase3 -events -n=1000 -seed=1221 -workers=6` | **+1.32 ± 1.28** (A share 50.4%), 329 s; block below |
+| `shipped:1` | `shipped:3[phase3]` | Croatian | 1000 | 1222 | 015a7211 | `-exp=duplicate -a=shipped:1 -b=shipped:3 -flagsB=phase3 -events -n=1000 -seed=1222 -workers=6 -variant=croatia` | **+5.35 ± 1.44** (A share 51.4%), 354 s; block below |
+
+Seed 1221 (Bitola), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:3 -flagsB=phase3 -events -n=1000 -seed=1221 -workers=6`:
+
+```
+shipped:1[] vs shipped:3[phase3] (bitola, 1000 deals x2, 329s)
+  A advantage per hand: +1.32 ± 1.28 (95% CI ±2.50)
+  points banked: A 181371  B 178721  (A share 50.4%)
+  A called 908 (made 83%), B called 908 (made 83%), passed out 184 / 2000
+  A counts: applied 17837, decided 17837, deferred 0, defender trump leads 140, belote searches 0, belote skips 0, failed 0
+  B counts: applied 12566, decided 12566, deferred 0, defender trump leads 78, belote searches 0, belote skips 0, failed 0
+  events A: decisions 29056, blind tens 306 (10.5 per 1000; forced 303, free 3), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 40/42, caller belote then fell 9
+  events B: decisions 29056, blind tens 477 (16.4 per 1000; forced 253, free 224), high kept then ruffed 7 (0.2 per 1000), capots made/conceded 42/40, caller belote then fell 7
+```
+
+Seed 1222 (Croatian), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:3 -flagsB=phase3 -events -n=1000 -seed=1222 -workers=6 -variant=croatia`:
+
+```
+shipped:1[] vs shipped:3[phase3] (croatia, 1000 deals x2, 354s)
+  A advantage per hand: +5.35 ± 1.44 (95% CI ±2.82)
+  points banked: A 198397  B 187693  (A share 51.4%)
+  A called 1000 (made 82%), B called 1000 (made 79%), passed out 0 / 2000
+  A counts: applied 19375, decided 19375, deferred 0, defender trump leads 154, belote searches 0, belote skips 0, failed 0
+  B counts: applied 13601, decided 13601, deferred 0, defender trump leads 84, belote searches 0, belote skips 0, failed 0
+  events A: decisions 32000, blind tens 307 (9.6 per 1000; forced 306, free 1), high kept then ruffed 6 (0.2 per 1000), capots made/conceded 51/46, caller belote then fell 10
+  events B: decisions 32000, blind tens 505 (15.8 per 1000; forced 301, free 204), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 46/51, caller belote then fell 17
+```
+
+Pooled by weights 1/SE² (printed two-decimal values): w = 1/1.28² = 0.610 and 1/1.44² = 0.482 (sum 1.093);
+mean = (1.32 · 0.610 + 5.35 · 0.482) / 1.093 = **+3.10**; SE = 1 / √1.093 = **0.96**; z = 3.2. Both variants are
+positive; A is not worse than B at 2 SE (the gate of design §7), so the gate is met, and the pooled gain is also
+above 2 SE. The counters show the owner's blind-Ten rule at the table: 306 and 307 blind Tens (10.5 and 9.6 per 1 000
+decisions, of them 3 and 1 free) against 477 and 505 for the phase-3 bot (16.4 and 15.8 per 1 000, 224 and 204 free).
+"High kept then ruffed" reads 6 and 6 against 7 and 5, too rare to read as a change.
+
+Stability and the cheat gap at the final defaults, the sizes of §2.9. Stability: `shipped:1` plays all four seats and
+every searched position is re-run under sampler seed salts 0..4 (§2.9); with the search from trick 1 the lines for
+tricks 1 and 2 now count positions. Cheat gap: double-dummy on the true deal against the shipped bot.
+
+| Policy A | Policy B | Variant | Deals | Seed | Commit | Command | Result |
+|---|---|---|---|---|---|---|---|
+| `shipped:1` | (self-play) | Bitola | 300 | 1223 | 015a7211 | `-exp=stability -a=shipped:1 -n=300 -seeds=5 -seed=1223 -workers=6` | tricks 1-2 55.7% / 54.8% changed; pooled tricks 3-4 **43.9%** (1430), tricks 5-8 **16.4%** (2282); 345 s; block below |
+| `shipped:1` | (self-play) | Croatian | 300 | 1224 | 015a7211 | `-exp=stability -a=shipped:1 -n=300 -seeds=5 -seed=1224 -workers=6 -variant=croatia` | tricks 1-2 53.5% / 51.7% changed; pooled tricks 3-4 **46.2%** (1617), tricks 5-8 **17.1%** (2546); 389 s; block below |
+| `cheat` | `shipped:1` | Bitola | 400 | 1225 | 015a7211 | `-exp=duplicate -a=cheat -b=shipped:1 -n=400 -seed=1225 -workers=6` | **+19.86 ± 2.59** (A share 56.3%); A made 92% of 225 calls, B 78% of 389; 186/800 passed out; 85 s; block below |
+
+Seed 1223 (Bitola), `./botlab -exp=stability -a=shipped:1 -n=300 -seeds=5 -seed=1223 -workers=6`:
+
+```
+stability of shipped:1[] (bitola, 300 hands, 5 seeds, 345s)
+  trick 1:   736 positions,  55.7% changed
+  trick 2:   732 positions,  54.8% changed
+  trick 3:   713 positions,  50.6% changed
+  trick 4:   717 positions,  37.2% changed
+  trick 5:   737 positions,  30.1% changed
+  trick 6:   760 positions,  15.1% changed
+  trick 7:   785 positions,   4.7% changed
+  trick 8:     0 positions,   0.0% changed
+  tricks 3-4:  1430 positions,  43.9% changed
+  tricks 5-8:  2282 positions,  16.4% changed
+```
+
+Seed 1224 (Croatian), `./botlab -exp=stability -a=shipped:1 -n=300 -seeds=5 -seed=1224 -workers=6 -variant=croatia`:
+
+```
+stability of shipped:1[] (croatia, 300 hands, 5 seeds, 389s)
+  trick 1:   823 positions,  53.5% changed
+  trick 2:   832 positions,  51.7% changed
+  trick 3:   816 positions,  49.3% changed
+  trick 4:   801 positions,  43.1% changed
+  trick 5:   806 positions,  30.9% changed
+  trick 6:   862 positions,  17.2% changed
+  trick 7:   878 positions,   4.3% changed
+  trick 8:     0 positions,   0.0% changed
+  tricks 3-4:  1617 positions,  46.2% changed
+  tricks 5-8:  2546 positions,  17.1% changed
+```
+
+Seed 1225 (Bitola), `./botlab -exp=duplicate -a=cheat -b=shipped:1 -n=400 -seed=1225 -workers=6`:
+
+```
+cheat vs shipped:1[] (bitola, 400 deals x2, 85s)
+  A advantage per hand: +19.86 ± 2.59 (95% CI ±5.07)
+  points banked: A 70650  B 54758  (A share 56.3%)
+  A called 225 (made 92%), B called 389 (made 78%), passed out 186 / 800
+  B counts: applied 5956, decided 5956, deferred 0, defender trump leads 22, belote searches 0, belote skips 0, failed 0
+```
+
+Reading: tricks 1 and 2, searched at 12 samples, change their card under a reseed at 52 to 56% of positions, the
+highest of any trick; tricks 3-4 read 43.9% and 46.2% against 45.2% and 49.4% at the end of phase 3 (§2.9, seeds
+1003/1004), tricks 5-8 16.4% and 17.1% against 18.0% and 20.8%, on different seeds and positions reached by another
+bot. The cheat gap is +19.86 ± 2.59 against +27.18 ± 2.72 at the end of phase 3 (seed 1005); the difference
+(-7.32) is 1.9 SE of the difference between two runs on different seeds, and the bidding table changed in between,
+so it is not read as a measured change in play.
+
+The simulation gates at 015a7211 (`BELJOT_BOT_SIM=1 go test -tags nodynamic -count=1 ./internal/bot/ -run
+TestSimulation -v` from `server/`, `searchFromTrick` 3, two runs with the same search lines, 9.6 and 10.4 s):
+`search share over 60 hands: 74.3% (8312/11190 points); search ran at 419 card plays and decided 419` and
+`search minus rules per deal over 40 deals: +12.30 +/- 6.21 (8 passed out); search ran at 447 card plays and decided
+447`. With `searchFromTrick` set to 1 in a scratch copy the four tests took 73.8 s (71.8%, 579 plays; +13.97 ± 6.91,
+627 plays), so the gates stay at trick 3 (`BOT_RULES.md` §5.8). The trick-1 benchmark at 015a7211
+(`TestSearchTrick1StaysUnderTheDeadline`, measured by the controller on an idle machine with the performance power
+profile): means 332.73, 331.41 and 332.80 ms over 10 positions, maxima 593.5, 623.7 and 602.2 ms, under the 400 ms
+bound on all three runs.
 
 ## 3. Bidding calibration tables
 
@@ -1922,7 +2063,22 @@ python3 -I pol16.py recal3_bitola_pooled.csv recal3_croatia_pooled.csv   # §3.5
 ./botlab -exp=bidscore -a=shipped:1 -scoreState=ownClose -class=edge -n=500 -seed=1207 -workers=6   # §2.10 D5, the tighten on edge hands
 ./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1211 -workers=6   # §2.10 D1; -seed=1212 -variant=croatia
 ./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1213 -workers=6   # §2.10 D1; -seed=1214 -variant=croatia
+./botlab -exp=shapecheck   # §1.4, 20 deals fitting A,c4,noJ,no9,sA0 and the hit rate
+./botlab -exp=duplicate -a=shipped:1 -flagsA=opening12 -b=shipped:3 -n=4000 -seed=1111 -workers=6   # §2.10 D2 (lab at 90bbb688); -seed=1112 -variant=croatia
+./botlab -exp=duplicate -a=shipped:1 -flagsA=blindTenVeto -b=shipped:1 -flagsB=noBlindTen -events -n=1000 -seed=1125 -workers=6   # §2.10 C1; blindTen3/blindTen10, seeds 1121-1130
+./botlab -exp=duplicate -a=shipped:1 -flagsA=cashHighVeto -b=shipped:1 -flagsB=noCashHigh -events -n=1000 -seed=1135 -workers=6   # §2.10 C2; cashHigh3/cashHigh10, seeds 1131-1136
+./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsB=noBounds -n=1000 -seed=1141 -workers=6   # §2.10 B1; -seed=1142 -variant=croatia
+./botlab -exp=duplicate -a=shipped:1 -flagsA=beloteGate5 -b=shipped:1 -flagsB=noBeloteGate -events -n=1000 -seed=1171 -workers=6   # §2.10 D4; -seed=1172 -variant=croatia; -transfer=off -n=400 on 1173/1174
+./botlab -exp=duplicate -a=shipped:1 -b=shipped:3 -flagsB=phase3 -events -n=1000 -seed=1221 -workers=6   # §2.10 E3 regression against the phase-3 bot; -seed=1222 -variant=croatia
+./botlab -exp=stability -a=shipped:1 -n=300 -seeds=5 -seed=1223 -workers=6   # §2.10 E3 stability; -seed=1224 -variant=croatia
+./botlab -exp=duplicate -a=cheat -b=shipped:1 -n=400 -seed=1225 -workers=6   # §2.10 E3 cheat gap
 ```
+
+The phase-4 regression baseline is `-b=shipped:3 -flagsB=phase3` (§1.5): the phase-3 bot searches from trick 3,
+and the flag turns every phase-4 tuning field off and clears the rank bounds. What it cannot turn off stays on both
+sides: the bidding table (rows 10, 11 and 13), the auction in memory, which reads nothing in production with
+`BidConsistency false`, and the exact hand-end settlement of the race, which acts only on stop-at-target tables and
+so not in `duplicate`. The row therefore measures the card play.
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1
 `internal/bot/bot.go` with `package botlab` and the flag hooks described in §1.5 (`aceFirst`,
