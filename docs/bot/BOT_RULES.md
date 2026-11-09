@@ -12,16 +12,17 @@ Phase 4 starts the search at trick 1, so it now plays every card from the first 
 owner's two table rules as vetoes inside the search (no blind Ten; cash the Ace or Ten when the suit
 will not run, §5.10) and the rank bounds that forced overplays and over-trumps prove (§7). It also
 records the auction in the memory (§7), values the hand's end inside the stop-at-target race (§5.10)
-and adds three bidding rows the owner approved (§4.2). Three phase-4 items were measured and do not
-ship: the deciding hand, the caller's Belote answer and the auction filter (each off in §5.10).
-Score-aware bidding (§4.4): measured; no rule proposed; owner checkpoint sent 2026-11-09, answer
-pending. The rule layer also carries the earlier tuning: partner trump-draw with a
-declaration-inference abort when the opponents provably hold the master, boss preservation,
-uncuttable-boss last-trick retention, suppressing trump draws once the opponents are void of trump,
-leading into a partner's void, smearing onto a partner's boss, seat-aware **secure trick takes**
-with a material-stake gate and control-trump economy, the **boss-preserving smear** with its
-endgame/dead-suit exceptions, and never fighting a partner who is **forced to win a trump-led
-trick**.
+and adds three bidding rows the owner approved (§4.2). A veto yields only when the stop-at-target
+race is decided for the vetoed card and against the other card, and a Ten discarded beside nothing
+but Aces is not vetoed (§5.10). Three phase-4 items were measured and do not ship: the deciding
+hand, the caller's Belote answer and the auction filter (each off in §5.10). Score-aware bidding
+(§4.4): measured; closed: no rule (owner, 2026-11-09). The rule layer also carries the earlier
+tuning: partner trump-draw with a declaration-inference abort when the opponents provably hold
+the master, boss preservation, uncuttable-boss last-trick retention, suppressing trump draws once
+the opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
+seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
+**boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner who
+is **forced to win a trump-led trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -179,8 +180,8 @@ the 9, or four small trumps without the Ace.
 - `trumpLengthBonus` (currently 10): raise to favor length, lower to favor points when several
   suits match or the pick is forced.
 - The table considers only the bid hand and the seat's position. It considers no partner or
-  match score. Score-aware bidding (phase 4, `BOT_V2_LAB_RESULTS.md` §2.10, D5): measured; no rule
-  proposed; owner checkpoint sent 2026-11-09, answer pending.
+  match score. Score-aware bidding (phase 4, `BOT_V2_LAB_RESULTS.md` §2.10, D5): measured;
+  closed: no rule (owner, 2026-11-09).
 
 ---
 
@@ -374,7 +375,8 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   match that queued no search, such as a human-only table or one with the search off, logs no
   summary. A dropped job (full queue) is neither a search nor a miss. To judge the host after a
   deploy, grep the logs for `bot: search summary` and compare `missed` and `missedOpening` with
-  `searches`.
+  `searches`: a `missedOpening` close to the number of trick-1 and trick-2 decisions means the host
+  is too slow for the 12 opening samples (5.4), and the opening plays by the rules.
 
 Only `server/cmd/api/main.go` enables the search, through `Manager.SetBotSearch`. A `Manager`
 that never calls it plays every card by the rules.
@@ -580,12 +582,13 @@ over 5,374 two-card information sets lost **2.54 points per changed decision**, 
 fully legal hands was 11 better / 23 worse, and sweeping the threshold showed *never contesting*
 scored best. `TestDecide_TrickSevenRetentionBeatsContesting` pins this — **do not add a contest
 guard here.** Known gaps that a future change might legitimately address (capot, leading trick 7,
-the non-trump over-ruff) are superseded: since phase 4 the search plays every trick and the rule layer
-runs only after a missed deadline. Their entries in
+the non-trump over-ruff) are superseded: since phase 4 the search plays every trick and the rule
+layer runs only after a missed deadline. Their entries in
 `_bmad-output/implementation-artifacts/deferred-work.md` are closed.
 
-analogue — a spare that gets over-ruffed — is superseded the same way: since phase 4 the search plays every trick and the rule layer
-runs only after a missed deadline (closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
+analogue — a spare that gets over-ruffed — is superseded the same way: since phase 4 the search
+plays every trick and the rule layer runs only after a missed deadline (closed in
+`_bmad-output/implementation-artifacts/deferred-work.md`).
 
 **Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
 (`isUncuttableBoss`): a non-trump card that is the boss of its suit **and** cannot be ruffed
@@ -1075,15 +1078,17 @@ By impact:
    against CPU time (§5.4, §5.6). Change them only with the simulation gates and the duplicate
    comparison of §5.8.
 10. `bot.DefaultSearchTuning()`: the conventions and objectives inside the search (§5.10), among
-   them `OpeningSamples`, the owner's two vetoes (`BlindTenPenalty`, `CashHighWinnerBonus`), and the
-   measured-and-off switches `DecidingHand`, `BeloteSkipMargin` and `BidConsistency`. Change one
-   only with a lab row under the decision rule its row in §5.10 names.
+   them `OpeningSamples`, the owner's two vetoes (`BlindTenPenalty`, `CashHighWinnerBonus`, both
+   `ConventionVeto` 1500, which yields only to a stop-at-target race decided for the vetoed card;
+   a Ten discarded beside nothing but Aces is not vetoed), and the measured-and-off switches
+   `DecidingHand`, `BeloteSkipMargin` and `BidConsistency`. Change one only with a lab row under
+   the decision rule its row in §5.10 names.
 
 Blind spots if you want a stronger bot. These belong to the rule layer, which plays
 only as the fallback; the search's own limits are in §5.9. (The first four were logged in
-`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass; they are
-superseded, since phase 4 the search plays every trick and the rule layer runs only after a missed
-deadline, and the entries are closed there.)
+`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass;
+they are superseded, since phase 4 the search plays every trick and the rule layer runs only
+after a missed deadline, and the entries are closed there.)
 
 - **Addressed** — the stake gate used to have no cost/benefit weighing (any > 0 stake could
   spend a 20-point master to secure a 3-point trick). `trumpEconomyTake` now gates a control
@@ -1104,8 +1109,9 @@ deadline, and the entries are closed there.)
 - There is **no** general arbitration between spending a master mid-hand and last-trick control —
   the two sites simply do not interact, because retention short-circuits before `chooseFollow` at
   two cards. `retainLastTrickWinner` also ignores **capot** (a swept hand makes the last trick
-  worth +100, not +10) and can lead a spare into an over-ruff; both are superseded: since phase 4 the search plays every trick and the rule layer
-  runs only after a missed deadline (entries closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
+  worth +100, not +10) and can lead a spare into an over-ruff; both are superseded: since phase 4
+  the search plays every trick and the rule layer runs only after a missed deadline (entries
+  closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
 - The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
   for sure only when the bot itself leads it.
 - `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like
@@ -1157,5 +1163,8 @@ deadline, and the entries are closed there.)
 | Unit tests for all of the above | `TestDecide_*` | `server/internal/bot/bot_test.go` |
 | Strength check (bot vs. random) | `TestSimulation_*` | `server/internal/bot/simulation_test.go` |
 | Search strength and time gates | `TestSimulation_Search*` and the trick-1 assertion of `TestSearchTrick1StaysUnderTwiceTheDeadline` (need `BELJOT_BOT_SIM=1`), `TestSearchTrick3StaysUnderTheDeadline` | `server/internal/bot/simulation_test.go`, `server/internal/bot/search/bench_test.go` |
-| The owner's table rules inside the search (no blind Ten, cash the Ace or Ten) and the other tuning | `SearchTuning`, `DefaultSearchTuning`, `blindTen`, `suitAtRisk` | `server/internal/bot/search_tuning.go` |
+| The owner's table rules inside the search (no blind Ten, cash the Ace or Ten) and the other tuning | `SearchTuning`, `DefaultSearchTuning`, `ConventionVeto`, `vetoedBlindTen`, `blindTen`, `suitAtRisk` | `server/internal/bot/search_tuning.go` |
+| The vetoes at their pre-closeout 10000 in the lab | lab flag `hardVeto`, `TuningFromFlags` | `docs/bot/lab/flags.go` |
+| The race crossing from tricks 6 and 7 against the engine | `TestRaceCrossingFromTricksSixAndSevenMatchesTheEngine` | `server/internal/bot/search/race_crossing_test.go` |
+| Per-match summary of searches and missed deadlines | `botSearchStats`, `logBotSearchSummary` | `server/internal/match/bot_search_stats.go` |
 | Rank bounds from forced overplays and over-trumps; the auction record | `ObservePlay` (`observeBounds`), `RankBounds`, `ObserveBid`, `Bids` | `server/internal/bot/memory.go` |

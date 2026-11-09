@@ -596,12 +596,12 @@ commit cell names 8a2d9b20. An item that was closed without a measurement has no
 | D6b the deciding hand on default tables (`DecidingHand`) | with minus without +0.0017 ± 0.0053 (z 0.3); Bitola -0.0005 ± 0.0065, Croatian +0.0060 ± 0.0090 | match edge per game, `-stopAtTarget=false`, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE; `DecidingHand false`, the code stays) | b4f4b3a4 |
 | E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added; ships in fc1e0984 | c8416aef, f9ecf56f |
 | D4 the Belote answer as the caller (`BeloteSkipMargin 5`) | with minus without -0.02 ± 0.04 (z -0.4); Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17; transfer off +0.00 ± 0.00 in both (no-op, as required) | duplicate advantage per hand, 1 000 deals per variant (400 with transfer off), `shipped:1` both sides | does not ship (strength; not better at 2 SE; `BeloteSkipMargin 0`, the code stays) | d9e20b2f |
-| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; no rule proposed; owner checkpoint sent 2026-11-09, answer pending (the loosen is not positive at 2 SE; tighten measured on edge hands, calls win) | 853f5421 (server), lab a228fe80 and 2f63a9eb |
+| D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; no rule proposed; closed: no rule (owner, 2026-11-09); the loosen is not positive at 2 SE, and tighten measured on edge hands, calls win | 853f5421 (server), lab a228fe80 and 2f63a9eb |
 | D1 bidding-consistency sampling (`BidConsistency`, a sampled deal is rejected when another seat's auction action contradicts the bid table on every bid-time hand its cards allow) | vs the shipped bidder +1.03 ± 0.73 (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder (`-opp=human`) -0.61 ± 0.56 (z -1.1; Bitola -0.16 ± 0.79, Croatian -1.04 ± 0.78) | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE against the shipped bidder; `BidConsistency false`, the code stays for the lab) | a2decb2f |
 | B2 the auction in memory (`Memory.ObserveBid`, `View.Bids`) | no measurement row: bookkeeping | | ships; read only by `BidConsistency` (D1), which is off, so no behaviour changes | e199898f |
 | C3 defender leads in the rule layer, tricks 1-2 | not measured | | closed: covered by the search once D2 shipped (the rule layer plays tricks 1-2 only after a missed deadline); C1's rule-layer half is the fallback's `avoidBlindTen`, C2 has none | none |
 | D3 capot defence and pursuit in the rule layer, tricks 1-2 | not measured | | closed for the same reason as C3 (Task 12 skipped) | none |
-| E2 the deferred minors of phases 1 to 4 | no strength change (tests, docs, refactors) | | each done or dropped with its reason ("Closed minors (Task 16)") | 704390b4, 8ab1c977, 53e9f484, 38b7be20, de5aa0b7, 015a7211 |
+| E2 the review minors of phases 1 to 4 | no strength change (tests, docs, refactors) | | each done or dropped with its reason ("Closed minors (Task 16)") | 704390b4, 8ab1c977, 53e9f484, 38b7be20, de5aa0b7, 015a7211 |
 | E3 phase regression, `shipped:1` against the phase-3 bot (`shipped:3` with `phase3`) | +3.23 ± 0.96 (z 3.4); Bitola +1.69 ± 1.28, Croatian +5.18 ± 1.44, the same points at fe8c4d98 and at a12fb1ef ("Closeout") | duplicate advantage per hand, 1 000 deals per variant | gate met (not worse at 2 SE) | a12fb1ef |
 | Conventions yield to a decided race (`ConventionVeto` 1500, against `hardVeto` 10000) | 0.0000 ± 0.0000 in both variants: identical play, no pool (SE 0) | match edge per game, stop at target, 1 000 deals per variant, `shipped:1` both sides, seeds 1231/1232 | ships (correctness bound pinned by tests; not worse at 2 SE, no position reached the yield) | a12fb1ef |
 | E3 stability and the cheat gap at the final defaults | stability, cards changed under a reseed: trick 1 56.7%, trick 2 56.0% (Bitola), trick 1 54.4%, trick 2 52.7% (Croatian); tricks 3-4 44.5% and 46.8%; tricks 5-8 16.7% and 17.3%; cheat gap +19.80 ± 2.59 | `-exp=stability`, 300 hands per variant, 5 seeds; cheat gap: duplicate advantage per hand of `cheat` over `shipped:1`, 400 deals, Bitola | reported, not gated | fe8c4d98 |
@@ -998,8 +998,8 @@ Proposed rules (a rule is proposed only when it passes at 2 SE pooled):
 
 The design expected a modest loosen when the opponents are close; the measurement does not support it: the shipped
 table already covers `ruleA` in Bitola, and calling the Croatian hands below it with the opponents close is
--0.036 ± 0.023, not better (within 2 SE of zero, on the losing side). The shipped (score-blind) bidder stays as it is
-unless the owner decides otherwise.
+-0.036 ± 0.023, not better (within 2 SE of zero, on the losing side). The shipped (score-blind) bidder stays as it is;
+closed: no rule (owner, 2026-11-09).
 
 Commands (lab built from `docs/bot/lab/` at a228fe80 for the first twelve rows and at 2f63a9eb for the
 two `edge` rows, server 853f5421 throughout; each 500-pair line verbatim, with the 200-pair first pass on the same seed):
@@ -1159,7 +1159,7 @@ when the opponents bid by the table it assumes and leans negative when they do n
 
 #### Closed minors (Task 16)
 
-The small findings the reviews of phases 1 to 4 deferred, keyed by the controller's list for Task 16; each is
+The small findings the reviews of phases 1 to 4 raised, keyed by the controller's list for Task 16; each is
 done or dropped with its reason.
 
 - A1 done — `pimc_test.go`: one sample gives SE 0 on the margin, on every card and in `Evaluate`
@@ -1211,9 +1211,10 @@ done or dropped with its reason.
   field and `pos1x`; `reachesMatch` says a forced dealer pick counts (skipping it would change §3.6's deal sets).
 - B14 done — `bidtable`'s doc comment says its forced call plays without the candidate in memory, so §2.4's rows are
   historic.
-- B15 dropped — owner item for the PR body (a production counter for the trick-1/2 deadline fallback), no code.
+- B15 dropped — owner item for the PR body (a production counter for the trick-1/2 deadline fallback), no code; the
+  closeout added the counter (e11ce3c7, below).
 - B16 done — `chore(bot): gofmt the lab` (704390b4) for `bidev.go`, `dd.go`, `pimc.go`, `sim.go`, `view.go`; `gofmt -l`
-  is empty for the lab and every server file of this task; `make lint` not enforcing gofmt is for the PR body.
+  is empty for the lab and every server file of this task; `make lint` enforces gofmt since the closeout (ddc46355).
 - C1 done — §1.4 says a `bidpos` deal set depends on `-a` (§3.6 already did).
 - C2 done — the counter rows carry afcef2fd, the paragraph is rewrapped and says once that one deterministic policy on
   both sides gives identical A and B lines.
@@ -1231,7 +1232,7 @@ done or dropped with its reason.
 - C10 done — the D4 run table is one paragraph that points to the four blocks.
 - C11 done — 2f63a9eb in the D5 summary row and its commands line, the `classCall` doc comment wrapped, "show" fixed.
 - C12 done — nothing beyond B10 was added.
-- D: left to the closing task (Task 17).
+- D: carried into the closing task (Task 17) and closed there.
 - E1 done — `bidConsistent` accepts a seat with fewer cards than a bid-time hand
   (`TestBidConsistentExplainsASeatShortOfABidTimeHand`, red before); BOT_RULES 5.2 says so.
 - E2 done — the `bidChecks` doc comment and BOT_RULES 5.2 say the forced-pick exemption relies on the shipped Croatian
@@ -1239,6 +1240,26 @@ done or dropped with its reason.
 - E3 done — both tests assert `Nil` explicitly.
 - E4 done — BOT_RULES 5.9 says the auction filter is measured and off; the 5.2 paragraph is rewrapped.
 - E5 done — `BeloteAnswerWith` builds the filter once and passes it to both evaluations.
+
+Closeout (2026-11-09), on the owner's instruction to finish bot v2 with nothing left open; each item is done:
+
+- The flaky room test: `InviteFriendsDialog.test.tsx` waits for the typed search's fetch before it reopens the dialog,
+  3f89569c.
+- B15's production counter: one `bot: search summary` line per match with the searches, the missed deadlines and the
+  misses on tricks 1 and 2 (`match/bot_search_stats.go`, BOT_RULES 5.5), e11ce3c7.
+- B7's trade-off pinned (with 40 / 85 banked the 57 card points and the 20 still fall, so the Belote search skips) and
+  B3's crossing tests moved unchanged to `search/race_crossing_test.go`, 2482e9cd.
+- B16's lint gap: `golangci-lint` enforces gofmt (`server/.golangci.yml`), ddc46355.
+- The rule layer's four entries in `_bmad-output/implementation-artifacts/deferred-work.md` (retention blind to trick
+  7's points, the non-trump over-ruff, the capot, the spare led into an over-trump on trick 7) closed as superseded,
+  since the search plays every trick and the rule layer runs only after a missed deadline; `ParseShape` rejects an
+  exact count below an at-least bound, 0f2961e5.
+- The two veto edge cases: `ConventionVeto` 1500 (10 000 before) yields only to a race decided for the vetoed card, a
+  Ten discarded beside nothing but Aces is not vetoed (search and `avoidBlindTen`), `Evaluate` counts made deals only
+  under `Options.TrackCallerMade`, and the lab flag `hardVeto` restores 10 000, a12fb1ef; measured in "Closeout
+  (2026-11-09)" below (race 0.0000 ± 0.0000, regression +3.23 ± 0.96, C1 +0.19 ± 0.29), a17cc2f1.
+- D5 closed: no rule (owner, 2026-11-09), and no open item is left in the three bot documents, in the closing docs
+  pass (`docs(bot): close every open item of bot v2`).
 
 #### E3 final defaults: regression, stability and the cheat gap
 
@@ -1533,10 +1554,10 @@ partner, whose pass can leave the dealer forced):
 | J + two others (no 9/A) | +25.2 ± 3.2 | +48.2 ± 3.2 | +19.3 ± 4.2 |
 | three small | −37.4 ± 3.1 | −14.6 ± 3.6 | −44.1 ± 4.6 |
 
-Bid-time visibility factors (for the deferred bidding-consistency inference): a pattern present
-in the final 8-card hand was visible when the seat bid with probability J+9 0.357 / 0.536, all
-four of a suit 0.071 / 0.214, J with its two suit-mates 0.179 / 0.357 (Bitola 5 of 8 / Croatian
-6 of 8).
+Bid-time visibility factors (for the bidding-consistency inference, measured in phase 4 and not
+shipped, §2.10 D1): a pattern present in the final 8-card hand was visible when the seat bid with
+probability J+9 0.357 / 0.536, all four of a suit 0.071 / 0.214, J with its two suit-mates
+0.179 / 0.357 (Bitola 5 of 8 / Croatian 6 of 8).
 
 ### 3.3 Linear fit and threshold policy
 
@@ -2049,8 +2070,8 @@ power, not on sign: the shape is 0.4 % of the decision rows (1 424 of 348 794) a
 that frequency needs a standard error under 3.5, which this run (SE 4.2) does not reach.
 Retiring the row costs the lab's own scoring −0.028 ± 0.017 per non-forced row (1.6 SE). The
 revert is one clause (`p.count >= 4 && p.ace ||` in `matchesBidTable`, with the row 4 test cases
-flipped back), and the owner judges the shape at PR review. Croatian row 4 is +5.7 ± 7.1 and has
-no case in either direction.
+flipped back), and the owner judges the shape at PR review (§3.6: approved 2026-11-08, it ships as
+row 13). Croatian row 4 is +5.7 ± 7.1 and has no case in either direction.
 
 **Reference scores** (value per non-forced row ± SE over rows, call rate in brackets; script
 `docs/bot/lab/pol16.py` (§4), not `class_table.py`, which scores another table; the script scores
@@ -2142,7 +2163,7 @@ observed +0.5 is its net effect plus that of the new deal set, and lies inside t
 bias is small and not distinguishable from zero at these sizes. The human-like bidder gives +10.6 ± 3.5
 for the same shape.
 
-**Owner's answer.** Pending: one yes or no per shape.
+**Owner's answer.** Yes (2026-11-08), as for the other three shapes above: the shape ships as row 13.
 
 ## 4. Reproducing
 
