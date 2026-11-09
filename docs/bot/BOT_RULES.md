@@ -239,7 +239,8 @@ Every deal that satisfies the hard facts is equally likely when the rejection dr
 constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
 what the seats led or discarded (see 5.9).
 
-**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `search_bridge.go`). When it is on and the
+**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `search_bridge.go`; off in production, see
+5.10). When it is on and the
 hand's auction is recorded (`View.Bids`, §7), the chooser and the Belote evaluation pass `search.Options.SampleFilter`,
 which rejects a sampled deal in which another seat's auction action contradicts the bid table of §4.2. A seat's eight
 cards are its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card in the current trick. It bid
@@ -434,7 +435,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
-| `BidConsistency` | false | measured in `BOT_V2_LAB_RESULTS.md` §2.10 (D1) | Samples only deals consistent with the auction (5.2) |
+| `BidConsistency` | false | vs the shipped bidder +1.03 ± 0.73 per hand (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder -0.61 ± 0.56 (z -1.1) | Samples only deals consistent with the auction (5.2); not better at 2 SE against the shipped bidder, so it stays off and the code stays for the lab (§2.10, D1) |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 **The blind-Ten rule.** A side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not

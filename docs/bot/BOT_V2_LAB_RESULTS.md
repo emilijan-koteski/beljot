@@ -136,8 +136,8 @@ table = core + edge - (positions in both: a non-core call while another suit is 
   16/30/40 on tricks 3/4/5, so it plays the bot of fc49e0d), `defTrump3`, `defTrump10`,
   `defTrumpVeto`, `noDefTrump`, `tenUnder3`, `noTenUnder`, `riskNN` (λ = NN/10), `noRisk`,
   `drawCond`, `noDrawCond`, `race`, `noRace`, `opening12`, `noOpening`, and the phase-4 flags `blindTen3`,
-  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, `deciding`, `noDeciding` (`DecidingHand`), and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
-  `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0`, `CashHighWinnerBonus = 0` and `DecidingHand = false`) and the bounds cleared. `duplicate` prints the
+  `blindTen10`, `blindTenVeto`, `noBlindTen`, `cashHigh3`, `cashHigh10`, `cashHighVeto`, `noCashHigh`, `deciding`, `noDeciding` (`DecidingHand`), `bidInfer`, `noBidInfer` (`BidConsistency`), and `noBounds` (the view's `RankBounds` is cleared before the production search, so the sampler never excludes a card above a bound). The flag `phase3` plays the phase-3 bot: the default tuning with
+  `OpeningSamples = 0`, every phase-4 field at its off value (today `BlindTenPenalty = 0`, `CashHighWinnerBonus = 0`, `DecidingHand = false`, `BeloteSkipMargin = 0` and `BidConsistency = false`) and the bounds cleared. `duplicate` prints the
   applied, decided, deferred and defender-trump-lead counts of a side that reports them.
 - `human`: `HumanBidder` (`humanbid.go`) over `shipped:3` with the same flags. Play, declarations, Belote
   and surrender come from the inner policy. Bidding: with probability 0.8 it calls when a suit holds J
@@ -576,6 +576,7 @@ built from. The summary is kept at the top; the rows below it carry command, see
 | E1 bidding shapes measured (§3.6): Bitola row 4, Croatian row-10 shape, Bitola row-11 shape second to speak, Croatian 9 with three trumps and one side Ace second to speak | vs the shipped bidder +7.5 ± 3.4, +10.0 ± 3.5, +10.6 ± 3.2, +18.3 ± 3.5 (vs the human-like bidder +10.6, +13.3, +11.8, +22.5), n 2 000 to 2 081 per cell | EV(call) - EV(pass) per decision row, targeted deals, `shipped:1` | owner approved all four; rows 10 and 11 extended, row 13 added | c8416aef, f9ecf56f, fc1e0984 |
 | D4 the Belote answer as the caller (`BeloteSkipMargin 5`) | with minus without -0.02 ± 0.04 (z -0.4); Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17; transfer off +0.00 ± 0.00 in both (no-op, as required) | duplicate advantage per hand, 1 000 deals per variant (400 with transfer off), `shipped:1` both sides | does not ship (strength; not better at 2 SE; `BeloteSkipMargin 0`, the code stays) | d9e20b2f |
 | D5 score-aware bidding (`bidscore -class`, loosen on `below` when the opponents are close, tighten to `core` when the own side is close) | `oppClose` `below` -0.036 ± 0.023 (Croatian only; the Bitola `below` class is empty); `ownClose` `table` +0.052 ± 0.013 (z 4.1), `edge` (table hands outside core) +0.026 ± 0.013 (z 2.1); `neither` `table` +0.116 ± 0.026, `below` -0.052 ± 0.040 | call-minus-pass match wins per decision, 500 pairs per cell, `shipped:1` | measured; awaiting the owner (no rule proposed: the loosen is not positive at 2 SE; tighten measured on edge hands, calls win, no rule) | 853f5421 (server), lab a228fe80 and the `edge` commit |
+| D1 bidding-consistency sampling (`BidConsistency`, a sampled deal is rejected when another seat's auction action contradicts the bid table on every bid-time hand its cards allow) | vs the shipped bidder +1.03 ± 0.73 (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder (`-opp=human`) -0.61 ± 0.56 (z -1.1; Bitola -0.16 ± 0.79, Croatian -1.04 ± 0.78) | duplicate advantage per hand, 1 000 deals per variant, `shipped:1` both sides | does not ship (strength; not better at 2 SE against the shipped bidder; `BidConsistency false`, the code stays for the lab) | a2decb2f |
 
 #### D2 opening search
 
@@ -1029,6 +1030,82 @@ Seed 1208 (Croatian, `ownClose`, `edge`), `./botlab -exp=bidscore -a=shipped:1 -
 bidscore ownClose: 500 pairs, call-minus-pass match wins +0.044 ± 0.019, call wins 489/500, pass wins 478/500
   croatia, class=edge, stopAtTarget=true, open after 12 hands: call 0, pass 0; mean hands per match: call 1.12, pass 1.27; forced pass at the reshuffle seat 0; 358.1s (0.72s per pair)
 ```
+
+
+#### D1 bidding-consistency sampling
+
+A is `shipped:1` with `-flagsA=bidInfer` (`BidConsistency true`), B is `shipped:1` with `-flagsB=noBidInfer`, the cumulative
+baseline on both sides; the filter is the only difference. With it on, the chooser and the Belote evaluation reject a
+sampled deal in which another seat's pass or call contradicts the bid table (`BOT_RULES.md` §5.2): a seat's eight cards
+are its sampled remaining cards, its played cards and its card in the trick, and every bid-time hand they allow is tried
+(Bitola: five of them plus the candidate; Croatian: six), a pass explained by one hand that matches no callable suit, a
+call by one hand that matches the called suit; Croatian's forced dealer pick is not checked. Rejected deals are redrawn up
+to four draws per requested sample, and a search that accepts none reruns unfiltered. The first pair plays against
+the shipped bidder (the table the filter assumes), the second with `-opp=human` (seats 1/3 bid by `HumanBidder` over
+`shipped:3` with B's flags, so the filter's assumption is wrong for the opponents). Server code at a2decb2f (default
+`false`), lab built with the `mk41` copy, `-workers=6`, two runs at a time. A 50-deal probe
+(`-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=50 -seed=1211 -workers=6`) ran in 16 s
+(+4.76 ± 5.88) with no crash. The counts line carries no filter counter (the production `SearchResult` does not report
+rejected draws), so the acceptance rate is not measured.
+
+| Variant | Opponents | Seed | Commit | Command | Advantage per hand (A minus B) | Time |
+|---|---|---|---|---|---|---|
+| Bitola | shipped bidder | 1211 | a2decb2f | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1211 -workers=6` | +1.55 ± 1.08 (95% CI ±2.12) | 595 s |
+| Croatian | shipped bidder | 1212 | a2decb2f | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1212 -variant=croatia -workers=6` | +0.60 ± 0.98 (95% CI ±1.91) | 630 s |
+| Bitola | human-like bidder | 1213 | a2decb2f | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1213 -workers=6` | -0.16 ± 0.79 (95% CI ±1.55) | 355 s |
+| Croatian | human-like bidder | 1214 | a2decb2f | `-exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1214 -variant=croatia -workers=6` | -1.04 ± 0.78 (95% CI ±1.53) | 370 s |
+
+Seed 1211 (Bitola), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1211 -workers=6`:
+
+```
+shipped:1[bidInfer] vs shipped:1[noBidInfer] (bitola, 1000 deals x2, 595s)
+  A advantage per hand: +1.55 ± 1.08 (95% CI ±2.12)
+  points banked: A 179417  B 176323  (A share 50.4%)
+  A called 900 (made 82%), B called 900 (made 81%), passed out 200 / 2000
+  A counts: applied 17548, decided 17548, deferred 0, defender trump leads 107, belote searches 0, belote skips 0
+  B counts: applied 17645, decided 17645, deferred 0, defender trump leads 139, belote searches 0, belote skips 0
+```
+
+Seed 1212 (Croatian), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1212 -variant=croatia -workers=6`:
+
+```
+shipped:1[bidInfer] vs shipped:1[noBidInfer] (croatia, 1000 deals x2, 630s)
+  A advantage per hand: +0.60 ± 0.98 (95% CI ±1.91)
+  points banked: A 197553  B 196357  (A share 50.2%)
+  A called 1000 (made 80%), B called 1000 (made 80%), passed out 0 / 2000
+  A counts: applied 19238, decided 19238, deferred 0, defender trump leads 151, belote searches 0, belote skips 0
+  B counts: applied 19327, decided 19327, deferred 0, defender trump leads 161, belote searches 0, belote skips 0
+```
+
+Seed 1213 (Bitola, human-like bidder), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1213 -workers=6`:
+
+```
+shipped:1[bidInfer] vs shipped:1[noBidInfer] (bitola, 1000 deals x2, 355s)
+  A advantage per hand: -0.16 ± 0.79 (95% CI ±1.55)
+  points banked: A 95283  B 95169  (A share 50.0%)
+  A called 502 (made 83%), B called 502 (made 85%), passed out 278 / 2000
+  A counts: applied 8543, decided 8543, deferred 0, defender trump leads 46, belote searches 0, belote skips 0
+  B counts: applied 8539, decided 8539, deferred 0, defender trump leads 51, belote searches 0, belote skips 0
+```
+
+Seed 1214 (Croatian, human-like bidder), `./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1214 -variant=croatia -workers=6`:
+
+```
+shipped:1[bidInfer] vs shipped:1[noBidInfer] (croatia, 1000 deals x2, 370s)
+  A advantage per hand: -1.04 ± 0.78 (95% CI ±1.53)
+  points banked: A 102706  B 104019  (A share 49.7%)
+  A called 542 (made 78%), B called 542 (made 79%), passed out 0 / 2000
+  A counts: applied 9761, decided 9761, deferred 0, defender trump leads 57, belote searches 0, belote skips 0
+  B counts: applied 9775, decided 9775, deferred 0, defender trump leads 63, belote searches 0, belote skips 0
+```
+
+Pooling by weights 1/SE² (printed two-decimal values). Against the shipped bidder: w = 1/1.08² = 0.857 and 1/0.98² =
+1.041; (1.55 · 0.857 + 0.60 · 1.041) / 1.899 = +1.03; SE = 1 / √1.899 = 0.73; z = 1.4. Against the human-like bidder:
+w = 1/0.79² = 1.602 and 1/0.78² = 1.644; (-0.16 · 1.602 - 1.04 · 1.644) / 3.246 = -0.61; SE = 1 / √3.246 = 0.56; z = -1.1.
+Rule: (i) better at 2 SE against the shipped bidder: +1.03 < 2 · 0.73 = 1.45, not met; (ii) not worse at 2 SE against
+the human-like bidder: -0.61 > -1.11, met; (iii) no variant opposite at 2 SE in pair (i): both positive, met. (i) fails,
+so `BidConsistency` ships `false` and the code stays for the lab. Both pairs point the expected way (the filter helps
+when the opponents bid by the table it assumes and leans negative when they do not), but neither is significant.
 
 ## 3. Bidding calibration tables
 
@@ -1749,6 +1826,8 @@ cd /tmp/lab/server && go build -tags nodynamic -o botlab ./cmd/botlab
 ./botlab -exp=classcheck -a=shipped:1 -n=20000 -seed=1190 -variant=croatia
 ./botlab -exp=bidscore -a=shipped:1 -scoreState=oppClose -class=below -n=500 -seed=1197 -variant=croatia -workers=6   # §2.10 D5, -class=below|table|core|edge
 ./botlab -exp=bidscore -a=shipped:1 -scoreState=ownClose -class=edge -n=500 -seed=1207 -workers=6   # §2.10 D5, the tighten on edge hands
+./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -n=1000 -seed=1211 -workers=6   # §2.10 D1; -seed=1212 -variant=croatia
+./botlab -exp=duplicate -a=shipped:1 -b=shipped:1 -flagsA=bidInfer -flagsB=noBidInfer -opp=human -n=1000 -seed=1213 -workers=6   # §2.10 D1; -seed=1214 -variant=croatia
 ```
 
 The Python scripts are in `docs/bot/lab/` and need numpy. `labbot.go` is the pre-phase-1
