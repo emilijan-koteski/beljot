@@ -315,6 +315,7 @@ describe("InviteFriendsDialog Lobby tab", () => {
     await waitFor(() =>
       expect(screen.getByTestId("invite-lobby-empty")).toHaveTextContent('No one matches "mar"'),
     );
+    await waitFor(() => expect(listInvitablePlayersSpy).toHaveBeenLastCalledWith(7, "mar"));
     const callsBeforeReopen = listInvitablePlayersSpy.mock.calls.length;
 
     rerender(dialog(false));
