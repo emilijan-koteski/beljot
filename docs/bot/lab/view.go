@@ -55,9 +55,9 @@ type View struct {
 	DeclPoints          [2]int
 	KnownVoidsWithTrump [4][4]bool
 	RankBounds          [4][4]int
-	BidRound   int
-	Passed     [4]PassInfo
-	ForcedCall bool
+	BidRound            int
+	Passed              [4]PassInfo
+	ForcedCall          bool
 }
 
 // PassInfo records what a seat refused during bidding: the candidate suit (round 1) and/or every other suit (round 2 / free bidding).

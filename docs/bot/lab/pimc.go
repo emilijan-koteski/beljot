@@ -215,9 +215,9 @@ type PIMC struct {
 	Samples   int
 	FromTrick int
 	Schedule  []int
-	Rng      *rand.Rand
-	Fallback Policy
-	Label    string
+	Rng       *rand.Rand
+	Fallback  Policy
+	Label     string
 }
 
 func (p *PIMC) Name() string { return p.Label }

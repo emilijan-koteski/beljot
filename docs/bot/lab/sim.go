@@ -23,7 +23,7 @@ type StateAware interface {
 // CheatBot plays the double-dummy optimum of the actual deal: an upper bound, never fair.
 type CheatBot struct{ Fallback Policy }
 
-func (CheatBot) Name() string             { return "cheat" }
+func (CheatBot) Name() string                { return "cheat" }
 func (c CheatBot) Decide(v View) game.Action { return c.Fallback.Decide(v) }
 func (c CheatBot) DecideState(gs *game.GameState, seat int, v View) game.Action {
 	if gs.Phase != game.PhasePlaying || gs.PendingBelotSeat != nil || gs.AwaitingDeclaration || len(v.LegalCards) <= 1 {

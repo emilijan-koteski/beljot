@@ -27,8 +27,8 @@ func SuitIdx(s game.Suit) int {
 }
 
 func CardIdx(c game.Card) int { return SuitIdx(c.Suit)*8 + game.NaturalRankOrder[c.Rank] }
-func IdxCard(i int) game.Card  { return game.Card{Suit: suitList[i/8], Rank: rankList[i%8]} }
-func SuitMask(s int) uint32    { return uint32(0xFF) << (8 * uint(s)) }
+func IdxCard(i int) game.Card { return game.Card{Suit: suitList[i/8], Rank: rankList[i%8]} }
+func SuitMask(s int) uint32   { return uint32(0xFF) << (8 * uint(s)) }
 
 func MaskOf(cards []game.Card) uint32 {
 	var m uint32

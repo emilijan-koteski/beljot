@@ -4,9 +4,9 @@ import "github.com/emilijan/beljot/server/internal/game"
 
 type bidCoef struct {
 	count, j, nine, ace, ten, king, queen, eight, seven float64
-	j9, jA, nineA                                      float64
-	sideA, sideT, sideK                                float64
-	round2, pos1, pos2, pos3, konst                    float64
+	j9, jA, nineA                                       float64
+	sideA, sideT, sideK                                 float64
+	round2, pos1, pos2, pos3, konst                     float64
 }
 
 var bidCoefBitola = bidCoef{35.4, 54.1, 11.9, -5.5, -0.5, 0.5, 1.1, -12.1, -13.9, 29.6, 12.2, 9.7, 18.9, 6.8, 0.4, -3.7, 1.3, 1.1, -1.5, -136.6}
