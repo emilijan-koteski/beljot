@@ -10,9 +10,9 @@ import (
 
 const ConventionVeto = 1500
 
-// SearchTuning holds the behaviours layered on the search; its zero value is phase 2 and SeedSalt is a lab-only seed
-// offset. ConventionVeto outweighs every points margin a hand produces yet yields to a race the card wins and the other
-// card loses in nearly every sample.
+// SearchTuning holds the behaviours layered on the search; its zero value is phase 2 and SeedSalt is a lab-only offset.
+// The veto yields when the vetoed card's mean beats the other card's by more than 1 500, which in practice needs the
+// match won with that card and lost or heavily lost with the other in most samples.
 type SearchTuning struct {
 	DefenderTrumpLeadBonus int
 	TenUnderAceBonus       int

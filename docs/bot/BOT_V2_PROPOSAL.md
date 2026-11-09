@@ -1,6 +1,6 @@
 # Beljot bot v2: analysis and proposal
 
-Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Phase 4 is implemented on branch `feat/bot-v2-phase4` (2026-11-09): the search plays from trick 1 (12 samples on tricks 1 and 2), the owner's two table rules (no blind Ten; cash the Ace or Ten when the suit will not run) ship as vetoes inside the search, the sampler uses the rank bounds of forced overplays, the memory records the auction, the race values the hand's end, and three bidding rows the owner approved are in the table; bidding-consistency sampling, the Belote answer as the caller and the deciding hand on default tables were measured and do not ship; score-aware bidding: measured; closed: no rule (owner, 2026-11-09). The closeout of 2026-11-09 (a12fb1ef) lets both vetoes yield to a stop-at-target race decided for the vetoed card and exempts a Ten discarded beside nothing but Aces. Against the phase-3 bot it measured +1.69 ± 1.28 (Bitola) and +5.18 ± 1.44 (Croatian) per hand in duplicate, pooled +3.23 ± 0.96 (z 3.4; 1000 deals per variant), the same points at fe8c4d98 and at a12fb1ef. Every item of §4.7 and §6 is shipped, measured and rejected, skipped by ruling, recorded as not measurable, or closed with no rule by the owner (score-aware bidding): the proposal is complete; nothing is deferred.
+Status: proposal, revision 4 (signed off after three rounds of adversarial review), 2026-10-25. Phase 1 (§4.7) is implemented on branch `feat/bot-v2-phase1` (2026-10-25); the lab measured that package at +3.9 ± 0.7 (Bitola) / +5.2 ± 0.7 (Croatian) before implementation, and the implemented package, after the final-review fixes, measured +4.05 ± 0.69 (Bitola) / +5.20 ± 0.71 (Croatian) against the frozen v1 copy (4000 deals ×2 each). Phase 2 (§4.7) is implemented on branch `feat/bot-v2-phase2` (2026-10-25): the search runs from trick 3 with the default budget; measured +6.0 ± 5.4 (40 deals) and +10.05 ± 1.76 (400 deals) against the rule layer in duplicate self-play. The per-trick sample counts are caps, and a missed deadline (or no consistent deal) plays the rule layer. Phase 3 is implemented on branch `feat/bot-v2-phase3` (2026-11-08): the faster solver, two search conventions, sample counts 32/60/80 on tricks 3 to 5, the own Belote in the settlement, the race objective on stop-at-target tables and the recalibrated bidding table; the opening search was measured and left off. Against the phase-2 bot it measured +1.84 ± 0.82 (Bitola) and +0.79 ± 0.71 (Croatian) per hand in duplicate, pooled +1.24 ± 0.54 (1000 deals per variant). Phase 4 is implemented on branch `feat/bot-v2-phase4` (2026-11-09): the search plays from trick 1 (12 samples on tricks 1 and 2), the owner's two table rules (no blind Ten; cash the Ace or Ten when the suit will not run) ship as vetoes inside the search, the sampler uses the rank bounds of forced overplays, the memory records the auction, the race values the hand's end, and three bidding rows the owner approved are in the table; bidding-consistency sampling, the Belote answer as the caller and the deciding hand on default tables were measured and do not ship; score-aware bidding: measured; closed: no rule (owner, 2026-11-09). The closeout of 2026-11-09 (a12fb1ef) lets both vetoes yield in the stop-at-target race (the veto yields when the vetoed card's mean beats the other card's by more than 1 500, which in practice needs the match won with that card and lost or heavily lost with the other in most samples) and exempts a Ten discarded beside nothing but Aces; the final fix wave widens the exemption to a Ten beside Aces or other blind Tens. Against the phase-3 bot it measured +1.69 ± 1.28 (Bitola) and +5.18 ± 1.44 (Croatian) per hand in duplicate, pooled +3.23 ± 0.96 (z 3.4; 1000 deals per variant), the same points at fe8c4d98, at a12fb1ef and at 3b2eaa87. Every item of §4.7 and §6 is shipped, measured and rejected, skipped by ruling, recorded as not measurable, or closed with no rule by the owner (score-aware bidding): the proposal is complete; nothing is deferred.
 
 The proposal is the output of a measurement-driven review of `server/internal/bot` for both
 variants (Bitola and Croatian). The numbers and the method are in `BOT_V2_LAB_RESULTS.md`; the
@@ -45,16 +45,16 @@ What this is **not**: a collection of new special-case rules. Single rule tweaks
 point each; the current bot leaves 10–18 points per hand on the table through decisions no fixed
 rule makes well, because they depend on where the unseen cards probably are.
 
-What the two review rounds changed (details in the review log): the bidding ships as a table
-with a stated inclusion criterion, not a formula; the search is "anytime" with a statistical
-stopping rule, and the proposal states plainly that at the affordable budget the early tricks
-stay seed-sensitive until the solver is faster; the hand award follows the engine's settlement
-exactly, including the both-cross rule the rules file states differently, the stop-at-target
-race (which needs its own objective inside the solver) and a per-sample declaration contest; the
-bidding-consistency inference is deferred and, when it comes, derived from a hypergeometric
-visibility factor — measured in phase 4 (+1.03 ± 0.73 against the shipped bidder, −0.61 ± 0.56
-against the human-like one) and not shipped; a production path that skips the bot memory update
-is listed as a phase-1 fix; audit verdicts are per variant with standard errors.
+What the two review rounds changed (details in the review log): the bidding ships as a table with a
+stated inclusion criterion, not a formula; the search is "anytime" with a statistical stopping rule,
+and the proposal states plainly that at the affordable budget the early tricks stay seed-sensitive
+until the solver is faster; the hand award follows the engine's settlement exactly, including the
+both-cross rule the rules file states differently, the stop-at-target race (which needs its own
+objective inside the solver) and a per-sample declaration contest; the bidding-consistency
+inference, derived from a hypergeometric visibility factor, was deferred to a later phase; phase 4
+measured it as a hard filter (+1.03 ± 0.73 against the shipped bidder, −0.61 ± 0.56 against the
+human-like one) and did not ship it; a production path that skips the bot memory update is listed as
+a phase-1 fix; audit verdicts are per variant with standard errors.
 
 ---
 
@@ -207,14 +207,14 @@ pre-play trick, not just the lead suit.
 
 **Soft likelihoods** (a weight in (0, 1] per sampled deal; none in the first delivery):
 
-10. **Bidding consistency.** Deferred — measured in phase 4 (+1.03 ± 0.73 against the shipped
-   bidder, −0.61 ± 0.56 against the human-like one) and not shipped. A naive version (weight 0.2
-   on any deal where a passer holds J+9, four of the suit, or J with three) measured
-   **−1.9 ± 1.9**, and the review showed why: the pass was made on 5 of the 8 cards (Bitola) or 6
-   (Croatian), so a final hand that shows the pattern often did not show it at bid time. The
-   probability that it did is a hypergeometric constant: J+9 both visible 0.36 / 0.54; all four
-   visible 0.07 / 0.21; J with two others 0.18 / 0.36 (Bitola / Croatian). If the inference is
-   ever used, the weight is `w = 1 − P(visible) · (1 − ε)`, with a bidder model that matches the
+10. **Bidding consistency.** Was deferred to a later phase; phase 4 measured it as a hard filter
+   (+1.03 ± 0.73 against the shipped bidder, −0.61 ± 0.56 against the human-like one) and did not
+   ship it. A naive version (weight 0.2 on any deal where a passer holds J+9, four of the suit, or J
+   with three) measured **−1.9 ± 1.9**, and the review showed why: the pass was made on 5 of the 8
+   cards (Bitola) or 6 (Croatian), so a final hand that shows the pattern often did not show it at
+   bid time. The probability that it did is a hypergeometric constant: J+9 both visible 0.36 / 0.54;
+   all four visible 0.07 / 0.21; J with two others 0.18 / 0.36 (Bitola / Croatian). If the inference
+   is ever used, the weight is `w = 1 − P(visible) · (1 − ε)`, with a bidder model that matches the
    seats at the table (for bot seats, their own table; for humans, nothing until there is data).
    Every soft weight stays ≥ 0.5 until a mixed-table measurement exists.
 11. **Ten-under-Ace signal.** Under these rules a side-suit discard is legal only when the player

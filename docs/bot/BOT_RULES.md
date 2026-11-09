@@ -12,17 +12,18 @@ Phase 4 starts the search at trick 1, so it now plays every card from the first 
 owner's two table rules as vetoes inside the search (no blind Ten; cash the Ace or Ten when the suit
 will not run, §5.10) and the rank bounds that forced overplays and over-trumps prove (§7). It also
 records the auction in the memory (§7), values the hand's end inside the stop-at-target race (§5.10)
-and adds three bidding rows the owner approved (§4.2). A veto yields only when the stop-at-target
-race is decided for the vetoed card and against the other card, and a Ten discarded beside nothing
-but Aces is not vetoed (§5.10). Three phase-4 items were measured and do not ship: the deciding
-hand, the caller's Belote answer and the auction filter (each off in §5.10). Score-aware bidding
-(§4.4): measured; closed: no rule (owner, 2026-11-09). The rule layer also carries the earlier
-tuning: partner trump-draw with a declaration-inference abort when the opponents provably hold
-the master, boss preservation, uncuttable-boss last-trick retention, suppressing trump draws once
-the opponents are void of trump, leading into a partner's void, smearing onto a partner's boss,
-seat-aware **secure trick takes** with a material-stake gate and control-trump economy, the
-**boss-preserving smear** with its endgame/dead-suit exceptions, and never fighting a partner who
-is **forced to win a trump-led trick**.
+and adds three bidding rows the owner approved (§4.2). In the stop-at-target race the veto yields
+when the vetoed card's mean beats the other card's by more than 1 500, which in practice needs the
+match won with that card and lost or heavily lost with the other in most samples, and a Ten
+discarded beside nothing but Aces or other blind Tens is not vetoed (§5.10). Three phase-4 items
+were measured and do not ship: the deciding hand, the caller's Belote answer and the auction filter
+(each off in §5.10). Score-aware bidding (§4.4): measured; closed: no rule (owner, 2026-11-09). The
+rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
+when the opponents provably hold the master, boss preservation, uncuttable-boss last-trick
+retention, suppressing trump draws once the opponents are void of trump, leading into a partner's
+void, smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate
+and control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions, and
+never fighting a partner who is **forced to win a trump-led trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -360,7 +361,8 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   `bot: search reached no decision; rules played` (card search) or
   `bot: Belote search reached no decision; announced` (Belote search), each with `roomID`, `seat`
   and `trick`. A full queue logs `bot: search queue full; rules played` or
-  `bot: search queue full; Belote announced` at Debug, with the same fields.
+  `bot: search queue full; Belote announced` at Debug, with the same fields. Production's
+  Info-level JSON handler does not print Debug lines, so the summary below is the signal.
 - Each match counts its searches on the session (`botSearchStats` in
   `match/bot_search_stats.go`): searches queued (card and Belote), searches that reached no
   decision, and those of them at tricks 1 and 2. When the match ends, normally or by abandonment,
@@ -373,7 +375,8 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   (text form; the message is `bot: search summary` with the fields `roomID`, `matchID`,
   `searches`, `missed`, `missedOpening`). `matchID` is 0 when persisting the match failed. A
   match that queued no search, such as a human-only table or one with the search off, logs no
-  summary. A dropped job (full queue) is neither a search nor a miss. To judge the host after a
+  summary. A dropped job (full queue) is neither a search nor a miss, and a miss landing after
+  the summary has fired (a match abandoned mid-search) is not counted. To judge the host after a
   deploy, grep the logs for `bot: search summary` and compare `missed` and `missedOpening` with
   `searches`: a `missedOpening` close to the number of trick-1 and trick-2 decisions means the host
   is too slow for the 12 opening samples (5.4), and the opening plays by the rules.
@@ -408,8 +411,9 @@ loaded machine can turn a search into a rule-layer play.
 ### 5.8 Measured strength and the gates
 
 Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_RESULTS.md` §2.10,
-server code fe8c4d98, and the regression and the simulation gates again at a12fb1ef, the vetoes at 1500, with the same values; the trick-1 benchmark at 015a7211); the rows marked phase 3 or phase 2 are older measurements (§2.9) that phase 4
-did not repeat:
+server code fe8c4d98, and the regression and the simulation gates again at a12fb1ef, the vetoes at
+1500, with the same values; the trick-1 benchmark at 015a7211); the rows marked phase 3 or phase 2
+are older measurements (§2.9) that phase 4 did not repeat:
 
 | Measurement | Result |
 |---|---|
@@ -467,20 +471,25 @@ when the seeded deck came in, before the phase-4 play changes); its gate stays 6
 
 ### 5.10 Conventions and risk inside the search
 
-`SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the
-search. `bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`,
-`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 1500` (the veto), `CashHighWinnerBonus 1500` (the veto), and 0 or false for the rest. The chooser takes the
-card with the best adjusted mean, ties to the lower card index. The veto, `ConventionVeto` = 1500 (10000 before a12fb1ef),
-outweighs every points margin a hand can produce (at most about 250), so in points the vetoed card is never chosen while an
-alternative exists; in the race, where a sample decided for or against the team is worth plus or minus 1000, it yields when
-the vetoed card's mean beats the alternative's by more than 1500, which needs the vetoed card to win the match in nearly every
-sample and the alternative to lose it in nearly every sample. Measured against the old 10000 (lab flag `hardVeto`) on a
-stop-at-target race, seeds 1231/1232: 0.0000 ± 0.0000 match edge per game in both variants, identical play (no position
-reached the yield), not worse at 2 SE. Every row is in
-`BOT_V2_LAB_RESULTS.md` §2.9 (phase 3) or §2.10 (phase 4), duplicate unless the row says match
-edge, 1000 deals per variant unless the row says otherwise, pooled by inverse variance. The rows
-whose setting ships at 0 or false (`LeadRiskLambda`, `TrumpDrawConditional`, `DecidingHand`,
-`BeloteSkipMargin`, `BidConsistency`) were measured and do not ship; their code stays for the lab.
+`SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the search.
+`bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`, `TenUnderAceBonus 3`,
+`RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 1500` (the veto),
+`CashHighWinnerBonus 1500` (the veto), and 0 or false for the rest. The chooser takes the card with
+the best adjusted mean, ties to the lower card index. The veto, `ConventionVeto` = 1500 (10000
+before a12fb1ef), outweighs every points margin a hand can produce (about 414–504 without
+declarations and about 854–944 with four Jacks and Belote; 1 500 needs about 550 declared on one
+hand, a holding from which neither a fall nor an opposing capot is reachable, so in points mode the
+veto acts as a rule). In the race, where a sample decided for or against the team is worth plus or
+minus 1000, the veto yields when the vetoed card's mean beats the other card's by more than 1 500,
+which in practice needs the match won with that card and lost or heavily lost with the other in most
+samples. Measured against the old 10000 (lab flag `hardVeto`) on a stop-at-target race, seeds
+1231/1232: 0.0000 ± 0.0000 match edge per game in both variants, identical counts and results (no
+position reached the yield), not worse at 2 SE. The cash-high veto at 1 500 is covered by the race
+run and, in points mode, by the absence of any 1 500 gap. Every row is in `BOT_V2_LAB_RESULTS.md`
+§2.9 (phase 3) or §2.10 (phase 4), duplicate unless the row says match edge, 1000 deals per variant
+unless the row says otherwise, pooled by inverse variance. The rows whose setting ships at 0 or
+false (`LeadRiskLambda`, `TrumpDrawConditional`, `DecidingHand`, `BeloteSkipMargin`,
+`BidConsistency`) were measured and do not ship; their code stays for the lab.
 
 | Setting | Ships | Measured | Why |
 |---|---|---|---|
@@ -491,33 +500,39 @@ whose setting ships at 0 or false (`LeadRiskLambda`, `TrumpDrawConditional`, `De
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
 | `DecidingHand` | false | +0.0017 ± 0.0053 match edge per game (z 0.3) | On a table without stop-at-target, value a sample whose settled hand decides the match at plus or minus 1000, when a team could reach the target this hand (`couldDecideThisHand`); not better at 2 SE, the code stays off |
 | `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
-| `BlindTenPenalty` | 1500 (`ConventionVeto`) | +0.19 ± 0.29 per hand, four runs at a12fb1ef with the 1500 veto and the Ace-discard exemption (+0.17 ± 0.29 at fe8c4d98 after the predicate fix; earlier predicate -0.37 ± 0.29; 3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is +0.7 SE |
+| `BlindTenPenalty` | 1500 (`ConventionVeto`) | +0.19 ± 0.29 per hand, four runs at 3b2eaa87 with the 1500 veto and the exemption beside Aces or other blind Tens, the same points at a12fb1ef (+0.17 ± 0.29 at fe8c4d98 after the predicate fix; earlier predicate -0.37 ± 0.29; 3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is +0.7 SE |
 | `CashHighWinnerBonus` | 1500 (`ConventionVeto`; measured at 10000) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
 | `BidConsistency` | false | vs the shipped bidder +1.03 ± 0.73 per hand (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder -0.61 ± 0.56 (z -1.1) | Samples only deals consistent with the auction (5.2); not better at 2 SE against the shipped bidder, so it stays off and the code stays for the lab (§2.10, D1) |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
-**The blind-Ten rule.** A side-suit Ten led, or discarded onto a trick an opponent is winning (void in the led suit, or
-following after a trump cut), while its Ace is unplayed, not in the hand, not known with the partner and not in the trick, loses
-the veto (1500) from its score, so any other legal card beats it unless the race is decided for the Ten and against the other card,
-and a Ten that is the only legal card is still played. A Ten that follows the led suit with no trump cut takes the trick and is not
-blind. A Ten discarded (not following the led suit) when every other legal card is an Ace is not vetoed, in the search or in the
-rule layer's `avoidBlindTen` (one predicate, `vetoedBlindTen`): the Ace is the worse discard, 11 points and a sure winner given
-away; a lead keeps the veto. At a12fb1ef the veto plays 246 forced and 7 free blind Tens over 121 440 decisions, the free ones
-Tens discarded beside an Ace. Blind Tens per 1 000 decisions (Bitola, Croatian), counted as
-from fe8c4d98 (leads and discards only; earlier counts also included following Tens and are not comparable): 2.0 to 2.2 with
-the veto and 8.1 to 8.5 without it; with the veto 248 of 121 440 decisions are forced Tens and 4 are free, without it 103 forced
-and 906 free (0.8 and 7.5 per 1 000).
+**The blind-Ten rule.** A side-suit Ten led, or discarded onto a trick an opponent is winning (void
+in the led suit, or following after a trump cut), while its Ace is unplayed, not in the hand, not
+known with the partner and not in the trick, loses the veto (1500) from its score, so any other
+legal card beats it unless the race is decided for the Ten and against the other card, and a Ten
+that is the only legal card is still played. A Ten that follows the led suit with no trump cut takes
+the trick and is not blind. A Ten discarded (not following the led suit) when every other legal card
+is an Ace or another blind Ten is not vetoed, in the search or in the rule layer's `avoidBlindTen`
+(one predicate, `vetoedBlindTen`): the Ace is the worse discard, 11 points and a sure winner given
+away, and beside another blind Ten the search keeps its better Ten; a lead keeps the veto. At
+3b2eaa87 the veto plays 246 forced, 6 beside an Ace (the exemption) and 1 free blind Tens over
+121 440 decisions (lab counter, `BOT_V2_LAB_RESULTS.md` §2.10). Blind Tens per 1 000 decisions
+(Bitola, Croatian), counted as from fe8c4d98 (leads and discards only; earlier counts also included
+following Tens and are not comparable): 2.0 to 2.2 with the veto and 8.1 to 8.5 without it; with the
+veto 248 of 121 440 decisions are forced Tens and 4 are free, without it 103 forced and 906 free
+(0.8 and 7.5 per 1 000).
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
 applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.
 
-**The cash-high rule.** Last to play with at least two legal led-suit cards that beat the trick, no trump cut and the led suit not
-trump, the Ace or Ten that wins (never the King or Queen) gains `CashHighWinnerBonus` when the suit will not run, because the high card
-will be ruffed before it cashes. The suit will not run when the seat holds three or more cards of it, any seat declared three or more of it, or an
-opponent is known void in it and not void in trumps (`suitAtRisk`; the last trigger is the design's addition to the owner's two).
-With one winner, or after a cut, the search's card stands. The rule fires about once in a thousand decisions, so the counter "high
-kept then ruffed" moves little (13 against 18 over 59 424 decisions).
+**The cash-high rule.** Last to play with at least two legal led-suit cards that beat the trick, no
+trump cut and the led suit not trump, the Ace or Ten that wins (never the King or Queen) gains
+`CashHighWinnerBonus` when the suit will not run, because the high card will be ruffed before it
+cashes. The suit will not run when the seat holds three or more cards of it, any seat declared three
+or more of it, or an opponent is known void in it and not void in trumps (`suitAtRisk`; the last
+trigger is the design's addition to the owner's two). With one winner, or after a cut, the search's
+card stands. The rule fires about once in a thousand decisions, so the counter "high kept then
+ruffed" moves little (13 against 18 over 59 424 decisions).
 
 **The race objective.** On a stop-at-target table the engine ends the match the moment a team's
 running total (match score, hand points, declarations, Belote) reaches the target after a trick,
@@ -586,8 +601,9 @@ the non-trump over-ruff) are superseded: since phase 4 the search plays every tr
 layer runs only after a missed deadline. Their entries in
 `_bmad-output/implementation-artifacts/deferred-work.md` are closed.
 
-analogue — a spare that gets over-ruffed — is superseded the same way: since phase 4 the search
-plays every trick and the rule layer runs only after a missed deadline (closed in
+The trick-7 retention guard checks only a trump-led trick; its non-trump-lead analogue — a spare
+that gets over-ruffed — is superseded the same way: since phase 4 the search plays every trick and
+the rule layer runs only after a missed deadline (closed in
 `_bmad-output/implementation-artifacts/deferred-work.md`).
 
 **Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
@@ -1077,12 +1093,14 @@ By impact:
    constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength
    against CPU time (§5.4, §5.6). Change them only with the simulation gates and the duplicate
    comparison of §5.8.
-10. `bot.DefaultSearchTuning()`: the conventions and objectives inside the search (§5.10), among
-   them `OpeningSamples`, the owner's two vetoes (`BlindTenPenalty`, `CashHighWinnerBonus`, both
-   `ConventionVeto` 1500, which yields only to a stop-at-target race decided for the vetoed card;
-   a Ten discarded beside nothing but Aces is not vetoed), and the measured-and-off switches
-   `DecidingHand`, `BeloteSkipMargin` and `BidConsistency`. Change one only with a lab row under
-   the decision rule its row in §5.10 names.
+10. `bot.DefaultSearchTuning()`: the conventions and objectives inside the search (§5.10), among them
+   `OpeningSamples`, the owner's two vetoes (`BlindTenPenalty`, `CashHighWinnerBonus`, both
+   `ConventionVeto` 1500; in the stop-at-target race the veto yields when the vetoed card's mean
+   beats the other card's by more than 1 500, which in practice needs the match won with that card
+   and lost or heavily lost with the other in most samples; a Ten discarded beside nothing but Aces
+   or other blind Tens is not vetoed), and the measured-and-off switches `DecidingHand`,
+   `BeloteSkipMargin` and `BidConsistency`. Change one only with a lab row under the decision rule
+   its row in §5.10 names.
 
 Blind spots if you want a stronger bot. These belong to the rule layer, which plays
 only as the fallback; the search's own limits are in §5.9. (The first four were logged in
@@ -1164,7 +1182,7 @@ after a missed deadline, and the entries are closed there.)
 | Strength check (bot vs. random) | `TestSimulation_*` | `server/internal/bot/simulation_test.go` |
 | Search strength and time gates | `TestSimulation_Search*` and the trick-1 assertion of `TestSearchTrick1StaysUnderTwiceTheDeadline` (need `BELJOT_BOT_SIM=1`), `TestSearchTrick3StaysUnderTheDeadline` | `server/internal/bot/simulation_test.go`, `server/internal/bot/search/bench_test.go` |
 | The owner's table rules inside the search (no blind Ten, cash the Ace or Ten) and the other tuning | `SearchTuning`, `DefaultSearchTuning`, `ConventionVeto`, `vetoedBlindTen`, `blindTen`, `suitAtRisk` | `server/internal/bot/search_tuning.go` |
-| The vetoes at their pre-closeout 10000 in the lab | lab flag `hardVeto`, `TuningFromFlags` | `docs/bot/lab/flags.go` |
+| The vetoes at their pre-closeout 10000 in the lab (`hardVeto` is applied after `noBlindTen`/`noCashHigh`, so it overrides them) | lab flag `hardVeto`, `TuningFromFlags` | `docs/bot/lab/flags.go` |
 | The race crossing from tricks 6 and 7 against the engine | `TestRaceCrossingFromTricksSixAndSevenMatchesTheEngine` | `server/internal/bot/search/race_crossing_test.go` |
 | Per-match summary of searches and missed deadlines | `botSearchStats`, `logBotSearchSummary` | `server/internal/match/bot_search_stats.go` |
 | Rank bounds from forced overplays and over-trumps; the auction record | `ObservePlay` (`observeBounds`), `RankBounds`, `ObserveBid`, `Bids` | `server/internal/bot/memory.go` |
