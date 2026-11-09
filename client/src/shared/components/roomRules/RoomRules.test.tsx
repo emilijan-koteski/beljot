@@ -17,12 +17,13 @@ afterEach(async () => {
 });
 
 describe("matchRuleLines", () => {
-  it("lists the four match rules in a fixed order, all standard by default", () => {
+  it("lists the five match rules in a fixed order, all standard by default", () => {
     const lines = matchRuleLines(t, makeRoom());
-    expect(lines.map((l) => l.key)).toEqual(["direction", "declarations", "fall", "end"]);
+    expect(lines.map((l) => l.key)).toEqual(["direction", "declarations", "window", "fall", "end"]);
     expect(lines.map((l) => l.value)).toEqual([
       "To the right",
       "On",
+      "3",
       "To the winners",
       "Finish the hand",
     ]);
@@ -34,8 +35,14 @@ describe("matchRuleLines", () => {
       t,
       makeRoom({ clockwise: true, declarationsTransfer: false, stopAtTarget: true }),
     );
-    expect(lines.map((l) => l.value)).toEqual(["To the left", "On", "Voided", "Stop at target"]);
-    expect(lines.map((l) => l.changed)).toEqual([true, false, true, true]);
+    expect(lines.map((l) => l.value)).toEqual([
+      "To the left",
+      "On",
+      "3",
+      "Voided",
+      "Stop at target",
+    ]);
+    expect(lines.map((l) => l.changed)).toEqual([true, false, false, true, true]);
   });
 
   it("leaves declarations on a fall unused when declarations are off", () => {
@@ -44,6 +51,37 @@ describe("matchRuleLines", () => {
       makeRoom({ declarationsEnabled: false, declarationsTransfer: false }),
     ).find((l) => l.key === "fall")!;
     expect(fall).toMatchObject({ value: "Not used", unused: true, changed: false });
+  });
+
+  it("names the last declaration trick of a Bitola room, changed below trick 3", () => {
+    const window = (overrides: Parameters<typeof makeRoom>[0]) =>
+      matchRuleLines(t, makeRoom(overrides)).find((l) => l.key === "window")!;
+
+    expect(window({ variant: "bitola" })).toMatchObject({
+      label: "Declare until trick",
+      value: "3",
+      changed: false,
+      unused: false,
+    });
+    expect(window({ variant: "bitola", declarationLastTrick: 1 })).toMatchObject({
+      value: "1",
+      changed: true,
+      unused: false,
+    });
+  });
+
+  it("leaves the declaration window unused in Croatian or with declarations off", () => {
+    const window = (overrides: Parameters<typeof makeRoom>[0]) =>
+      matchRuleLines(t, makeRoom(overrides)).find((l) => l.key === "window")!;
+
+    expect(window({ variant: "croatia", declarationLastTrick: 3 })).toMatchObject({
+      value: "Not used",
+      unused: true,
+      changed: false,
+    });
+    expect(
+      window({ variant: "bitola", declarationsEnabled: false, declarationLastTrick: 2 }),
+    ).toMatchObject({ value: "Not used", unused: true, changed: false });
   });
 });
 

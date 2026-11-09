@@ -606,6 +606,72 @@ func NewGameCroatianFirstTrick(trump game.Suit) *game.GameState {
 	return gs
 }
 
+// NewGameBitolaWindow returns a Bitola hand at the start of trick 1, hearts trump, where every seat holds one plain
+// quarte (seat 0 7-T spades, 1 J-A spades, 2 7-T clubs, 3 J-A clubs) and only side cards are needed in tricks 1-3.
+func NewGameBitolaWindow() *game.GameState {
+	gs := NewGameFirstTrick(game.SuitHearts)
+	hands := [4][]string{
+		{"7S", "8S", "9S", "TS", "7H", "8H", "7D", "8D"},
+		{"JS", "QS", "KS", "AS", "9H", "TH", "9D", "TD"},
+		{"7C", "8C", "9C", "TC", "JH", "QH", "JD", "QD"},
+		{"JC", "QC", "KC", "AC", "KH", "AH", "KD", "AD"},
+	}
+	for seat, ids := range hands {
+		gs.Players[seat].Hand = mustParseCards(ids)
+	}
+	return gs
+}
+
+func mustParseCards(ids []string) []game.Card {
+	cards := make([]game.Card, 0, len(ids))
+	for _, id := range ids {
+		c, err := game.ParseCard(id)
+		if err != nil {
+			panic("testfixtures: " + err.Error())
+		}
+		cards = append(cards, c)
+	}
+	return cards
+}
+
+// WithDeclarationLastTrick sets the last trick of a turn-window fixture's declaration window, as a room setting would.
+func WithDeclarationLastTrick(gs *game.GameState, lastTrick int) *game.GameState {
+	gs.Rules.DeclarationLastTrick = lastTrick
+	gs.DeclarationLastTrick = lastTrick
+	return gs
+}
+
+// WithDeclarationTurn readies seat to declare under the fixture's timing: a turn prompt in a turn window, or the
+// freshly opened declaring phase of a dedicated one.
+func WithDeclarationTurn(gs *game.GameState, seat int) *game.GameState {
+	if gs.Rules.DeclarationTiming == game.DeclarationTimingDedicatedPhase {
+		gs.Phase = game.PhaseDeclaring
+		gs.TrickNumber = 0
+		gs.CurrentTrick = []game.TrickCard{}
+		gs.ActivePlayerSeat = gs.Rules.NextSeat(gs.DealerSeat)
+		gs.AwaitingDeclaration = false
+		for i := range gs.Players {
+			gs.Players[i].DeclarationAnswered = false
+		}
+		return gs
+	}
+	gs.ActivePlayerSeat = seat
+	gs.AwaitingDeclaration = true
+	return gs
+}
+
+// WithOpenDeclarationCycle puts a turn-window fixture inside the declaration cycle the declarer opened, with the
+// declarer answered and the trick left as it is.
+func WithOpenDeclarationCycle(gs *game.GameState, declarer int) *game.GameState {
+	gs.Phase = game.PhaseDeclaring
+	gs.ActivePlayerSeat = declarer
+	gs.AwaitingDeclaration = false
+	for i := range gs.Players {
+		gs.Players[i].DeclarationAnswered = i == declarer
+	}
+	return gs
+}
+
 func WithoutDeclarations(gs *game.GameState) *game.GameState {
 	gs.Rules.DeclarationsEnabled = false
 	gs.DeclarationsEnabled = false

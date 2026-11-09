@@ -17,6 +17,7 @@ type StaleRoom struct {
 	StopAtTarget         bool
 	DeclarationsTransfer bool
 	Clockwise            bool
+	DeclarationLastTrick int
 	UpdatedAt            time.Time
 }
 
@@ -103,6 +104,7 @@ func (m *Manager) reconcileStaleRoom(roomRepo StaleRoomRepository, r StaleRoom) 
 			StopAtTarget:         r.StopAtTarget,
 			DeclarationsTransfer: r.DeclarationsTransfer,
 			Clockwise:            r.Clockwise,
+			DeclarationLastTrick: r.DeclarationLastTrick,
 			StartedAt:            r.UpdatedAt,
 			CompletedAt:          time.Now(),
 			Status:               "abandoned",

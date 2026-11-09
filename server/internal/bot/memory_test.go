@@ -73,7 +73,7 @@ func boundsMatchTheTrueHands(t *testing.T, variant game.Variant, drive simDriver
 	rng := rand.New(rand.NewPCG(8, 41))
 	boundsSeen := 0
 	for range 300 {
-		gs := game.NewGame([4]uint{}, [4]string{}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false, true, false)
+		gs := game.NewGame([4]uint{}, [4]string{}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick)
 		mem := bot.NewMemory()
 		check := func(t *testing.T, cur *game.GameState, _ int, _ game.Action) {
 			if cur.TrumpSuit == nil {
@@ -107,7 +107,7 @@ func randomDriver(gs *game.GameState, _ *bot.Memory, rng *rand.Rand) (int, game.
 
 func randomCroatianPlayDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
 	if gs.Phase != game.PhasePlaying {
-		return croatianBotDriver(gs, mem, rng)
+		return allBotsDriver(gs, mem, rng)
 	}
 	return randomDriver(gs, mem, rng)
 }

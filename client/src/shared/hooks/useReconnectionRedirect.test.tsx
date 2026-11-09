@@ -47,6 +47,7 @@ const minimalMatchState: MatchState = {
   stopAtTarget: false,
   declarationsTransfer: true,
   clockwise: false,
+  declarationLastTrick: 3,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],

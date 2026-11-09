@@ -25,6 +25,15 @@ describe("variantRules.ts mirrors game.RulesFor", () => {
     },
   );
 
+  it.each(["bitola", "croatia"] as const)(
+    "%s declarationWindow matches the Go declaration timing",
+    (variant) => {
+      expect(rulesForVariant(variant).declarationWindow).toBe(
+        variantRulesGolden[variant].declarationTiming === "turn_window",
+      );
+    },
+  );
+
   it("the two variants genuinely differ on overlap", () => {
     expect(variantRulesGolden.bitola.declarationOverlap).toBe(false);
     expect(variantRulesGolden.croatia.declarationOverlap).toBe(true);

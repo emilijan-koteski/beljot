@@ -190,6 +190,9 @@ describe("RulesPage", () => {
     expect(screen.getByTestId("rules-option-direction")).toHaveTextContent(
       /To the right · To the left/,
     );
+    expect(screen.getByTestId("rules-option-declarationLastTrick")).toHaveTextContent(
+      /Declare until trick.*3 · 1 · 2/,
+    );
   });
 
   it("renders translated chapters in Macedonian, Croatian and Serbian", async () => {

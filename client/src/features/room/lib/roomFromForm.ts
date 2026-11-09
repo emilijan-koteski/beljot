@@ -15,6 +15,7 @@ export interface RoomFormValues {
   stopAtTarget: boolean;
   declarationsTransfer: boolean;
   clockwise: boolean;
+  declarationLastTrick: number;
   hostUsername: string;
   hostAvatarUrl: string | null;
 }
@@ -53,6 +54,7 @@ export function roomFromForm(p: RoomFormValues): Room {
     stopAtTarget: p.stopAtTarget,
     declarationsTransfer: p.declarationsTransfer,
     clockwise: p.clockwise,
+    declarationLastTrick: p.declarationLastTrick,
     status: "waiting",
     playerCount: 1,
     isQuickPlay: false,

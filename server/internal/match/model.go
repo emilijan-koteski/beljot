@@ -1,6 +1,10 @@
 package match
 
-import "time"
+import (
+	"time"
+
+	"github.com/emilijan/beljot/server/internal/game"
+)
 
 // PlayerSeatInfo holds the player info needed for live-match initialization.
 // Bot seats carry IsBot=true with UserID 0 and an empty Username.
@@ -35,6 +39,7 @@ type Match struct {
 	StopAtTarget         bool         `gorm:"not null" json:"stopAtTarget"`
 	DeclarationsTransfer bool         `gorm:"not null" json:"declarationsTransfer"`
 	Clockwise            bool         `gorm:"not null" json:"clockwise"`
+	DeclarationLastTrick int          `gorm:"not null;default:3" json:"declarationLastTrick"`
 	StartedAt            time.Time    `gorm:"not null" json:"startedAt"`
 	CompletedAt          time.Time    `gorm:"not null" json:"completedAt"`
 	Status               string       `gorm:"size:20;not null;default:completed" json:"status"`
@@ -47,6 +52,15 @@ type Match struct {
 	Player4CoinDelta     int          `gorm:"not null;default:0" json:"player4CoinDelta"`
 	CreatedAt            time.Time    `json:"createdAt"`
 	Hands                []HandResult `gorm:"foreignKey:MatchID;constraint:OnDelete:CASCADE" json:"-"`
+}
+
+// recordedDeclarationLastTrick is the window a match row stores: the turn window's last trick, or the default for
+// rules without one, so every row holds a value from 1 to 3.
+func recordedDeclarationLastTrick(rules game.VariantRules) int {
+	if rules.DeclarationLastTrick < game.MinDeclarationLastTrick {
+		return game.DefaultDeclarationLastTrick
+	}
+	return rules.DeclarationLastTrick
 }
 
 // matchSeatColumns projects a session's seat array into the persistence

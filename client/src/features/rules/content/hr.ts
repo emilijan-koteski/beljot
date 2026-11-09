@@ -139,12 +139,12 @@ export const hr: RulesLangData = {
             {
               variant: "bitola",
               otherVariantNote: "Hrvatska: svi zovu odjednom, prije prvog štiha.",
-              t: "Zovi uz prvu kartu",
-              d: "Karte pokaži na početku drugog štiha.",
+              t: "Prije karte: zovi ili nastavi",
+              d: "Do štiha određenog za stol, zadano trećeg. Zoveš sve što imaš; odigrana karta se više ne računa. Ostali tada dobivaju jednu priliku, najbolje se odmah boduje i zvanja završavaju za tu ruku.",
             },
             {
               variant: "croatia",
-              otherVariantNote: "Bitola: zoveš kad igraš prvu kartu.",
+              otherVariantNote: "Bitola: zvanja prije karte, do štiha određenog za stol.",
               t: "Zovi prije prvog štiha",
               d: "Svi zovu u isto vrijeme; sva zvanja se pokažu zajedno.",
             },

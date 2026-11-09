@@ -25,7 +25,7 @@ func TestStartMatch_RejectsALineUpWithAnEmptySeat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := NewManager(&recordingBroadcaster{}, nil)
 
-			err := m.StartMatch(100, string(game.VariantCroatia), "501", tc.players, "per-move", 10, 10, 120, 0, true, false, true, false)
+			err := m.StartMatch(100, string(game.VariantCroatia), "501", tc.players, "per-move", 10, 10, 120, 0, true, false, true, false, 3)
 
 			require.Error(t, err)
 			assert.Nil(t, m.GetStateSnapshot(100), "no session starts")

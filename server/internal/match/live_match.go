@@ -235,7 +235,7 @@ func (m *Manager) AddUserRemovedHook(fn func(userID uint)) {
 
 // StartMatch creates a new game session from room data and broadcasts the initial state.
 // coinBuyIn is the per-human stake for settlement, 0 for no-economy matches.
-func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error {
+func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, players [4]PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool, declarationLastTrick int) error {
 	if err := validateSeats(players); err != nil {
 		return fmt.Errorf("room %d: %w", roomID, err)
 	}
@@ -254,7 +254,7 @@ func (m *Manager) StartMatch(roomID uint, variant string, matchMode string, play
 		botSeats[p.Seat] = p.IsBot
 	}
 
-	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget, declarationsTransfer, clockwise)
+	gs := game.NewGame(playerIDs, usernames, botSeats, game.Variant(variant), matchMode, roomID, declarationsEnabled, stopAtTarget, declarationsTransfer, clockwise, declarationLastTrick)
 
 	for _, p := range players {
 		if !p.IsBot {
@@ -716,8 +716,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
 		}
 
-		m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
-
 		handJustScored := newState.LastHandResult != nil &&
 			newState.LastHandResult.HandNumber == oldState.HandNumber &&
 			oldState.Phase != game.PhaseHandComplete &&
@@ -778,6 +776,10 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 		m.broadcastState(playerIDs, newState)
 
 	case game.ActionDeclare, game.ActionSkipDeclare:
+		if action.Type == game.ActionSkipDeclare && oldState.Phase == game.PhasePlaying {
+			m.sendStateToSeat(playerIDs, newState, action.PlayerSeat)
+			return
+		}
 		if action.Type == game.ActionDeclare && oldState.Phase != game.PhaseDeclaring {
 			declared := ws.PlayerDeclaredPayload{PlayerSeat: action.PlayerSeat}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventPlayerDeclared, declared))
@@ -813,7 +815,6 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 				"cards":      trickCards,
 			}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventTrickResolved, trickResolved))
-			m.broadcastDeclarationsResolvedIfTransition(oldState, newState, userIDs)
 		}
 		if newState.Phase == game.PhaseMatchEnd {
 			return
@@ -1022,6 +1023,7 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 		StopAtTarget:         finalState.Rules.StopAtTarget,
 		DeclarationsTransfer: finalState.Rules.DeclarationsTransfer,
 		Clockwise:            finalState.Rules.Clockwise,
+		DeclarationLastTrick: recordedDeclarationLastTrick(finalState.Rules),
 		StartedAt:            session.startedAt,
 		CompletedAt:          time.Now(),
 		Status:               "completed",
@@ -1111,6 +1113,20 @@ func buildStateFrames(playerIDs [4]uint, state *game.GameState, excludeSeat int)
 		})
 	}
 	return frames
+}
+
+// sendStateToSeat sends the projected state to one seat only, for a change no other seat can see; a bot seat gets
+// nothing.
+func (m *Manager) sendStateToSeat(playerIDs [4]uint, state *game.GameState, seat int) {
+	m.sendToSeat(playerIDs, seat, buildMessage(ws.EventMatchState, game.ProjectForSeat(state, seat)))
+}
+
+// sendToSeat sends one message to a single human seat as a frame; a bot seat or an out-of-range seat gets nothing.
+func (m *Manager) sendToSeat(playerIDs [4]uint, seat int, msg []byte) {
+	if seat < 0 || seat > 3 || playerIDs[seat] == 0 {
+		return
+	}
+	m.hub.SendFrames([]ws.UserFrame{{UserID: playerIDs[seat], Msg: msg}})
 }
 
 // broadcastState sends the state to every human seat, projected per recipient.
@@ -1497,10 +1513,14 @@ func autoActionTypeFor(actionType string) (ws.AutoActionType, bool) {
 	return "", false
 }
 
-// sendAutoAction tells every human player about a timeout auto-action. A private skip reaches only the timed-out
-// player by name; the others see a plain timeout, because the skip would reveal what that seat holds.
+// sendAutoAction tells the human players about a timeout auto-action. A skipped declaration prompt reaches only the
+// timed-out player, and a skipped Belote reaches the others as a plain timeout, so neither reveals that seat's hand.
 func (m *Manager) sendAutoAction(playerIDs [4]uint, seat int, autoType ws.AutoActionType) {
 	exact := buildMessage(ws.EventAutoAction, ws.AutoActionPayload{PlayerSeat: seat, Type: autoType})
+	if autoType == ws.AutoActionSkipDeclare {
+		m.sendToSeat(playerIDs, seat, exact)
+		return
+	}
 	if !isPrivateAutoAction(autoType) {
 		m.hub.BroadcastToUsers(humanUserIDs(playerIDs), exact)
 		return

@@ -1255,3 +1255,19 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-room-invite-whistle-sound.md`
   summary: On WebKit, `resume()` may reject (NotAllowedError) instead of staying pending, which would end the invite chirp's 1 s grace early so a click inside it cannot unlock audio.
   evidence: Unverified (maybe-false), would be low to medium. `requestStart` maps a rejection to "settled", and `FakeAudioContext` models only a pending or a throwing resume. Settle it alongside the iOS/Safari device check above.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-bitola-declaration-window.md`
+  summary: The `CLAUDE.md` list of constants mirrored by hand names the declaration window default but not its 1..3 range (`game.MinDeclarationLastTrick`/`MaxDeclarationLastTrick` against the client's option list).
+  evidence: Review finding (low). The range is copied by hand into the create-room options, the rules page and the `ErrInvalidDeclarationLastTrick` message. It is deferred only because the fix edits an agent-context file.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-bitola-declaration-window.md`
+  summary: `.claude/rules/game-rules.md` "Wire and state" does not record that projection hides `awaitingDeclaration` from every seat but the prompted one, that a turn-prompt pass sends its state frame to the actor only, or that a Belote or a cycle resolution ends a stop-at-target match at once, mid-trick.
+  evidence: Review finding (low). All three are easy to break silently. It is deferred only because the fix edits an agent-context file.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-bitola-declaration-window.md`
+  summary: A quick double click on a Bitola turn prompt's Declare or Continue sends the answer twice, and the second is rejected with an error toast.
+  evidence: `DeclarationPrompt.tsx` `sendOnce` guards only the simultaneous dialog. The pre-change trick-1 prompt behaved the same way, so this is pre-existing. The fix is to apply the once-guard to the turn prompt too, reset when it unmounts.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-bitola-declaration-window.md`
+  summary: A timed-out Belote prompt still sends other seats `auto_action` "timeout", while a plain card-play timeout sends them nothing, which reveals that the seat held both trump King and Queen.
+  evidence: Pre-existing, found while verifying the declaration-prompt timeout leak in this story's review. `isPrivateAutoAction` masks `skip_belot` as "timeout" rather than suppressing it, and the seat has just played a trump King or Queen. The fix is to send `skip_belot` to the timed-out seat only, as this story now does for `skip_declare`.

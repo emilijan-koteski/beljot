@@ -19,7 +19,7 @@ func startPauseMatch(t *testing.T, roomID uint, windowSec int) *match.Manager {
 	go hub.Run()
 	t.Cleanup(hub.Shutdown)
 	mgr := match.NewManager(hub, newMockMatchRepo())
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, windowSec, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, windowSec, 0, true, false, true, false, 3))
 	return mgr
 }
 

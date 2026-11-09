@@ -6,12 +6,21 @@ import type { Variant } from "@/shared/types/matchTypes";
  */
 interface VariantRuleFacts {
   readonly declarationOverlap: boolean;
+  readonly declarationWindow: boolean;
   readonly kingIsRebelote: boolean;
 }
 
 const PRESETS: Record<Variant, VariantRuleFacts> = {
-  bitola: Object.freeze({ declarationOverlap: false, kingIsRebelote: true }),
-  croatia: Object.freeze({ declarationOverlap: true, kingIsRebelote: false }),
+  bitola: Object.freeze({
+    declarationOverlap: false,
+    declarationWindow: true,
+    kingIsRebelote: true,
+  }),
+  croatia: Object.freeze({
+    declarationOverlap: true,
+    declarationWindow: false,
+    kingIsRebelote: false,
+  }),
 };
 
 /**

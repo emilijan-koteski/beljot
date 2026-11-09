@@ -455,6 +455,7 @@ func (m *Manager) abandonMatchLocked(session *LiveMatch, abandonedSeat int, reas
 	stopAtTarget := gs.Rules.StopAtTarget
 	declarationsTransfer := gs.Rules.DeclarationsTransfer
 	clockwise := gs.Rules.Clockwise
+	declarationLastTrick := recordedDeclarationLastTrick(gs.Rules)
 	var botSeats [4]bool
 	var connected [4]bool
 	for i := range gs.Players {
@@ -541,6 +542,7 @@ func (m *Manager) abandonMatchLocked(session *LiveMatch, abandonedSeat int, reas
 		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
 		Clockwise:            clockwise,
+		DeclarationLastTrick: declarationLastTrick,
 		StartedAt:            startedAt,
 		CompletedAt:          time.Now(),
 		Status:               "abandoned",

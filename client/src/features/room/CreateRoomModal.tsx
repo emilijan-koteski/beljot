@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { rulesForVariant } from "@/features/match/lib/variantRules";
 import { CreateRoomPreview } from "@/features/room/components/CreateRoomPreview";
 import { FetchError } from "@/shared/api/axiosClient";
 import { HonorShield } from "@/shared/components/HonorShield";
@@ -29,7 +30,11 @@ import {
 import { variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
-import type { MatchMode } from "@/shared/types/matchTypes";
+import {
+  DECLARATION_LAST_TRICK_OPTIONS,
+  DEFAULT_DECLARATION_LAST_TRICK,
+  type MatchMode,
+} from "@/shared/types/matchTypes";
 
 interface CreateRoomModalProps {
   open: boolean;
@@ -83,6 +88,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const [stopAtTarget, setStopAtTarget] = useState(false);
   const [declarationsTransfer, setDeclarationsTransfer] = useState(true);
   const [clockwise, setClockwise] = useState(false);
+  const [declarationLastTrick, setDeclarationLastTrick] = useState(DEFAULT_DECLARATION_LAST_TRICK);
   const [timerStyle, setTimerStyle] = useState<"relaxed" | "per-move">("per-move");
   const [timerDuration, setTimerDuration] = useState(DEFAULT_MOVE_SECONDS);
   const [presetBuyIn, setPresetBuyIn] = useState(DEFAULT_BUY_IN);
@@ -115,6 +121,10 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
   const failsOwnHonorGate = honorKnown && meHonor < effectiveMinHonor;
   const failsOwnGate = failsOwnNewPlayerGate || failsOwnHonorGate;
   const effectiveDeclarationsTransfer = !declarationsEnabled || declarationsTransfer;
+  const declarationWindowUsed = rulesForVariant(variant).declarationWindow && declarationsEnabled;
+  const effectiveDeclarationLastTrick = declarationWindowUsed
+    ? declarationLastTrick
+    : DEFAULT_DECLARATION_LAST_TRICK;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +153,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
         stopAtTarget,
         declarationsTransfer: effectiveDeclarationsTransfer,
         clockwise,
+        declarationLastTrick: effectiveDeclarationLastTrick,
       });
       onOpenChange(false);
       navigate(`/rooms/${room.id}`);
@@ -203,6 +214,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
       setStopAtTarget(false);
       setDeclarationsTransfer(true);
       setClockwise(false);
+      setDeclarationLastTrick(DEFAULT_DECLARATION_LAST_TRICK);
       setTimerStyle("per-move");
       setTimerDuration(DEFAULT_MOVE_SECONDS);
       setPresetBuyIn(DEFAULT_BUY_IN);
@@ -425,6 +437,27 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
               className={SEGMENTED}
               testId="declarations-transfer-segmented"
               ariaLabel={t("lobby.createRoomModal.declarationsTransfer")}
+            />
+          </CompactField>
+        )}
+        {declarationWindowUsed && (
+          <CompactField
+            testId="field-declaration-last-trick-segmented"
+            label={t("lobby.createRoomModal.declarationLastTrick")}
+            info={t("lobby.createRoomModal.declarationLastTrickHint")}
+            infoTestId="declaration-last-trick-info-toggle"
+            changed={declarationLastTrick !== DEFAULT_DECLARATION_LAST_TRICK}
+          >
+            <Segmented
+              value={String(declarationLastTrick)}
+              onValueChange={(v) => setDeclarationLastTrick(Number(v))}
+              options={DECLARATION_LAST_TRICK_OPTIONS.map((n) => ({
+                value: String(n),
+                label: String(n),
+              }))}
+              className={SEGMENTED}
+              testId="declaration-last-trick-segmented"
+              ariaLabel={t("lobby.createRoomModal.declarationLastTrick")}
             />
           </CompactField>
         )}
@@ -748,6 +781,7 @@ export function CreateRoomModal({ open, onOpenChange }: CreateRoomModalProps) {
                 stopAtTarget={stopAtTarget}
                 declarationsTransfer={effectiveDeclarationsTransfer}
                 clockwise={clockwise}
+                declarationLastTrick={effectiveDeclarationLastTrick}
                 hostUsername={meUsername || "host"}
                 hostAvatarUrl={meAvatarUrl}
               />

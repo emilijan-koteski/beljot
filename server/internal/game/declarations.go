@@ -292,8 +292,14 @@ func maybeCloseDeclarationPhase(state *GameState) {
 	closeDeclarationPhase(state)
 }
 
-// closeDeclarationPhase resolves the declaration contest and opens trick 1 unconditionally.
+// closeDeclarationPhase resolves the declaration contest. The dedicated phase then opens trick 1, and a turn-window
+// cycle hands the trick back to the declarer.
 func closeDeclarationPhase(state *GameState) {
+	if state.Rules.DeclarationTiming == DeclarationTimingTurnWindow {
+		closeDeclarationCycle(state)
+		return
+	}
+
 	resolveDeclarationsForHand(state)
 
 	for i := range state.Players {
@@ -310,8 +316,8 @@ func closeDeclarationPhase(state *GameState) {
 	}
 }
 
-// ForceCloseDeclarationPhase resolves the declaration contest and opens trick 1, treating unanswered seats as skipped.
-// The session manager calls it when the phase's fixed window elapses.
+// ForceCloseDeclarationPhase closes the declaration phase as closeDeclarationPhase does, treating unanswered seats as
+// skipped. The session manager calls it when the phase's fixed window elapses.
 func ForceCloseDeclarationPhase(state *GameState) (*GameState, error) {
 	if state.Phase != PhaseDeclaring {
 		return nil, apperr.ErrWrongPhase
@@ -322,7 +328,8 @@ func ForceCloseDeclarationPhase(state *GameState) (*GameState, error) {
 	return newState, nil
 }
 
-// handleDeclare detects and stores the player's declarations at trick 1 or during PhaseDeclaring.
+// handleDeclare stores the seat's declarations from its current hand. A declaration at a turn prompt opens the
+// declaration cycle; one inside PhaseDeclaring answers it.
 func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	if err := checkDeclarationAnswerable(state, action.PlayerSeat); err != nil {
 		return nil, err
@@ -342,15 +349,17 @@ func handleDeclare(state *GameState, action Action) (*GameState, error) {
 	newState.Players[action.PlayerSeat].Declarations = decls
 	newState.AwaitingDeclaration = false
 
-	if newState.Phase == PhaseDeclaring {
-		newState.Players[action.PlayerSeat].DeclarationAnswered = true
-		maybeCloseDeclarationPhase(newState)
+	if newState.Phase == PhasePlaying {
+		openDeclarationCycle(newState, action.PlayerSeat)
+		return newState, nil
 	}
 
+	newState.Players[action.PlayerSeat].DeclarationAnswered = true
+	maybeCloseDeclarationPhase(newState)
 	return newState, nil
 }
 
-// handleSkipDeclare records a skip_declare at trick 1 or during PhaseDeclaring.
+// handleSkipDeclare records a skip_declare at a turn prompt or during PhaseDeclaring.
 func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 	if err := checkDeclarationAnswerable(state, action.PlayerSeat); err != nil {
 		return nil, err
@@ -367,8 +376,8 @@ func handleSkipDeclare(state *GameState, action Action) (*GameState, error) {
 	return newState, nil
 }
 
-// checkDeclarationAnswerable reports whether seat may declare or skip now.
-// In PhaseDeclaring any unanswered seat may answer; at trick 1 only the prompted active seat may.
+// checkDeclarationAnswerable reports whether seat may declare or skip now. In PhaseDeclaring any unanswered seat
+// may answer; during play only the prompted active seat may, while the declaration window is open.
 func checkDeclarationAnswerable(state *GameState, seat int) error {
 	if seat < 0 || seat > 3 {
 		return apperr.ErrNotYourTurn
@@ -381,14 +390,14 @@ func checkDeclarationAnswerable(state *GameState, seat int) error {
 		return nil
 	}
 
-	if state.TrickNumber != 1 {
-		return apperr.ErrWrongPhase
-	}
-	if !state.AwaitingDeclaration {
+	if !declarationWindowOpen(state) {
 		return apperr.ErrWrongPhase
 	}
 	if seat != state.ActivePlayerSeat {
 		return apperr.ErrNotYourTurn
+	}
+	if !state.AwaitingDeclaration {
+		return apperr.ErrWrongPhase
 	}
 	return nil
 }
@@ -431,8 +440,7 @@ func shouldPromptBelot(state *GameState, playedCard Card, handBeforePlay []Card)
 	return hasBelot(handBeforePlay, trumpSuit)
 }
 
-// handleAnnounceBelot awards 20 points to the announcing player's team.
-// The target check is deferred while a trick-1 declaration contest is still open, so declared melds are scored first.
+// handleAnnounceBelot awards 20 points to the announcing player's team and checks the target at once.
 func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 	if state.PendingBelotSeat == nil || *state.PendingBelotSeat != action.PlayerSeat {
 		return nil, apperr.ErrBelotNotAvailable
@@ -444,8 +452,7 @@ func handleAnnounceBelot(state *GameState, action Action) (*GameState, error) {
 	newState.BelotAnnounced = true
 	newState.PendingBelotSeat = nil
 
-	deferForOpenTrick1Contest := newState.TrickNumber == 1 && !newState.DeclarationsResolved
-	if !deferForOpenTrick1Contest && stopAtTargetIfReached(newState) {
+	if stopAtTargetIfReached(newState) {
 		return newState, nil
 	}
 
@@ -474,26 +481,18 @@ func finishCardPlay(state *GameState) {
 	lastCard := state.CurrentTrick[len(state.CurrentTrick)-1]
 	state.ActivePlayerSeat = state.Rules.NextSeat(lastCard.PlayerSeat)
 
-	if state.TrickNumber == 1 && len(state.CurrentTrick) < 4 {
+	if len(state.CurrentTrick) < 4 {
 		checkDeclarationPrompt(state)
+		return
 	}
 
-	if len(state.CurrentTrick) == 4 {
-		resolveTrickWithDeclarations(state)
-	}
+	resolveTrickAndAdvance(state)
 }
 
-// resolveTrickWithDeclarations resolves a trick and, if it's trick 1,
-// also resolves declarations.
-func resolveTrickWithDeclarations(state *GameState) {
+// resolveTrickAndAdvance resolves a full trick, then ends the match at the target, scores a finished hand, or
+// prompts the next trick's leader.
+func resolveTrickAndAdvance(state *GameState) {
 	resolveTrick(state)
-
-	if state.TrickNumber == 2 && !state.DeclarationsResolved {
-		resolveDeclarationsForHand(state)
-	}
-	if state.Phase == PhaseHandScoring && !state.DeclarationsResolved {
-		resolveDeclarationsForHand(state)
-	}
 
 	if stopAtTargetIfReached(state) {
 		return
@@ -501,7 +500,10 @@ func resolveTrickWithDeclarations(state *GameState) {
 
 	if state.Phase == PhaseHandScoring {
 		scoreHand(state)
+		return
 	}
+
+	checkDeclarationPrompt(state)
 }
 
 // bothTeamsDeclared reports whether each team put at least one meld on the table.
@@ -521,7 +523,7 @@ func bothTeamsDeclared(state *GameState) bool {
 	return teamA && teamB
 }
 
-// resolveDeclarationsForHand resolves declarations after trick 1 and awards points.
+// resolveDeclarationsForHand resolves the hand's declaration contest, awards the winning team and drops the loser's melds.
 func resolveDeclarationsForHand(state *GameState) {
 	state.DeclarationsContested = bothTeamsDeclared(state)
 
@@ -538,18 +540,4 @@ func resolveDeclarationsForHand(state *GameState) {
 		}
 	}
 	state.DeclarationsResolved = true
-}
-
-// checkDeclarationPrompt sets AwaitingDeclaration if it is trick 1 and the active player has declarable combinations.
-func checkDeclarationPrompt(state *GameState) {
-	if state.TrickNumber != 1 || state.DeclarationsResolved {
-		return
-	}
-	seat := state.ActivePlayerSeat
-	if len(state.Players[seat].Declarations) > 0 {
-		return
-	}
-	if hasDeclarableCombinations(state.Players[seat].Hand, state.Rules.DeclarationOverlap) {
-		state.AwaitingDeclaration = true
-	}
 }

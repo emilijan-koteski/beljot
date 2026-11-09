@@ -142,7 +142,7 @@ func TestGameStateJSONCamelCaseKeys(t *testing.T) {
 func TestNewGame(t *testing.T) {
 	playerIDs := [4]uint{10, 20, 30, 40}
 	usernames := [4]string{"alice", "bob", "carol", "dave"}
-	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true, false)
+	gs := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true, false, game.DefaultDeclarationLastTrick)
 
 	t.Run("sets match metadata", func(t *testing.T) {
 		assert.Equal(t, uint(42), gs.RoomID)
@@ -162,7 +162,7 @@ func TestNewGame(t *testing.T) {
 		const draws = 4000
 		var counts [4]int
 		for range draws {
-			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true, false)
+			g := game.NewGame(playerIDs, usernames, [4]bool{}, game.VariantBitola, "1001", 42, true, false, true, false, game.DefaultDeclarationLastTrick)
 			require.GreaterOrEqual(t, g.DealerSeat, 0)
 			require.LessOrEqual(t, g.DealerSeat, 3)
 			require.Equal(t, (g.DealerSeat+1)%4, g.ActivePlayerSeat,
@@ -318,7 +318,8 @@ func TestRulesForPresets(t *testing.T) {
 		HasTrumpCandidate:    true,
 		AllPassOutcome:       game.AllPassReshuffleAndRotate,
 		DeclarationOverlap:   false,
-		DeclarationTiming:    game.DeclarationTimingDuringFirstTrick,
+		DeclarationTiming:    game.DeclarationTimingTurnWindow,
+		DeclarationLastTrick: game.DefaultDeclarationLastTrick,
 		DeclarationsEnabled:  true,
 		DeclarationsTransfer: true,
 		TieRule:              game.TieRuleHangingPoints,
@@ -363,6 +364,7 @@ func TestRulesForPresets(t *testing.T) {
 		assert.NotEqual(t, bitola.AllPassOutcome, croatia.AllPassOutcome)
 		assert.NotEqual(t, bitola.DeclarationOverlap, croatia.DeclarationOverlap)
 		assert.NotEqual(t, bitola.DeclarationTiming, croatia.DeclarationTiming)
+		assert.NotEqual(t, bitola.DeclarationLastTrick, croatia.DeclarationLastTrick)
 		assert.NotEqual(t, bitola.TieRule, croatia.TieRule)
 	})
 
@@ -391,7 +393,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1, true, false, true, false)
+				[4]bool{}, tc.variant, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick)
 			assert.Equal(t, game.RulesFor(tc.variant), gs.Rules)
 			assert.Equal(t, tc.variant, gs.Variant, "the variant string is stored verbatim")
 		})
@@ -403,7 +405,7 @@ func TestNewGameResolvesRulesOnce(t *testing.T) {
 // conservation.
 func TestNewGameCroatianDeal(t *testing.T) {
 	gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-		[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true, false)
+		[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true, false, game.DefaultDeclarationLastTrick)
 
 	t.Run("six open cards and two face-down per seat", func(t *testing.T) {
 		for i, p := range gs.Players {
@@ -440,7 +442,7 @@ func TestNewGameCroatianDeal(t *testing.T) {
 		}
 
 		bidding := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-			[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true, false)
+			[4]bool{}, game.VariantCroatia, "1001", 7, true, false, true, false, game.DefaultDeclarationLastTrick)
 		bidding.Phase = game.PhaseBidding
 		suit := game.SuitSpades
 		resolved, err := game.ApplyAction(bidding, game.Action{
@@ -505,7 +507,7 @@ func TestGameStateJSONOmitsServerOnlyRuleFields(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-				[4]bool{}, tc.variant, "1001", 1, true, false, true, false)
+				[4]bool{}, tc.variant, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick)
 
 			data, err := json.Marshal(gs)
 			require.NoError(t, err)

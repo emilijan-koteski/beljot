@@ -225,3 +225,42 @@ func TestProjectForSeat_PostPickMergedHand(t *testing.T) {
 		}
 	}
 }
+
+// TestProjectForSeat_DeclarationWindowPrivacy checks only the prompted seat sees its own turn prompt, and that the
+// cycle shows nobody another seat's melds before the resolution.
+func TestProjectForSeat_DeclarationWindowPrivacy(t *testing.T) {
+	prompted := testfixtures.NewGameBitolaWindow()
+	prompted.AwaitingDeclaration = true
+	require.Equal(t, 1, prompted.ActivePlayerSeat)
+
+	for seat := 0; seat < 4; seat++ {
+		p := game.ProjectForSeat(prompted, seat)
+		assert.Equal(t, seat == 1, p.AwaitingDeclaration, "seat %d sees the prompt flag", seat)
+	}
+	assert.True(t, prompted.AwaitingDeclaration, "projection must not touch the raw state")
+
+	cycle, err := game.ApplyAction(prompted, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
+	require.NoError(t, err)
+	cycle, err = game.ApplyAction(cycle, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
+	require.NoError(t, err)
+	require.Equal(t, game.PhaseDeclaring, cycle.Phase)
+
+	for seat := 0; seat < 4; seat++ {
+		p := game.ProjectForSeat(cycle, seat)
+		for other := 0; other < 4; other++ {
+			if other == seat {
+				assert.Equal(t, cycle.Players[other].Declarations, p.Players[other].Declarations,
+					"seat %d sees its own melds", seat)
+				continue
+			}
+			assert.Empty(t, p.Players[other].Declarations, "seat %d must not see seat %d's melds", seat, other)
+		}
+		assert.Equal(t, cycle.Players[1].DeclarationAnswered, p.Players[1].DeclarationAnswered,
+			"who has answered is public, as in the Croatian phase")
+	}
+
+	raw, err := json.Marshal(game.ProjectForSeat(prompted, 2))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"awaitingDeclaration":false`)
+	assert.Contains(t, string(raw), `"declarationLastTrick":`)
+}

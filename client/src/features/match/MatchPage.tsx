@@ -1031,7 +1031,9 @@ export function MatchPage() {
   }, [clearGame, returnToLobby, setMatchAbandonedData]);
 
   const promptPlayer = matchState?.players.find((p) => p.seat === myPlayerSeat);
-  const { declarationOverlap, kingIsRebelote } = rulesForVariant(matchState?.variant);
+  const { declarationOverlap, declarationWindow, kingIsRebelote } = rulesForVariant(
+    matchState?.variant,
+  );
   const promptHandKey = (promptPlayer?.hand ?? []).map((c) => `${c.rank}${c.suit}`).join(",");
   const promptDeclarations = useMemo(
     () =>
@@ -1145,9 +1147,21 @@ export function MatchPage() {
   const showDeclarationPrompt =
     trumpReveal === null &&
     !dealing &&
+    pendingResolvedTrick === null &&
     (isDeclarationPhase
       ? myPlayer !== undefined && declarationReveal === null
       : matchState.awaitingDeclaration === true && matchState.activePlayerSeat === myPlayerSeat);
+  const declarationPassIsFinal = matchState.trickNumber >= matchState.declarationLastTrick;
+  const midTrickDeclarer =
+    isDeclarationPhase &&
+    matchState.trickNumber >= 1 &&
+    matchState.activePlayerSeat !== myPlayerSeat
+      ? matchState.players.find((p) => p.seat === matchState.activePlayerSeat)
+      : undefined;
+  const declaredBy =
+    midTrickDeclarer === undefined
+      ? undefined
+      : (playerDisplayName(t, midTrickDeclarer) ?? midTrickDeclarer.username);
 
   const ownTurnDeadline =
     !dealing &&
@@ -1535,6 +1549,8 @@ export function MatchPage() {
           simultaneous={isDeclarationPhase}
           answered={isDeclarationPhase && myPlayer.declarationAnswered}
           answeredCount={declarationAnsweredCount}
+          passIsFinal={declarationPassIsFinal}
+          declaredBy={declaredBy}
         />
       )}
 
@@ -1692,6 +1708,11 @@ export function MatchPage() {
         stopAtTarget={matchState.stopAtTarget}
         declarationsTransfer={matchState.declarationsTransfer}
         clockwise={matchState.clockwise}
+        declarationLastTrick={
+          declarationWindow && matchState.declarationsEnabled
+            ? matchState.declarationLastTrick
+            : undefined
+        }
       />
     </div>
   );

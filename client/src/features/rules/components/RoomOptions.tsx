@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import { useRules } from "@/features/rules/RulesContext";
 import { RULE_ICONS } from "@/shared/components/roomRules/roomRuleLines";
+import {
+  DECLARATION_LAST_TRICK_OPTIONS,
+  DEFAULT_DECLARATION_LAST_TRICK,
+} from "@/shared/types/matchTypes";
 
 const FORM = "lobby.createRoomModal";
 
@@ -45,6 +49,16 @@ export function RoomOptions() {
       standard: t(`${FORM}.declarationsOn`),
       other: t(`${FORM}.declarationsOff`),
       hint: t(`${FORM}.declarationsHint`),
+    },
+    {
+      key: "declarationLastTrick",
+      icon: RULE_ICONS.declarationWindow,
+      label: t(`${FORM}.declarationLastTrick`),
+      standard: String(DEFAULT_DECLARATION_LAST_TRICK),
+      other: DECLARATION_LAST_TRICK_OPTIONS.filter(
+        (n) => n !== DEFAULT_DECLARATION_LAST_TRICK,
+      ).join(" · "),
+      hint: t(`${FORM}.declarationLastTrickHint`),
     },
     {
       key: "declarationsTransfer",

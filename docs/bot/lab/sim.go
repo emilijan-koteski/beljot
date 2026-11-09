@@ -149,7 +149,7 @@ func NewDealState(d Deal, variant game.Variant) *game.GameState {
 
 // NewDealStateWith is NewDealState with the teams' match scores and the room's stop-at-target rule.
 func NewDealStateWith(d Deal, variant game.Variant, scores [2]int, stopAtTarget bool) *game.GameState {
-	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, stopAtTarget, true, false)
+	gs := game.NewGame([4]uint{0, 0, 0, 0}, [4]string{"", "", "", ""}, [4]bool{true, true, true, true}, variant, "1001", 1, true, stopAtTarget, true, false, game.DefaultDeclarationLastTrick)
 	gs.TeamScores = scores
 	for i := range gs.Players {
 		gs.Players[i].Hand = []game.Card{}

@@ -216,11 +216,14 @@ func botDecisionSeats(gs *game.GameState) []int {
 
 const botBelotBeat = 150 * time.Millisecond
 
-// botThinkDelay returns the humanized delay before the bot at seat acts: botPlayDelay for bids and plays,
-// botDelayMin for fixed-window phases and botBelotBeat for its own Belote answer, unless a Belote search is queued.
+// botThinkDelay returns the humanized delay before the bot at seat acts: botPlayDelay for bids and plays, botDelayMin
+// for fixed-window phases and its own declaration prompt, and botBelotBeat for its own Belote answer.
 func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat {
 		return min(botBelotBeat, m.botDelayMax)
+	}
+	if gs.Phase == game.PhasePlaying && gs.AwaitingDeclaration && gs.ActivePlayerSeat == seat {
+		return m.botDelayMin
 	}
 	phase := gs.Phase
 	if phase == game.PhaseHandComplete || phase == game.PhaseDeclaring {

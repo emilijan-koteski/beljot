@@ -81,8 +81,10 @@ Every time it is the bot's turn, it checks these in strict priority:
    declarations on a fall, the +20 does not end a stop-at-target match on the spot, and the hand
    searched without the Belote (`search.Evaluate`, the same deals) beats the hand searched with it
    by more than the margin; a missed deadline, a dropped job or a stale result announces.
-4. **Awaiting declaration** -> always declare. The engine auto-detects melds; declaring
-   always maximizes points.
+4. **Awaiting declaration** -> always declare, after the shortest think delay (`botDelayMin`). The
+   engine detects the melds from the current hand, and declaring always maximizes points. In Bitola
+   a declaration at a turn prompt opens the declaration cycle. In any declaring phase (Croatian's,
+   or a Bitola cycle) the bot declares when it holds a meld and skips otherwise.
 5. **Otherwise** -> `chooseCard` (Scenario B). From trick 1 the match layer first offers a card
    play to the search (§5); `chooseCard` then plays only when the search does not apply or does
    not deliver in time.
@@ -462,9 +464,9 @@ when the seeded deck came in, before the phase-4 play changes); its gate stays 6
   Capot, a fall) is valued as the decided match since phase 4 (5.10, the hand's end in the race). What
   remains: the race starts only when a running total is within the card points still to play plus
   10 of the target, so on a stop-at-target table a fall or a Capot that would carry a team over from
-  further away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement;
-  in a Bitola trick 1 with declarations still open the engine checks the target only at the end of
-  the trick, and the search does not model that case on tricks 1 and 2.
+  further away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement.
+  The search does not model Bitola declarations still to come in tricks 1..N either, though a later
+  declaration can change both teams' totals and, on a stop-at-target table, end the match mid-trick.
 - **No bidding, declaration, Belote or surrender decisions.** The caller's Belote answer of rule 3
   (`search.Evaluate` with and without the 20 on the same deals) exists for the lab and ships off
   (`BeloteSkipMargin 0`).

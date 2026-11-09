@@ -94,6 +94,7 @@ const mockMatchState: MatchState = {
   stopAtTarget: false,
   declarationsTransfer: true,
   clockwise: false,
+  declarationLastTrick: 3,
   activePlayerSeat: 0,
   trickNumber: 1,
   currentTrick: [],
@@ -1233,6 +1234,41 @@ describe("MatchPage", () => {
       expect(screen.getByTestId("score-reveal")).toBeInTheDocument();
     });
 
+    it("holds a declaration prompt until the collect snapshot clears", () => {
+      useMatchStore.getState().setMatchState({
+        ...mockMatchState,
+        trumpSuit: "H",
+        trickNumber: 2,
+        activePlayerSeat: 0,
+        awaitingDeclaration: true,
+        players: mockMatchState.players.map((p) =>
+          p.seat === 0
+            ? {
+                ...p,
+                declarations: [],
+                hand: [
+                  { rank: "9", suit: "S" },
+                  { rank: "T", suit: "S" },
+                  { rank: "J", suit: "S" },
+                ] as MatchState["players"][number]["hand"],
+              }
+            : p,
+        ) as MatchState["players"],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(collectSnapshot);
+      });
+      renderMatchPage();
+
+      expect(screen.queryByTestId("declaration-prompt")).not.toBeInTheDocument();
+
+      act(() => {
+        useMatchStore.getState().setPendingResolvedTrick(null);
+      });
+      expect(screen.getByTestId("declaration-prompt")).toBeInTheDocument();
+    });
+
     it("defers the declaration reveal until the collect snapshot clears (bug 3)", () => {
       useMatchStore.getState().setMatchState(mockMatchState);
       useMatchStore.getState().setMyPlayerSeat(0);
@@ -1834,6 +1870,43 @@ describe("MatchPage", () => {
       expect(screen.queryByTestId("declaration-prompt")).not.toBeInTheDocument();
     });
 
+    it("says Continue on a Bitola turn prompt before the last declaration trick", () => {
+      useMatchStore.getState().setMatchState({
+        ...overlapPromptState("bitola"),
+        trickNumber: 2,
+        declarationLastTrick: 3,
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      const skip = within(screen.getByTestId("declaration-prompt")).getByTestId(
+        "declaration-prompt-skip",
+      );
+      expect(skip).toHaveTextContent("Continue");
+      fireEvent.click(skip);
+      expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+    });
+
+    it.each([
+      [3, 3],
+      [1, 1],
+    ])(
+      "says Skip on a Bitola turn prompt in trick %i of a table that closes after trick %i",
+      (trickNumber, declarationLastTrick) => {
+        useMatchStore.getState().setMatchState({
+          ...overlapPromptState("bitola"),
+          trickNumber,
+          declarationLastTrick,
+        });
+        useMatchStore.getState().setMyPlayerSeat(0);
+        renderMatchPage();
+
+        expect(
+          within(screen.getByTestId("declaration-prompt")).getByTestId("declaration-prompt-skip"),
+        ).toHaveTextContent("Skip");
+      },
+    );
+
     it("lists one deduped meld and totals 200 in a Bitola match", () => {
       useMatchStore.getState().setMatchState(overlapPromptState("bitola"));
       useMatchStore.getState().setMyPlayerSeat(0);
@@ -1888,6 +1961,29 @@ describe("MatchPage", () => {
       fireEvent.click(screen.getByTestId("rules-button"));
 
       expect(screen.getByTestId("rules-dialog-clockwise-note")).toBeInTheDocument();
+    });
+
+    it("notes an early declaration close on a Bitola table", () => {
+      useMatchStore.getState().setMatchState({ ...mockMatchState, declarationLastTrick: 1 });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.getByTestId("rules-dialog-declaration-window-note")).toHaveTextContent(
+        "declarations close after trick 1",
+      );
+    });
+
+    it.each([
+      ["a Croatian table", { variant: "croatia" as const }],
+      ["a table without declarations", { declarationsEnabled: false }],
+    ])("shows no declaration window note on %s", (_case, overrides) => {
+      useMatchStore
+        .getState()
+        .setMatchState({ ...mockMatchState, declarationLastTrick: 1, ...overrides });
+      renderMatchPage();
+      fireEvent.click(screen.getByTestId("rules-button"));
+
+      expect(screen.queryByTestId("rules-dialog-declaration-window-note")).not.toBeInTheDocument();
     });
   });
 
@@ -2304,6 +2400,66 @@ describe("MatchPage", () => {
       );
 
       expect(mockSendMessage).toHaveBeenCalledWith("action:skip_declare", {});
+    });
+
+    it("names no declarer in a phase before the first trick", () => {
+      renderDeclaring();
+
+      const prompt = screen.getByTestId("declaration-prompt");
+      expect(
+        within(prompt).queryByTestId("declaration-prompt-declared-by"),
+      ).not.toBeInTheDocument();
+      expect(within(prompt).getByTestId("declaration-prompt-skip")).toHaveTextContent("Skip");
+    });
+
+    describe("opened mid-trick by a Bitola declarer", () => {
+      function midTrickOverrides(declarer: { isBot: boolean }): Partial<MatchState> {
+        return {
+          trickNumber: 2,
+          activePlayerSeat: 1,
+          currentTrick: [
+            { card: { rank: "Q", suit: "D" }, playerSeat: 3 },
+            { card: { rank: "A", suit: "C" }, playerSeat: 0 },
+          ],
+          leadSuit: "D",
+          players: declaringState().players.map((p) =>
+            p.seat === 1 ? { ...p, isBot: declarer.isBot, declarationAnswered: true } : p,
+          ) as MatchState["players"],
+        };
+      }
+
+      it("names the declarer above the cycle dialog", () => {
+        renderDeclaring(midTrickOverrides({ isBot: false }));
+
+        const prompt = screen.getByTestId("declaration-prompt");
+        expect(within(prompt).getByTestId("declaration-prompt-declared-by")).toHaveTextContent(
+          "Bob declared",
+        );
+        expect(within(prompt).getByTestId("declaration-prompt-skip")).toHaveTextContent("Skip");
+      });
+
+      it("names nobody in the declarer's own dialog", () => {
+        renderDeclaring({ ...midTrickOverrides({ isBot: false }), activePlayerSeat: 0 });
+
+        expect(screen.getByTestId("declaration-prompt")).toBeInTheDocument();
+        expect(screen.queryByTestId("declaration-prompt-declared-by")).not.toBeInTheDocument();
+      });
+
+      it("names a bot declarer by its seat name", () => {
+        renderDeclaring(midTrickOverrides({ isBot: true }));
+
+        expect(screen.getByTestId("declaration-prompt-declared-by")).toHaveTextContent(
+          "Bot 2 declared",
+        );
+      });
+
+      it("keeps the open trick on the table and no seat on the clock", () => {
+        renderDeclaring(midTrickOverrides({ isBot: false }));
+
+        expect(screen.getByTestId("trick-slot-card-3")).toBeInTheDocument();
+        expect(screen.getByTestId("trick-slot-card-0")).toBeInTheDocument();
+        expect(screen.getByTestId("player-seat-1")).toHaveAttribute("data-active", "false");
+      });
     });
   });
 

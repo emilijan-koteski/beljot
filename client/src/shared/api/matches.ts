@@ -56,6 +56,7 @@ export interface MatchListItem {
   stopAtTarget?: boolean;
   declarationsTransfer?: boolean;
   clockwise?: boolean;
+  declarationLastTrick?: number;
   players: MatchPlayer[];
   hands: MatchHandView[];
 }

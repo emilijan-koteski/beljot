@@ -107,7 +107,7 @@ func TestClockwise_NewGameMirrorsFlagAndOpensBesideDealer(t *testing.T) {
 
 				for range 64 {
 					gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-						[4]bool{}, variant, "1001", 1, true, false, true, d.clockwise)
+						[4]bool{}, variant, "1001", 1, true, false, true, d.clockwise, game.DefaultDeclarationLastTrick)
 
 					assert.Equal(t, d.clockwise, gs.Rules.Clockwise)
 					assert.Equal(t, d.clockwise, gs.Clockwise)
@@ -116,7 +116,7 @@ func TestClockwise_NewGameMirrorsFlagAndOpensBesideDealer(t *testing.T) {
 				}
 
 				gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"},
-					[4]bool{}, variant, "1001", 1, true, false, true, d.clockwise)
+					[4]bool{}, variant, "1001", 1, true, false, true, d.clockwise, game.DefaultDeclarationLastTrick)
 				data, err := json.Marshal(gs)
 				require.NoError(t, err)
 				var raw map[string]any

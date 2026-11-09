@@ -36,7 +36,7 @@ func startMissedTurnsTable(t *testing.T, roomID uint, players [4]match.PlayerSea
 	tbl.mgr.SetBotDelayForTest(time.Hour, time.Hour)
 	tbl.mgr.SetHonorRecorder(tbl.honor)
 	tbl.mgr.SetXPAwarder(tbl.xp)
-	require.NoError(t, tbl.mgr.StartMatch(roomID, "bitola", "1001", players, "per-move", 60, 10, 120, 0, true, false, true, false))
+	require.NoError(t, tbl.mgr.StartMatch(roomID, "bitola", "1001", players, "per-move", 60, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { tbl.mgr.RemoveSession(roomID) })
 	return tbl
 }

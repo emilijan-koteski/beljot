@@ -64,6 +64,28 @@ func (r *recordingBroadcaster) record(msg []byte) {
 	r.msgs = append(r.msgs, cp)
 }
 
+// frameRecorder keeps who each state batch and each broadcast went to, for tests about who learns what.
+type frameRecorder struct {
+	batches    [][]uint
+	broadcasts [][]uint
+}
+
+func (f *frameRecorder) BroadcastToUsers(userIDs []uint, _ []byte) {
+	f.broadcasts = append(f.broadcasts, slices.Clone(userIDs))
+}
+
+func (f *frameRecorder) SendToUser(userID uint, _ []byte) {
+	f.broadcasts = append(f.broadcasts, []uint{userID})
+}
+
+func (f *frameRecorder) SendFrames(frames []ws.UserFrame) {
+	ids := make([]uint, 0, len(frames))
+	for _, fr := range frames {
+		ids = append(ids, fr.UserID)
+	}
+	f.batches = append(f.batches, ids)
+}
+
 // snapshot returns the recorded messages so far, safe to read while a session broadcasts.
 func (r *recordingBroadcaster) snapshot() [][]byte {
 	r.mu.Lock()
@@ -330,12 +352,13 @@ func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 			ActivePlayerSeat:    2,
 		}
 		newState := &game.GameState{
-			Phase:            game.PhasePlaying,
+			Phase:            game.PhaseDeclaring,
 			HandNumber:       1,
 			TrumpSuit:        &trump,
 			TrickNumber:      1,
 			ActivePlayerSeat: 2,
 		}
+		newState.Players[2].DeclarationAnswered = true
 		return oldState, newState
 	}
 
@@ -361,16 +384,39 @@ func TestBroadcastActionResult_DeclareEmitsPlayerDeclared(t *testing.T) {
 			"player_declared must come before match_state (got %v)", types)
 	})
 
-	t.Run("skip_declare stays silent", func(t *testing.T) {
-		rec := &recordingBroadcaster{}
-		m := &Manager{hub: rec}
-		oldState, newState := declareStates()
+	t.Run("skip_declare at a turn prompt reaches only the actor", func(t *testing.T) {
+		hub := &frameRecorder{}
+		m := &Manager{hub: hub}
+		oldState, _ := declareStates()
+		newState := &game.GameState{
+			Phase:            game.PhasePlaying,
+			HandNumber:       1,
+			TrumpSuit:        &trump,
+			TrickNumber:      1,
+			ActivePlayerSeat: 2,
+		}
 
 		m.broadcastActionResult([4]uint{10, 20, 30, 40}, oldState, newState,
 			game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 2}, false)
 
-		assert.NotContains(t, rec.eventTypes(), ws.EventPlayerDeclared,
-			"skipping declarations must not announce anything")
+		require.Len(t, hub.batches, 1, "a pass sends one state frame and nothing else")
+		assert.Equal(t, []uint{30}, hub.batches[0], "only the passing seat learns it passed")
+		assert.Empty(t, hub.broadcasts, "skipping declarations must not announce anything")
+	})
+
+	t.Run("skip_declare inside the cycle updates every seat", func(t *testing.T) {
+		hub := &frameRecorder{}
+		m := &Manager{hub: hub}
+		_, cycle := declareStates()
+		newState := *cycle
+		newState.Players[0].DeclarationAnswered = true
+
+		m.broadcastActionResult([4]uint{10, 20, 30, 40}, cycle, &newState,
+			game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 0}, false)
+
+		require.Len(t, hub.batches, 1)
+		assert.ElementsMatch(t, []uint{10, 20, 30, 40}, hub.batches[0], "who has answered is public, as in Croatia")
+		assert.Empty(t, hub.broadcasts)
 	})
 }
 
@@ -387,7 +433,7 @@ func TestHandleTimerExpiry_ForcedDealerPickResolvesBidding(t *testing.T) {
 		{UserID: 30, Username: "c", Seat: 2},
 		{UserID: 40, Username: "d", Seat: 3},
 	}
-	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false, true, false))
+	require.NoError(t, m.StartMatch(roomID, string(game.VariantCroatia), "1001", players, "per-move", 10, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { m.RemoveSession(roomID) })
 
 	gs := testfixtures.NewGameCroatianMidBidding(3)

@@ -61,6 +61,7 @@ const DEFAULT_PAYLOAD = {
   stopAtTarget: false,
   declarationsTransfer: true,
   clockwise: false,
+  declarationLastTrick: 3,
 };
 
 function renderModal() {
@@ -398,6 +399,64 @@ describe("CreateRoomModal rules", () => {
     expect(screen.queryByTestId("declarations-transfer-segmented")).not.toBeInTheDocument();
   });
 
+  it("offers the declaration window only in Bitola with declarations on", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    expect(screen.queryByTestId("declaration-last-trick-segmented")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("variant-segmented-bitola"));
+    expect(field("declaration-last-trick-segmented")).toHaveTextContent("Declare until trick");
+    expect(screen.getByTestId("declaration-last-trick-info-toggle")).toBeInTheDocument();
+    expect(checked("declaration-last-trick-segmented-3")).toBe(true);
+    expect(field("declaration-last-trick-segmented")).not.toHaveAttribute("data-changed");
+
+    await user.click(screen.getByTestId("declarations-segmented-off"));
+    expect(screen.queryByTestId("declaration-last-trick-segmented")).not.toBeInTheDocument();
+  });
+
+  it("sends trick 3 by default and the chosen trick in Bitola", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByTestId("variant-segmented-bitola"));
+    await submit(user);
+    await waitFor(() =>
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "bitola", declarationLastTrick: 3 }),
+      ),
+    );
+
+    mockCreateRoom.mockClear();
+    await user.click(screen.getByTestId("declaration-last-trick-segmented-1"));
+    expect(field("declaration-last-trick-segmented")).toHaveAttribute("data-changed", "true");
+    await submit(user);
+    await waitFor(() =>
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "bitola", declarationLastTrick: 1 }),
+      ),
+    );
+  });
+
+  it.each([
+    ["switching to Croatian", "variant-segmented-croatia"],
+    ["turning declarations off", "declarations-segmented-off"],
+  ])("sends trick 3 after %s, whatever Bitola had chosen", async (_case, control) => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByTestId("variant-segmented-bitola"));
+    await user.click(screen.getByTestId("declaration-last-trick-segmented-2"));
+    await user.click(screen.getByTestId(control));
+    await submit(user);
+
+    await waitFor(() =>
+      expect(mockCreateRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ declarationLastTrick: 3 }),
+      ),
+    );
+  });
+
   it("names the options in the shared rule words", () => {
     renderModal();
 
@@ -422,12 +481,27 @@ describe("CreateRoomModal rules", () => {
     expect(previewRule("newPlayers")).toHaveTextContent("Veterans only");
   });
 
+  it("previews the declaration window in Bitola and marks it unused in Croatian", async () => {
+    const user = userEvent.setup();
+    atWidth(1280);
+    renderModal();
+
+    expect(previewRule("window")).toHaveTextContent("Not used");
+
+    await user.click(screen.getByTestId("variant-segmented-bitola"));
+    await user.click(screen.getByTestId("declaration-last-trick-segmented-1"));
+
+    expect(previewRule("window")).toHaveTextContent("Declare until trick1");
+    expect(previewRule("window")).toHaveAttribute("data-changed", "true");
+  });
+
   it("resets every setting when dismissed", async () => {
     const user = userEvent.setup();
     renderModal();
 
     await setRoomName(user, "Something");
     await user.click(screen.getByTestId("variant-segmented-bitola"));
+    await user.click(screen.getByTestId("declaration-last-trick-segmented-1"));
     await user.click(screen.getByTestId("timer-segmented-relaxed"));
     await user.click(screen.getByTestId("declarations-segmented-off"));
     await user.click(screen.getByTestId("direction-segmented-clockwise"));
@@ -438,6 +512,9 @@ describe("CreateRoomModal rules", () => {
     expect(checked("timer-segmented-20")).toBe(true);
     expect(checked("declarations-segmented-on")).toBe(true);
     expect(checked("direction-segmented-counterClockwise")).toBe(true);
+
+    await user.click(screen.getByTestId("variant-segmented-bitola"));
+    expect(checked("declaration-last-trick-segmented-3")).toBe(true);
   });
 });
 

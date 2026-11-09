@@ -725,6 +725,8 @@
       "declarationsTransferOn": "Pobednicima",
       "declarationsTransferOff": "Poništena",
       "declarationsTransferHint": "Na pad ili kapot zvanja idu pobednicima ili se poništavaju",
+      "declarationLastTrick": "Zvanja do štiha",
+      "declarationLastTrickHint": "Bitola: zvanja pre karte, do ovog štiha",
       "matchEnd": "Kraj meča",
       "matchEndFinish": "Dovrši deljenje",
       "matchEndStop": "Dosta",
@@ -903,6 +905,7 @@
       "title": "Imaš zvanja",
       "declare": "Zovi",
       "skip": "Preskoči",
+      "continue": "Nastavi",
       "noneTitle": "Nemaš zvanja",
       "waitingOthers": "Čekaju se ostali… {{answered}}/4",
       "total": "Ukupno",
@@ -915,7 +918,8 @@
       "headlineThem": "Oni su osvojili zvanja",
       "byPlayer": "od {{name}}",
       "dismiss": "Zatvori",
-      "declaredBanner": "{{username}} ima zvanje"
+      "declaredBanner": "{{username}} ima zvanje",
+      "declaredBy": "{{name}} ima zvanje"
     },
     "belot": {
       "titleBelot": "Zovi Belu",
@@ -1120,7 +1124,8 @@
     "rules": {
       "stopAtTargetNote": "Za ovim stolom se igra sa dosta: meč završava čim jedan tim dostigne cilj, bez dovršavanja ruke.",
       "noDeclarationsTransferNote": "Na ovom stolu se zvanja i Bela ekipe koja padne ili ne uzme nijedan štih poništavaju umesto da idu drugoj ekipi.",
-      "clockwiseNote": "Na ovom stolu igra se kreće ulevo: deljenje, licitiranje, štihovi i sledeći delilac idu ulevo."
+      "clockwiseNote": "Na ovom stolu igra se kreće ulevo: deljenje, licitiranje, štihovi i sledeći delilac idu ulevo.",
+      "declarationWindowNote": "Na ovom stolu zvanja se zatvaraju posle {{n}}. štiha."
     }
   },
   "auth": {
@@ -1293,7 +1298,7 @@
       "bitola": {
         "title": "Bitola",
         "b1": "Dva kruga licitacije na okrenutu kartu.",
-        "b2": "Zvanja se pokazuju od drugog štiha.",
+        "b2": "Zvanja pre karte, do trećeg štiha.",
         "b3": "Bela na dami, Rebela na kralju."
       },
       "croatian": {

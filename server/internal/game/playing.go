@@ -35,15 +35,15 @@ func handlePlayCard(state *GameState, action Action) (*GameState, error) {
 		return nil, apperr.ErrNotYourTurn
 	}
 
+	if action.PlayerSeat != state.ActivePlayerSeat {
+		return nil, apperr.ErrNotYourTurn
+	}
+
 	if state.AwaitingDeclaration {
 		return nil, apperr.ErrActionRequired
 	}
 	if state.PendingBelotSeat != nil {
 		return nil, apperr.ErrActionRequired
-	}
-
-	if action.PlayerSeat != state.ActivePlayerSeat {
-		return nil, apperr.ErrNotYourTurn
 	}
 
 	if action.Card == nil {
@@ -84,14 +84,12 @@ func handlePlayCard(state *GameState, action Action) (*GameState, error) {
 
 	newState.ActivePlayerSeat = newState.Rules.NextSeat(newState.ActivePlayerSeat)
 
-	if newState.TrickNumber == 1 && len(newState.CurrentTrick) < 4 {
+	if len(newState.CurrentTrick) < 4 {
 		checkDeclarationPrompt(newState)
+		return newState, nil
 	}
 
-	if len(newState.CurrentTrick) == 4 {
-		resolveTrickWithDeclarations(newState)
-	}
-
+	resolveTrickAndAdvance(newState)
 	return newState, nil
 }
 

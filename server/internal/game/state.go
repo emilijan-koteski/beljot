@@ -73,6 +73,7 @@ type GameState struct {
 	StopAtTarget         bool         `json:"stopAtTarget"`
 	DeclarationsTransfer bool         `json:"declarationsTransfer"`
 	Clockwise            bool         `json:"clockwise"`
+	DeclarationLastTrick int          `json:"declarationLastTrick"`
 	StoppedAtTarget      bool         `json:"-"`
 	WonByInstantWin      bool         `json:"-"`
 
@@ -142,10 +143,9 @@ func ShuffleDeck(deck []Card) {
 	})
 }
 
-// NewGame creates a 4-player game, resolves the variant rules once with the room's declarationsEnabled,
-// stopAtTarget, declarationsTransfer and clockwise overrides, picks a random dealer, and deals. The room flags
-// are positional so a forgotten argument fails to compile instead of silently starting a match on the wrong rules.
-func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) *GameState {
+// NewGame creates a 4-player game with the room's rule overrides, picks a random dealer, and deals. The rules are
+// positional so a forgotten one fails to compile; declarationLastTrick applies to a turn window and only within 1..3.
+func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Variant, matchMode string, roomID uint, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool, declarationLastTrick int) *GameState {
 	dealerSeat := rand.IntN(4)
 
 	rules := RulesFor(variant)
@@ -153,6 +153,10 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 	rules.StopAtTarget = stopAtTarget
 	rules.DeclarationsTransfer = declarationsTransfer
 	rules.Clockwise = clockwise
+	if rules.DeclarationTiming == DeclarationTimingTurnWindow &&
+		declarationLastTrick >= MinDeclarationLastTrick && declarationLastTrick <= MaxDeclarationLastTrick {
+		rules.DeclarationLastTrick = declarationLastTrick
+	}
 
 	gs := &GameState{
 		RoomID:               roomID,
@@ -162,6 +166,7 @@ func NewGame(playerIDs [4]uint, usernames [4]string, bots [4]bool, variant Varia
 		StopAtTarget:         rules.StopAtTarget,
 		DeclarationsTransfer: rules.DeclarationsTransfer,
 		Clockwise:            rules.Clockwise,
+		DeclarationLastTrick: rules.DeclarationLastTrick,
 		MatchMode:            matchMode,
 		Phase:                PhaseDealing,
 		HandNumber:           1,

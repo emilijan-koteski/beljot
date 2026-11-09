@@ -153,7 +153,7 @@ export interface DeclarationsResolvedPayload {
 }
 
 /**
- * Announces that a seat committed a declaration; the meld stays secret until
+ * Announces that a seat declared at a turn prompt inside the declaration window; the meld stays secret until
  * event:declarations_resolved.
  */
 export interface PlayerDeclaredPayload {
@@ -179,8 +179,8 @@ export interface MatchResumedPayload {
 
 /**
  * Non-card auto-action taken on move-timer expiry; card auto-play uses CardPlayedPayload.autoPlayed.
- * "pick_trump" serves a dealer with no legal pass, and other seats get "timeout" in place of a skip
- * that would reveal a hand.
+ * "pick_trump" serves a dealer with no legal pass, and other seats get "timeout" for a skipped Belote
+ * and nothing for a skipped declaration, so no hand is revealed.
  */
 export type AutoActionType =
   "pass_trump" | "skip_declare" | "skip_belot" | "pick_trump" | "timeout";
@@ -311,7 +311,8 @@ export const SYSTEM_ROOM_CREATED = "system:room_created" as const;
 export const SYSTEM_ROOM_UPDATED = "system:room_updated" as const;
 
 /**
- * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on and an absent stopAtTarget or clockwise means off.
+ * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on, an absent stopAtTarget or clockwise
+ * means off, and an absent declarationLastTrick means 3.
  */
 export interface RoomCreatedPayload {
   id: number;
@@ -335,12 +336,14 @@ export interface RoomCreatedPayload {
   stopAtTarget?: boolean;
   declarationsTransfer?: boolean;
   clockwise?: boolean;
+  declarationLastTrick?: number;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on and an absent stopAtTarget or clockwise means off.
+ * Lobby room snapshot; an absent declarationsEnabled or declarationsTransfer means on, an absent stopAtTarget or clockwise
+ * means off, and an absent declarationLastTrick means 3.
  */
 export interface RoomUpdatedPayload {
   id: number;
@@ -364,6 +367,7 @@ export interface RoomUpdatedPayload {
   stopAtTarget?: boolean;
   declarationsTransfer?: boolean;
   clockwise?: boolean;
+  declarationLastTrick?: number;
   createdAt: string;
   updatedAt: string;
 }

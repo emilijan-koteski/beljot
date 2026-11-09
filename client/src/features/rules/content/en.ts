@@ -138,12 +138,13 @@ export const en: RulesLangData = {
             {
               variant: "bitola",
               otherVariantNote: "Croatian: everyone declares at once, before the first trick.",
-              t: "Declare on your first card",
-              d: "Show the cards at the start of the second trick.",
+              t: "Before your card: declare or continue",
+              d: "Up to the trick set for the table, the third by default. Declaring takes all you hold; a card already played no longer counts. The others then get one chance, the best scores at once, and declaring ends for the hand.",
             },
             {
               variant: "croatia",
-              otherVariantNote: "Bitola: declare as you play your first card.",
+              otherVariantNote:
+                "Bitola: declare before your card, up to the trick set for the table.",
               t: "Declare before the first trick",
               d: "Everyone declares at the same time; all are shown together.",
             },

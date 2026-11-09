@@ -1,7 +1,7 @@
 package game
 
-// ProjectForSeat returns a deep-cloned copy of gs masked to what seat may see: other hands, unresolved
-// declarations and others' PendingBelotSeat are hidden. An out-of-range seat matches nobody and sees everything masked.
+// ProjectForSeat returns a deep-cloned copy of gs masked to what seat may see: other hands, unresolved declarations,
+// and others' PendingBelotSeat and declaration prompt are hidden. An out-of-range seat sees everything masked.
 func ProjectForSeat(gs *GameState, seat int) *GameState {
 	p := cloneGameState(gs)
 
@@ -18,6 +18,10 @@ func ProjectForSeat(gs *GameState, seat int) *GameState {
 
 	if p.PendingBelotSeat != nil && *p.PendingBelotSeat != seat {
 		p.PendingBelotSeat = nil
+	}
+
+	if p.AwaitingDeclaration && p.ActivePlayerSeat != seat {
+		p.AwaitingDeclaration = false
 	}
 
 	return p

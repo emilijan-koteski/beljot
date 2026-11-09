@@ -32,7 +32,7 @@ func TestStartMatch_CarriesDeclarationsTransferIntoTheSession(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
 				roomID, tt.variant, "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				true, false, tt.transfer, false,
+				true, false, tt.transfer, false, 3,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -58,12 +58,13 @@ type roomRuleFlags struct {
 	stopAtTarget         bool
 	declarationsTransfer bool
 	clockwise            bool
+	declarationLastTrick int
 }
 
 var everyPairOfRuleFlagsDiffers = []roomRuleFlags{
-	{name: "room defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true, clockwise: false},
-	{name: "no declarations, stop at target, clockwise", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true, clockwise: true},
-	{name: "stop at target and declarations voided", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false, clockwise: false},
+	{name: "room defaults", declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true, clockwise: false, declarationLastTrick: 3},
+	{name: "no declarations, stop at target, clockwise", declarationsEnabled: false, stopAtTarget: true, declarationsTransfer: true, clockwise: true, declarationLastTrick: 1},
+	{name: "stop at target and declarations voided", declarationsEnabled: true, stopAtTarget: true, declarationsTransfer: false, clockwise: false, declarationLastTrick: 2},
 }
 
 // assertRecordedRuleFlags checks a persisted match row carries every room rule flag.
@@ -73,6 +74,7 @@ func assertRecordedRuleFlags(t *testing.T, want roomRuleFlags, got *match.Match)
 	assert.Equal(t, want.stopAtTarget, got.StopAtTarget, "stopAtTarget")
 	assert.Equal(t, want.declarationsTransfer, got.DeclarationsTransfer, "declarationsTransfer")
 	assert.Equal(t, want.clockwise, got.Clockwise, "clockwise")
+	assert.Equal(t, want.declarationLastTrick, got.DeclarationLastTrick, "declarationLastTrick")
 }
 
 // TestAbandonedMatchRecord_CarriesRuleFlags checks a match closed by a reconnect timeout records every room
@@ -85,7 +87,8 @@ func TestAbandonedMatchRecord_CarriesRuleFlags(t *testing.T) {
 			mgr := match.NewManager(&hubSpy{}, repo)
 			mgr.SetBotDelayForTest(time.Minute, time.Minute)
 			require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(2, 3), "relaxed", 0, 10, 1, 0,
-				flags.declarationsEnabled, flags.stopAtTarget, flags.declarationsTransfer, flags.clockwise))
+				flags.declarationsEnabled, flags.stopAtTarget, flags.declarationsTransfer, flags.clockwise,
+				flags.declarationLastTrick))
 
 			mgr.HandleDisconnect(10)
 			require.True(t, waitFor(5*time.Second, func() bool { return !mgr.HasSession(roomID) }),
@@ -113,6 +116,7 @@ func TestReconciledMatchRecord_CarriesRuleFlags(t *testing.T) {
 				StopAtTarget:         flags.stopAtTarget,
 				DeclarationsTransfer: flags.declarationsTransfer,
 				Clockwise:            flags.clockwise,
+				DeclarationLastTrick: flags.declarationLastTrick,
 			}}
 			stub.botSeats[132] = []int{0, 1, 2, 3}
 

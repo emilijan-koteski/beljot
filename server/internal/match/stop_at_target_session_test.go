@@ -56,7 +56,7 @@ func TestStartMatch_CarriesStopAtTargetIntoTheSession(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
 				roomID, tt.variant, "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				true, tt.stopAtTarget, true, false,
+				true, tt.stopAtTarget, true, false, 3,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -100,7 +100,7 @@ func beloteFourthCardBase(t *testing.T, roomID uint, trickNum int) *game.GameSta
 }
 
 // driveToBelotePrompt plays the trick up to seat 2's King of trump, answering any
-// trick-1 meld prompt with skip_declare, and returns the state holding the Belote prompt.
+// meld prompt with skip_declare, and returns the state holding the Belote prompt.
 func driveToBelotePrompt(t *testing.T, gs *game.GameState) *game.GameState {
 	t.Helper()
 
@@ -192,7 +192,7 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 		repo := newMockMatchRepo()
 		mgr := match.NewManager(hub, repo)
 		require.NoError(t, mgr.StartMatch(
-			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
+			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false, 3,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -235,7 +235,7 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 		hub := &hubSpy{}
 		mgr := match.NewManager(hub, newMockMatchRepo())
 		require.NoError(t, mgr.StartMatch(
-			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
+			roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false, 3,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -257,13 +257,12 @@ func TestStopAtTarget_BeloteStopEmitsNoTrickResolved(t *testing.T) {
 }
 
 // A crossing after skip_belot or a short announce_belot still resolves the trick, so
-// its event:trick_resolved and the trick-1 declarations reveal are owed.
+// its event:trick_resolved is owed; with nobody declared there is no reveal.
 func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *testing.T) {
 	tests := []struct {
 		name         string
 		answer       string
 		trickNum     int
-		wantReveal   bool
 		wantAnnounce bool
 	}{
 		{
@@ -272,10 +271,9 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 			trickNum: 2,
 		},
 		{
-			name:       "skip_belot at trick 1, trick crosses",
-			answer:     game.ActionSkipBelot,
-			trickNum:   1,
-			wantReveal: true,
+			name:     "skip_belot inside the declaration window, trick crosses",
+			answer:   game.ActionSkipBelot,
+			trickNum: 1,
 		},
 		{
 			name:         "announce_belot short of the target, trick crosses",
@@ -295,7 +293,7 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 				repo := newMockMatchRepo()
 				mgr := match.NewManager(hub, repo)
 				require.NoError(t, mgr.StartMatch(
-					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
+					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false, 3,
 				))
 				t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -333,12 +331,8 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 					assert.Less(t, belotIdx, trickIdx,
 						"the announcement precedes the trick it did not stop: %v", kinds)
 				}
-				if tc.wantReveal {
-					revealIdx := indexOf(kinds, ws.EventDeclarationsResolved)
-					require.GreaterOrEqual(t, revealIdx, 0,
-						"trick 1 resolved the contest, so the reveal is owed: %v", kinds)
-					assert.Less(t, revealIdx, endIdx, "%v", kinds)
-				}
+				assert.Equal(t, -1, indexOf(kinds, ws.EventDeclarationsResolved),
+					"every meld prompt was passed, so there is nothing to reveal: %v", kinds)
 
 				if stateIdx := indexOf(kinds, ws.EventMatchState); stateIdx >= 0 {
 					assert.Greater(t, stateIdx, endIdx,
@@ -359,7 +353,7 @@ func TestStopAtTarget_TrickCrossingAfterABeloteAnswerStillResolvesTheTrick(t *te
 				hub := &hubSpy{}
 				mgr := match.NewManager(hub, newMockMatchRepo())
 				require.NoError(t, mgr.StartMatch(
-					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
+					roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false, 3,
 				))
 				t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -411,7 +405,7 @@ func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 		repo := newMockMatchRepo()
 		mgr := match.NewManager(hub, repo)
 		require.NoError(t, mgr.StartMatch(
-			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false,
+			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false, 3,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -455,7 +449,7 @@ func TestStopAtTarget_DeclareCrossingEmitsRevealThenMatchEnd(t *testing.T) {
 		hub := &hubSpy{}
 		mgr := match.NewManager(hub, newMockMatchRepo())
 		require.NoError(t, mgr.StartMatch(
-			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false,
+			roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, false, true, false, 3,
 		))
 		t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -574,7 +568,7 @@ func TestStopAtTarget_StaleHandResultIsNotReAnnouncedOrPersisted(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -617,7 +611,7 @@ func TestStopAtTarget_ClearsAnArmedTurnTimer(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, true, true, false,
+		roomID, "bitola", "1001", defaultPlayers(), "per-move", timerSec, 10, 120, 0, true, true, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -692,7 +686,7 @@ func TestStopAtTarget_DeclarationTimeoutRunsHandleMatchEnd(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false,
+		roomID, "croatia", "1001", defaultPlayers(), "per-move", 60, 10, 120, 0, true, true, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -750,7 +744,7 @@ func TestStopAtTarget_MatchEndPayloadNamesTheStop(t *testing.T) {
 	repo := newMockMatchRepo()
 	mgr := match.NewManager(hub, repo)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
