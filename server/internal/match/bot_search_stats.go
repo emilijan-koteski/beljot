@@ -7,8 +7,9 @@ import (
 
 const lastOpeningTrick = 2
 
-// botSearchStats counts one match's bot searches and those that reached no decision by their deadline. Its counters
-// are atomic because a miss is counted on a pool worker, off the session lock.
+// botSearchStats counts one match's bot searches and those that reached no decision by their deadline, atomically
+// because a miss is counted on a pool worker. A miss landing after the summary has fired, as when the match is
+// abandoned mid-search, is not counted.
 type botSearchStats struct {
 	submitted     atomic.Int64
 	missed        atomic.Int64
@@ -16,6 +17,7 @@ type botSearchStats struct {
 	reported      atomic.Bool
 }
 
+// noteSubmitted counts a search the pool accepted; a job the full queue dropped is not counted.
 func (s *botSearchStats) noteSubmitted() {
 	s.submitted.Add(1)
 }
