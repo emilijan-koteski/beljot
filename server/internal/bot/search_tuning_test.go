@@ -469,3 +469,53 @@ func TestDefaultSearchTuningCashHighWinnerBonus(t *testing.T) {
 func TestDefaultSearchTuningDecidingHand(t *testing.T) {
 	assert.False(t, bot.DefaultSearchTuning().DecidingHand, "D6b was not better at 2 SE")
 }
+
+func fourthHandOnSpades() []game.TrickCard {
+	return []game.TrickCard{{Card: card("7S"), PlayerSeat: 1}, {Card: card("8S"), PlayerSeat: 2}, {Card: card("QS"), PlayerSeat: 3}}
+}
+
+func TestBlindTenIsALeadOrADiscard(t *testing.T) {
+	tests := []struct {
+		name  string
+		hand  []string
+		trick []game.TrickCard
+		want  bool
+	}{
+		{"fourth hand following takes the trick", []string{"TS", "KS"}, fourthHandOnSpades(), false},
+		{"second hand following an opponent's lead", []string{"TS", "KS"}, []game.TrickCard{{Card: card("7S"), PlayerSeat: 3}}, false},
+		{"void in the led suit with an opponent winning", []string{"TS", "7C"}, []game.TrickCard{{Card: card("8D"), PlayerSeat: 3}}, true},
+		{"following after an opponent's trump cut", []string{"TS", "7C"}, []game.TrickCard{{Card: card("8S"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}}, true},
+		{"leading", []string{"TS", "7C"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, bot.BlindTenForTest(blindTenView(tt.hand, tt.trick), card("TS")))
+		})
+	}
+}
+
+func TestChooseAdjustedTakesTheTrickWithTheTenLast(t *testing.T) {
+	v := cashHighView([]string{"TS", "KS"}, fourthHandOnSpades())
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("TS")): {Mean: 8},
+		search.CardIdx(card("KS")): {Mean: 0},
+	}}
+	assert.False(t, bot.BlindTenForTest(v, card("TS")))
+	got, ok := bot.ChooseAdjustedForTest(v, res, bot.DefaultSearchTuning())
+	require.True(t, ok)
+	assert.Equal(t, "TS", got.String())
+}
+
+func TestChooseAdjustedCashesTheTenAtRiskWithItsAceOut(t *testing.T) {
+	v := cashHighView([]string{"TS", "KS", "9S"}, fourthHandOnSpades())
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("TS")): {Mean: 0},
+		search.CardIdx(card("KS")): {Mean: 4},
+		search.CardIdx(card("9S")): {Mean: -6},
+	}}
+	assert.True(t, bot.CashHighWinnerForTest(v, card("TS")))
+	assert.False(t, bot.BlindTenForTest(v, card("TS")))
+	got, ok := bot.ChooseAdjustedForTest(v, res, bot.DefaultSearchTuning())
+	require.True(t, ok)
+	assert.Equal(t, "TS", got.String())
+}

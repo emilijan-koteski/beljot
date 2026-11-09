@@ -62,13 +62,16 @@ func isPenalisedDefenderTrump(c game.Card, trump game.Suit) bool {
 	return c.Suit == trump && c.Rank != game.RankJack && c.Rank != game.Rank9
 }
 
-// blindTen reports whether the card is a side-suit Ten played while its Ace is out and not known to be with the partner,
-// on a lead or onto a trick the seat's side is not winning.
+// blindTen reports a side-suit Ten led, or discarded onto a trick an opponent is winning, while its Ace is unplayed, not in
+// hand and not known with the partner. A Ten that follows suit and takes the trick is not blind.
 func blindTen(v View, c game.Card, ctx TrickContext) bool {
 	if c.Rank != game.RankTen || v.TrumpSuit == nil || c.Suit == *v.TrumpSuit {
 		return false
 	}
 	if ctx.Position != 0 && ctx.SideWinning {
+		return false
+	}
+	if ctx.Position != 0 && ctx.Led != nil && c.Suit == *ctx.Led && !ctx.TrumpCut {
 		return false
 	}
 	ace := game.Card{Rank: game.RankAce, Suit: c.Suit}
