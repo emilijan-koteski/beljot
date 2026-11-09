@@ -46,9 +46,7 @@ func TestBidConsistentAcceptsTheForcedPick(t *testing.T) {
 	weakCaller := handsWith(2, "7S", "8H", "7H", "8D", "7D", "8C", "7C", "QD")
 
 	forced := bot.BidConsistentForTest(croatianAuctionView(callRec(2, 1, 3, game.SuitSpades, nil)))
-	if forced != nil {
-		assert.True(t, forced(weakCaller), "the dealer had to call, so the hand proves nothing")
-	}
+	assert.Nil(t, forced, "the dealer had to call, so the auction proves nothing")
 
 	free := bot.BidConsistentForTest(croatianAuctionView(callRec(2, 1, 1, game.SuitSpades, nil)))
 	require.NotNil(t, free)
@@ -101,9 +99,14 @@ func TestBidConsistentTriesEveryBidTimeSubset(t *testing.T) {
 
 	t.Run("the bot's own bids and an empty auction are not filtered", func(t *testing.T) {
 		assert.Nil(t, bot.BidConsistentForTest(croatianAuctionView()))
-		own := bot.BidConsistentForTest(croatianAuctionView(passRec(0, 1, 0, nil)))
-		if own != nil {
-			assert.True(t, own(handsWith(0, "JH", "9H", "JS", "9S", "JD", "9D", "JC", "9C")))
-		}
+		assert.Nil(t, bot.BidConsistentForTest(croatianAuctionView(passRec(0, 1, 0, nil))))
 	})
+}
+
+func TestBidConsistentExplainsASeatShortOfABidTimeHand(t *testing.T) {
+	filter := bot.BidConsistentForTest(croatianAuctionView(passRec(1, 1, 0, nil)))
+	require.NotNil(t, filter)
+
+	assert.True(t, filter(handsWith(1, "JH", "9H", "JS", "9S", "JD")), "five cards cannot show a six-card bid-time hand")
+	assert.False(t, filter(handsWith(1, "JH", "9H", "JS", "9S", "JD", "9D")))
 }

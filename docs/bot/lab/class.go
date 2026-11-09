@@ -188,7 +188,7 @@ func classcheck(v game.Variant) {
 			if _, ok := classCall(classBelow, gs, step, seat, natural); ok {
 				below++
 			}
-			_, inCore := classCall(classCore, gs, step, seat, natural)
+			inCore := isCore && natural.Type == game.ActionPickTrump
 			_, inEdge := classCall(classEdge, gs, step, seat, natural)
 			if inCore {
 				core++

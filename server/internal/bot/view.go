@@ -2,8 +2,8 @@ package bot
 
 import "github.com/emilijan/beljot/server/internal/game"
 
-// View is the redacted, seat-local projection of the game state handed to Decide.
-// It carries only what a human player in that seat could know.
+// View is the redacted, seat-local projection of the game state handed to Decide: only what a human in that seat could
+// know. Build RankBounds from NoRankBounds, as its zero value bounds every seat in every suit at the 7.
 type View struct {
 	Seat       int
 	Hand       []game.Card

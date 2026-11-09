@@ -79,7 +79,8 @@ func auctionCandidate(bids []BidRecord) *game.Card {
 	return nil
 }
 
-// bidChecks turns every other seat's auction action into a check, leaving out Croatian's forced dealer pick.
+// bidChecks turns every other seat's auction action into a check. It leaves out a call after three passes with no
+// candidate, which is the forced dealer pick only because the shipped Croatian rules make the dealer pick.
 func bidChecks(v View, candidate *game.Card) []bidCheck {
 	var checks []bidCheck
 	for _, rec := range v.Bids {
@@ -120,7 +121,8 @@ func callableSuits(hasCandidate bool, candidate *game.Card) []game.Suit {
 }
 
 // bidConsistent rejects a sampled deal in which another seat's auction action contradicts the bid table, trying every
-// bid-time hand its eight cards allow. It is nil without an auction, or for a Bitola auction with no recorded candidate.
+// bid-time hand its cards allow and accepting a seat with fewer cards than a bid-time hand. It is nil without an
+// auction, or for a Bitola auction with no recorded candidate.
 func bidConsistent(v View) func(hands [4]uint32) bool {
 	if len(v.Bids) == 0 {
 		return nil
@@ -148,7 +150,7 @@ func bidConsistent(v View) func(hands [4]uint32) bool {
 		for i := range checks {
 			c := &checks[i]
 			pool := (hands[c.seat] | seen[c.seat]) &^ shown
-			if !c.explained(pool, min(c.handSize, bits.OnesCount32(pool)), shown) {
+			if bits.OnesCount32(pool) >= c.handSize && !c.explained(pool, c.handSize, shown) {
 				return false
 			}
 		}

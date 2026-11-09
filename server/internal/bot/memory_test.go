@@ -65,10 +65,15 @@ func TestMemoryResetsBoundsWithTheHand(t *testing.T) {
 }
 
 func TestMemoryBoundsMatchTheTrueHands(t *testing.T) {
+	t.Run("bitola", func(t *testing.T) { boundsMatchTheTrueHands(t, game.VariantBitola, randomDriver) })
+	t.Run("croatia", func(t *testing.T) { boundsMatchTheTrueHands(t, game.VariantCroatia, randomCroatianPlayDriver) })
+}
+
+func boundsMatchTheTrueHands(t *testing.T, variant game.Variant, drive simDriver) {
 	rng := rand.New(rand.NewPCG(8, 41))
 	boundsSeen := 0
 	for range 300 {
-		gs := newBitolaGame()
+		gs := game.NewGame([4]uint{}, [4]string{}, [4]bool{true, true, true, true}, variant, "1001", 1, true, false, true, false)
 		mem := bot.NewMemory()
 		check := func(t *testing.T, cur *game.GameState, _ int, _ game.Action) {
 			if cur.TrumpSuit == nil {
@@ -90,7 +95,7 @@ func TestMemoryBoundsMatchTheTrueHands(t *testing.T) {
 				}
 			}
 		}
-		_, _ = playOneHandWith(t, gs, mem, rng, randomDriver, check)
+		_, _ = playOneHandWith(t, gs, mem, rng, drive, check)
 	}
 	assert.Positive(t, boundsSeen, "no bound was ever checked against a held card")
 }
@@ -98,6 +103,13 @@ func TestMemoryBoundsMatchTheTrueHands(t *testing.T) {
 func randomDriver(gs *game.GameState, _ *bot.Memory, rng *rand.Rand) (int, game.Action) {
 	seat := actingSeat(gs)
 	return seat, randomLegalAction(gs, seat, rng)
+}
+
+func randomCroatianPlayDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
+	if gs.Phase != game.PhasePlaying {
+		return croatianBotDriver(gs, mem, rng)
+	}
+	return randomDriver(gs, mem, rng)
 }
 
 func bidPass(seat int) game.Action {
@@ -144,7 +156,10 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 			assert.Equal(t, 1, b.Round)
 			assert.Equal(t, i, b.PassesBefore)
 		}
-		assert.True(t, bids[2].Passed)
+		for _, b := range bids[:3] {
+			assert.True(t, b.Passed)
+			assert.Nil(t, b.Suit, "a pass names no suit")
+		}
 		assert.False(t, bids[3].Passed)
 		assert.Equal(t, spades, *bids[3].Suit)
 		for _, b := range bids {
@@ -196,6 +211,14 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 		got := mem.Bids()
 		got[0].Seat = 3
 		assert.Equal(t, 0, mem.Bids()[0].Seat)
+
+		cand := card("QD")
+		mem.ObserveBid(1, bidPick(1, nil), &cand, 1, 1)
+		got = mem.Bids()
+		*got[1].Suit = game.SuitClubs
+		*got[1].Candidate = card("7C")
+		assert.Equal(t, game.SuitDiamonds, *mem.Bids()[1].Suit, "the suit is copied too")
+		assert.Equal(t, card("QD"), *mem.Bids()[1].Candidate, "the candidate is copied too")
 	})
 }
 

@@ -453,6 +453,20 @@ func TestBuildBotView_FaceDownNeverVisible(t *testing.T) {
 	}
 }
 
+func TestBuildBotView_CarriesTheAuction(t *testing.T) {
+	gs := testfixtures.NewGameCroatianMidBidding(2)
+	spades := game.SuitSpades
+	mem := bot.NewMemory()
+	mem.ObserveBid(1, game.Action{Type: game.ActionPassTrump, PlayerSeat: 1}, nil, 1, 0)
+	mem.ObserveBid(2, game.Action{Type: game.ActionPickTrump, PlayerSeat: 2, Suit: &spades}, nil, 1, 1)
+
+	v := buildBotView(gs, 0, mem)
+
+	require.Len(t, v.Bids, 2)
+	assert.Equal(t, mem.Bids(), v.Bids)
+	assert.Nil(t, buildBotView(gs, 0, nil).Bids)
+}
+
 // TestBuildBotView_MustPickTrumpIsSeatScoped checks that the must-pick-trump flag
 // is set only for the seat on the clock and derives from the rule config.
 func TestBuildBotView_MustPickTrumpIsSeatScoped(t *testing.T) {

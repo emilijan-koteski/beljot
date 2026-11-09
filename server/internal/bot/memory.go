@@ -261,9 +261,22 @@ func calledSuit(action game.Action, candidate *game.Card) *game.Suit {
 	return &suit
 }
 
-// Bids returns a copy of this hand's auction records in order.
+// Bids returns a deep copy of this hand's auction records in order.
 func (m *Memory) Bids() []BidRecord {
-	return slices.Clone(m.bids)
+	out := slices.Clone(m.bids)
+	for i := range out {
+		out[i].Suit = clonedPointer(out[i].Suit)
+		out[i].Candidate = clonedPointer(out[i].Candidate)
+	}
+	return out
+}
+
+func clonedPointer[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	c := *p
+	return &c
 }
 
 // PlayedBy returns a copy of the cards each seat has played this hand.

@@ -20,12 +20,18 @@ type Shape struct {
 	Pos                       int
 }
 
-// ParseShape builds a Shape from a comma list such as "A,c4,noJ,no9,sA0,pos1".
+// ParseShape builds a Shape from a comma list such as "A,c4,noJ,no9,sA0,pos1". It rejects an unknown token, a
+// second token for the same field and a contradictory pair.
 func ParseShape(spec string) (Shape, error) {
 	s := Shape{Count: shapeAny, SideAces: shapeAny, Pos: shapeAny}
+	seen := map[string]bool{}
 	for _, tok := range strings.Split(spec, ",") {
 		tok = strings.TrimSpace(tok)
-		var k int
+		field := shapeField(tok)
+		if field != "" && seen[field] {
+			return Shape{}, fmt.Errorf("repeated shape field in %q", spec)
+		}
+		seen[field] = true
 		switch {
 		case tok == "":
 		case tok == "J":
@@ -48,11 +54,10 @@ func ParseShape(spec string) (Shape, error) {
 			s.CountMin = int(tok[1] - '0')
 		case len(tok) == 2 && tok[0] == 'c' && tok[1] >= '0' && tok[1] <= '8':
 			s.Count = int(tok[1] - '0')
+		case len(tok) == 4 && tok[:3] == "pos" && tok[3] >= '0' && tok[3] <= '3':
+			s.Pos = int(tok[3] - '0')
 		default:
-			if _, err := fmt.Sscanf(tok, "pos%d", &k); err != nil || k < 0 || k > 3 {
-				return Shape{}, fmt.Errorf("unknown shape token %q", tok)
-			}
-			s.Pos = k
+			return Shape{}, fmt.Errorf("unknown shape token %q", tok)
 		}
 	}
 	if (s.J && s.NoJ) || (s.Has9 && s.No9) || (s.A && s.NoA) {
@@ -70,33 +75,15 @@ func (s Shape) Matches(hand []game.Card, candidate *game.Card, trump game.Suit, 
 	if candidate != nil {
 		cards = append(append([]game.Card{}, hand...), *candidate)
 	}
-	count, sideAces := 0, 0
-	var hasJ, has9, hasA bool
-	for _, c := range cards {
-		if c.Suit != trump {
-			if c.Rank == game.RankAce {
-				sideAces++
-			}
-			continue
-		}
-		count++
-		switch c.Rank {
-		case game.RankJack:
-			hasJ = true
-		case game.Rank9:
-			has9 = true
-		case game.RankAce:
-			hasA = true
-		}
-	}
+	h := holdingOf(cards, trump)
 	switch {
-	case s.Count != shapeAny && count != s.Count,
-		count < s.CountMin,
-		s.SideAces != shapeAny && sideAces != s.SideAces,
-		sideAces < s.SideAcesMin,
-		s.J && !hasJ, s.NoJ && hasJ,
-		s.Has9 && !has9, s.No9 && has9,
-		s.A && !hasA, s.NoA && hasA:
+	case s.Count != shapeAny && h.count != s.Count,
+		h.count < s.CountMin,
+		s.SideAces != shapeAny && h.sideAces != s.SideAces,
+		h.sideAces < s.SideAcesMin,
+		s.J && !h.j, s.NoJ && h.j,
+		s.Has9 && !h.nine, s.No9 && h.nine,
+		s.A && !h.ace, s.NoA && h.ace:
 		return false
 	}
 	return true
@@ -118,7 +105,8 @@ func biddingSuits(gs *game.GameState, step int) []game.Suit {
 	return game.AllSuits[:]
 }
 
-// matchingPositions lists the natural bidding steps of the dealt state that fit the shape, as "step:suit".
+// matchingPositions lists the all-pass bidding steps of the dealt state that fit the shape, as "step:suit". Step s is
+// seat dealer+1+s with s%4 passes before it, which is BiddingPassCount there since the count restarts each round.
 func matchingPositions(gs *game.GameState, s Shape) []string {
 	var out []string
 	last := 4
@@ -136,7 +124,8 @@ func matchingPositions(gs *game.GameState, s Shape) []string {
 	return out
 }
 
-// reachesMatch walks the natural auction of pol and reports whether a position it actually reaches fits the shape.
+// reachesMatch walks the natural auction of pol and reports whether a position it reaches fits the shape. A forced
+// dealer pick counts although class_table.py drops its row, which keeps the deal sets of §3.6 reproducible.
 func reachesMatch(gs *game.GameState, s Shape, pol botlab.Policy) bool {
 	gs.Phase = game.PhaseBidding
 	game.RefreshDerivedFlags(gs)
@@ -164,38 +153,64 @@ func reachesMatch(gs *game.GameState, s Shape, pol botlab.Policy) bool {
 	return false
 }
 
+const targetedDealTries = 1_000_000
+
 // TargetedDeal draws deals until one has a bidding position fitting the shape; a nil shape returns RandomDeal at once.
 func TargetedDeal(rng *rand.Rand, v game.Variant, s *Shape) (botlab.Deal, bool) {
 	if s == nil {
 		return botlab.RandomDeal(rng), true
 	}
-	for tries := 0; tries < 1_000_000; tries++ {
-		d := botlab.RandomDeal(rng)
-		if len(matchingPositions(botlab.NewDealState(d, v), *s)) > 0 {
+	return drawDealUntil(rng, func(d botlab.Deal) bool {
+		return len(matchingPositions(botlab.NewDealState(d, v), *s)) > 0
+	})
+}
+
+// TargetedDealReached is TargetedDeal that also requires the natural auction of pol to reach the matching position;
+// begin, when set, runs before each walk.
+func TargetedDealReached(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy, begin func()) (botlab.Deal, bool) {
+	if s == nil {
+		return botlab.RandomDeal(rng), true
+	}
+	return drawDealUntil(rng, func(d botlab.Deal) bool {
+		gs := botlab.NewDealState(d, v)
+		if len(matchingPositions(gs, *s)) == 0 {
+			return false
+		}
+		if begin != nil {
+			begin()
+		}
+		return reachesMatch(gs, *s, pol)
+	})
+}
+
+func drawDealUntil(rng *rand.Rand, accept func(botlab.Deal) bool) (botlab.Deal, bool) {
+	for range targetedDealTries {
+		if d := botlab.RandomDeal(rng); accept(d) {
 			return d, true
 		}
 	}
 	return botlab.Deal{}, false
 }
 
-// TargetedDealReached is TargetedDeal that also requires the matching position to be reached by the natural auction of pol; begin, when set, runs before each walk.
-func TargetedDealReached(rng *rand.Rand, v game.Variant, s *Shape, pol botlab.Policy, begin func()) (botlab.Deal, bool) {
-	if s == nil {
-		return botlab.RandomDeal(rng), true
+// shapeField names the Shape field a token sets, so ParseShape can reject a second token for it.
+func shapeField(tok string) string {
+	switch {
+	case tok == "":
+		return ""
+	case tok == "J" || tok == "noJ" || tok == "9" || tok == "no9" || tok == "A" || tok == "noA":
+		return tok
+	case strings.HasPrefix(tok, "sA") && strings.HasSuffix(tok, "+"):
+		return "sideAcesMin"
+	case strings.HasPrefix(tok, "sA"):
+		return "sideAces"
+	case strings.HasPrefix(tok, "c") && strings.HasSuffix(tok, "+"):
+		return "countMin"
+	case strings.HasPrefix(tok, "c"):
+		return "count"
+	case strings.HasPrefix(tok, "pos"):
+		return "pos"
 	}
-	for tries := 0; tries < 1_000_000; tries++ {
-		d := botlab.RandomDeal(rng)
-		if len(matchingPositions(botlab.NewDealState(d, v), *s)) == 0 {
-			continue
-		}
-		if begin != nil {
-			begin()
-		}
-		if reachesMatch(botlab.NewDealState(d, v), *s, pol) {
-			return d, true
-		}
-	}
-	return botlab.Deal{}, false
+	return ""
 }
 
 func shapeFilter() *Shape {

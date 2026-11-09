@@ -423,7 +423,7 @@ func TestEvaluateMatchesChooseOnAForcedCard(t *testing.T) {
 	pos := search.Position{Trump: hearts, Leader: 1, Trick: trick, Capot: search.CapotFlag([2]int{3, 2})}
 	require.Equal(t, []game.Card{junk}, legalFor(pos, own))
 	settle := settlementOver(hearts, trick, own, unseen)
-	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1}
+	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1, TrackCallerMade: true}
 
 	chosen, ok := search.Choose(in, pos, []game.Card{junk}, settle, opts, farFuture())
 	require.True(t, ok)
@@ -447,7 +447,7 @@ func TestEvaluateValuesForTeamAWhenTeamBIsForced(t *testing.T) {
 	require.Equal(t, []game.Card{junk}, legalFor(pos, own))
 	settle := settlementOver(hearts, trick, own, unseen)
 	settle.CallerTeam = game.TeamB
-	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1}
+	opts := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1, TrackCallerMade: true}
 
 	chosen, ok := search.Choose(in, pos, []game.Card{junk}, settle, opts, farFuture())
 	require.True(t, ok)

@@ -38,8 +38,8 @@ func bidKey(hand []game.Card, suit game.Suit) string {
 	return fmt.Sprintf("n%d %-6s side%d", count, strings.Join(marks, ""), side)
 }
 
-// bidtable forces the first bidder to call (each suit under Croatian rules; the candidate
-// suit under Bitola round 1) and compares with letting the bidding run its course.
+// bidtable forces the first bidder to call (each suit in Croatian, the candidate in Bitola round 1) and compares that
+// with letting the bidding run. Its forced call plays without the candidate in memory, so §2.4's rows are historic.
 func bidtable(v game.Variant) {
 	t0 := time.Now()
 	deals := make([]botlab.Deal, *n)

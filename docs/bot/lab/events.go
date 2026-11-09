@@ -80,9 +80,12 @@ func (r *EventRecorder) SetSeats(seats [4]bool) {
 // Tally returns the counts so far.
 func (r *EventRecorder) Tally() EventTally { return r.tally }
 
-// Hook returns the play hook that feeds the recorder.
+// Hook returns the play hook that feeds the recorder; it ignores a call without a trump suit or a card.
 func (r *EventRecorder) Hook() PlayHook {
 	return func(gs *game.GameState, seat int, action game.Action, v View) {
+		if gs.TrumpSuit == nil || action.Card == nil {
+			return
+		}
 		if len(gs.CurrentTrick) == 0 {
 			r.closeTrick(*gs.TrumpSuit)
 		}

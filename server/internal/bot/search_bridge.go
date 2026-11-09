@@ -140,10 +140,10 @@ func chooseSearch(v View, samples int, deadline time.Time, t SearchTuning, class
 	return search.Choose(in, pos, v.LegalCards, settle, opts, deadline)
 }
 
-// evaluateSearch is search.Evaluate's mean under the same auction filter and fallback as chooseSearch.
-func evaluateSearch(v View, in search.Information, pos search.Position, s search.Settlement, opts search.Options,
-	deadline time.Time, t SearchTuning) (float64, bool) {
-	filtered := filteredOptions(v, opts, t)
+// evaluateSearch is search.Evaluate's mean under filtered's auction filter when it has one, falling back to opts when
+// no deal fits the auction, as chooseSearch does.
+func evaluateSearch(in search.Information, pos search.Position, s search.Settlement, opts, filtered search.Options,
+	deadline time.Time) (float64, bool) {
 	if filtered.SampleFilter != nil {
 		if mean, _, _, ok := search.Evaluate(in, pos, s, filtered, deadline); ok {
 			return mean, true
@@ -191,12 +191,13 @@ func BeloteAnswerWith(v View, deadline time.Time, t SearchTuning) (announce bool
 		return true, false
 	}
 	opts := search.Options{Samples: samplesFor(v.TrickNumber, t), SeedSalt: t.SeedSalt}
+	filtered := filteredOptions(v, opts, t)
 	in := informationFrom(v)
-	withBelote, ok := evaluateSearch(v, in, positionFrom(announced, t), settlementFrom(announced), opts, deadline, t)
+	withBelote, ok := evaluateSearch(in, positionFrom(announced, t), settlementFrom(announced), opts, filtered, deadline)
 	if !ok {
 		return true, false
 	}
-	withoutBelote, ok := evaluateSearch(v, in, positionFrom(v, t), settlementFrom(v), opts, deadline, t)
+	withoutBelote, ok := evaluateSearch(in, positionFrom(v, t), settlementFrom(v), opts, filtered, deadline)
 	if !ok {
 		return true, false
 	}

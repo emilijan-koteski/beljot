@@ -25,16 +25,17 @@ type Position struct {
 	Race      *Race
 }
 
-// Options bound the search: at most Samples deals, and a stop once at least EarlyStopAfter are in and the best card
-// leads the runner-up by more than EarlyStopSE standard errors. SampleClass optionally sorts each deal into class 0
-// or 1, SampleFilter optionally rejects a deal before it is solved, and SeedSalt is mixed into the sampler seed.
+// Options bound the search: at most Samples deals, stopping once EarlyStopAfter are in and the best card leads by more
+// than EarlyStopSE standard errors. SampleClass sorts deals into class 0 or 1, SampleFilter rejects deals before they
+// are solved, SeedSalt salts the sampler seed and TrackCallerMade fills Result.CallerMade.
 type Options struct {
-	Samples        int
-	EarlyStopAfter int
-	EarlyStopSE    float64
-	SampleClass    func(hands [4]uint32) int
-	SampleFilter   func(hands [4]uint32) bool
-	SeedSalt       uint64
+	Samples         int
+	EarlyStopAfter  int
+	EarlyStopSE     float64
+	SampleClass     func(hands [4]uint32) int
+	SampleFilter    func(hands [4]uint32) bool
+	SeedSalt        uint64
+	TrackCallerMade bool
 }
 
 // CardStats is a card's mean settled value and the standard error of that mean, 0 below two samples.
@@ -49,8 +50,8 @@ type ClassStats struct {
 }
 
 // Result is the chosen card, how many deals backed it, its mean settled value for the seat's team, its lead over
-// the runner-up and the standard error of that lead, per-card and per-class statistics, and the chosen card's share
-// of deals in which the caller made the contract.
+// the runner-up and that lead's standard error, per-card and per-class statistics, and, when the options track it,
+// the chosen card's share of deals in which the caller made the contract.
 type Result struct {
 	Card       game.Card
 	Samples    int
@@ -90,7 +91,7 @@ func Choose(
 	if len(cards) == 0 || game.StepSeat(pos.Leader, len(pos.Trick), pos.Clockwise) != in.Seat {
 		return Result{}, false
 	}
-	votes := newTally(cards, pos.Race)
+	votes := newTally(cards, pos.Race, opts.TrackCallerMade)
 	teamSign := 1 - 2*game.TeamForSeat(in.Seat)
 	rng := rand.New(rand.NewPCG(in.Seed()^opts.SeedSalt, samplerStream))
 	solver := NewSolver(pos.Trump, pos.Clockwise)
@@ -190,21 +191,22 @@ func legalIndexes(legal []game.Card) []int {
 }
 
 // tally keeps, per candidate card, the settled value of every sample so far and their sum, valuing the hand's end as
-// the match when it races.
+// the match when it races, and counts the deals the caller made only when trackMade asks.
 type tally struct {
-	race   *Race
-	cards  []int
-	values [NCards][]int
-	sums   [NCards]int
-	made   [NCards]int
-	n      int
+	race      *Race
+	trackMade bool
+	cards     []int
+	values    [NCards][]int
+	sums      [NCards]int
+	made      [NCards]int
+	n         int
 
 	classSums    [2][NCards]int
 	classSamples [2]int
 }
 
-func newTally(cards []int, race *Race) *tally {
-	return &tally{cards: cards, race: race}
+func newTally(cards []int, race *Race, trackMade bool) *tally {
+	return &tally{cards: cards, race: race, trackMade: trackMade}
 }
 
 func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) bool {
@@ -219,7 +221,7 @@ func (t *tally) add(remainders map[int]int, s Settlement, teamSign, class int) b
 	for i, card := range t.cards {
 		t.values[card] = append(t.values[card], settled[i])
 		t.sums[card] += settled[i]
-		if callerMadeIn(t.race, s, remainders[card]) {
+		if t.trackMade && callerMadeIn(t.race, s, remainders[card]) {
 			t.made[card]++
 		}
 	}

@@ -649,7 +649,8 @@ func TestDecidingHandValuesAFallAsTheLostMatch(t *testing.T) {
 
 	points, ok := bot.SearchCardWith(v, farFuture(), noDeciding)
 	require.True(t, ok)
-	require.Equal(t, card("7D"), points.Card, "for points the seven risks the fall")
+	require.Equal(t, card("7D"), points.Card, "for points the seven risks the fall; the deals come from the "+
+		"sampler's seed, so after a sampler change re-derive the hands until this holds")
 	match, ok := bot.SearchCardWith(v, farFuture(), deciding)
 	require.True(t, ok)
 	assert.Equal(t, card("TC"), match.Card)
@@ -743,6 +744,20 @@ func TestBeloteAnswerAnnouncesWhenTheBeloteDecidesTheRace(t *testing.T) {
 	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
 	assert.True(t, ok)
 	assert.False(t, announce, "five points short after the Belote, the fall still decides")
+}
+
+func TestBeloteAnswerAnnouncesWhenTheTwentyMakesTheContract(t *testing.T) {
+	v := beloteFallView()
+	v.HandPoints = [2]int{60, 85}
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.True(t, announce, "77 card points fall against 85, the Belote's 20 makes the contract")
+
+	v.HandPoints = [2]int{75, 70}
+	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.True(t, announce, "a contract made either way keeps its Belote")
 }
 
 func TestBeloteAnswerIsDeterministic(t *testing.T) {
