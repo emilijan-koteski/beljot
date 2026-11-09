@@ -43,6 +43,7 @@ type View struct {
 	KnownVoids    [4][4]bool
 	KnownCards    [4][]game.Card
 	DeclaredCards [4][]game.Card
+	Bids          []BidRecord
 	RankBounds    [4][4]int
 }
 

@@ -51,6 +51,7 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		RankBounds:           mem.RankBounds(),
 		KnownCards:           mem.KnownCards(),
 		DeclaredCards:        mem.DeclaredCards(),
+		Bids:                 mem.Bids(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true

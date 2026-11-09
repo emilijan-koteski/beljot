@@ -67,7 +67,7 @@ func toBotView(v View) bot.View {
 		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
-		DeclarationsEnabled: v.DeclarationsEnabled, RankBounds: v.RankBounds,
+		DeclarationsEnabled: v.DeclarationsEnabled, RankBounds: v.RankBounds, Bids: v.Bids,
 	}
 }
 
@@ -239,6 +239,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
+		v.Bids = mem.Bids()
 	}
 	v.DeclPoints = [2]int{gs.DeclarationPoints[0] + gs.BelotPoints[0], gs.DeclarationPoints[1] + gs.BelotPoints[1]}
 	v.BidRound = gs.BiddingRound
@@ -317,6 +318,7 @@ func PlayHandFrom(gs *game.GameState, pol [4]Policy, hook PlayHook, mem *Memory)
 				return HandOutcome{Status: HandPassedOut}, nil
 			}
 			cand := gs.TrumpCandidate
+			mem.ObserveBid(seat, bot.BidActionWithCandidate(action, cand), gs.BiddingRound, gs.BiddingPassCount)
 			next, err := game.ApplyAction(gs, action)
 			if err != nil {
 				return HandOutcome{}, fmt.Errorf("bidding seat %d %s: %w", seat, action.Type, err)

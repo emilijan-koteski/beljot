@@ -99,3 +99,93 @@ func randomDriver(gs *game.GameState, _ *bot.Memory, rng *rand.Rand) (int, game.
 	seat := actingSeat(gs)
 	return seat, randomLegalAction(gs, seat, rng)
 }
+
+func bidPass(seat int) game.Action {
+	return game.Action{Type: game.ActionPassTrump, PlayerSeat: seat}
+}
+
+func bidPick(seat int, suit *game.Suit) game.Action {
+	return game.Action{Type: game.ActionPickTrump, PlayerSeat: seat, Suit: suit}
+}
+
+func TestMemoryRecordsTheAuction(t *testing.T) {
+	hearts, spades := game.SuitHearts, game.SuitSpades
+
+	t.Run("bitola two rounds", func(t *testing.T) {
+		mem := bot.NewMemory()
+		for i := 0; i < 4; i++ {
+			mem.ObserveBid(i, bidPass(i), 1, i)
+		}
+		mem.ObserveBid(0, bidPick(0, &hearts), 2, 0)
+		bids := mem.Bids()
+		require.Len(t, bids, 5)
+		for i := 0; i < 4; i++ {
+			assert.Equal(t, bot.BidRecord{Seat: i, Round: 1, Passed: true, PassesBefore: i}, bids[i])
+		}
+		assert.False(t, bids[4].Passed)
+		assert.Equal(t, 2, bids[4].Round)
+		assert.Equal(t, 0, bids[4].PassesBefore)
+		require.NotNil(t, bids[4].Suit)
+		assert.Equal(t, hearts, *bids[4].Suit)
+	})
+
+	t.Run("croatian forced dealer pick", func(t *testing.T) {
+		mem := bot.NewMemory()
+		for i := 0; i < 3; i++ {
+			mem.ObserveBid(i+1, bidPass(i+1), 1, i)
+		}
+		mem.ObserveBid(0, bidPick(0, &spades), 1, 3)
+		bids := mem.Bids()
+		require.Len(t, bids, 4)
+		for i, b := range bids {
+			assert.Equal(t, 1, b.Round)
+			assert.Equal(t, i, b.PassesBefore)
+		}
+		assert.True(t, bids[2].Passed)
+		assert.False(t, bids[3].Passed)
+		assert.Equal(t, spades, *bids[3].Suit)
+	})
+
+	t.Run("round one pick takes the candidate suit", func(t *testing.T) {
+		mem := bot.NewMemory()
+		cand := card("QD")
+		mem.ObserveBid(1, bot.BidActionWithCandidate(bidPick(1, nil), &cand), 1, 0)
+		bids := mem.Bids()
+		require.Len(t, bids, 1)
+		require.NotNil(t, bids[0].Suit)
+		assert.Equal(t, game.SuitDiamonds, *bids[0].Suit)
+		assert.False(t, bids[0].Passed)
+	})
+
+	t.Run("a new auction replaces a passed-out one", func(t *testing.T) {
+		mem := bot.NewMemory()
+		for i := 0; i < 4; i++ {
+			mem.ObserveBid(i, bidPass(i), 1, i)
+		}
+		for i := 0; i < 4; i++ {
+			mem.ObserveBid(i, bidPass(i), 2, i)
+		}
+		mem.ObserveBid(1, bidPass(1), 1, 0)
+		bids := mem.Bids()
+		require.Len(t, bids, 1)
+		assert.Equal(t, 1, bids[0].Seat)
+	})
+
+	t.Run("sync hand clears the record", func(t *testing.T) {
+		mem := bot.NewMemory()
+		mem.ObserveBid(0, bidPass(0), 1, 0)
+		mem.SyncHand(1)
+		assert.Len(t, mem.Bids(), 1)
+		mem.SyncHand(2)
+		assert.Empty(t, mem.Bids())
+	})
+
+	t.Run("bids returns a copy", func(t *testing.T) {
+		mem := bot.NewMemory()
+		assert.Empty(t, mem.Bids())
+		mem.ObserveBid(0, bidPass(0), 1, 0)
+		got := mem.Bids()
+		got[0].Seat = 3
+		assert.Equal(t, 0, mem.Bids()[0].Seat)
+	})
+}

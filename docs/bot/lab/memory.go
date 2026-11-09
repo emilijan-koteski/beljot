@@ -39,6 +39,16 @@ func (m *Memory) SyncHand(handNumber int) {
 	m.bounds.SyncHand(handNumber)
 }
 
+// ObserveBid records a trump auction action in the production memory.
+func (m *Memory) ObserveBid(seat int, action game.Action, round int, passesBefore int) {
+	m.bounds.ObserveBid(seat, action, round, passesBefore)
+}
+
+// Bids returns a copy of this hand's auction records.
+func (m *Memory) Bids() []bot.BidRecord {
+	return m.bounds.Bids()
+}
+
 // ObservePlay records a resolved play and marks the seat void when it did not follow leadSuit; the rank bounds come
 // from the production memory. leadSuit and trick are the pre-play lead suit and trick, nil when this card led.
 func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit, trump *game.Suit, trick []game.TrickCard) {

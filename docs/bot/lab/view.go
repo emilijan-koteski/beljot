@@ -1,6 +1,9 @@
 package botlab
 
-import "github.com/emilijan/beljot/server/internal/game"
+import (
+	"github.com/emilijan/beljot/server/internal/bot"
+	"github.com/emilijan/beljot/server/internal/game"
+)
 
 // View is the redacted, seat-local projection of the game state handed to Decide.
 // It carries only what a human player in that seat could know.
@@ -36,6 +39,7 @@ type View struct {
 	PlayedCards []game.Card
 	KnownVoids  [4][4]bool
 	KnownCards  [4][]game.Card
+	Bids        []bot.BidRecord
 
 	DeclaredCards [4][]game.Card
 

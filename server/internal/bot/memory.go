@@ -16,6 +16,16 @@ type Memory struct {
 	declared   [4][]game.Card
 	located    [4][]game.Card
 	bounds     [4][4]int8
+	bids       []BidRecord
+}
+
+// BidRecord is one auction action: who acted, in which round, after how many passes, and the called suit unless it passed.
+type BidRecord struct {
+	Seat         int
+	Round        int
+	Passed       bool
+	Suit         *game.Suit
+	PassesBefore int
 }
 
 // NewMemory returns a Memory primed for the first hand.
@@ -44,6 +54,7 @@ func (m *Memory) SyncHand(handNumber int) {
 		m.declared = [4][]game.Card{}
 		m.located = [4][]game.Card{}
 		m.bounds = noRankBounds()
+		m.bids = nil
 	}
 }
 
@@ -210,4 +221,32 @@ func (m *Memory) KnownCards() [4][]game.Card {
 		}
 	}
 	return out
+}
+
+// ObserveBid records a trump auction action; round and passesBefore are the engine's bidding round and pass count before it.
+// The first action of an auction (round 1, no passes) starts a fresh record, which covers a Bitola reshuffle within one hand.
+func (m *Memory) ObserveBid(seat int, action game.Action, round int, passesBefore int) {
+	if round == 1 && passesBefore == 0 {
+		m.bids = nil
+	}
+	rec := BidRecord{Seat: seat, Round: round, PassesBefore: passesBefore, Passed: action.Type == game.ActionPassTrump}
+	if !rec.Passed && action.Suit != nil {
+		suit := *action.Suit
+		rec.Suit = &suit
+	}
+	m.bids = append(m.bids, rec)
+}
+
+// BidActionWithCandidate returns the action with the trump candidate's suit filled in when a round-1 pick carries none.
+func BidActionWithCandidate(action game.Action, candidate *game.Card) game.Action {
+	if action.Type == game.ActionPickTrump && action.Suit == nil && candidate != nil {
+		suit := candidate.Suit
+		action.Suit = &suit
+	}
+	return action
+}
+
+// Bids returns a copy of this hand's auction records in order.
+func (m *Memory) Bids() []BidRecord {
+	return slices.Clone(m.bids)
 }

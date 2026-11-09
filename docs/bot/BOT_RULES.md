@@ -872,6 +872,9 @@ what a human in that seat could:
   the led suit is marked void in it (`ObservePlay`). A seat that plays neither the led suit nor
   a trump is void in trump as well: it would have had to cut. Voids are tracked for **all 4
   seats** (including the partner, used by the lead-into-void and smear rules).
+- **The auction** (`Bids`, from `Memory.ObserveBid`): for the current hand, each bid action with its seat,
+  round, the passes before it, and either a pass or the called suit (a Bitola round-1 pick records the
+  candidate's suit). A Bitola reshuffle starts a new record, and `SyncHand` clears it with the hand.
 - **Rank bounds** (`RankBounds[seat][suit]`, from `Memory`): the strength index (`NonTrumpRankOrder`,
   `TrumpRankOrder` for the trump suit) of the highest card the seat can still hold in that suit, -1
   for no bound, only ever lowered. Two exact facts feed it, each following from a follow rule of the

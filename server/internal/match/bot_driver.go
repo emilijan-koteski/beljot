@@ -326,6 +326,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
+		v.Bids = mem.Bids()
 	}
 	return v
 }
@@ -356,6 +357,10 @@ func (m *Manager) observeBotMemoryLocked(session *LiveMatch, oldState, newState 
 	}
 	if action.Type == game.ActionPlayCard && action.Card != nil {
 		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit, oldState.CurrentTrick)
+	}
+	if action.Type == game.ActionPassTrump || action.Type == game.ActionPickTrump {
+		mem.ObserveBid(action.PlayerSeat, bot.BidActionWithCandidate(action, oldState.TrumpCandidate),
+			oldState.BiddingRound, oldState.BiddingPassCount)
 	}
 	mem.SyncHand(newState.HandNumber)
 	if action.Type == game.ActionPickTrump && oldState.TrumpCandidate != nil {
