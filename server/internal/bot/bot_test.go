@@ -2130,13 +2130,25 @@ func TestCardsProvablyAbsent(t *testing.T) {
 	}
 }
 
-func TestChooseFollowNeverDiscardsABlindTen(t *testing.T) {
-	v := viewForTweakCase(playTweakCase{
-		hand:       cards("AD", "TS"),
-		trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 3}},
-		callerSeat: 1,
-	})
-	assert.Equal(t, "AD", bot.ChooseCardForTest(v).String())
+func TestChooseFollowDiscardsTheBlindTenRatherThanAnAce(t *testing.T) {
+	tests := []struct {
+		name string
+		hand []game.Card
+		want string
+	}{
+		{"only an Ace beside the ten", cards("AD", "TS"), "TS"},
+		{"a low card beside the ten and the Ace", cards("AD", "TS", "7C"), "7C"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := viewForTweakCase(playTweakCase{
+				hand:       tt.hand,
+				trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 3}},
+				callerSeat: 1,
+			})
+			assert.Equal(t, tt.want, bot.ChooseCardForTest(v).String())
+		})
+	}
 }
 
 func TestChooseLeadNeverLeadsABlindTen(t *testing.T) {

@@ -465,7 +465,7 @@ func TestEvaluateValuesAClosedTrick(t *testing.T) {
 	open := []int{cardOf(game.SuitClubs, game.RankAce), cardOf(game.SuitClubs, game.Rank7), cardOf(game.SuitClubs, game.RankKing)}
 	closed := append(slices.Clone(open), search.CardIdx(last))
 	settle := settlementOver(hearts, closed)
-	opts := search.Options{Samples: 4, EarlyStopAfter: 5, EarlyStopSE: 1}
+	opts := search.Options{Samples: 4, EarlyStopAfter: 5, EarlyStopSE: 1, TrackCallerMade: true}
 
 	before := search.Position{Trump: hearts, Leader: 1, Trick: open, Capot: search.CapotFlag([2]int{3, 4})}
 	chosen, ok := search.Choose(search.Information{Seat: 0, Own: search.MaskOf([]game.Card{last})}, before, []game.Card{last}, settle, opts, farFuture())
@@ -480,6 +480,30 @@ func TestEvaluateValuesAClosedTrick(t *testing.T) {
 	assert.InDelta(t, chosen.Mean, mean, 1e-9)
 	assert.Zero(t, se)
 	assert.InDelta(t, 1.0, made, 1e-9)
+}
+
+func TestEvaluateLeavesTheMadeShareOutUnlessTracked(t *testing.T) {
+	junk := game.Card{Suit: game.SuitClubs, Rank: game.Rank7}
+	master := game.Card{Suit: game.SuitHearts, Rank: game.RankJack}
+	unseen := unseenWithClubs(rand.New(rand.NewPCG(9, 4)))
+	own := search.MaskOf([]game.Card{junk, master})
+	trick := []int{cardOf(game.SuitClubs, game.RankAce)}
+	in := search.Information{Seat: 2, Own: own, Unseen: unseen, Need: [4]int{2, 1, 0, 2}}
+	pos := search.Position{Trump: hearts, Leader: 1, Trick: trick, Capot: search.CapotFlag([2]int{3, 2})}
+	settle := settlementOver(hearts, trick, own, unseen)
+	untracked := search.Options{Samples: 24, EarlyStopAfter: 25, EarlyStopSE: 1}
+	tracked := untracked
+	tracked.TrackCallerMade = true
+
+	meanOff, seOff, madeOff, ok := search.Evaluate(in, pos, settle, untracked, farFuture())
+	require.True(t, ok)
+	meanOn, seOn, madeOn, ok := search.Evaluate(in, pos, settle, tracked, farFuture())
+	require.True(t, ok)
+
+	assert.Zero(t, madeOff)
+	assert.Positive(t, madeOn)
+	assert.InDelta(t, meanOn, meanOff, 1e-9)
+	assert.InDelta(t, seOn, seOff, 1e-9)
 }
 
 func TestEvaluateTimesOut(t *testing.T) {

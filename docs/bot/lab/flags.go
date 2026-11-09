@@ -7,6 +7,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/bot"
 )
 
+const hardVeto = 10_000
+
 // Flags switch experimental rule variants on in the lab bot.
 type Flags struct {
 	set  map[string]bool
@@ -91,6 +93,10 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noCashHigh") {
 		t.CashHighWinnerBonus = 0
+	}
+	if f.On("hardVeto") {
+		t.BlindTenPenalty = hardVeto
+		t.CashHighWinnerBonus = hardVeto
 	}
 	if f.On("tenUnder3") {
 		t.TenUnderAceBonus = 3

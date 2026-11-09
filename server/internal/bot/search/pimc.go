@@ -125,7 +125,7 @@ func Choose(
 }
 
 // Evaluate values the position with no card to choose: the settled value for team A averaged over deals sampled from
-// the seat's information, its standard error and the share of deals the caller made, false as Choose reports false.
+// the seat's information, its standard error and, when TrackCallerMade asks, the share of deals the caller made.
 func Evaluate(in Information, pos Position, s Settlement, opts Options, deadline time.Time) (mean, se, made float64, ok bool) {
 	if len(pos.Trick) > seats {
 		return 0, 0, 0, false
@@ -146,7 +146,7 @@ func Evaluate(in Information, pos Position, s Settlement, opts Options, deadline
 		solver.Reset()
 		remainder := rootValue(solver, hands, pos)
 		values = append(values, settledValue(pos.Race, s, remainder))
-		if callerMadeIn(pos.Race, s, remainder) {
+		if opts.TrackCallerMade && callerMadeIn(pos.Race, s, remainder) {
 			madeCount++
 		}
 	}

@@ -519,3 +519,71 @@ func TestChooseAdjustedCashesTheTenAtRiskWithItsAceOut(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "TS", got.String())
 }
+
+func blindTenResult(means map[string]float64) search.Result {
+	res := search.Result{Cards: map[int]search.CardStats{}}
+	for id, mean := range means {
+		res.Cards[search.CardIdx(card(id))] = search.CardStats{Mean: mean}
+	}
+	return res
+}
+
+func TestConventionVetoYieldsOnlyToADecidedRace(t *testing.T) {
+	hearts := game.SuitHearts
+	v := defenderLeadView([]string{"TS", "7D"}, &hearts, 1, nil)
+	require.True(t, bot.BlindTenForTest(v, card("TS")))
+	tests := []struct {
+		name     string
+		ten, low float64
+		want     string
+	}{
+		{"the ten wins the match in every sample and the alternative loses it", search.RaceWin, -search.RaceWin, "TS"},
+		{"a race gap short of decided keeps the veto", 600, -600, "7D"},
+		{"a points margin of 600 keeps the veto", 600, 0, "7D"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := blindTenResult(map[string]float64{"TS": tt.ten, "7D": tt.low})
+			got, ok := bot.ChooseAdjustedForTest(v, res, bot.DefaultSearchTuning())
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}
+
+func TestBlindTenIsTheBetterDiscardThanAnAce(t *testing.T) {
+	onClubs := []game.TrickCard{{Card: card("8C"), PlayerSeat: 3}}
+	tests := []struct {
+		name  string
+		hand  []string
+		trick []game.TrickCard
+		means map[string]float64
+		want  string
+	}{
+		{"a discard with only an Ace beside the ten", []string{"AD", "TS"}, onClubs, map[string]float64{"AD": 0, "TS": 4}, "TS"},
+		{"a discard with a low card available", []string{"AD", "TS", "7C"}, []game.TrickCard{{Card: card("8H"), PlayerSeat: 3}},
+			map[string]float64{"AD": 0, "TS": 4, "7C": 1}, "7C"},
+		{"a lead keeps the veto", []string{"TS", "AD"}, nil, map[string]float64{"AD": 0, "TS": 4}, "AD"},
+		{"a ten following after a trump cut keeps the veto", []string{"TS", "7S"},
+			[]game.TrickCard{{Card: card("8S"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}}, map[string]float64{"7S": 0, "TS": 4}, "7S"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := blindTenView(tt.hand, tt.trick)
+			if len(tt.trick) > 0 {
+				v.LegalCards = nil
+				for _, c := range v.Hand {
+					if c.Suit == tt.trick[0].Card.Suit {
+						v.LegalCards = append(v.LegalCards, c)
+					}
+				}
+				if len(v.LegalCards) == 0 {
+					v.LegalCards = v.Hand
+				}
+			}
+			got, ok := bot.ChooseAdjustedForTest(v, blindTenResult(tt.means), bot.DefaultSearchTuning())
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}

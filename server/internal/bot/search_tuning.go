@@ -8,10 +8,11 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-const ConventionVeto = 10_000
+const ConventionVeto = 1500
 
 // SearchTuning holds the behaviours layered on the search; its zero value is phase 2 and SeedSalt is a lab-only seed
-// offset. A bonus or penalty set to ConventionVeto outweighs any searched margin, so that convention acts as a rule.
+// offset. ConventionVeto outweighs every points margin a hand produces yet yields to a race the card wins and the other
+// card loses in nearly every sample.
 type SearchTuning struct {
 	DefenderTrumpLeadBonus int
 	TenUnderAceBonus       int
@@ -84,6 +85,24 @@ func blindTen(v View, c game.Card, ctx TrickContext) bool {
 		}
 	}
 	return true
+}
+
+// blindTenDiscardExempt reports a Ten discarded while every other legal card is an Ace, the worse discard to give away.
+func blindTenDiscardExempt(c game.Card, legal []game.Card, ctx TrickContext) bool {
+	if ctx.Position == 0 || ctx.Led == nil || c.Suit == *ctx.Led {
+		return false
+	}
+	for _, other := range legal {
+		if other != c && other.Rank != game.RankAce {
+			return false
+		}
+	}
+	return true
+}
+
+// vetoedBlindTen reports a blind Ten that is not exempt as a discard beside nothing but Aces.
+func vetoedBlindTen(v View, c game.Card, legal []game.Card, ctx TrickContext) bool {
+	return blindTen(v, c, ctx) && !blindTenDiscardExempt(c, legal, ctx)
 }
 
 func countSuit(cards []game.Card, suit game.Suit) int {
@@ -160,7 +179,7 @@ func chooseAdjusted(v View, res search.Result, t SearchTuning) (game.Card, bool)
 		if ten != nil && c == *ten {
 			score += float64(t.TenUnderAceBonus)
 		}
-		if t.BlindTenPenalty > 0 && blindTen(v, c, ctx) {
+		if t.BlindTenPenalty > 0 && vetoedBlindTen(v, c, v.LegalCards, ctx) {
 			score -= float64(t.BlindTenPenalty)
 		}
 		if t.CashHighWinnerBonus > 0 && cashHighWinner(v, c, ctx) {

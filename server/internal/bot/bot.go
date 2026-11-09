@@ -1172,12 +1172,12 @@ func highestPointsLedSuitWinner(v View, legal []game.Card, led, trump game.Suit)
 // only choice.
 func avoidBlindTen(v View, legal []game.Card, trump game.Suit, pick game.Card) game.Card {
 	ctx := trickContextOf(v)
-	if !blindTen(v, pick, ctx) {
+	if !vetoedBlindTen(v, pick, legal, ctx) {
 		return pick
 	}
 	var rest []game.Card
 	for _, c := range legal {
-		if !blindTen(v, c, ctx) {
+		if !vetoedBlindTen(v, c, legal, ctx) {
 			rest = append(rest, c)
 		}
 	}
