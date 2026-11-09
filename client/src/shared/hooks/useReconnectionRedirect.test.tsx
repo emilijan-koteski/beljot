@@ -126,6 +126,7 @@ const minimalMatchState: MatchState = {
   belotPoints: [0, 0],
   winnerTeam: null,
   lastHandResult: null,
+  hangingPoints: null,
   turnExpiresAt: null,
   timerDurationSec: 0,
   turnTimeRemaining: 0,

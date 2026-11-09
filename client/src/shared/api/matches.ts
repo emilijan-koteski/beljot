@@ -1,5 +1,5 @@
 import { axiosClient } from "@/shared/api/axiosClient";
-import type { MatchMode, Variant } from "@/shared/types/matchTypes";
+import type { HangingPoints, MatchMode, Variant } from "@/shared/types/matchTypes";
 
 export type MatchOutcome = "win" | "loss" | "abandoned";
 
@@ -31,6 +31,8 @@ export interface MatchHandView {
   contractingTeam: number;
   teamAHandTotal: number;
   teamBHandTotal: number;
+  hangingCreated?: HangingPoints | null;
+  hangingPaid?: HangingPoints | null;
 }
 
 /**

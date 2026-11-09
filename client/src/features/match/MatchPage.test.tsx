@@ -173,6 +173,7 @@ const mockMatchState: MatchState = {
   belotAnnounced: false,
   winnerTeam: null,
   lastHandResult: null,
+  hangingPoints: null,
   turnExpiresAt: null,
   timerDurationSec: 0,
   previousPhase: "" as const,
@@ -1213,6 +1214,8 @@ describe("MatchPage", () => {
       contractingTeam: 0,
       teamAHandTotal: 100,
       teamBHandTotal: 62,
+      hangingCreated: null,
+      hangingPaid: null,
       teamAMatchScore: 100,
       teamBMatchScore: 62,
     };
@@ -1735,6 +1738,8 @@ describe("MatchPage", () => {
       contractingTeam: 1,
       teamAHandTotal: 70,
       teamBHandTotal: 92,
+      hangingCreated: null,
+      hangingPaid: null,
     };
     const scorePayload = { ...handScore, teamAMatchScore: 70, teamBMatchScore: 92 };
 
@@ -1814,6 +1819,34 @@ describe("MatchPage", () => {
         vi.advanceTimersByTime(2000);
       });
       expect(screen.getByTestId("score-reveal")).toHaveTextContent("Went down · card points to us");
+    });
+
+    it("rebuilds a Bitola tie and the points left hanging on reconnect", () => {
+      useMatchStore.getState().setMatchState({
+        ...mockMatchState,
+        phase: "hand_complete",
+        lastHandResult: {
+          ...handScore,
+          teamACardPoints: 81,
+          teamBCardPoints: 71,
+          contractingTeam: 0,
+          teamAHandTotal: 0,
+          teamBHandTotal: 162,
+          hangingCreated: { amount: 81, team: 0 },
+          hangingPaid: { amount: 81, team: 1 },
+        },
+        hangingPoints: { amount: 81, team: 0 },
+        teamScores: [81, 162],
+      });
+      useMatchStore.getState().setMyPlayerSeat(0);
+      renderMatchPage();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByTestId("score-reveal")).toHaveTextContent("Tie · our 81 hangs");
+      expect(screen.getByTestId("row-hanging-paid")).toHaveTextContent("+81");
+      expect(screen.getByTestId("score-hanging")).toHaveTextContent("Our 81 hangs");
     });
   });
   describe("declaration prompt overlap wiring", () => {
@@ -3074,6 +3107,8 @@ describe("MatchPage", () => {
         contractingTeam: 0,
         teamAHandTotal: 90,
         teamBHandTotal: 82,
+        hangingCreated: null,
+        hangingPaid: null,
         teamAMatchScore: 90,
         teamBMatchScore: 82,
       };
@@ -3286,6 +3321,8 @@ describe("MatchPage", () => {
         contractingTeam: 0,
         teamAHandTotal: 252,
         teamBHandTotal: 0,
+        hangingCreated: null,
+        hangingPaid: null,
       };
 
       it("plays the capot jingle once when the banner opens", () => {

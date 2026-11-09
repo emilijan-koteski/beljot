@@ -247,7 +247,12 @@
           "us": "ние",
           "them": "тие",
           "failedUs": "паднаа · ние",
-          "failedThem": "паднаа · тие"
+          "failedThem": "паднаа · тие",
+          "hangingUs": "нерешено · висат нашите {{points}}",
+          "hangingThem": "нерешено · висат нивните {{points}}",
+          "hangingDiscardedUs": "нерешено · нашите {{points}} се бришат",
+          "hangingDiscardedThem": "нерешено · нивните {{points}} се бришат",
+          "hangingPaid": "+{{points}} висечки"
         },
         "unfinished": "Недовршена рака: целта е достигната"
       }
@@ -958,7 +963,9 @@
       "trick": "штих",
       "thisHand": "ова делење",
       "handLabel": "Делење {{hand}}",
-      "handVariant": "Делење {{hand}} · {{variant}}"
+      "handVariant": "Делење {{hand}} · {{variant}}",
+      "hangingUs": "Висат нашите {{amount}}",
+      "hangingThem": "Висат нивните {{amount}}"
     },
     "scoreReveal": {
       "title": "Резултат на делењето",
@@ -968,10 +975,15 @@
       "subtitleFailedThem": "Падната · сите поени за нив",
       "subtitleFailedCardsUs": "Падната · поените од карти за нас",
       "subtitleFailedCardsThem": "Падната · поените од карти за нив",
+      "subtitleTieUs": "Нерешено · висат нашите {{amount}}",
+      "subtitleTieThem": "Нерешено · висат нивните {{amount}}",
+      "subtitleTieDiscardedUs": "Нерешено · нашите {{amount}} се бришат",
+      "subtitleTieDiscardedThem": "Нерешено · нивните {{amount}} се бришат",
       "cardPoints": "Поени од карти",
       "declarationPoints": "Најави",
       "lastTrickBonus": "Бонус за последен штих",
       "capotBonus": "Чаљо бонус",
+      "hangingPaid": "Висечки поени",
       "handTotal": "Вкупно делење",
       "matchTotal": "Резултат на меч",
       "continue": "Продолжи",

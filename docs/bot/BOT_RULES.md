@@ -291,13 +291,17 @@ rejects nothing.
   the last trick or the Capot bonus. `search/solver_test.go` checks it against a brute-force
   minimax and against the engine's legality and trick winner; the lab prototype's speed table is
   in `BOT_V2_LAB_RESULTS.md` §1.1.
-- **Settle** (`search.Settle`): the remainder value becomes the award the engine would bank,
-  mirroring `scoreHand`. It adds the hand points already banked and both teams' declaration and
-  Belote points. A Capot gives the whole hand and the Capot bonus to the sweeping team. A caller
-  who does not beat the defenders (a tie loses) concedes the hand: the defenders take all card
-  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own, and the
-  other side banks nothing. `search.SettleTotals` returns the two teams' awards and `Settle` is
-  their difference. `TestSettleMatchesEngineAtTheLastTrick` and
+- **Settle** (`search.Settle`): the remainder value becomes the award the engine would bank.
+  `search.SettleTotals` splits the remainder between the teams, detects a Capot, and then calls
+  `game.SettleHand`, the same function `scoreHand` uses, so the bot and the engine cannot drift. It
+  adds the hand points already banked and both teams' declaration and Belote points. A Capot gives
+  the whole hand and the Capot bonus to the sweeping team. A caller who does not beat the defenders
+  concedes the hand: the defenders take all card points plus either both teams' declarations
+  (`DeclarationsTransfer`) or only their own, and the other side banks nothing. A tie is such a fall
+  under the Croatian `TieRule`; under Bitola's the defenders bank only their own total and the
+  caller's half hangs, counting for nobody until a later hand pays it. Points already hanging
+  (`View.HangingPoints`) are added to whoever takes the hand, exactly as the engine pays them.
+  `Settle` is the difference of the two awards. `TestSettleMatchesEngineAtTheLastTrick` and
   `TestSettleTotalsMatchEngineAtTheLastTrick` pin the agreement with the engine.
 - **Choose** (`search.Choose`): for each legal card, the settled values are averaged over the
   samples, signed for the seat's team, and the best average is played. Equal sums go to the lower

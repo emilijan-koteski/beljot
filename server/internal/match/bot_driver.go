@@ -319,7 +319,12 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
+		TieRule:              gs.Rules.TieRule,
 		RankBounds:           bot.NoRankBounds(),
+	}
+	if gs.HangingPoints != nil {
+		hanging := *gs.HangingPoints
+		v.HangingPoints = &hanging
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true

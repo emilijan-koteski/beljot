@@ -63,6 +63,7 @@ func handleSurrenderAccept(state *GameState, action Action) (*GameState, error) 
 	opponentTeam := 1 - TeamForSeat(proposer)
 	newState.WinnerTeam = &opponentTeam
 	newState.Phase = PhaseMatchEnd
+	newState.HangingPoints = nil
 	newState.SurrenderProposerSeat = nil
 	newState.TurnExpiresAt = nil
 	newState.TurnTimeRemaining = 0

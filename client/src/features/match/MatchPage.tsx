@@ -1227,6 +1227,7 @@ export function MatchPage() {
         handNumber={matchState.handNumber}
         variantLabel={variantLabel(t, matchState.variant)}
         matchTarget={matchTarget}
+        hangingPoints={matchState.hangingPoints ?? null}
       />
 
       <div
@@ -1673,6 +1674,7 @@ export function MatchPage() {
           acknowledged={handCompleteAcked}
           matchTarget={matchTarget}
           declarationsTransfer={matchState.declarationsTransfer}
+          matchOver={matchEndData !== null || matchState.phase === "match_end"}
         />
       )}
 

@@ -101,6 +101,7 @@ const mockMatchState: MatchState = {
   belotAnnounced: false,
   winnerTeam: null,
   lastHandResult: null,
+  hangingPoints: null,
   turnExpiresAt: null,
   timerDurationSec: 0,
   previousPhase: "" as const,
@@ -164,6 +165,8 @@ describe("matchStore", () => {
       contractingTeam: 1,
       teamAHandTotal: 70,
       teamBHandTotal: 92,
+      hangingCreated: null,
+      hangingPaid: null,
       teamAMatchScore: 70,
       teamBMatchScore: 92,
     });

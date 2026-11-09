@@ -38,6 +38,8 @@ type View struct {
 	StopAtTarget         bool
 	DeclarationsTransfer bool
 	DeclarationsEnabled  bool
+	TieRule              game.TieRule
+	HangingPoints        *game.HangingPoints
 
 	PlayedCards   []game.Card
 	PlayedBy      [4][]game.Card

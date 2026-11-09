@@ -64,9 +64,15 @@ interface HandsGridProps {
   themFinal: number;
 }
 
-/** True when a hand has any note badge (capot / last-trick / failed contract). */
+/** True when a hand has any note badge (capot / last-trick / failed contract / hanging points). */
 function handHasNotes(h: MatchHandView): boolean {
-  return h.capot || h.lastTrickBonus > 0 || h.failedContract;
+  return (
+    h.capot ||
+    h.lastTrickBonus > 0 ||
+    h.failedContract ||
+    (h.hangingCreated ?? null) !== null ||
+    (h.hangingPaid ?? null) !== null
+  );
 }
 
 interface HandNotesProps {
@@ -74,22 +80,37 @@ interface HandNotesProps {
   capotIsUs: boolean;
   lastTrickIsUs: boolean;
   contractingIsUs: boolean;
+  viewerTeamIndex: 0 | 1;
+  isLastHand: boolean;
   usColor: string;
   themColor: string;
 }
 
-/** Renders the capot, last-trick and failed-contract badges for a hand as a fragment. */
+/** Renders the capot, last-trick, failed-contract and hanging-points badges for a hand as a fragment. */
 function HandNotes({
   hand: h,
   capotIsUs,
   lastTrickIsUs,
   contractingIsUs,
+  viewerTeamIndex,
+  isLastHand,
   usColor,
   themColor,
 }: HandNotesProps) {
   const { t } = useTranslation();
   const teamWord = (isUs: boolean) =>
     isUs ? t("profile.matchHistory.hand.note.us") : t("profile.matchHistory.hand.note.them");
+  const hangingCreated = h.hangingCreated ?? null;
+  const hangingPaid = h.hangingPaid ?? null;
+  const hangingPaidIsUs = hangingPaid !== null && hangingPaid.team === viewerTeamIndex;
+  const hangingIsUs = hangingCreated !== null && hangingCreated.team === viewerTeamIndex;
+  const hangingKey = isLastHand
+    ? hangingIsUs
+      ? "profile.matchHistory.hand.note.hangingDiscardedUs"
+      : "profile.matchHistory.hand.note.hangingDiscardedThem"
+    : hangingIsUs
+      ? "profile.matchHistory.hand.note.hangingUs"
+      : "profile.matchHistory.hand.note.hangingThem";
   return (
     <>
       {h.capot && (
@@ -121,6 +142,24 @@ function HandNotes({
             : t("profile.matchHistory.hand.note.failedThem")}
         </span>
       )}
+      {hangingCreated !== null && (
+        <span
+          className="bg-brass-soft text-brass-deep border-brass/30 rounded-md border px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
+          data-testid="match-history-hand-hanging"
+        >
+          {t(hangingKey, { points: hangingCreated.amount })}
+        </span>
+      )}
+      {hangingPaid !== null && (
+        <span
+          className="bg-surface-3 border-border rounded-md border px-1.5 py-0.5 text-2xs font-semibold tracking-wider"
+          style={{ color: hangingPaidIsUs ? usColor : themColor }}
+          data-testid="match-history-hand-hanging-paid"
+        >
+          {t("profile.matchHistory.hand.note.hangingPaid", { points: hangingPaid.amount })} ·{" "}
+          {teamWord(hangingPaidIsUs)}
+        </span>
+      )}
     </>
   );
 }
@@ -149,6 +188,7 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
     (n, h) => n + (viewerTeamIndex === 0 ? h.teamBHandTotal : h.teamAHandTotal),
     0,
   );
+  const lastHandNumber = Math.max(...hands.map((h) => h.handNumber));
   const unscoredUs = usFinal - scoredUs;
   const unscoredThem = themFinal - scoredThem;
   const hasUnscoredHand = unscoredUs > 0 || unscoredThem > 0;
@@ -189,6 +229,8 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
           capotIsUs={d.capotIsUs}
           lastTrickIsUs={d.lastTrickIsUs}
           contractingIsUs={d.contractingIsUs}
+          viewerTeamIndex={viewerTeamIndex}
+          isLastHand={h.handNumber === lastHandNumber}
           usColor={usColor}
           themColor={themColor}
         />
@@ -313,6 +355,8 @@ function HandsGrid({ hands, viewerTeamIndex, layout, usFinal, themFinal }: Hands
                     capotIsUs={d.capotIsUs}
                     lastTrickIsUs={d.lastTrickIsUs}
                     contractingIsUs={d.contractingIsUs}
+                    viewerTeamIndex={viewerTeamIndex}
+                    isLastHand={h.handNumber === lastHandNumber}
                     usColor={usColor}
                     themColor={themColor}
                   />

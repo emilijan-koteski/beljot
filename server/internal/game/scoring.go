@@ -39,34 +39,23 @@ func scoreHand(state *GameState) {
 
 	aDeclTotal := state.DeclarationPoints[TeamA] + state.BelotPoints[TeamA]
 	bDeclTotal := state.DeclarationPoints[TeamB] + state.BelotPoints[TeamB]
-	aTotal := state.HandPoints[TeamA] + aDeclTotal
-	bTotal := state.HandPoints[TeamB] + bDeclTotal
-
 	contractingTeam := TeamForSeat(*state.TrumpCallerSeat)
-	opposingTeam := 1 - contractingTeam
 
-	var contractingTotal, opposingTotal int
-	if contractingTeam == TeamA {
-		contractingTotal = aTotal
-		opposingTotal = bTotal
-	} else {
-		contractingTotal = bTotal
-		opposingTotal = aTotal
+	tally := HandTally{
+		CardPoints:           state.HandPoints,
+		DeclPoints:           [2]int{aDeclTotal, bDeclTotal},
+		CallerTeam:           contractingTeam,
+		Capot:                isCapot,
+		DeclarationsTransfer: state.Rules.DeclarationsTransfer,
+		TieRule:              state.Rules.TieRule,
 	}
-
-	failedContract := contractingTotal <= opposingTotal
-	declTotals := [2]int{aDeclTotal, bDeclTotal}
-	var awarded [2]int
-	switch {
-	case isCapot:
-		awarded[*capotTeam] = wholeHandAward(state, *capotTeam, declTotals)
-	case failedContract:
-		awarded[opposingTeam] = wholeHandAward(state, opposingTeam, declTotals)
-	default:
-		awarded = [2]int{aTotal, bTotal}
+	if capotTeam != nil {
+		tally.CapotTeam = *capotTeam
 	}
-	state.TeamScores[TeamA] += awarded[TeamA]
-	state.TeamScores[TeamB] += awarded[TeamB]
+	settled := SettleHand(tally, state.HangingPoints)
+	state.HangingPoints = cloneHangingPoints(settled.Hanging)
+	state.TeamScores[TeamA] += settled.Awarded[TeamA]
+	state.TeamScores[TeamB] += settled.Awarded[TeamB]
 
 	state.LastHandResult = &HandScore{
 		HandNumber:      state.HandNumber,
@@ -80,10 +69,12 @@ func scoreHand(state *GameState) {
 		Capot:           isCapot,
 		CapotTeam:       capotTeam,
 		CapotBonus:      capotBonus,
-		FailedContract:  failedContract,
+		FailedContract:  settled.FailedContract,
 		ContractingTeam: contractingTeam,
-		TeamAHandTotal:  awarded[TeamA],
-		TeamBHandTotal:  awarded[TeamB],
+		TeamAHandTotal:  settled.Awarded[TeamA],
+		TeamBHandTotal:  settled.Awarded[TeamB],
+		HangingCreated:  settled.Hanging,
+		HangingPaid:     settled.Paid,
 	}
 
 	target := MatchTarget(state.MatchMode)
@@ -94,6 +85,7 @@ func scoreHand(state *GameState) {
 		winner := determineMatchWinner(state, aOver, bOver)
 		state.WinnerTeam = &winner
 		state.Phase = PhaseMatchEnd
+		state.HangingPoints = nil
 		return
 	}
 
@@ -101,14 +93,73 @@ func scoreHand(state *GameState) {
 	state.HandCompleteReady = [4]bool{}
 }
 
+// HandTally is a completed hand as settlement sees it. CardPoints include the last-trick or Capot bonus, DeclPoints
+// include Belote, and CapotTeam counts only when Capot is set.
+type HandTally struct {
+	CardPoints           [2]int
+	DeclPoints           [2]int
+	CallerTeam           int
+	Capot                bool
+	CapotTeam            int
+	DeclarationsTransfer bool
+	TieRule              TieRule
+}
+
+// HandSettlement is what a hand banks: each team's award with any hanging points paid, whether the caller fell,
+// the entry a Bitola tie leaves hanging, and the hanging points the hand paid out and to whom.
+type HandSettlement struct {
+	Awarded        [2]int
+	FailedContract bool
+	Hanging        *HangingPoints
+	Paid           *HangingPoints
+}
+
+// SettleHand settles a completed hand against the points left hanging by a tie, if any. It is the single rule that
+// scoreHand and the bot search both apply: a Capot, then a pass, then a Bitola tie, then a fall.
+func SettleHand(t HandTally, hanging *HangingPoints) HandSettlement {
+	caller, opponents := t.CallerTeam, 1-t.CallerTeam
+	totals := [2]int{t.CardPoints[TeamA] + t.DeclPoints[TeamA], t.CardPoints[TeamB] + t.DeclPoints[TeamB]}
+
+	var s HandSettlement
+	taker := opponents
+	switch {
+	case t.Capot:
+		s.Awarded[t.CapotTeam] = wholeHandAward(t, t.CapotTeam)
+		taker = t.CapotTeam
+	case totals[caller] > totals[opponents]:
+		s.Awarded = totals
+		taker = caller
+	case totals[caller] == totals[opponents] && t.TieRule == TieRuleHangingPoints:
+		s.Awarded[opponents] = totals[opponents]
+		s.Hanging = &HangingPoints{Amount: totals[caller], Team: caller}
+	default:
+		s.Awarded[opponents] = wholeHandAward(t, opponents)
+	}
+
+	switch {
+	case t.Capot:
+		s.FailedContract = t.CapotTeam != caller
+	case t.TieRule == TieRuleHangingPoints:
+		s.FailedContract = totals[caller] < totals[opponents]
+	default:
+		s.FailedContract = totals[caller] <= totals[opponents]
+	}
+
+	if hanging != nil {
+		s.Awarded[taker] += hanging.Amount
+		s.Paid = &HangingPoints{Amount: hanging.Amount, Team: taker}
+	}
+	return s
+}
+
 // wholeHandAward returns what a team taking the whole hand (a fall or a Capot) banks: every card point, plus
 // both sides' declarations and Belote when they transfer, or only its own when they do not.
-func wholeHandAward(state *GameState, winner int, declTotals [2]int) int {
-	cardPoints := state.HandPoints[TeamA] + state.HandPoints[TeamB]
-	if state.Rules.DeclarationsTransfer {
-		return cardPoints + declTotals[TeamA] + declTotals[TeamB]
+func wholeHandAward(t HandTally, winner int) int {
+	cardPoints := t.CardPoints[TeamA] + t.CardPoints[TeamB]
+	if t.DeclarationsTransfer {
+		return cardPoints + t.DeclPoints[TeamA] + t.DeclPoints[TeamB]
 	}
-	return cardPoints + declTotals[winner]
+	return cardPoints + t.DeclPoints[winner]
 }
 
 // teamRunningTotal returns what team would bank if the match stopped now: its match score plus the unfinished hand's points.
@@ -147,6 +198,7 @@ func stopAtTargetIfReached(state *GameState) bool {
 	state.Phase = PhaseMatchEnd
 	state.LastHandResult = nil
 	state.StoppedAtTarget = true
+	state.HangingPoints = nil
 
 	state.TurnExpiresAt = nil
 	state.TurnTimeRemaining = 0
@@ -209,6 +261,7 @@ func startNewHand(state *GameState) {
 		state.WinnerTeam = winnerTeam
 		state.Phase = PhaseMatchEnd
 		state.WonByInstantWin = true
+		state.HangingPoints = nil
 		return
 	}
 

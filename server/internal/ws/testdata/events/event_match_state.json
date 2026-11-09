@@ -114,7 +114,30 @@
   "pendingBelotSeat": null,
   "belotAnnounced": false,
   "winnerTeam": null,
-  "lastHandResult": null,
+  "lastHandResult": {
+    "teamACardPoints": 81,
+    "teamBCardPoints": 71,
+    "teamADeclPoints": 0,
+    "teamBDeclPoints": 0,
+    "lastTrickTeam": 1,
+    "lastTrickBonus": 10,
+    "capot": false,
+    "capotTeam": null,
+    "capotBonus": 0,
+    "failedContract": false,
+    "contractingTeam": 1,
+    "teamAHandTotal": 81,
+    "teamBHandTotal": 0,
+    "hangingCreated": {
+      "amount": 81,
+      "team": 1
+    },
+    "hangingPaid": null
+  },
+  "hangingPoints": {
+    "amount": 81,
+    "team": 1
+  },
   "activePlayerSeat": 1,
   "turnExpiresAt": null,
   "timerDurationSec": 0,

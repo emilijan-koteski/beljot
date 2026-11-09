@@ -97,6 +97,34 @@ type CardPlayedPayload struct {
 	AutoPlayed bool   `json:"autoPlayed"`
 }
 
+// HangingPointsPayload is a Bitola tied hand's held-over points: the team whose half hangs, or the team paid them.
+type HangingPointsPayload struct {
+	Amount int `json:"amount"`
+	Team   int `json:"team"`
+}
+
+// HandScoredPayload is the typed payload for EventHandScored events. HangingCreated is set when a Bitola tie hangs the
+// caller's half, HangingPaid when the hand paid out an earlier one, and the hand totals already include that payout.
+type HandScoredPayload struct {
+	TeamACardPoints int                   `json:"teamACardPoints"`
+	TeamBCardPoints int                   `json:"teamBCardPoints"`
+	TeamADeclPoints int                   `json:"teamADeclPoints"`
+	TeamBDeclPoints int                   `json:"teamBDeclPoints"`
+	LastTrickTeam   int                   `json:"lastTrickTeam"`
+	LastTrickBonus  int                   `json:"lastTrickBonus"`
+	Capot           bool                  `json:"capot"`
+	CapotTeam       *int                  `json:"capotTeam"`
+	CapotBonus      int                   `json:"capotBonus"`
+	FailedContract  bool                  `json:"failedContract"`
+	ContractingTeam int                   `json:"contractingTeam"`
+	TeamAHandTotal  int                   `json:"teamAHandTotal"`
+	TeamBHandTotal  int                   `json:"teamBHandTotal"`
+	TeamAMatchScore int                   `json:"teamAMatchScore"`
+	TeamBMatchScore int                   `json:"teamBMatchScore"`
+	HangingCreated  *HangingPointsPayload `json:"hangingCreated"`
+	HangingPaid     *HangingPointsPayload `json:"hangingPaid"`
+}
+
 // TrumpSelectedPayload is the typed payload for EventTrumpSelected events.
 // CardID is the face-up trump candidate the picker absorbed, which the post-pick state no longer carries.
 type TrumpSelectedPayload struct {

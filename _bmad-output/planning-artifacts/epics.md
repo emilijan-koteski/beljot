@@ -86,7 +86,7 @@ FR60: Rooms can be marked private with an owner-set password (stored hashed; nul
 FR61: Friends can exchange private one-on-one "whisper" messages, initiated with the `/w <username>` chat command from the lobby, a room, or a match. Whispering is blocked to any friend currently in the sender's same active room or match (teammate or opponent) to prevent card-information collusion; the block is enforced server-side. Whispers are real-time only (recipient must be online) and ephemeral (not persisted), and render visually distinct (pink) with Valorant-style channel switching between the primary chat and each whisper thread (added 2026-08-14)
 FR62: Room members can invite "available" friends (online, in the lobby, not in any room or match) into a room in `waiting` status. A host (owner) invite bypasses the room password via a server-authorized one-time grant; a non-host member's invite still requires the invitee to enter the room password if one is set. Invites are delivered as a popup, expire on timeout, and auto-void if the room fills/closes or the friend leaves the lobby. The honor gate (FR57) and seat capacity still apply to all invitees (added 2026-08-14)
 FR63: Players can choose a card deck style (French-suited default, Croatian/German-suited alternative) as a persisted account preference, selectable from the in-game Settings dialog alongside language. The choice is purely visual, applies to every card surface in a match, is free of charge, and has no gameplay effect — it is not a purchasable cosmetic (see FR50) (added 2026-08-18)
-FR64: The Bitola variant applies the **hanging points** tie rule: when the taker's team total equals the opponents', neither team scores and the hand's points are carried over to the side that wins the next decisive hand. Interacts with the 1001/501 match target and match-end resolution. Croatian keeps all-points-to-opponents, which is what ships today for both variants as an interim stand-in. Split out of Story 3.5 (added 2026-08-18)
+FR64: The Bitola variant applies the **hanging points** (виси) tie rule: when the taker's team total equals the opponents', the opponents bank their own half, the taker banks nothing, and the taker's half hangs. The next scored hand pays it to whoever takes that hand: the taker if they pass, the Capot team on a Capot, otherwise the taker's opponents (a fall or another tie). At most one entry hangs, and only a tie creates one. Points still hanging when the match ends are discarded. Croatian keeps all-points-to-opponents. Split out of Story 3.5 (added 2026-08-18, rewritten 2026-11-09 when Story 12.7 shipped)
 FR65: The system changes each human player's Season Points after every match: winners gain and losers lose SP, scaled by the score margin relative to the match target and by the gap between the two teams' average SP (Elo-style expected result; bot seats count as a fixed SP at the Gold 1 floor); a team that makes a Capot gains a small flat bonus; season SP never drops below 0 (added 2026-09-26)
 FR66: The system penalizes abandonment in SP: the abandoning player loses a fixed amount equal to twice the largest possible match loss; their teammate loses half of what a surrender at that moment would have cost; the opponents are scored as winning by surrender (added 2026-09-26)
 
@@ -177,7 +177,7 @@ NFR17: A single player's disconnection must not affect game state integrity or c
 - Phase 4: Seasonal rank + leaderboard (FR37, FR39, FR40, FR65, FR66), social login (FR3 — Google shipped early via Story 14.1; Facebook Story 14.2 pending). Mobile (FR52) descoped 2026-08-14 — Epic 15 removed (see _bmad-output/archive/planning-artifacts/sprint-change-proposal-2026-08-14.md)
 - Phase 5: Spectator (FR48), achievements (FR49), cosmetics (FR50), tournaments (FR51)
 - Agents must NOT implement the Croatian variant before Phase 3 (501 mode was moved to Phase 2 / Epic 10 on 2026-06-11 and is no longer phase-gated)
-- Tied-hand rule diverges by variant (deferred to Epic 12 / Phase 3): the interim engine applies the **Croatian** rule (a tie sends all points to the taker's opponents) to all variants; the **Bitola** variant must later use **hanging points (carry-over)** instead. See `deferred-work.md`. Do not treat the current Bitola tie behavior as a bug before then.
+- Tied-hand rule diverges by variant: **Croatian** sends a tie's points to the taker's opponents; **Bitola** uses **hanging points** (FR64, Story 12.7, shipped 2026-11-09).
 - FR28 and FR43 have undefined formulas — require product decisions before implementation (abandonment mechanics must be settled to wire Honor FR56 and partial XP FR43 correctly)
 
 **From UX Design:**
@@ -360,7 +360,7 @@ Players can play the Croatian variant, choose the card deck style they play with
 
 **D-VAR-1 — Variants are presets over a rule config, not branch conditions.** Every divergence above is a named field on a `VariantRules` struct resolved once at game initialization; `bitola` and `croatia` are preset resolvers returning a fully-populated config. The engine reads rule fields only — `state.Variant` is never compared inside `bidding.go`, `declarations.go`, `scoring.go`, or `validation.go`. Separate code paths per rule outcome are still required; the selector is the config field, not the variant string. The seven fields are: deal shape, trump candidate on/off, round-2 reveal on/off, all-pass outcome, declaration overlap, declaration timing, tie rule. This is forward-compatibility for a planned future story exposing these rules directly in room creation, with Bitola and Croatian demoted to preset buttons — that story must be reachable by adding a config source, not by rewriting the engine.
 
-**Tied hand — the divergence Bitola absorbs.** Croatian sends a tied hand's points to the taker's opponents, which is exactly what ships today for all variants as a deliberate interim stand-in (Story 3.5). **Bitola** is the side that moves, to hanging points (carry-over): on a tie nobody scores and the points carry to the side that wins the next decisive hand. Needs cross-hand state plus match-end interaction — Story 12.7.
+**Tied hand — the divergence Bitola absorbs.** Croatian sends a tied hand's points to the taker's opponents (Story 3.5). **Bitola** uses hanging points: the opponents bank their half, and the taker's half hangs until the next scored hand pays it to whoever takes that hand — Story 12.7.
 
 **FRs covered:** FR8, FR29, FR63, FR64
 **Phase:** 3
@@ -900,6 +900,7 @@ So that the competitive integrity of the game is maintained.
 **Given** one team wins all 8 tricks (Capot)
 **When** hand scoring is calculated
 **Then** the winning team receives +100 bonus points (replacing the +10 last-trick bonus, not in addition to it)
+**And** the Capot team takes the whole hand and never fails, even when the other side declared as much or more: a team's declarations are confirmed only once it wins a trick (owner rule 2026-11-09, both variants)
 
 **Given** the team that picked trump (the taker's team) scores fewer points than, or exactly ties, the opposing team
 **When** failed hand logic is applied
@@ -909,7 +910,7 @@ So that the competitive integrity of the game is maintained.
 **When** normal scoring is applied
 **Then** each team keeps their own card points + declaration points + applicable bonuses
 
-> **Variant note (interim simplification — see Epic 12 and `deferred-work.md`):** the "a tie sends all points to the opponents" rule above is the **Croatian-variant** rule. It is applied to all variants for now. The **Bitola variant** must eventually use **hanging points (carry-over)** on a tie instead — the hand's points are held over, nobody scores, and they carry to the winner of the next decisive hand. Deferred to Epic 12 (Variant Expansion, Phase 3).
+> **Variant note:** the "a tie sends all points to the opponents" rule above is the **Croatian** rule. **Bitola** settles a tie with hanging points instead — see FR64 and Story 12.7.
 
 **Given** hand scoring is complete
 **When** scores are added to the match total
@@ -2310,7 +2311,7 @@ So that we can play together quickly — with the host able to pull friends past
 
 Players can play the Croatian variant, choose the card deck style they play with, and access an in-app rules reference covering both variants. (The 501-point match mode originally planned here moved to Epic 10 as Story 10.2 on 2026-06-11.)
 
-**Scope corrected 2026-08-18** — see sprint-change-proposal-2026-08-18.md and the binding D-VAR-1 constraint on the Epic 12 overview card. Story 12.1 was rewritten and split; Stories 12.4-12.8 were added. Sequencing is load-bearing: **12.1 -> 12.5 -> 12.6 -> 12.7 -> 12.8**, with 12.4 independent. Enablement (12.8) must ship last — after 12.1 the variant is half-built, and exposing the room option earlier ships a broken game.
+**Scope corrected 2026-08-18** — see sprint-change-proposal-2026-08-18.md and the binding D-VAR-1 constraint on the Epic 12 overview card. Story 12.1 was rewritten and split; Stories 12.4-12.8 were added. Sequencing is load-bearing: **12.1 -> 12.5 -> 12.6 -> 12.8**, with 12.4 independent. 12.7 was deferred on 2026-08-20 so 12.8 did not wait on it, and shipped on its own on 2026-11-09. Enablement (12.8) must ship last — after 12.1 the variant is half-built, and exposing the room option earlier ships a broken game.
 
 ### Story 12.1: Variant Rule Configuration & Croatian Dealing/Bidding
 
@@ -2502,45 +2503,39 @@ So that declarations resolve the way the Croatian game plays them rather than be
 ### Story 12.7: Bitola Hanging-Points Tie Rule
 
 As a Bitola player,
-I want a tied hand's points to hang and carry to the next decisive hand,
-So that a tie is held over the way we play it, rather than handed to the opponents.
+I want the taker's half of a tied hand to hang until the next hand,
+So that a tie is settled the way we play it, rather than handed to the opponents.
+
+**Rule (owner-confirmed 2026-11-09; replaces the 2026-08-18 draft, in which the whole pool hung and ties accumulated):** on a tie the opponents bank their own half, the taker banks 0, and the taker's half hangs as a single `{amount, team}` entry. The next scored hand pays it to whoever takes that hand: the taker if they pass, the Capot team on a Capot, otherwise the taker's opponents (a fall or another tie). Who owns the entry never changes who is paid.
 
 **Acceptance Criteria:**
 
 **Given** a Bitola hand where the taker's team total equals the opponents'
 **When** the hand is scored
-**Then** neither team's match score changes
-**And** the hand's full point pool is held as hanging points on the game state
+**Then** the opponents bank their own total, the taker banks 0, and the taker's total hangs as the only entry on the game state
 
-**Given** hanging points are outstanding
-**When** the next hand resolves decisively
-**Then** the hanging points are added to that hand's winning side and the accumulator resets to zero
+**Given** points are hanging
+**When** the next hand is scored
+**Then** they are added to the team that takes that hand, and no entry remains unless that hand ties too, which leaves its own new entry
 
-**Given** hanging points are outstanding
-**When** the next hand also ties
-**Then** both pools accumulate and carry forward together
-
-**Given** a Bitola hand ties
+**Given** a hand that ties or pays out hanging points
 **When** the match-end condition is checked
-**Then** no team crosses the target on that hand — hanging points count toward nobody until they resolve
-
-**Given** a match ends by surrender or abandonment with hanging points outstanding
-**When** the match is finalized
-**Then** the hanging points are discarded and the existing surrender/abandonment settlement is unchanged
+**Then** everything banked that hand counts toward the target, the opponents' half and the payout included
+**And** an entry still hanging when the match ends (target, all-eight-trumps deal, surrender, abandonment, stop at target) is discarded and counts toward nothing
 
 **Given** a Croatian hand ties
 **When** it is scored
-**Then** all points transfer to the taker's opponents, exactly as ships today — no Croatian behaviour changes
+**Then** all points transfer to the taker's opponents, unchanged
 
-**Given** a hand ties or resolves hanging points
-**When** the score reveal and hand-results table render
-**Then** the held-over state is visible to players, in all four locales
+**Given** a hand ties or pays out hanging points
+**When** the score panel, score reveal and match history render
+**Then** the entry and its payout are visible to players, in all four locales
 
 **Given** the rules reference
 **When** it describes Bitola scoring
-**Then** the hanging-points rule is documented in all four locale files, and the Croatian pages continue to describe all-points-to-opponents
+**Then** the rule is documented in all four locales, and the Croatian pages still describe all-points-to-opponents
 
-**Resolved ambiguity — do not re-open.** "The side that wins the next decisive hand" has two candidate readings: (a) the team with the higher hand total, or (b) the taker's team if they succeed, else the opponents. They are **provably equivalent** across every reachable outcome — a successful take means scoring strictly more; a failed take transfers everything to the opponents; a Capot gives its team the higher total by definition; and a tie is not decisive. Implement either, but do not let a future refactor invent a third meaning.
+**Shipped 2026-11-09** — `implementation-artifacts/spec-bitola-hanging-points.md`.
 
 ### Story 12.8: Croatian Variant Enablement
 

@@ -1,25 +1,42 @@
 package match
 
-import "time"
+import (
+	"time"
+
+	"github.com/emilijan/beljot/server/internal/game"
+)
 
 // HandResult persists the scoring breakdown for a single completed hand of a match.
 // It is written alongside the Match row by MatchRepository.CreateWithHands.
 type HandResult struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	MatchID         uint      `gorm:"not null;index;uniqueIndex:idx_hand_results_match_hand" json:"matchId"`
-	HandNumber      int       `gorm:"not null;uniqueIndex:idx_hand_results_match_hand" json:"handNumber"`
-	TeamACardPoints int       `gorm:"column:team_a_card_points;not null" json:"teamACardPoints"`
-	TeamBCardPoints int       `gorm:"column:team_b_card_points;not null" json:"teamBCardPoints"`
-	TeamADeclPoints int       `gorm:"column:team_a_decl_points;not null" json:"teamADeclPoints"`
-	TeamBDeclPoints int       `gorm:"column:team_b_decl_points;not null" json:"teamBDeclPoints"`
-	LastTrickTeam   int       `gorm:"not null" json:"lastTrickTeam"`
-	LastTrickBonus  int       `gorm:"not null" json:"lastTrickBonus"`
-	Capot           bool      `gorm:"not null" json:"capot"`
-	CapotTeam       *int      `json:"capotTeam,omitempty"`
-	CapotBonus      int       `gorm:"not null" json:"capotBonus"`
-	FailedContract  bool      `gorm:"not null" json:"failedContract"`
-	ContractingTeam int       `gorm:"not null" json:"contractingTeam"`
-	TeamAHandTotal  int       `gorm:"column:team_a_hand_total;not null" json:"teamAHandTotal"`
-	TeamBHandTotal  int       `gorm:"column:team_b_hand_total;not null" json:"teamBHandTotal"`
-	CreatedAt       time.Time `json:"createdAt"`
+	ID                   uint      `gorm:"primaryKey" json:"id"`
+	MatchID              uint      `gorm:"not null;index;uniqueIndex:idx_hand_results_match_hand" json:"matchId"`
+	HandNumber           int       `gorm:"not null;uniqueIndex:idx_hand_results_match_hand" json:"handNumber"`
+	TeamACardPoints      int       `gorm:"column:team_a_card_points;not null" json:"teamACardPoints"`
+	TeamBCardPoints      int       `gorm:"column:team_b_card_points;not null" json:"teamBCardPoints"`
+	TeamADeclPoints      int       `gorm:"column:team_a_decl_points;not null" json:"teamADeclPoints"`
+	TeamBDeclPoints      int       `gorm:"column:team_b_decl_points;not null" json:"teamBDeclPoints"`
+	LastTrickTeam        int       `gorm:"not null" json:"lastTrickTeam"`
+	LastTrickBonus       int       `gorm:"not null" json:"lastTrickBonus"`
+	Capot                bool      `gorm:"not null" json:"capot"`
+	CapotTeam            *int      `json:"capotTeam,omitempty"`
+	CapotBonus           int       `gorm:"not null" json:"capotBonus"`
+	FailedContract       bool      `gorm:"not null" json:"failedContract"`
+	ContractingTeam      int       `gorm:"not null" json:"contractingTeam"`
+	TeamAHandTotal       int       `gorm:"column:team_a_hand_total;not null" json:"teamAHandTotal"`
+	TeamBHandTotal       int       `gorm:"column:team_b_hand_total;not null" json:"teamBHandTotal"`
+	HangingCreatedAmount *int      `gorm:"column:hanging_created_amount" json:"hangingCreatedAmount,omitempty"`
+	HangingCreatedTeam   *int      `gorm:"column:hanging_created_team" json:"hangingCreatedTeam,omitempty"`
+	HangingPaidAmount    *int      `gorm:"column:hanging_paid_amount" json:"hangingPaidAmount,omitempty"`
+	HangingPaidTeam      *int      `gorm:"column:hanging_paid_team" json:"hangingPaidTeam,omitempty"`
+	CreatedAt            time.Time `json:"createdAt"`
+}
+
+// hangingColumns splits hanging points into the nullable amount and team columns of a hand row.
+func hangingColumns(h *game.HangingPoints) (amount, team *int) {
+	if h == nil {
+		return nil, nil
+	}
+	a, t := h.Amount, h.Team
+	return &a, &t
 }

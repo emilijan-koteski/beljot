@@ -188,6 +188,7 @@ describe("gameTypes", () => {
         belotAnnounced: false,
         winnerTeam: null,
         lastHandResult: null,
+        hangingPoints: null,
         turnExpiresAt: null,
         timerDurationSec: 0,
         previousPhase: "" as const,

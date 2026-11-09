@@ -1,5 +1,5 @@
 # generated: 2026-04-06
-# last_updated: 2026-10-11
+# last_updated: 2026-11-09
 # project: beljot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -172,8 +172,8 @@ development_status:
   # Scope corrected 2026-08-18 via bmad-correct-course (sprint-change-proposal-2026-08-18.md):
   # rules audit found SEVEN divergences, not one. 12.1 rewritten + split; 12.4-12.8 added.
   # Sequence is load-bearing: 12.1 -> 12.5 -> 12.6 -> 12.8; 12.4 independent.
-  # 12-7 DEFERRED 2026-08-20 by owner decision: Bitola keeps the Croatian tie rule, so hanging
-  # points is not built and 12.8 no longer waits on it. See deferred-work.md.
+  # 12-7 was deferred 2026-08-20 so 12.8 did not wait on it. The owner revived it with a revised
+  # rule and it was built 2026-11-09 (spec-bitola-hanging-points.md).
   epic-12: in-progress
   12-1-variant-rule-config-and-croatian-bidding: review
   # 12-2-501-point-match-mode moved to Epic 10 as 10-2 on 2026-06-11 (bmad-correct-course)
@@ -181,7 +181,7 @@ development_status:
   12-4-card-deck-style-preference: review
   12-5-croatian-declaration-overlap: review
   12-6-croatian-declaration-phase: review
-  12-7-bitola-hanging-points-tie-rule: backlog # deferred indefinitely — see deferred-work.md
+  12-7-bitola-hanging-points-tie-rule: review
   12-8-croatian-variant-enablement: review
   # 12-9 added 2026-08-20 by owner decision: Story 12.8 AC(d) (rules-reference reconciliation)
   # was split out at intent capture and never given a story number. Ships inside Epic 12.

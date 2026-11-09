@@ -43,8 +43,14 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 ## Scoring
 
 - Hand scoring and match scoring are separate functions in `scoring.go`.
-- The taker's team must score strictly more than the opponents, declarations on both sides counted. A tie fails, and the opponents take the hand. Bitola will eventually carry tied points over; the current tie behavior is a deliberate stand-in, not a bug.
+- The taker's team must score strictly more than the opponents, declarations on both sides counted. Less is a fall, and the opponents take the hand. `game.SettleHand` in `scoring.go` is the one settlement rule; `scoreHand` and the bot search both call it, and it branches on `VariantRules.TieRule`:
+  - **Croatian (`all_to_opponents`):** a tie is a fall too.
+  - **Bitola (`hanging_points`):** on a tie the opponents bank their own total, the taker banks 0, and the taker's total hangs as `GameState.HangingPoints` `{amount, team}`. A tie is not a failed contract. At most one entry hangs, and every seat sees it.
+  - The next scored hand pays the hanging points to whoever takes that hand: the Capot team, else the taker if it passes, else the taker's opponents (a fall or another tie). Only a tie creates a new entry. The payout is inside that hand's totals, so hand totals still add up to the match score, and it counts toward the target in the same end-of-hand check.
+  - The entry is a fixed amount once it hangs. "Declarations on a fall" never trims it, so a payout to the other side carries the caller's declarations and Belote with it.
+  - A reshuffle keeps the entry. Points still hanging when the match ends (target, all-eight-trumps deal, surrender, abandonment) are discarded, and a stop at target banks running totals without them.
 - Capot (+100) replaces the last-trick bonus (+10). It is not added to it.
+- A Capot always gives its team the whole hand, in both variants, and the caller never fails one it makes, even against a larger or equal declared total: a team's declarations are confirmed only once it wins a trick. The other side's Capot always fails the caller. A Capot is never a tie.
 - A fall or a Capot gives one side the whole hand. What happens to declarations then is the room's "Declarations on a fall" rule (`VariantRules.DeclarationsTransfer`), which `wholeHandAward` in `scoring.go` applies:
   - **On (default):** the side taking the hand banks every point, including both sides' declarations and Belote.
   - **Off:** that side banks all card points plus only its own declarations and Belote. The other side's are voided, and nobody scores them.

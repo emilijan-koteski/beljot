@@ -85,6 +85,31 @@ func TestHandScoring_CapotForfeitsLosersDeclarations(t *testing.T) {
 	assert.Equal(t, 0, result.LastHandResult.TeamBHandTotal, "Team B hand total is 0")
 }
 
+func TestHandScoring_CapotPassesAgainstLargerDeclarations(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func() *game.GameState
+	}{
+		{"bitola", testfixtures.NewGameCapotInProgress},
+		{"croatian", func() *game.GameState {
+			return testfixtures.WithCroatianRules(testfixtures.NewGameCapotInProgress())
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := tt.build()
+			gs.DeclarationPoints = [2]int{0, 300}
+
+			result := playTrick8(t, gs)
+
+			require.NotNil(t, result.LastHandResult)
+			assert.True(t, result.LastHandResult.Capot)
+			assert.False(t, result.LastHandResult.FailedContract, "the caller's Capot passes whatever the other side declared")
+			assert.Equal(t, [2]int{552, 0}, result.TeamScores, "the Capot team takes every point, the other side's declarations included")
+		})
+	}
+}
+
 func TestHandScoring_CapotBroken(t *testing.T) {
 	gs := testfixtures.NewGameCapotInProgress()
 	gs.Players[0].Hand = []game.Card{{Rank: game.Rank7, Suit: game.SuitDiamonds}}
@@ -106,8 +131,8 @@ func TestHandScoring_FailedContract(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "Team B gets 0 on failed contract")
 }
 
-func TestHandScoring_EqualPointsIsFailure(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianEqualPointsIsFailure(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{80, 49}
 
 	result := playTrick8(t, gs)
@@ -118,8 +143,8 @@ func TestHandScoring_EqualPointsIsFailure(t *testing.T) {
 	assert.True(t, result.LastHandResult.FailedContract, "a tie marks the hand failed for the caller")
 }
 
-func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianTieFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{81, 50}
 	gs.TeamScores = [2]int{0, 0}
 
@@ -132,8 +157,8 @@ func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller scores 0 on the tie")
 }
 
-func TestHandScoring_TieWithDeclarationsFailsTrumpCaller(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianTieWithDeclarationsFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{71, 60}
 	gs.DeclarationPoints = [2]int{20, 0}
 	gs.TeamScores = [2]int{0, 0}

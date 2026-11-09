@@ -27,6 +27,7 @@ interface ScoreRevealProps {
   acknowledged?: boolean;
   matchTarget?: number;
   declarationsTransfer?: boolean;
+  matchOver?: boolean;
 }
 
 function callerTeamString(seat: number): TeamString {
@@ -59,6 +60,7 @@ export function ScoreReveal({
   acknowledged = false,
   matchTarget = 1001,
   declarationsTransfer = true,
+  matchOver = false,
 }: ScoreRevealProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -93,8 +95,21 @@ export function ScoreReveal({
   const deck = resolveCardDeck(useAuthStore((s) => s.user?.cardDeckPreference));
   const trumpSuitName = trumpSuit ? t(suitNameKey(trumpSuit, deck)) : null;
 
+  const hangingCreated = data.hangingCreated ?? null;
+  const hangingPaid = data.hangingPaid ?? null;
+
   let subtitle: string | null = null;
-  if (data.failedContract) {
+  if (hangingCreated !== null) {
+    const ours = teamStringForIndex(hangingCreated.team) === viewerTeam;
+    const key = matchOver
+      ? ours
+        ? "match.scoreReveal.subtitleTieDiscardedUs"
+        : "match.scoreReveal.subtitleTieDiscardedThem"
+      : ours
+        ? "match.scoreReveal.subtitleTieUs"
+        : "match.scoreReveal.subtitleTieThem";
+    subtitle = t(key, { amount: hangingCreated.amount });
+  } else if (data.failedContract) {
     const beneficiary: TeamString = data.contractingTeam === 0 ? "teamB" : "teamA";
     subtitle = t(failedSubtitleKey(beneficiary === viewerTeam, declarationsTransfer));
   } else if (trumpSuitName && callerTeam) {
@@ -169,6 +184,15 @@ export function ScoreReveal({
                   team={data.capotTeam === 0 ? 0 : 1}
                   teamGradient={data.capotTeam === 0 ? teamAGradient : teamBGradient}
                   testId="row-capot-bonus"
+                />
+              )}
+              {hangingPaid !== null && (
+                <BonusRow
+                  label={t("match.scoreReveal.hangingPaid")}
+                  amount={hangingPaid.amount}
+                  team={hangingPaid.team === 0 ? 0 : 1}
+                  teamGradient={hangingPaid.team === 0 ? teamAGradient : teamBGradient}
+                  testId="row-hanging-paid"
                 />
               )}
               <ScoreRow

@@ -553,3 +553,73 @@ func TestGormMatchRepository_GetLastMatchForRoomAndUser(t *testing.T) {
 		assert.Equal(t, real.ID, got.ID, "falls through the placeholder to real play")
 	})
 }
+
+func TestGormMatchRepository_HandResultsRoundTripHangingPoints(t *testing.T) {
+	db := getRepoTestDB(t)
+	repo := match.NewGormMatchRepository(db)
+
+	suffix := repoFixtureSuffix()
+	a := seedRepoUser(t, db, "hp"+suffix+"a")
+	b := seedRepoUser(t, db, "hp"+suffix+"b")
+	c := seedRepoUser(t, db, "hp"+suffix+"c")
+	d := seedRepoUser(t, db, "hp"+suffix+"d")
+	roomID := seedRepoRoom(t, db, a, suffix)
+
+	completed := time.Now().UTC().Truncate(time.Second)
+	m := &match.Match{
+		RoomID:      roomID,
+		Player1ID:   &a,
+		Player2ID:   &b,
+		Player3ID:   &c,
+		Player4ID:   &d,
+		TeamAScore:  262,
+		TeamBScore:  62,
+		Variant:     "bitola",
+		MatchMode:   "1001",
+		StartedAt:   completed.Add(-20 * time.Minute),
+		CompletedAt: completed,
+		Status:      "abandoned",
+	}
+	amount, owner, paidTo := 81, 1, 0
+	require.NoError(t, repo.CreateWithHands(m, []match.HandResult{
+		{
+			HandNumber: 1, ContractingTeam: 1, TeamAHandTotal: 81, TeamBHandTotal: 0,
+			HangingCreatedAmount: &amount, HangingCreatedTeam: &owner,
+		},
+		{
+			HandNumber: 2, ContractingTeam: 0, TeamAHandTotal: 181, TeamBHandTotal: 62,
+			HangingPaidAmount: &amount, HangingPaidTeam: &paidTo,
+		},
+	}))
+
+	got, err := repo.GetLastMatchForRoomAndUser(roomID, a)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, got.Hands, 2)
+
+	tie, payout := got.Hands[0], got.Hands[1]
+	require.NotNil(t, tie.HangingCreatedAmount)
+	require.NotNil(t, tie.HangingCreatedTeam)
+	assert.Equal(t, 81, *tie.HangingCreatedAmount)
+	assert.Equal(t, 1, *tie.HangingCreatedTeam)
+	assert.Nil(t, tie.HangingPaidAmount)
+	assert.Nil(t, tie.HangingPaidTeam)
+
+	require.NotNil(t, payout.HangingPaidAmount)
+	require.NotNil(t, payout.HangingPaidTeam)
+	assert.Equal(t, 81, *payout.HangingPaidAmount)
+	assert.Equal(t, 0, *payout.HangingPaidTeam)
+	assert.Nil(t, payout.HangingCreatedAmount)
+	assert.Nil(t, payout.HangingCreatedTeam)
+
+	paidTeam, err := repo.GetCareerAggregatesForUser(a)
+	require.NoError(t, err)
+	require.True(t, paidTeam.HasBestHand)
+	assert.Equal(t, 100, paidTeam.BestHandPoints, "the best hand leaves out the 81 paid from the earlier tie")
+	assert.Equal(t, 2, paidTeam.BestHandNumber)
+
+	otherTeam, err := repo.GetCareerAggregatesForUser(b)
+	require.NoError(t, err)
+	require.True(t, otherTeam.HasBestHand)
+	assert.Equal(t, 62, otherTeam.BestHandPoints, "a payout to the other team changes nothing")
+}

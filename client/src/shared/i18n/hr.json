@@ -247,7 +247,12 @@
           "us": "mi",
           "them": "oni",
           "failedUs": "pali · mi",
-          "failedThem": "pali · oni"
+          "failedThem": "pali · oni",
+          "hangingUs": "neriješeno · vise naših {{points}}",
+          "hangingThem": "neriješeno · vise njihovih {{points}}",
+          "hangingDiscardedUs": "neriješeno · naših {{points}} se brišu",
+          "hangingDiscardedThem": "neriješeno · njihovih {{points}} se brišu",
+          "hangingPaid": "+{{points}} visećih"
         },
         "unfinished": "Nedovršena ruka: cilj je dosegnut"
       }
@@ -958,7 +963,9 @@
       "trick": "štih",
       "thisHand": "ovo dijeljenje",
       "handLabel": "Dijeljenje {{hand}}",
-      "handVariant": "Dijeljenje {{hand}} · {{variant}}"
+      "handVariant": "Dijeljenje {{hand}} · {{variant}}",
+      "hangingUs": "Vise naših {{amount}}",
+      "hangingThem": "Vise njihovih {{amount}}"
     },
     "scoreReveal": {
       "title": "Rezultat dijeljenja",
@@ -968,10 +975,15 @@
       "subtitleFailedThem": "Pali · svi bodovi za njih",
       "subtitleFailedCardsUs": "Pali · bodovi iz karata za nas",
       "subtitleFailedCardsThem": "Pali · bodovi iz karata za njih",
+      "subtitleTieUs": "Neriješeno · vise naših {{amount}}",
+      "subtitleTieThem": "Neriješeno · vise njihovih {{amount}}",
+      "subtitleTieDiscardedUs": "Neriješeno · naših {{amount}} se brišu",
+      "subtitleTieDiscardedThem": "Neriješeno · njihovih {{amount}} se brišu",
       "cardPoints": "Bodovi karata",
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus posljednjeg štiha",
       "capotBonus": "Bonus za štiglju",
+      "hangingPaid": "Viseći bodovi",
       "handTotal": "Ukupno dijeljenje",
       "matchTotal": "Rezultat meča",
       "continue": "Nastavi",

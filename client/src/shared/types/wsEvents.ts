@@ -1,4 +1,5 @@
 import type { RoomPlayer } from "@/shared/types/apiTypes";
+import type { HangingPoints } from "@/shared/types/matchTypes";
 
 /**
  * Envelope for every WebSocket frame; keep in sync with server/internal/ws/events.go. serverNow is
@@ -113,6 +114,8 @@ export interface HandScoredPayload {
   teamBHandTotal: number;
   teamAMatchScore: number;
   teamBMatchScore: number;
+  hangingCreated: HangingPoints | null;
+  hangingPaid: HangingPoints | null;
 }
 
 /**

@@ -439,6 +439,7 @@ func (m *Manager) abandonMatchLocked(session *LiveMatch, abandonedSeat int, reas
 	}
 	gs.SurrenderProposerSeat = nil
 	gs.TurnExpiresAt = nil
+	gs.HangingPoints = nil
 
 	session.cancelAllReconnectTimers()
 	session.cancelTurnTimer()

@@ -264,7 +264,9 @@ WHERE status IN ('completed', 'abandoned')
 	}
 	bestRes := r.db.Raw(`
 SELECT
-  (CASE WHEN `+viewerTeamCaseM+` = 0 THEN h.team_a_hand_total ELSE h.team_b_hand_total END) AS points,
+  (CASE WHEN `+viewerTeamCaseM+` = 0 THEN h.team_a_hand_total ELSE h.team_b_hand_total END)
+    - (CASE WHEN COALESCE(h.hanging_paid_team, -1) = `+viewerTeamCaseM+`
+        THEN COALESCE(h.hanging_paid_amount, 0) ELSE 0 END) AS points,
   h.hand_number AS hand_number,
   m.completed_at AS completed_at
 FROM hand_results h
@@ -272,6 +274,7 @@ JOIN matches m ON m.id = h.match_id
 WHERE (m.player1_id = ? OR m.player2_id = ? OR m.player3_id = ? OR m.player4_id = ?)
 ORDER BY points DESC
 LIMIT 1`,
+		userID, userID, userID, userID,
 		userID, userID, userID, userID,
 		userID, userID, userID, userID,
 	).Scan(&bh)

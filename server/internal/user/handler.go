@@ -159,20 +159,29 @@ type MatchPlayer struct {
 
 // MatchHandView is the per-hand scoring breakdown embedded in a match list item.
 type MatchHandView struct {
-	HandNumber      int  `json:"handNumber"`
-	TeamACardPoints int  `json:"teamACardPoints"`
-	TeamBCardPoints int  `json:"teamBCardPoints"`
-	TeamADeclPoints int  `json:"teamADeclPoints"`
-	TeamBDeclPoints int  `json:"teamBDeclPoints"`
-	LastTrickTeam   int  `json:"lastTrickTeam"`
-	LastTrickBonus  int  `json:"lastTrickBonus"`
-	Capot           bool `json:"capot"`
-	CapotTeam       *int `json:"capotTeam,omitempty"`
-	CapotBonus      int  `json:"capotBonus"`
-	FailedContract  bool `json:"failedContract"`
-	ContractingTeam int  `json:"contractingTeam"`
-	TeamAHandTotal  int  `json:"teamAHandTotal"`
-	TeamBHandTotal  int  `json:"teamBHandTotal"`
+	HandNumber      int                     `json:"handNumber"`
+	TeamACardPoints int                     `json:"teamACardPoints"`
+	TeamBCardPoints int                     `json:"teamBCardPoints"`
+	TeamADeclPoints int                     `json:"teamADeclPoints"`
+	TeamBDeclPoints int                     `json:"teamBDeclPoints"`
+	LastTrickTeam   int                     `json:"lastTrickTeam"`
+	LastTrickBonus  int                     `json:"lastTrickBonus"`
+	Capot           bool                    `json:"capot"`
+	CapotTeam       *int                    `json:"capotTeam,omitempty"`
+	CapotBonus      int                     `json:"capotBonus"`
+	FailedContract  bool                    `json:"failedContract"`
+	ContractingTeam int                     `json:"contractingTeam"`
+	TeamAHandTotal  int                     `json:"teamAHandTotal"`
+	TeamBHandTotal  int                     `json:"teamBHandTotal"`
+	HangingCreated  *MatchHangingPointsView `json:"hangingCreated"`
+	HangingPaid     *MatchHangingPointsView `json:"hangingPaid"`
+}
+
+// MatchHangingPointsView is a Bitola tie's held-over points in a hand's history: the team whose half hung, or the team
+// that was paid them.
+type MatchHangingPointsView struct {
+	Amount int `json:"amount"`
+	Team   int `json:"team"`
 }
 
 // MatchListItem is the per-match DTO returned by GET /users/:id/matches.
@@ -845,6 +854,14 @@ func (h *UserHandler) loadIdentitiesForMatches(matches []match.Match) (map[uint]
 // teamForSeat returns 0 for seats 0 and 2 and 1 for seats 1 and 3.
 func teamForSeat(seat int) int { return seat % 2 }
 
+// hangingPointsView reads a hand row's nullable hanging-points columns, returning nil unless both are set.
+func hangingPointsView(amount, team *int) *MatchHangingPointsView {
+	if amount == nil || team == nil {
+		return nil
+	}
+	return &MatchHangingPointsView{Amount: *amount, Team: *team}
+}
+
 // buildMatchListItem projects a match and its hands into the viewer-specific list item.
 func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]participantIdentity) MatchListItem {
 	seats := [4]*uint{m.Player1ID, m.Player2ID, m.Player3ID, m.Player4ID}
@@ -908,6 +925,8 @@ func buildMatchListItem(m match.Match, viewerID uint, identities map[uint]partic
 			ContractingTeam: h.ContractingTeam,
 			TeamAHandTotal:  h.TeamAHandTotal,
 			TeamBHandTotal:  h.TeamBHandTotal,
+			HangingCreated:  hangingPointsView(h.HangingCreatedAmount, h.HangingCreatedTeam),
+			HangingPaid:     hangingPointsView(h.HangingPaidAmount, h.HangingPaidTeam),
 		})
 	}
 
