@@ -136,9 +136,12 @@ func SettleHand(t HandTally, hanging *HangingPoints) HandSettlement {
 		s.Awarded[opponents] = wholeHandAward(t, opponents)
 	}
 
-	if t.TieRule == TieRuleHangingPoints {
+	switch {
+	case t.Capot:
+		s.FailedContract = t.CapotTeam != caller
+	case t.TieRule == TieRuleHangingPoints:
 		s.FailedContract = totals[caller] < totals[opponents]
-	} else {
+	default:
 		s.FailedContract = totals[caller] <= totals[opponents]
 	}
 

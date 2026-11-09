@@ -294,6 +294,20 @@ func TestHangingPoints_MatchEnd(t *testing.T) {
 	})
 }
 
+func TestHangingPoints_PayoutIsFixedWhenDeclarationsDoNotTransfer(t *testing.T) {
+	gs := testfixtures.WithoutDeclarationsTransfer(hangingLastTrick(t, game.TeamA, 60, 102))
+	gs.DeclarationPoints = [2]int{20, 0}
+	gs.HangingPoints = hanging(91, game.TeamA)
+
+	result := playTrick8(t, gs)
+
+	require.NotNil(t, result.LastHandResult)
+	assert.True(t, result.LastHandResult.FailedContract)
+	assert.Equal(t, [2]int{0, 162 + 91}, result.TeamScores,
+		"the fall voids A's new declaration, but the whole 91 hanging is paid to B")
+	assert.Equal(t, hanging(91, game.TeamB), result.LastHandResult.HangingPaid)
+}
+
 func TestHangingPoints_ReshuffleKeepsTheEntry(t *testing.T) {
 	gs := testfixtures.WithHangingPoints(testfixtures.NewGameMidBidding(7), 81, game.TeamA)
 
@@ -344,11 +358,15 @@ func TestHangingPoints_NoEntryOnTheWireWhenNothingHangs(t *testing.T) {
 	assert.Nil(t, raw["hangingPoints"])
 }
 
-// legacySettle is the settlement every variant used before hanging points: a Capot or a fall takes the whole hand.
-func legacySettle(t game.HandTally) ([2]int, bool) {
+// croatianSettle is the Croatian settlement written longhand: a Capot or a fall takes the whole hand, and the caller
+// fails on a fall or on the other side's Capot.
+func croatianSettle(t game.HandTally) ([2]int, bool) {
 	totals := [2]int{t.CardPoints[0] + t.DeclPoints[0], t.CardPoints[1] + t.DeclPoints[1]}
 	caller, opponents := t.CallerTeam, 1-t.CallerTeam
 	failed := totals[caller] <= totals[opponents]
+	if t.Capot {
+		failed = t.CapotTeam != caller
+	}
 	whole := func(winner int) int {
 		if t.DeclarationsTransfer {
 			return t.CardPoints[0] + t.CardPoints[1] + t.DeclPoints[0] + t.DeclPoints[1]
@@ -359,7 +377,7 @@ func legacySettle(t game.HandTally) ([2]int, bool) {
 	switch {
 	case t.Capot:
 		awarded[t.CapotTeam] = whole(t.CapotTeam)
-	case failed:
+	case totals[caller] <= totals[opponents]:
 		awarded[opponents] = whole(opponents)
 	default:
 		awarded = totals
@@ -367,7 +385,7 @@ func legacySettle(t game.HandTally) ([2]int, bool) {
 	return awarded, failed
 }
 
-func TestSettleHand_CroatianMatchesTheLegacyRule(t *testing.T) {
+func TestSettleHand_CroatianMatchesTheLonghandRule(t *testing.T) {
 	rng := rand.New(rand.NewPCG(2026, 1109))
 	decl := []int{0, 20, 50, 70, 100, 150}
 	var ties int
@@ -386,7 +404,7 @@ func TestSettleHand_CroatianMatchesTheLegacyRule(t *testing.T) {
 			tally.CardPoints = [2]int{}
 			tally.CardPoints[tally.CapotTeam] = 252
 		}
-		wantAwarded, wantFailed := legacySettle(tally)
+		wantAwarded, wantFailed := croatianSettle(tally)
 
 		got := game.SettleHand(tally, nil)
 
@@ -402,27 +420,35 @@ func TestSettleHand_CroatianMatchesTheLegacyRule(t *testing.T) {
 }
 
 func TestSettleHand_FailedContractOnACapot(t *testing.T) {
-	tally := game.HandTally{
-		CardPoints: [2]int{252, 0},
-		DeclPoints: [2]int{0, 300},
-		CallerTeam: game.TeamA,
-		Capot:      true,
-		CapotTeam:  game.TeamA,
-	}
-	for _, tt := range []struct {
-		rule       game.TieRule
+	tests := []struct {
+		name       string
+		capotTeam  int
 		declB      int
 		wantFailed bool
 	}{
-		{game.TieRuleAllToOpponents, 252, true},
-		{game.TieRuleHangingPoints, 252, false},
-		{game.TieRuleHangingPoints, 300, true},
-	} {
-		tally.TieRule = tt.rule
-		tally.DeclPoints[game.TeamB] = tt.declB
-		got := game.SettleHand(tally, nil)
-		assert.Equal(t, tt.wantFailed, got.FailedContract, "%s with %d declared against the Capot", tt.rule, tt.declB)
-		assert.Nil(t, got.Hanging, "a Capot never hangs")
-		assert.Zero(t, got.Awarded[game.TeamB], "the Capot team takes the whole hand")
+		{"the caller's Capot passes against a smaller declaration", game.TeamA, 100, false},
+		{"the caller's Capot passes against an equal total", game.TeamA, 252, false},
+		{"the caller's Capot passes against a larger declaration", game.TeamA, 300, false},
+		{"the other side's Capot fails the caller", game.TeamB, 0, true},
+	}
+	for _, rule := range []game.TieRule{game.TieRuleAllToOpponents, game.TieRuleHangingPoints} {
+		for _, tt := range tests {
+			t.Run(string(rule)+": "+tt.name, func(t *testing.T) {
+				tally := game.HandTally{
+					DeclPoints: [2]int{0, tt.declB},
+					CallerTeam: game.TeamA,
+					Capot:      true,
+					CapotTeam:  tt.capotTeam,
+					TieRule:    rule,
+				}
+				tally.CardPoints[tt.capotTeam] = 252
+
+				got := game.SettleHand(tally, nil)
+
+				assert.Equal(t, tt.wantFailed, got.FailedContract)
+				assert.Nil(t, got.Hanging, "a Capot never hangs")
+				assert.Zero(t, got.Awarded[1-tt.capotTeam], "the Capot team takes the whole hand")
+			})
+		}
 	}
 }

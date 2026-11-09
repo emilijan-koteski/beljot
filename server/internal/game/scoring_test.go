@@ -85,6 +85,31 @@ func TestHandScoring_CapotForfeitsLosersDeclarations(t *testing.T) {
 	assert.Equal(t, 0, result.LastHandResult.TeamBHandTotal, "Team B hand total is 0")
 }
 
+func TestHandScoring_CapotPassesAgainstLargerDeclarations(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func() *game.GameState
+	}{
+		{"bitola", testfixtures.NewGameCapotInProgress},
+		{"croatian", func() *game.GameState {
+			return testfixtures.WithCroatianRules(testfixtures.NewGameCapotInProgress())
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gs := tt.build()
+			gs.DeclarationPoints = [2]int{0, 300}
+
+			result := playTrick8(t, gs)
+
+			require.NotNil(t, result.LastHandResult)
+			assert.True(t, result.LastHandResult.Capot)
+			assert.False(t, result.LastHandResult.FailedContract, "the caller's Capot passes whatever the other side declared")
+			assert.Equal(t, [2]int{552, 0}, result.TeamScores, "the Capot team takes every point, the other side's declarations included")
+		})
+	}
+}
+
 func TestHandScoring_CapotBroken(t *testing.T) {
 	gs := testfixtures.NewGameCapotInProgress()
 	gs.Players[0].Hand = []game.Card{{Rank: game.Rank7, Suit: game.SuitDiamonds}}
