@@ -263,6 +263,49 @@ func TestSearchAppliesGates(t *testing.T) {
 	}
 }
 
+func giveSeatTheTrumpPair(gs *game.GameState, seat int) {
+	pair := cards("KH", "QH")
+	next := 0
+	for other := range gs.Players {
+		if other == seat {
+			continue
+		}
+		for i, c := range gs.Players[other].Hand {
+			if !slices.Contains(pair, c) {
+				continue
+			}
+			for gs.Players[seat].Hand[next].Suit == game.SuitHearts {
+				next++
+			}
+			gs.Players[other].Hand[i], gs.Players[seat].Hand[next] = gs.Players[seat].Hand[next], c
+		}
+	}
+}
+
+func TestStopAtTargetReachCountsTheBotsOwnBelote(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	giveSeatTheTrumpPair(gs, 0)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.Equal(t, game.SuitHearts, *v.TrumpSuit)
+	require.Subset(t, v.Hand, cards("KH", "QH"))
+	require.True(t, v.DeclarationsEnabled)
+	require.True(t, bot.SearchAppliesWith(v, 3, bot.SearchTuning{}))
+
+	v.StopAtTarget = true
+	banked := v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0]
+	reach := bot.RemainingCardPointsForTest(v) + 10
+	withoutRace := bot.SearchTuning{}
+
+	v.MatchTarget = banked + reach + 20
+	assert.False(t, bot.SearchAppliesWith(v, 3, withoutRace), "the certain Belote's 20 brings the target within reach")
+	v.MatchTarget++
+	assert.True(t, bot.SearchAppliesWith(v, 3, withoutRace), "one point beyond the Belote's reach")
+
+	v.MatchTarget = banked + reach + 20
+	v.DeclarationsEnabled = false
+	assert.True(t, bot.SearchAppliesWith(v, 3, withoutRace), "without declarations there is no Belote to count")
+}
+
 func TestSearchCardPlaysALegalCardDeterministically(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(5)
 	v := viewFromState(gs, 0, memoryOfMissingCards(gs))

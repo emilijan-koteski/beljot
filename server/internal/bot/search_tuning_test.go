@@ -140,6 +140,79 @@ func TestChooseAdjustedPrefersTheSteadierLead(t *testing.T) {
 	}
 }
 
+func TestChooseAdjustedEdgeCases(t *testing.T) {
+	hearts := game.SuitHearts
+	v := defenderLeadView([]string{"7S", "AC"}, &hearts, 0, nil)
+	stats := func(m map[string]search.CardStats) search.Result {
+		res := search.Result{Cards: map[int]search.CardStats{}}
+		for id, s := range m {
+			res.Cards[search.CardIdx(card(id))] = s
+		}
+		return res
+	}
+
+	t.Run("a legal card the search did not value is skipped", func(t *testing.T) {
+		got, ok := bot.ChooseAdjustedForTest(v, stats(map[string]search.CardStats{"AC": {Mean: -50}}), bot.SearchTuning{})
+		require.True(t, ok)
+		assert.Equal(t, "AC", got.String())
+	})
+
+	t.Run("no valued legal card chooses nothing", func(t *testing.T) {
+		_, ok := bot.ChooseAdjustedForTest(v, stats(map[string]search.CardStats{"KD": {Mean: 5}}), bot.SearchTuning{})
+		assert.False(t, ok)
+	})
+
+	t.Run("an empty legal set chooses nothing", func(t *testing.T) {
+		empty := v
+		empty.LegalCards = nil
+		_, ok := bot.ChooseAdjustedForTest(empty, stats(map[string]search.CardStats{"7S": {Mean: 5}}), bot.SearchTuning{})
+		assert.False(t, ok)
+	})
+
+	t.Run("a tie goes to the lowest card index", func(t *testing.T) {
+		want := "7S"
+		if search.CardIdx(card("AC")) < search.CardIdx(card("7S")) {
+			want = "AC"
+		}
+		res := stats(map[string]search.CardStats{"7S": {Mean: 4, SE: 1}, "AC": {Mean: 4, SE: 1}})
+		for _, order := range [][]string{{"7S", "AC"}, {"AC", "7S"}} {
+			tied := v
+			tied.LegalCards = cards(order...)
+			got, ok := bot.ChooseAdjustedForTest(tied, res, bot.SearchTuning{LeadRiskLambda: 1})
+			require.True(t, ok)
+			assert.Equal(t, want, got.String(), "legal order %v", order)
+		}
+	})
+}
+
+func TestChooseAdjustedCombinesTheRiskWeightWithABonus(t *testing.T) {
+	hearts := game.SuitHearts
+	v := defenderLeadView([]string{"8H", "7S"}, &hearts, 1, nil)
+	res := search.Result{Cards: map[int]search.CardStats{
+		search.CardIdx(card("8H")): {Mean: 15, SE: 1},
+		search.CardIdx(card("7S")): {Mean: 12, SE: 4},
+	}}
+	tests := []struct {
+		name   string
+		lambda float64
+		bonus  int
+		want   string
+	}{
+		{"the bonus alone moves the lead to the side card", 0, 5, "7S"},
+		{"the risk weight alone keeps the steadier trump", 1, 0, "8H"},
+		{"both: 15-1-5 beats 12-4", 1, 5, "8H"},
+		{"both: 15-1-7 loses to 12-4", 1, 7, "7S"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tuning := bot.SearchTuning{LeadRiskLambda: tt.lambda, DefenderTrumpLeadBonus: tt.bonus}
+			got, ok := bot.ChooseAdjustedForTest(v, res, tuning)
+			require.True(t, ok)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}
+
 func TestTopOutstandingTrump(t *testing.T) {
 	hearts := game.SuitHearts
 	tests := []struct {

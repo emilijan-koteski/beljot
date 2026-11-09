@@ -11,8 +11,9 @@ import (
 
 const noDeadline = 24 * time.Hour
 
-// Counts tallies what a search policy did over a run.
-type Counts struct{ Applied, Decided, Deferred, DefenderTrumpLeads, BeloteSearches, BeloteSkips int64 }
+// Counts tallies what a search policy did over a run: Applied splits into Decided, Deferred and Failed, the searches
+// that reached no decision before the deadline or found no deal.
+type Counts struct{ Applied, Decided, Deferred, DefenderTrumpLeads, BeloteSearches, BeloteSkips, Failed int64 }
 
 // Counting is implemented by policies that report Counts.
 type Counting interface{ Counts() Counts }
@@ -24,7 +25,7 @@ type ShippedBot struct {
 	Deadline  time.Duration
 	Flags     Flags
 
-	applied, decided, deferred, defenderTrumpLeads, beloteSearches, beloteSkips atomic.Int64
+	applied, decided, deferred, defenderTrumpLeads, beloteSearches, beloteSkips, failed atomic.Int64
 }
 
 // NewShippedBot builds a ShippedBot whose tuning comes from the flags and whose deadline is unlimited.
@@ -44,6 +45,7 @@ func (s *ShippedBot) Counts() Counts {
 		DefenderTrumpLeads: s.defenderTrumpLeads.Load(),
 		BeloteSearches:     s.beloteSearches.Load(),
 		BeloteSkips:        s.beloteSkips.Load(),
+		Failed:             s.failed.Load(),
 	}
 }
 
@@ -61,6 +63,7 @@ func (s *ShippedBot) Decide(v View) game.Action {
 	s.applied.Add(1)
 	res, ok := bot.SearchCardWith(bv, s.deadline(), s.Tuning)
 	if !ok {
+		s.failed.Add(1)
 		return bot.Decide(bv)
 	}
 	if res.Deferred {

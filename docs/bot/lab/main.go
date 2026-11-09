@@ -51,7 +51,7 @@ func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
 	case name == "shipped" || strings.HasPrefix(name, "shipped:"):
 		from := 3
 		if t, ok := strings.CutPrefix(name, "shipped:"); ok {
-			from, _ = strconv.Atoi(t)
+			from = policyNumber(name, t)
 		}
 		return botlab.NewShippedBot(from, botlab.ParseFlags(labFlags))
 	case name == "human":
@@ -59,20 +59,29 @@ func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
 	case strings.HasPrefix(name, "pimcs:"):
 		var sched []int
 		for _, part := range strings.Split(strings.TrimPrefix(name, "pimcs:"), ",") {
-			k, _ := strconv.Atoi(part)
+			k := policyNumber(name, part)
 			sched = append(sched, k)
 		}
 		return &botlab.PIMC{Samples: sched[0], Schedule: sched, Rng: rng, Fallback: botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}, Label: name + "[" + labFlags + "]"}
 	case strings.HasPrefix(name, "pimc:"):
 		parts := strings.Split(strings.TrimPrefix(name, "pimc:"), ":")
-		k, _ := strconv.Atoi(parts[0])
+		k := policyNumber(name, parts[0])
 		from := 1
 		if len(parts) > 1 {
-			from, _ = strconv.Atoi(parts[1])
+			from = policyNumber(name, parts[1])
 		}
 		return &botlab.PIMC{Samples: k, FromTrick: from, Rng: rng, Fallback: botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}, Label: name + "[" + labFlags + "]"}
 	}
 	panic("unknown policy " + name)
+}
+
+// policyNumber parses a number in a policy name, panicking on anything else so a typo cannot run a default.
+func policyNumber(name, text string) int {
+	k, err := strconv.Atoi(text)
+	if err != nil {
+		panic(fmt.Sprintf("bad number %q in policy %s", text, name))
+	}
+	return k
 }
 
 func main() {
@@ -291,12 +300,13 @@ func addCounts(total *botlab.Counts, p botlab.Policy) bool {
 	total.DefenderTrumpLeads += got.DefenderTrumpLeads
 	total.BeloteSearches += got.BeloteSearches
 	total.BeloteSkips += got.BeloteSkips
+	total.Failed += got.Failed
 	return true
 }
 
 func printCounts(side string, c botlab.Counts) {
-	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d, belote searches %d, belote skips %d\n",
-		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads, c.BeloteSearches, c.BeloteSkips)
+	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d, belote searches %d, belote skips %d, failed %d\n",
+		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads, c.BeloteSearches, c.BeloteSkips, c.Failed)
 }
 
 func duplicate(v game.Variant) {

@@ -10,8 +10,8 @@ import (
 
 const ConventionVeto = 10_000
 
-// SearchTuning holds the phase-3 behaviours layered on the search. The zero value is the phase-2 behaviour, and SeedSalt
-// is a lab-only sampler seed offset that production leaves at 0.
+// SearchTuning holds the behaviours layered on the search; its zero value is phase 2 and SeedSalt is a lab-only seed
+// offset. A bonus or penalty set to ConventionVeto outweighs any searched margin, so that convention acts as a rule.
 type SearchTuning struct {
 	DefenderTrumpLeadBonus int
 	TenUnderAceBonus       int

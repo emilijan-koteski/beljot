@@ -353,6 +353,54 @@ func TestChooseSplitsSamplesByClass(t *testing.T) {
 	}
 }
 
+func TestChooseLeavesAnEmptyClassWithoutMeans(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	tests := []struct {
+		name  string
+		class func(hands [4]uint32) int
+		want  [2]bool
+	}{
+		{"every deal in class 0", func([4]uint32) int { return 0 }, [2]bool{true, false}},
+		{"every deal in class 1", func([4]uint32) int { return 1 }, [2]bool{false, true}},
+		{"no deal in either class", func([4]uint32) int { return -1 }, [2]bool{false, false}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := search.Options{Samples: 6, EarlyStopAfter: 7, EarlyStopSE: 1, SampleClass: tt.class}
+			res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+			require.True(t, ok)
+			for class, filled := range tt.want {
+				if filled {
+					assert.Equal(t, res.Samples, res.Classes[class].Samples)
+					assert.Len(t, res.Classes[class].Means, len(c.legal))
+					continue
+				}
+				assert.Zero(t, res.Classes[class].Samples)
+				assert.Nil(t, res.Classes[class].Means)
+			}
+		})
+	}
+}
+
+func TestOneSampleHasNoStandardError(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	opts := search.Options{Samples: 1, EarlyStopAfter: 2, EarlyStopSE: 1}
+
+	res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+	require.True(t, ok)
+	require.Equal(t, 1, res.Samples)
+	require.Len(t, res.Cards, len(c.legal))
+	assert.Zero(t, res.SE)
+	for _, stats := range res.Cards {
+		assert.Zero(t, stats.SE)
+		assert.False(t, math.IsNaN(stats.Mean))
+	}
+
+	_, se, _, ok := search.Evaluate(c.in, c.pos, c.settle, opts, farFuture())
+	require.True(t, ok)
+	assert.Zero(t, se)
+}
+
 func TestChooseSeedSaltChangesTheSamplesNotTheInformation(t *testing.T) {
 	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
 	base := search.Options{Samples: 6, EarlyStopAfter: 6, EarlyStopSE: 1}
