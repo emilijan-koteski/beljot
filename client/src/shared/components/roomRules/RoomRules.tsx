@@ -129,7 +129,7 @@ interface RulesPopoverProps {
 }
 
 /**
- * The four match rules as fixed icon slots (brass where changed), opening the rules in words on hover or tap.
+ * The match rules as fixed icon slots (brass where changed), opening the rules in words on hover or tap.
  * Clicks stay inside, so the trigger can sit in a clickable row.
  */
 function RulesPopover({ rules, labelled = false, className, zIndex, children }: RulesPopoverProps) {

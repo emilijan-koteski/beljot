@@ -107,6 +107,8 @@ var (
 	ErrNewPlayerNotAllowed = NewAppError("NEW_PLAYER_NOT_ALLOWED", "this room does not allow new players", http.StatusConflict)
 	ErrInvalidMinHonor     = NewAppError("INVALID_MIN_HONOR", "minimum honor must be between 0 and 100", http.StatusBadRequest)
 
+	ErrInvalidDeclarationLastTrick = NewAppError("INVALID_DECLARATION_LAST_TRICK", "the last declaration trick must be between 1 and 3", http.StatusBadRequest)
+
 	ErrInsufficientCoins = NewAppError("INSUFFICIENT_COINS", "insufficient coins", http.StatusConflict)
 
 	ErrSelfFriendRequest     = NewAppError("SELF_FRIEND_REQUEST", "cannot send a friend request to yourself", http.StatusBadRequest)

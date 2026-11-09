@@ -29,7 +29,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
 
 ## Declarations
 
-- **Bitola:** declared during trick 1 and revealed at the start of trick 2. A card can belong to only one declaration, so overlapping groups keep the higher one.
+- **Bitola:** `DeclarationTiming` is `turn_window`. In tricks 1 to N (`DeclarationLastTrick`, the room's "Declare until trick", 1–3, default 3), a seat holding a meld in its current hand is prompted before its card: Declare, or Continue (Skip in trick N). Declaring takes every meld the seat holds and opens the simultaneous declaring phase mid-trick, with the declarer already answered. Every other seat answers once, in Croatian's dialog and window. The contest then resolves at once, play resumes at the declarer's card, and nobody is prompted again that hand. A card can belong to only one declaration, so overlapping groups keep the higher one.
 - **Croatian:** a dedicated declaration phase sits between bidding and trick 1, and one card may count in several declarations.
 - The highest declaration decides the winning team. Only that team's declarations score, and the losing team's are never revealed.
 - Belote (trump K and Q in one hand) scores 20 only when announced. Bitola calls it Belote when announced on the Queen and Rebelote on the King; Croatian calls it Belote on either. Declining on the first card forfeits the bonus.
@@ -51,7 +51,7 @@ Select the path from a `VariantRules` field, never by comparing the variant name
   - Belote follows the declarations, and a Capot obeys the rule just like a fall. A room with declarations off always stores the rule as on.
 - If both teams cross the target in the same hand, the higher total wins; an exact tie goes to the taker's team (`determineMatchWinner`).
 - On timer expiry, auto-play picks the first legal card sorted by suit, then rank.
-- Three per-move timer expiries in a row for one human seat forfeit the match exactly like a disconnect (`missed_turns.go`). The second miss sends only that player `event:missed_turn_warning`. A move of their own resets the count; the Croatian declaration window and the hand-complete pause do not count.
+- Three per-move timer expiries in a row for one human seat forfeit the match exactly like a disconnect (`missed_turns.go`). The second miss sends only that player `event:missed_turn_warning`. A move of their own resets the count. The declaring-phase window (Croatian, or a Bitola declaration round) and the hand-complete pause do not count; a timed-out Bitola turn prompt does.
 
 ## Wire and state
 

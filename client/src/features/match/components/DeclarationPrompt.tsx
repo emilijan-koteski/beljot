@@ -28,6 +28,8 @@ interface DeclarationPromptProps {
   simultaneous?: boolean;
   answered?: boolean;
   answeredCount?: number;
+  passIsFinal?: boolean;
+  declaredBy?: string;
 }
 
 function declarationLabel(
@@ -38,8 +40,8 @@ function declarationLabel(
 }
 
 /**
- * "Declare or skip" dialog, for the prompted seat in Bitola or for all four seats at once in the
- * Croatian simultaneous phase, where every seat sees the same panel so answering reveals nothing.
+ * "Declare or skip" dialog, for the prompted seat on a Bitola turn or for all four seats at once in a simultaneous
+ * phase, where every seat sees the same panel so answering reveals nothing.
  */
 export function DeclarationPrompt({
   declarations,
@@ -51,6 +53,8 @@ export function DeclarationPrompt({
   simultaneous = false,
   answered = false,
   answeredCount = 0,
+  passIsFinal = true,
+  declaredBy,
 }: DeclarationPromptProps) {
   const { t } = useTranslation();
   const promptRef = useFocusTrap<HTMLDivElement>();
@@ -89,7 +93,7 @@ export function DeclarationPrompt({
     <ClassicButton onClick={handleSkip} disabled={waiting} data-testid="declaration-prompt-skip">
       {waiting
         ? t("match.declaration.waitingOthers", { answered: shownAnsweredCount })
-        : t("match.declaration.skip")}
+        : t(simultaneous || passIsFinal ? "match.declaration.skip" : "match.declaration.continue")}
     </ClassicButton>
   );
 
@@ -110,6 +114,13 @@ export function DeclarationPrompt({
               <span id="declaration-prompt-title">
                 {hasDeclarations ? t("match.declaration.title") : t("match.declaration.noneTitle")}
               </span>
+            }
+            subtitle={
+              declaredBy !== undefined && (
+                <span data-testid="declaration-prompt-declared-by">
+                  {t("match.declaration.declaredBy", { name: declaredBy })}
+                </span>
+              )
             }
           >
             {hasDeclarations ? (

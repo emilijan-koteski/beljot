@@ -4,8 +4,16 @@ import { rulesForVariant } from "./variantRules";
 
 describe("rulesForVariant", () => {
   it("returns each variant's facts", () => {
-    expect(rulesForVariant("bitola")).toEqual({ declarationOverlap: false, kingIsRebelote: true });
-    expect(rulesForVariant("croatia")).toEqual({ declarationOverlap: true, kingIsRebelote: false });
+    expect(rulesForVariant("bitola")).toEqual({
+      declarationOverlap: false,
+      kingIsRebelote: true,
+      declarationWindow: true,
+    });
+    expect(rulesForVariant("croatia")).toEqual({
+      declarationOverlap: true,
+      kingIsRebelote: false,
+      declarationWindow: false,
+    });
   });
 
   it("falls back to Bitola for an unknown or missing variant", () => {

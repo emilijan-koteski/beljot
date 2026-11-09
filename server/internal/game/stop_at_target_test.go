@@ -393,12 +393,12 @@ func TestStopAtTargetOnBeloteAnnouncement(t *testing.T) {
 	}
 }
 
-// bitolaTrick1BelotePrompt drives NewGameFirstTrick to the Belote prompt on card 2 of trick 1.
-// Seat 0 has declared its melds, but the contest is still open and they are not yet scored.
+// bitolaTrick1BelotePrompt drives NewGameFirstTrick to the Belote prompt on card 2 of trick 1. Seat 0 passes its
+// declaration prompt first, so the window is still open and nothing has been declared.
 func bitolaTrick1BelotePrompt(t *testing.T, gs *game.GameState) *game.GameState {
 	t.Helper()
-	require.Equal(t, 1, gs.TrickNumber, "the deferral only exists at trick 1")
-	require.False(t, gs.DeclarationsResolved, "and only while the contest is open")
+	require.Equal(t, 1, gs.TrickNumber, "the fixture starts inside the declaration window")
+	require.False(t, gs.DeclarationsResolved, "with the contest still open")
 
 	gs.ActivePlayerSeat = 3
 	lead := game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}
@@ -408,11 +408,10 @@ func bitolaTrick1BelotePrompt(t *testing.T, gs *game.GameState) *game.GameState 
 	require.NoError(t, err, "seat 3 leads TD")
 	gs = next
 
-	require.True(t, gs.AwaitingDeclaration, "seat 0 holds two tierces and must be asked first")
-	next, err = game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
+	require.True(t, gs.AwaitingDeclaration, "seat 0 holds two tierces and is asked first")
+	next, err = game.ApplyAction(gs, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 0})
 	require.NoError(t, err)
 	gs = next
-	require.NotEmpty(t, gs.Players[0].Declarations, "seat 0's melds are on the table, unconverted")
 
 	king := game.Card{Rank: game.RankKing, Suit: game.SuitHearts}
 	next, err = game.ApplyAction(gs, game.Action{
@@ -422,37 +421,6 @@ func bitolaTrick1BelotePrompt(t *testing.T, gs *game.GameState) *game.GameState 
 	require.NotNil(t, next.PendingBelotSeat, "which raises the Belote prompt")
 	require.Equal(t, 0, *next.PendingBelotSeat)
 	require.Len(t, next.CurrentTrick, 2, "as CARD 2 of the trick")
-	require.False(t, next.DeclarationsResolved, "the contest is still open at this moment")
-	return next
-}
-
-// finishBitolaTrick1 plays the last two cards of trick 1 so the meld contest settles.
-// Seat 1 skips its meld, so team A wins the contest.
-func finishBitolaTrick1(t *testing.T, gs *game.GameState) *game.GameState {
-	t.Helper()
-
-	require.True(t, gs.AwaitingDeclaration, "seat 1 holds a quarte and is asked next")
-	next, err := game.ApplyAction(gs, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: 1})
-	require.NoError(t, err)
-	gs = next
-
-	follow := game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}
-	next, err = game.ApplyAction(gs, game.Action{
-		Type: game.ActionPlayCard, PlayerSeat: 1, Card: &follow,
-	})
-	require.NoError(t, err, "seat 1 follows the diamond lead")
-	gs = next
-
-	require.True(t, gs.AwaitingDeclaration, "seat 2 holds a trump tierce and is asked next")
-	next, err = game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 2})
-	require.NoError(t, err)
-	gs = next
-
-	overTrump := game.Card{Rank: game.RankJack, Suit: game.SuitHearts}
-	next, err = game.ApplyAction(gs, game.Action{
-		Type: game.ActionPlayCard, PlayerSeat: 2, Card: &overTrump,
-	})
-	require.NoError(t, err, "seat 2 over-trumps, completing the trick")
 	return next
 }
 
@@ -465,78 +433,41 @@ func announceBeloteAt(t *testing.T, gs *game.GameState, seat int) *game.GameStat
 	return next
 }
 
-// TestStopAtTargetDefersABeloteCrossingWhileTheTrick1ContestIsOpen checks a Belote crossing waits until trick 1 resolves the meld contest.
-// Stopping on the +20 mid-trick would drop every declared meld.
-func TestStopAtTargetDefersABeloteCrossingWhileTheTrick1ContestIsOpen(t *testing.T) {
-	controlPrompt := bitolaTrick1BelotePrompt(t, testfixtures.NewGameFirstTrick(game.SuitHearts))
-	control := finishBitolaTrick1(t, announceBeloteAt(t, controlPrompt, 0))
-	require.True(t, control.DeclarationsResolved, "the control's contest must settle")
-	wantDecl := control.DeclarationPoints[game.TeamA]
-	wantHand := control.HandPoints[game.TeamA]
-	wantBelot := control.BelotPoints[game.TeamA]
-	require.Positive(t, wantDecl,
-		"team A must WIN the contest, or a discarded meld would not show on its score")
-	require.Equal(t, 20, wantBelot)
-
+// TestStopAtTargetStopsABeloteCrossingInsideTheDeclarationWindow checks a Belote crossing ends the match at once
+// while the window is still open. Nothing is pending during card play, since a declaration resolves when it is made.
+func TestStopAtTargetStopsABeloteCrossingInsideTheDeclarationWindow(t *testing.T) {
 	const seed = 1001 - 20
 
-	t.Run("on: the announcement does not end the match", func(t *testing.T) {
+	t.Run("on: the announcement ends the match", func(t *testing.T) {
 		gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
 		gs.TeamScores[game.TeamA] = seed
 
 		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
 
-		if announced.Phase == game.PhaseMatchEnd {
-			assert.Failf(t, "declared melds discarded by a trick-1 Belote stop",
-				"the match ended on the +20 with %d points of declared meld never converted: "+
-					"seat 0 still holds %d unconverted declaration(s), declarationPoints=%v, "+
-					"banked teamScores=%v",
-				wantDecl, len(announced.Players[0].Declarations),
-				announced.DeclarationPoints, announced.TeamScores)
-		}
-
-		require.NotEqual(t, game.PhaseMatchEnd, announced.Phase,
-			"the +20 crossed, but the trick-1 contest is still open — the stop must wait")
-		assert.Equal(t, game.PhasePlaying, announced.Phase)
-		assert.Equal(t, 20, announced.BelotPoints[game.TeamA], "the +20 is still banked")
-		assert.Equal(t, [2]int{0, 0}, announced.DeclarationPoints,
-			"and no meld has been converted yet, which is exactly why stopping here loses them")
-		assert.False(t, announced.DeclarationsResolved)
-		assert.Nil(t, announced.WinnerTeam)
-		assert.Equal(t, seed, announced.TeamScores[game.TeamA], "nothing banked into the match score")
-
-		after := finishBitolaTrick1(t, announced)
-
-		require.Equal(t, game.PhaseMatchEnd, after.Phase,
-			"the stop fires at the trick-1 resolution instead")
-		require.NotNil(t, after.WinnerTeam)
-		assert.Equal(t, game.TeamA, *after.WinnerTeam)
-		assert.True(t, after.DeclarationsResolved, "the contest settled first")
-		assert.Equal(t, wantDecl, after.DeclarationPoints[game.TeamA],
-			"the declared melds ARE converted and included in the banked total")
-		assert.Equal(t, seed+wantHand+wantDecl+wantBelot, after.TeamScores[game.TeamA],
-			"the banked score is the COMPLETE running total: match score, trick points, melds, Belote")
-		assert.Greater(t, after.TeamScores[game.TeamA], seed+wantBelot,
-			"strictly more than an immediate stop on the +20 would have banked — the "+
-				"difference is the melds and trick points a trick-1 stop discarded")
+		require.Equal(t, game.PhaseMatchEnd, announced.Phase)
+		require.NotNil(t, announced.WinnerTeam)
+		assert.Equal(t, game.TeamA, *announced.WinnerTeam)
+		assert.Equal(t, 1001, announced.TeamScores[game.TeamA])
+		assert.Equal(t, [2]int{0, 0}, announced.DeclarationPoints, "seat 0 passed, so it declared nothing")
+		assert.False(t, announced.AwaitingDeclaration)
+		assert.Len(t, announced.CurrentTrick, 2, "the trick is abandoned where it stopped")
 	})
 
-	t.Run("off: the same fixture plays on past trick 1", func(t *testing.T) {
+	t.Run("off: the same fixture plays on and asks the next meld holder", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 		gs.TeamScores[game.TeamA] = seed
 
 		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
-		after := finishBitolaTrick1(t, announced)
 
-		assert.Equal(t, game.PhasePlaying, after.Phase)
-		assert.Nil(t, after.WinnerTeam)
-		assert.Equal(t, 2, after.TrickNumber)
-		assert.Equal(t, seed, after.TeamScores[game.TeamA],
-			"nothing banked mid-hand when the rule is off")
+		assert.Equal(t, game.PhasePlaying, announced.Phase)
+		assert.Nil(t, announced.WinnerTeam)
+		assert.Equal(t, 1, announced.ActivePlayerSeat)
+		assert.True(t, announced.AwaitingDeclaration, "seat 1 holds a quarte and the window is still open")
+		assert.Equal(t, seed, announced.TeamScores[game.TeamA], "nothing banked mid-hand when the rule is off")
 	})
 }
 
-// TestStopAtTargetDoesNotDeferOutsideAnOpenTrick1Contest checks the deferral depends only on TrickNumber and DeclarationsResolved, not the variant.
+// TestStopAtTargetDoesNotDeferOutsideAnOpenTrick1Contest checks a Belote crossing with no open contest ends the match at once.
 func TestStopAtTargetDoesNotDeferOutsideAnOpenTrick1Contest(t *testing.T) {
 	t.Run("croatia has already resolved its contest before trick 1", func(t *testing.T) {
 		croatian := testfixtures.NewGameCroatianDeclaring(game.SuitHearts)
@@ -768,84 +699,114 @@ func TestStopAtTargetWithBothTeamsOverTarget(t *testing.T) {
 	assert.Greater(t, after.TeamScores[game.TeamA], after.TeamScores[game.TeamB])
 }
 
-// finishBitolaTrick1ContestToTeamB is finishBitolaTrick1 with seat 1 declaring its quarte.
-// Team B wins the meld contest while team A takes the trick.
-func finishBitolaTrick1ContestToTeamB(t *testing.T, gs *game.GameState) *game.GameState {
+// declarationCycleAt drives NewGameFirstTrick to the declaration cycle the given seat opens, answering every
+// earlier prompt with a pass and playing the scripted trick-1 cards before it.
+func declarationCycleAt(t *testing.T, gs *game.GameState, declarer int) *game.GameState {
 	t.Helper()
-
-	require.True(t, gs.AwaitingDeclaration, "seat 1 holds a quarte and is asked next")
-	next, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 1})
-	require.NoError(t, err)
-	gs = next
-
-	follow := game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}
-	next, err = game.ApplyAction(gs, game.Action{
-		Type: game.ActionPlayCard, PlayerSeat: 1, Card: &follow,
-	})
-	require.NoError(t, err, "seat 1 follows the diamond lead")
-	gs = next
-
-	require.True(t, gs.AwaitingDeclaration, "seat 2 holds a trump tierce and is asked next")
-	next, err = game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 2})
-	require.NoError(t, err)
-	gs = next
-
-	overTrump := game.Card{Rank: game.RankJack, Suit: game.SuitHearts}
-	next, err = game.ApplyAction(gs, game.Action{
-		Type: game.ActionPlayCard, PlayerSeat: 2, Card: &overTrump,
-	})
-	require.NoError(t, err, "seat 2 over-trumps, completing the trick")
-	return next
+	plays := []struct {
+		seat int
+		card game.Card
+	}{
+		{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},
+		{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},
+	}
+	gs.AwaitingDeclaration = true
+	for _, p := range plays {
+		require.True(t, gs.AwaitingDeclaration, "seat %d holds a meld and is asked", p.seat)
+		action := game.ActionSkipDeclare
+		if p.seat == declarer {
+			action = game.ActionDeclare
+		}
+		next, err := game.ApplyAction(gs, game.Action{Type: action, PlayerSeat: p.seat})
+		require.NoError(t, err)
+		if p.seat == declarer {
+			require.Equal(t, game.PhaseDeclaring, next.Phase)
+			return next
+		}
+		card := p.card
+		next, err = game.ApplyAction(next, game.Action{Type: game.ActionPlayCard, PlayerSeat: p.seat, Card: &card})
+		require.NoError(t, err)
+		gs = next
+	}
+	t.Fatalf("seat %d never declared", declarer)
+	return nil
 }
 
-// TestStopAtTargetBothTeamsCrossAtTheTrick1Resolution checks both teams crossing at the deferred trick-1 checkpoint.
-// The winner is settled by determineMatchWinner on score, not by who crossed first.
-func TestStopAtTargetBothTeamsCrossAtTheTrick1Resolution(t *testing.T) {
-	controlPrompt := bitolaTrick1BelotePrompt(t, testfixtures.NewGameFirstTrick(game.SuitHearts))
-	control := finishBitolaTrick1ContestToTeamB(t, announceBeloteAt(t, controlPrompt, 0))
-	require.True(t, control.DeclarationsResolved, "the control's contest must settle")
-
-	aGain := control.HandPoints[game.TeamA] + control.DeclarationPoints[game.TeamA] +
-		control.BelotPoints[game.TeamA]
-	bGain := control.HandPoints[game.TeamB] + control.DeclarationPoints[game.TeamB] +
-		control.BelotPoints[game.TeamB]
-	require.Positive(t, control.DeclarationPoints[game.TeamB],
-		"team B must win the contest, or only one team can cross and this case is vacuous")
-	require.Positive(t, control.HandPoints[game.TeamA],
-		"team A must take the trick, so the two awards really do split")
-
-	const target = 1001
-	seedA := target - aGain
-	seedB := target - bGain
-	require.Positive(t, seedA)
-	require.Positive(t, seedB)
-
-	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
-	gs.TeamScores[game.TeamA] = seedA
-	gs.TeamScores[game.TeamB] = seedB
-
-	announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
-	require.NotEqual(t, game.PhaseMatchEnd, announced.Phase, "the deferral still holds")
-
-	after := finishBitolaTrick1ContestToTeamB(t, announced)
-
-	require.Equal(t, game.PhaseMatchEnd, after.Phase)
-	require.NotNil(t, after.WinnerTeam)
-
-	assert.GreaterOrEqual(t, after.TeamScores[game.TeamA], target,
-		"team A crossed on its banked Belote")
-	assert.GreaterOrEqual(t, after.TeamScores[game.TeamB], target,
-		"and team B crossed on the contest, at the same checkpoint")
-
-	wantWinner := game.TeamA
-	switch {
-	case seedB+bGain > seedA+aGain:
-		wantWinner = game.TeamB
-	case seedA+aGain == seedB+bGain:
-		wantWinner = game.TeamForSeat(*after.TrumpCallerSeat)
+// skipRestOfCycle answers every seat the cycle still waits on with a pass.
+func skipRestOfCycle(t *testing.T, gs *game.GameState) *game.GameState {
+	t.Helper()
+	for seat := range gs.Players {
+		if gs.Phase != game.PhaseDeclaring || gs.Players[seat].DeclarationAnswered {
+			continue
+		}
+		next, err := game.ApplyAction(gs, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat})
+		require.NoError(t, err, "seat %d", seat)
+		gs = next
 	}
-	assert.Equal(t, wantWinner, *after.WinnerTeam,
-		"determineMatchWinner settles a double crossing: higher score, then the taker")
+	return gs
+}
+
+// TestStopAtTargetOnTheDeclarationCycle checks an award at the cycle's resolution that crosses the target ends the
+// match mid-trick, whether the last answer or the elapsed window closes it.
+func TestStopAtTargetOnTheDeclarationCycle(t *testing.T) {
+	tests := []struct {
+		name      string
+		declarer  int
+		team      int
+		award     int
+		trickSize int
+	}{
+		{"declared by the trick-1 leader", 1, game.TeamB, 50, 0},
+		{"declared by the second player", 2, game.TeamA, 20, 1},
+	}
+
+	closers := []struct {
+		name  string
+		close func(t *testing.T, gs *game.GameState) *game.GameState
+	}{
+		{"last answer", skipRestOfCycle},
+		{"elapsed window", func(t *testing.T, gs *game.GameState) *game.GameState {
+			t.Helper()
+			closed, err := game.ForceCloseDeclarationPhase(gs)
+			require.NoError(t, err)
+			return closed
+		}},
+	}
+
+	for _, tc := range tests {
+		for _, closer := range closers {
+			t.Run(tc.name+"/"+closer.name, func(t *testing.T) {
+				seed := 1001 - tc.award
+
+				t.Run("on: the resolution ends the match", func(t *testing.T) {
+					gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
+					gs.TeamScores[tc.team] = seed
+
+					after := closer.close(t, declarationCycleAt(t, gs, tc.declarer))
+
+					require.Equal(t, game.PhaseMatchEnd, after.Phase)
+					require.NotNil(t, after.WinnerTeam)
+					assert.Equal(t, tc.team, *after.WinnerTeam)
+					assert.Equal(t, 1001, after.TeamScores[tc.team])
+					assert.True(t, after.DeclarationsResolved)
+					assert.Equal(t, 1, after.TrickNumber)
+					assert.Len(t, after.CurrentTrick, tc.trickSize, "the trick is left where it stopped")
+				})
+
+				t.Run("off: play resumes at the declarer", func(t *testing.T) {
+					gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
+					gs.TeamScores[tc.team] = seed
+
+					after := closer.close(t, declarationCycleAt(t, gs, tc.declarer))
+
+					assert.Equal(t, game.PhasePlaying, after.Phase)
+					assert.Equal(t, tc.declarer, after.ActivePlayerSeat)
+					assert.Equal(t, tc.award, after.DeclarationPoints[tc.team])
+					assert.Equal(t, seed, after.TeamScores[tc.team])
+				})
+			})
+		}
+	}
 }
 
 // TestStopAtTargetRespectsThe501Target proves the rule reads MatchTarget rather
@@ -941,7 +902,7 @@ func TestStopAtTargetIsCarriedOnTheResolvedConfig(t *testing.T) {
 					[4]uint{10, 20, 30, 40},
 					[4]string{"a", "b", "c", "d"},
 					[4]bool{},
-					tc.variant, "1001", 1, true, want, true, false,
+					tc.variant, "1001", 1, true, want, true, false, game.DefaultDeclarationLastTrick,
 				)
 				assert.Equal(t, want, gs.Rules.StopAtTarget, "the config the engine reads")
 				assert.Equal(t, want, gs.StopAtTarget, "and the wire flag the client renders")
@@ -991,51 +952,24 @@ func TestStopAtTargetSurvivesPerSeatProjection(t *testing.T) {
 	}
 }
 
-// TestStopAtTargetOutranksASurrenderInsideTheDeferralWindow checks a crossing deferred during trick 1 beats a surrender in that window.
-// A surrender still decides the match when nobody has crossed.
-func TestStopAtTargetOutranksASurrenderInsideTheDeferralWindow(t *testing.T) {
-	const seed = 1001 - 20
+// TestSurrenderInsideTheDeclarationWindowAwardsTheOpponents checks a concession during the window decides the match
+// as always when nobody has crossed.
+func TestSurrenderInsideTheDeclarationWindowAwardsTheOpponents(t *testing.T) {
+	gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
+	announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
+	require.Equal(t, game.PhasePlaying, announced.Phase)
 
-	t.Run("a team already past the target wins despite the concession", func(t *testing.T) {
-		gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
-		gs.TeamScores[game.TeamA] = seed
-		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
-		require.NotEqual(t, game.PhaseMatchEnd, announced.Phase, "the deferral must be holding")
-
-		requested, err := game.ApplyAction(announced, game.Action{
-			Type: game.ActionSurrenderRequest, PlayerSeat: 0,
-		})
-		require.NoError(t, err)
-		accepted, err := game.ApplyAction(requested, game.Action{
-			Type: game.ActionSurrenderAccept, PlayerSeat: 2,
-		})
-		require.NoError(t, err)
-
-		require.Equal(t, game.PhaseMatchEnd, accepted.Phase)
-		require.NotNil(t, accepted.WinnerTeam)
-		assert.Equal(t, game.TeamA, *accepted.WinnerTeam,
-			"team A reached the target before the concession, so the concession cannot take it")
-		assert.GreaterOrEqual(t, accepted.TeamScores[game.TeamA], 1001,
-			"and the crossing total is banked")
-		assert.Nil(t, accepted.SurrenderProposerSeat)
+	requested, err := game.ApplyAction(announced, game.Action{
+		Type: game.ActionSurrenderRequest, PlayerSeat: 0,
 	})
-
-	t.Run("an ordinary surrender still awards the opponents", func(t *testing.T) {
-		gs := testfixtures.WithStopAtTarget(testfixtures.NewGameFirstTrick(game.SuitHearts))
-		announced := announceBeloteAt(t, bitolaTrick1BelotePrompt(t, gs), 0)
-
-		requested, err := game.ApplyAction(announced, game.Action{
-			Type: game.ActionSurrenderRequest, PlayerSeat: 0,
-		})
-		require.NoError(t, err)
-		accepted, err := game.ApplyAction(requested, game.Action{
-			Type: game.ActionSurrenderAccept, PlayerSeat: 2,
-		})
-		require.NoError(t, err)
-
-		require.Equal(t, game.PhaseMatchEnd, accepted.Phase)
-		require.NotNil(t, accepted.WinnerTeam)
-		assert.Equal(t, game.TeamB, *accepted.WinnerTeam,
-			"seat 0 conceded and no team had crossed, so team B takes it as always")
+	require.NoError(t, err)
+	accepted, err := game.ApplyAction(requested, game.Action{
+		Type: game.ActionSurrenderAccept, PlayerSeat: 2,
 	})
+	require.NoError(t, err)
+
+	require.Equal(t, game.PhaseMatchEnd, accepted.Phase)
+	require.NotNil(t, accepted.WinnerTeam)
+	assert.Equal(t, game.TeamB, *accepted.WinnerTeam,
+		"seat 0 conceded and no team had crossed, so team B takes it as always")
 }

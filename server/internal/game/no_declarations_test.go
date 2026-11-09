@@ -253,7 +253,7 @@ func playFinalTrick(t *testing.T, gs *game.GameState) *game.GameState {
 func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 	t.Run("off", func(t *testing.T) {
 		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"}, [4]bool{},
-			game.VariantBitola, "1001", 1, false, false, true, false)
+			game.VariantBitola, "1001", 1, false, false, true, false, game.DefaultDeclarationLastTrick)
 		assert.False(t, gs.DeclarationsEnabled)
 		assert.Equal(t, gs.Rules.DeclarationsEnabled, gs.DeclarationsEnabled)
 
@@ -265,7 +265,7 @@ func TestNoDeclarationsCarriesOntoTheWire(t *testing.T) {
 
 	t.Run("on", func(t *testing.T) {
 		gs := game.NewGame([4]uint{10, 20, 30, 40}, [4]string{"a", "b", "c", "d"}, [4]bool{},
-			game.VariantBitola, "1001", 1, true, false, true, false)
+			game.VariantBitola, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick)
 		assert.True(t, gs.DeclarationsEnabled)
 		assert.False(t, gs.DeclarationsResolved, "an ordinary hand starts with the contest open")
 	})
@@ -359,6 +359,18 @@ func TestNoDeclarationsWithRealMeldsInHandScoresZeroForThem(t *testing.T) {
 		"with declarations ON the same hand must award meld points, or the OFF assertions prove nothing")
 }
 
+// firstUnansweredSeat returns the lowest seat that still owes an answer in the declaring phase.
+func firstUnansweredSeat(t *testing.T, state *game.GameState) int {
+	t.Helper()
+	for seat := range state.Players {
+		if !state.Players[seat].DeclarationAnswered {
+			return seat
+		}
+	}
+	t.Fatal("the declaring phase is open with every seat answered")
+	return -1
+}
+
 // meldsExistSomewhere reports whether any seat holds a declarable combination,
 // under the state's own overlap rule.
 func meldsExistSomewhere(state *game.GameState) bool {
@@ -399,7 +411,7 @@ func playWholeHand(t *testing.T, gs *game.GameState) *game.GameState {
 			continue
 		case state.Phase == game.PhaseDeclaring:
 			next, err := game.ApplyAction(state, game.Action{
-				Type: game.ActionSkipDeclare, PlayerSeat: seat,
+				Type: game.ActionSkipDeclare, PlayerSeat: firstUnansweredSeat(t, state),
 			})
 			require.NoError(t, err)
 			state = next

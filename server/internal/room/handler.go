@@ -18,6 +18,7 @@ import (
 
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/auth"
+	"github.com/emilijan/beljot/server/internal/game"
 	"github.com/emilijan/beljot/server/internal/match"
 	"github.com/emilijan/beljot/server/internal/user"
 	"github.com/emilijan/beljot/server/internal/ws"
@@ -104,11 +105,12 @@ type CreateRoomRequest struct {
 	StopAtTarget         *bool  `json:"stopAtTarget"`
 	DeclarationsTransfer *bool  `json:"declarationsTransfer"`
 	Clockwise            bool   `json:"clockwise"`
+	DeclarationLastTrick *int   `json:"declarationLastTrick"`
 }
 
 // MatchStarter is the interface the room handler uses to start a live match and to ask whether a user is in one.
 type MatchStarter interface {
-	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool) error
+	StartMatch(roomID uint, variant string, matchMode string, players [4]match.PlayerSeatInfo, timerStyle string, timerDurationSec int, ownerID uint, reconnectWindowSec int, coinBuyIn int, declarationsEnabled bool, stopAtTarget bool, declarationsTransfer bool, clockwise bool, declarationLastTrick int) error
 	IsUserInMatch(userID uint) bool
 }
 
@@ -303,6 +305,7 @@ func roomLifecyclePayload(repo RoomRepository, r *Room) map[string]any {
 		"stopAtTarget":         r.StopAtTarget,
 		"declarationsTransfer": r.DeclarationsTransfer,
 		"clockwise":            r.Clockwise,
+		"declarationLastTrick": r.DeclarationLastTrick,
 		"playerCount":          r.PlayerCount,
 		"status":               r.Status,
 		"isQuickPlay":          r.IsQuickPlay,
@@ -457,6 +460,11 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		declarationsTransfer = *req.DeclarationsTransfer
 	}
 
+	declarationLastTrick, err := resolveDeclarationLastTrick(req.DeclarationLastTrick, variant, declarationsEnabled)
+	if err != nil {
+		return err
+	}
+
 	gateProbe := &Room{MinHonor: minHonor, AllowNewPlayers: allowNewPlayers}
 	if gateProbe.honorGated() {
 		snap, enforced, herr := h.honorSnapshotFor(userID)
@@ -507,6 +515,7 @@ func (h *RoomHandler) CreateRoom(c echo.Context) error {
 		StopAtTarget:         stopAtTarget,
 		DeclarationsTransfer: declarationsTransfer,
 		Clockwise:            req.Clockwise,
+		DeclarationLastTrick: declarationLastTrick,
 		Status:               "waiting",
 		PlayerCount:          1,
 	}
@@ -1966,7 +1975,7 @@ func (h *RoomHandler) startAutoStartedMatch(autoStartRoom *Room, players []RoomP
 		timerDuration = *autoStartRoom.TimerDurationSeconds
 	}
 	reconnectWindow := resolveReconnectWindow(autoStartRoom.ReconnectWindowSec)
-	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer, autoStartRoom.Clockwise); serr != nil {
+	if serr := h.matchStarter.StartMatch(autoStartRoom.ID, autoStartRoom.Variant, autoStartRoom.MatchMode, seatInfo, autoStartRoom.TimerStyle, timerDuration, autoStartRoom.OwnerID, reconnectWindow, autoStartRoom.CoinBuyIn, autoStartRoom.DeclarationsEnabled, autoStartRoom.StopAtTarget, autoStartRoom.DeclarationsTransfer, autoStartRoom.Clockwise, autoStartRoom.DeclarationLastTrick); serr != nil {
 		if charged {
 			refund := make(map[uint]int, len(chargedIDs))
 			for _, id := range chargedIDs {
@@ -2968,7 +2977,7 @@ func (h *RoomHandler) StartMatch(c echo.Context) error {
 				timerDuration = *updatedRoom.TimerDurationSeconds
 			}
 			reconnectWindow := resolveReconnectWindow(updatedRoom.ReconnectWindowSec)
-			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer, updatedRoom.Clockwise); serr != nil {
+			if serr := h.matchStarter.StartMatch(uint(roomID), updatedRoom.Variant, updatedRoom.MatchMode, seatInfo, updatedRoom.TimerStyle, timerDuration, updatedRoom.OwnerID, reconnectWindow, updatedRoom.CoinBuyIn, updatedRoom.DeclarationsEnabled, updatedRoom.StopAtTarget, updatedRoom.DeclarationsTransfer, updatedRoom.Clockwise, updatedRoom.DeclarationLastTrick); serr != nil {
 				slog.Error("failed to start game session", "roomID", roomID, "error", serr)
 				if charged {
 					refund := make(map[uint]int, len(chargedIDs))
@@ -3075,6 +3084,7 @@ func (h *RoomHandler) QuickPlay(c echo.Context) error {
 				StopAtTarget:         false,
 				DeclarationsTransfer: true,
 				Clockwise:            false,
+				DeclarationLastTrick: game.DefaultDeclarationLastTrick,
 				Status:               "waiting",
 				PlayerCount:          1,
 			}

@@ -94,8 +94,14 @@ const (
 type DeclarationTiming string
 
 const (
-	DeclarationTimingDuringFirstTrick DeclarationTiming = "during_first_trick"
-	DeclarationTimingDedicatedPhase   DeclarationTiming = "dedicated_phase"
+	DeclarationTimingTurnWindow     DeclarationTiming = "turn_window"
+	DeclarationTimingDedicatedPhase DeclarationTiming = "dedicated_phase"
+)
+
+const (
+	MinDeclarationLastTrick     = 1
+	MaxDeclarationLastTrick     = 3
+	DefaultDeclarationLastTrick = MaxDeclarationLastTrick
 )
 
 // TieRule names how a hand whose two sides tie on points is settled.
@@ -112,6 +118,7 @@ type VariantRules struct {
 	AllPassOutcome       AllPassOutcome
 	DeclarationOverlap   bool
 	DeclarationTiming    DeclarationTiming
+	DeclarationLastTrick int
 	DeclarationsEnabled  bool
 	StopAtTarget         bool
 	DeclarationsTransfer bool
@@ -162,7 +169,8 @@ func RulesFor(v Variant) VariantRules {
 		HasTrumpCandidate:    true,
 		AllPassOutcome:       AllPassReshuffleAndRotate,
 		DeclarationOverlap:   false,
-		DeclarationTiming:    DeclarationTimingDuringFirstTrick,
+		DeclarationTiming:    DeclarationTimingTurnWindow,
+		DeclarationLastTrick: DefaultDeclarationLastTrick,
 		DeclarationsEnabled:  true,
 		StopAtTarget:         false,
 		DeclarationsTransfer: true,

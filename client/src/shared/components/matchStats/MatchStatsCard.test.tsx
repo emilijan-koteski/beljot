@@ -213,7 +213,7 @@ describe("MatchStatsCard", () => {
   });
 
   describe("rules", () => {
-    it("names the four match rules on the rule icons, brass where they changed", () => {
+    it("names the five match rules on the rule icons, brass where they changed", () => {
       renderCard({
         match: makeMatch({
           declarationsEnabled: false,
@@ -224,7 +224,7 @@ describe("MatchStatsCard", () => {
       });
 
       expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
-        "Rules: Direction: To the left, Declarations: Off, Declarations on a fall: Not used, Match end: Stop at target",
+        "Rules: Direction: To the left, Declarations: Off, Declare until trick: Not used, Declarations on a fall: Not used, Match end: Stop at target",
       );
     });
 
@@ -234,10 +234,11 @@ describe("MatchStatsCard", () => {
       delete (legacy as { stopAtTarget?: boolean }).stopAtTarget;
       delete (legacy as { declarationsTransfer?: boolean }).declarationsTransfer;
       delete (legacy as { clockwise?: boolean }).clockwise;
+      delete (legacy as { declarationLastTrick?: number }).declarationLastTrick;
       renderCard({ match: legacy });
 
       expect(screen.getByTestId("room-rules-trigger")).toHaveAccessibleName(
-        "Rules: Direction: To the right, Declarations: On, Declarations on a fall: To the winners, Match end: Finish the hand",
+        "Rules: Direction: To the right, Declarations: On, Declare until trick: 3, Declarations on a fall: To the winners, Match end: Finish the hand",
       );
     });
 

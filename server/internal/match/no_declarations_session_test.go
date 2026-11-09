@@ -32,7 +32,7 @@ func TestStartMatch_CarriesDeclarationsSettingIntoTheSession(t *testing.T) {
 			mgr := match.NewManager(hub, newMockMatchRepo())
 			require.NoError(t, mgr.StartMatch(
 				roomID, tt.variant, "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				tt.declarationsEnabled, false, true, false,
+				tt.declarationsEnabled, false, true, false, 3,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -50,7 +50,7 @@ func TestStartMatch_CarriesDeclarationsSettingIntoTheSession(t *testing.T) {
 				assert.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
 				assert.True(t, gs.Rules.DeclarationOverlap)
 			} else {
-				assert.Equal(t, game.DeclarationTimingDuringFirstTrick, gs.Rules.DeclarationTiming)
+				assert.Equal(t, game.DeclarationTimingTurnWindow, gs.Rules.DeclarationTiming)
 				assert.True(t, gs.Rules.HasTrumpCandidate)
 			}
 		})
@@ -64,7 +64,7 @@ func TestCroatianSessionWithoutDeclarationsNeverOpensThePhase(t *testing.T) {
 	hub := &hubSpy{}
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		roomID, "croatia", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, false, false, true, false,
+		roomID, "croatia", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, false, false, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 

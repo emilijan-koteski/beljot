@@ -337,7 +337,7 @@ func TestSolverMatchesEngineLegalityAndWinner(t *testing.T) {
 		clockwise := completed/2%2 == 1
 		gs := game.NewGame(
 			[4]uint{}, [4]string{}, [4]bool{true, true, true, true},
-			variant, "1001", 1, true, false, false, clockwise,
+			variant, "1001", 1, true, false, false, clockwise, game.DefaultDeclarationLastTrick,
 		)
 		if auditHand(t, gs, rng, &stats) {
 			completed++

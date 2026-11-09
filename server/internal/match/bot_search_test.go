@@ -46,7 +46,7 @@ func newSearchMatch(t *testing.T, settings match.BotSearchSettings, thinkDelay t
 	mgr.SetDealGraceForTest(false)
 	mgr.SetBotSearchForTest(settings)
 	mgr.SetBotDelayForTest(thinkDelay, thinkDelay)
-	require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { mgr.RemoveSession(searchRoomID) })
 
 	gs := markBots(testfixtures.NewGameMidPlay(5), searchBotSeat)
@@ -166,7 +166,7 @@ func TestBuildBotViewCarriesDeclarationsEnabled(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
-			require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+			require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 			t.Cleanup(func() { mgr.RemoveSession(searchRoomID) })
 			mgr.SetGameStateForTest(searchRoomID, markBots(tt.gs, searchBotSeat))
 			mgr.CancelBotTimersForTest(searchRoomID)
@@ -185,7 +185,7 @@ func newBeloteMatch(t *testing.T, tuning bot.SearchTuning, settings match.BotSea
 	mgr.SetBotSearchForTest(settings)
 	mgr.SetBotTuningForTest(tuning)
 	mgr.SetBotDelayForTest(thinkDelay, thinkDelay)
-	require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { mgr.RemoveSession(searchRoomID) })
 
 	gs := markBots(testfixtures.NewGameMidPlay(5), searchBotSeat)

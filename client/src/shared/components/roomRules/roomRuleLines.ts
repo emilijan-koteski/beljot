@@ -6,6 +6,7 @@ import {
   Clock,
   Coffee,
   Flag,
+  Hourglass,
   Lock,
   LockOpen,
   type LucideIcon,
@@ -19,12 +20,19 @@ import {
   Zap,
 } from "lucide-react";
 
+import { rulesForVariant } from "@/features/match/lib/variantRules";
 import { roomBotCount } from "@/shared/lib/roomOccupancy";
 import type { Room } from "@/shared/types/apiTypes";
+import { DEFAULT_DECLARATION_LAST_TRICK } from "@/shared/types/matchTypes";
 
 export type MatchRuleSource = Pick<
   Room,
-  "clockwise" | "declarationsEnabled" | "declarationsTransfer" | "stopAtTarget"
+  | "variant"
+  | "clockwise"
+  | "declarationsEnabled"
+  | "declarationsTransfer"
+  | "declarationLastTrick"
+  | "stopAtTarget"
 >;
 
 export type RoomRuleSource = MatchRuleSource &
@@ -37,6 +45,7 @@ export const RULE_ICONS = {
   declarationsOff: MegaphoneOff,
   fallTransfer: ArrowRightLeft,
   fallVoided: CircleSlash2,
+  declarationWindow: Hourglass,
   finishHand: Flag,
   stopAtTarget: Target,
   public: LockOpen,
@@ -60,10 +69,12 @@ export interface RuleLine {
 
 const FORM = "lobby.createRoomModal";
 
-/** The four match rules in a fixed order, worded as the create-room form words them. */
+/** The five match rules in a fixed order, worded as the create-room form words them. */
 export function matchRuleLines(t: TFunction, room: MatchRuleSource): RuleLine[] {
   const clockwise = room.clockwise === true;
   const declarationsOff = room.declarationsEnabled === false;
+  const windowUnused = !rulesForVariant(room.variant).declarationWindow || declarationsOff;
+  const lastTrick = room.declarationLastTrick ?? DEFAULT_DECLARATION_LAST_TRICK;
   const voided = room.declarationsTransfer === false && !declarationsOff;
   const stop = room.stopAtTarget === true;
   return [
@@ -80,6 +91,14 @@ export function matchRuleLines(t: TFunction, room: MatchRuleSource): RuleLine[] 
       value: t(declarationsOff ? `${FORM}.declarationsOff` : `${FORM}.declarationsOn`),
       icon: declarationsOff ? RULE_ICONS.declarationsOff : RULE_ICONS.declarationsOn,
       changed: declarationsOff,
+    },
+    {
+      key: "window",
+      label: t(`${FORM}.declarationLastTrick`),
+      value: windowUnused ? t("roomRules.notUsed") : String(lastTrick),
+      icon: RULE_ICONS.declarationWindow,
+      changed: !windowUnused && lastTrick !== DEFAULT_DECLARATION_LAST_TRICK,
+      unused: windowUnused,
     },
     {
       key: "fall",

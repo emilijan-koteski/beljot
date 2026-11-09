@@ -104,6 +104,37 @@ describe("DeclarationPrompt", () => {
     expect(onSkip).toHaveBeenCalledOnce();
   });
 
+  it("says Continue on a turn prompt whose pass leaves later tricks open", () => {
+    render(
+      <DeclarationPrompt
+        declarations={mockDeclarations}
+        onDeclare={vi.fn()}
+        onSkip={vi.fn()}
+        passIsFinal={false}
+      />,
+    );
+    expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("Continue");
+  });
+
+  it("says Skip on a turn prompt whose pass is final", () => {
+    render(
+      <DeclarationPrompt
+        declarations={mockDeclarations}
+        onDeclare={vi.fn()}
+        onSkip={vi.fn()}
+        passIsFinal
+      />,
+    );
+    expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("Skip");
+  });
+
+  it("names no declarer outside a declaration cycle", () => {
+    render(
+      <DeclarationPrompt declarations={mockDeclarations} onDeclare={vi.fn()} onSkip={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("declaration-prompt-declared-by")).not.toBeInTheDocument();
+  });
+
   it("has role dialog and aria-modal", () => {
     render(
       <DeclarationPrompt declarations={mockDeclarations} onDeclare={vi.fn()} onSkip={vi.fn()} />,
@@ -208,6 +239,29 @@ describe("DeclarationPrompt", () => {
     it("runs its own countdown ring with no server deadline", () => {
       renderSim();
       expect(screen.getByTestId("button-timer-ring")).toBeInTheDocument();
+    });
+
+    it("always says Skip, since nobody is asked twice in a cycle", () => {
+      renderSim({ passIsFinal: false });
+      expect(screen.getByTestId("declaration-prompt-skip")).toHaveTextContent("Skip");
+    });
+
+    it("names no declarer in a phase that opens before the first trick", () => {
+      renderSim();
+      expect(screen.queryByTestId("declaration-prompt-declared-by")).not.toBeInTheDocument();
+    });
+
+    it("names the seat that opened a mid-trick cycle, holding melds or not", () => {
+      const { unmount } = renderSim({ declaredBy: "Bot 2" });
+      expect(screen.getByTestId("declaration-prompt-declared-by")).toHaveTextContent(
+        "Bot 2 declared",
+      );
+      unmount();
+
+      renderSim({ declarations: [], declaredBy: "alice", answered: true, answeredCount: 2 });
+      expect(screen.getByTestId("declaration-prompt-declared-by")).toHaveTextContent(
+        "alice declared",
+      );
     });
 
     it("fires onSkip when its own window elapses", () => {

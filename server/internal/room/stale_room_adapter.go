@@ -23,6 +23,7 @@ func (a *StaleRoomRepositoryAdapter) FindByStatus(status string) ([]match.StaleR
 			StopAtTarget:         r.StopAtTarget,
 			DeclarationsTransfer: r.DeclarationsTransfer,
 			Clockwise:            r.Clockwise,
+			DeclarationLastTrick: r.DeclarationLastTrick,
 			UpdatedAt:            r.UpdatedAt,
 		}
 	}

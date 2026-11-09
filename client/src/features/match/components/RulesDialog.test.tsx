@@ -257,6 +257,24 @@ describe("RulesDialog (in-game)", () => {
     expect(screen.queryByTestId("rules-dialog-clockwise-note")).not.toBeInTheDocument();
   });
 
+  it.each([1, 2])("notes that declarations close after trick %i", (n) => {
+    render(<RulesDialog open onOpenChange={() => {}} declarationLastTrick={n} />);
+    expect(screen.getByTestId("rules-dialog-declaration-window-note")).toHaveTextContent(
+      `On this table, declarations close after trick ${n}.`,
+    );
+  });
+
+  it("shows no declaration window note at trick 3 or when the window is absent", () => {
+    const { unmount } = render(
+      <RulesDialog open onOpenChange={() => {}} declarationLastTrick={3} />,
+    );
+    expect(screen.queryByTestId("rules-dialog-declaration-window-note")).not.toBeInTheDocument();
+    unmount();
+
+    render(<RulesDialog open onOpenChange={() => {}} />);
+    expect(screen.queryByTestId("rules-dialog-declaration-window-note")).not.toBeInTheDocument();
+  });
+
   it("shows both table notes when the table stops at the target and voids declarations", () => {
     render(<RulesDialog open onOpenChange={() => {}} stopAtTarget declarationsTransfer={false} />);
     expect(screen.getByTestId("rules-dialog-stop-at-target-note")).toBeInTheDocument();

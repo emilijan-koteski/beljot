@@ -21,11 +21,13 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 		stopAtTarget         bool
 		declarationsTransfer bool
 		clockwise            bool
+		declarationLastTrick int
 	}{
-		{"all at their defaults", true, false, true, false},
-		{"declarations do not transfer", true, false, false, false},
-		{"clockwise play", true, false, true, true},
-		{"every rule changed", false, true, false, true},
+		{"all at their defaults", true, false, true, false, 3},
+		{"declarations do not transfer", true, false, false, false, 3},
+		{"clockwise play", true, false, true, true, 3},
+		{"a one-trick declaration window", true, false, true, false, 1},
+		{"every rule changed", false, true, false, true, 2},
 	}
 
 	for _, tt := range tests {
@@ -51,6 +53,7 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 				StopAtTarget:         tt.stopAtTarget,
 				DeclarationsTransfer: tt.declarationsTransfer,
 				Clockwise:            tt.clockwise,
+				DeclarationLastTrick: tt.declarationLastTrick,
 				StartedAt:            now.Add(-30 * time.Minute),
 				CompletedAt:          now,
 				Status:               "completed",
@@ -69,8 +72,10 @@ func TestListMatches_CarriesTheRulesTheMatchWasPlayedUnder(t *testing.T) {
 			assert.Equal(t, tt.stopAtTarget, item.StopAtTarget)
 			assert.Equal(t, tt.declarationsTransfer, item.DeclarationsTransfer)
 			assert.Equal(t, tt.clockwise, item.Clockwise)
+			assert.Equal(t, tt.declarationLastTrick, item.DeclarationLastTrick)
 			assert.Contains(t, rec.Body.String(), `"declarationsTransfer":`, "the key must be on the wire")
 			assert.Contains(t, rec.Body.String(), `"clockwise":`, "the key must be on the wire")
+			assert.Contains(t, rec.Body.String(), `"declarationLastTrick":`, "the key must be on the wire")
 		})
 	}
 }

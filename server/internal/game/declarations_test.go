@@ -132,7 +132,7 @@ func TestSkipDeclare(t *testing.T) {
 }
 
 func TestDeclareErrorCases(t *testing.T) {
-	t.Run("declare at trick 2 returns ErrWrongPhase", func(t *testing.T) {
+	t.Run("declare after the hand's declarations resolved returns ErrWrongPhase", func(t *testing.T) {
 		gs := testfixtures.NewGameMidPlay(2)
 		gs.AwaitingDeclaration = false
 
@@ -213,7 +213,7 @@ func TestDeclarationResolution(t *testing.T) {
 			{Type: game.DeclarationSequence, Cards: makeCards("7C", "8C", "9C"), PlayerSeat: 2, Value: 20},
 			{Type: game.DeclarationSequence, Cards: makeCards("JD", "QD", "KD", "AD"), PlayerSeat: 1, Value: 50},
 		}
-		state := completeTrick1(t, decls)
+		state := resolveSeatedDeclarations(t, decls)
 
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA], "Team A gets 0 — best meld lost")
 		assert.Equal(t, 50, state.DeclarationPoints[game.TeamB], "Team B gets 50 — sum of winning team's melds")
@@ -227,7 +227,7 @@ func TestDeclarationResolution(t *testing.T) {
 			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 0, Value: 20},
 			{Type: game.DeclarationFourOfAKind, Cards: makeCards("TS", "TH", "TD", "TC"), PlayerSeat: 2, Value: 100},
 		}
-		state := completeTrick1(t, decls)
+		state := resolveSeatedDeclarations(t, decls)
 
 		assert.Equal(t, 120, state.DeclarationPoints[game.TeamA], "Team A wins with full sum 20+100")
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamB], "Team B gets 0 — no declarations")
@@ -241,7 +241,7 @@ func TestDeclarationResolution(t *testing.T) {
 			{Type: game.DeclarationFourOfAKind, Cards: makeCards("9S", "9H", "9D", "9C"), PlayerSeat: 1, Value: 150},
 			{Type: game.DeclarationFourOfAKind, Cards: makeCards("KS", "KH", "KD", "KC"), PlayerSeat: 2, Value: 100},
 		}
-		state := completeTrick1(t, decls)
+		state := resolveSeatedDeclarations(t, decls)
 
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA], "Team A gets 0 even though sum (200) > team B's 150")
 		assert.Equal(t, 150, state.DeclarationPoints[game.TeamB], "Team B wins with its single strongest meld total")
@@ -251,32 +251,17 @@ func TestDeclarationResolution(t *testing.T) {
 	})
 }
 
-// completeTrick1 seats the given declarations on the NewGameFirstTrick fixture and plays trick 1
-// to completion, returning the post-resolution state with Belot pre-marked announced.
-func completeTrick1(t *testing.T, decls []game.Declaration) *game.GameState {
+// resolveSeatedDeclarations seats the given declarations on the NewGameFirstTrick fixture inside a declaration cycle
+// and closes it, returning the post-resolution state.
+func resolveSeatedDeclarations(t *testing.T, decls []game.Declaration) *game.GameState {
 	t.Helper()
-	state := testfixtures.NewGameWithDeclarations(decls)
+	state := testfixtures.WithOpenDeclarationCycle(testfixtures.NewGameWithDeclarations(decls), 1)
 	state.BelotAnnounced = true
 
-	plays := []struct {
-		seat int
-		card game.Card
-	}{
-		{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},
-		{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},
-		{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}},
-		{0, game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}},
-	}
-	for _, p := range plays {
-		card := p.card
-		next, err := game.ApplyAction(state, game.Action{
-			Type: game.ActionPlayCard, PlayerSeat: p.seat, Card: &card,
-		})
-		require.NoError(t, err, "seat %d play %v", p.seat, card)
-		state = next
-	}
-	require.True(t, state.DeclarationsResolved, "trick 1 must trigger declaration resolution")
-	return state
+	closed, err := game.ForceCloseDeclarationPhase(state)
+	require.NoError(t, err)
+	require.True(t, closed.DeclarationsResolved, "closing the cycle must resolve the declarations")
+	return closed
 }
 
 func TestBelotDetection(t *testing.T) {
@@ -429,7 +414,7 @@ func TestAnnounceBelot(t *testing.T) {
 }
 
 func TestFullTrick1WithDeclarations(t *testing.T) {
-	t.Run("full trick 1 flow with declarations and Belot", func(t *testing.T) {
+	t.Run("a declaration cycle in trick 1, then Belote", func(t *testing.T) {
 		gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
 		gs.AwaitingDeclaration = true
 
@@ -438,54 +423,48 @@ func TestFullTrick1WithDeclarations(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.False(t, state.AwaitingDeclaration)
-		assert.Equal(t, 1, len(state.Players[1].Declarations))
+		assert.Equal(t, game.PhaseDeclaring, state.Phase, "a declaration opens the cycle")
+		assert.Equal(t, 1, state.ActivePlayerSeat, "the declarer stays the resume seat")
+		assert.True(t, state.Players[1].DeclarationAnswered, "the declarer is answered on entry")
+		require.Len(t, state.Players[1].Declarations, 1)
 		assert.Equal(t, 50, state.Players[1].Declarations[0].Value)
 
-		card1 := game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionPlayCard, PlayerSeat: 1, Card: &card1,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, 1, len(state.CurrentTrick))
-		assert.True(t, state.AwaitingDeclaration)
-		assert.Equal(t, 2, state.ActivePlayerSeat)
+		for _, answer := range []game.Action{
+			{Type: game.ActionDeclare, PlayerSeat: 2},
+			{Type: game.ActionSkipDeclare, PlayerSeat: 3},
+			{Type: game.ActionDeclare, PlayerSeat: 0},
+		} {
+			state, err = game.ApplyAction(state, answer)
+			require.NoError(t, err, "seat %d %s", answer.PlayerSeat, answer.Type)
+		}
+		require.Equal(t, game.PhasePlaying, state.Phase, "the last answer closes the cycle")
+		assert.True(t, state.DeclarationsResolved)
+		assert.Equal(t, 1, state.TrickNumber)
+		assert.Equal(t, 1, state.ActivePlayerSeat, "play resumes at the declarer")
+		assert.False(t, state.AwaitingDeclaration, "with no new prompt")
+		assert.Equal(t, 50, state.DeclarationPoints[game.TeamB])
+		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA])
 
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionDeclare, PlayerSeat: 2,
-		})
-		require.NoError(t, err)
-		assert.False(t, state.AwaitingDeclaration)
-
-		card2 := game.Card{Rank: game.Rank9, Suit: game.SuitHearts}
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionPlayCard, PlayerSeat: 2, Card: &card2,
-		})
-		require.NoError(t, err)
-		assert.False(t, state.AwaitingDeclaration)
-		assert.Equal(t, 3, state.ActivePlayerSeat)
-
-		card3 := game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionPlayCard, PlayerSeat: 3, Card: &card3,
-		})
-		require.NoError(t, err)
-		assert.True(t, state.AwaitingDeclaration)
-		assert.Equal(t, 0, state.ActivePlayerSeat)
-
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionDeclare, PlayerSeat: 0,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, 2, len(state.Players[0].Declarations))
-
-		card0 := game.Card{Rank: game.RankKing, Suit: game.SuitHearts}
-		state, err = game.ApplyAction(state, game.Action{
-			Type: game.ActionPlayCard, PlayerSeat: 0, Card: &card0,
-		})
-		require.NoError(t, err)
+		plays := []struct {
+			seat int
+			card game.Card
+		}{
+			{1, game.Card{Rank: game.Rank8, Suit: game.SuitDiamonds}},
+			{2, game.Card{Rank: game.Rank9, Suit: game.SuitHearts}},
+			{3, game.Card{Rank: game.RankTen, Suit: game.SuitDiamonds}},
+			{0, game.Card{Rank: game.RankKing, Suit: game.SuitHearts}},
+		}
+		for _, p := range plays {
+			assert.False(t, state.AwaitingDeclaration, "nobody is asked again after the resolution")
+			card := p.card
+			state, err = game.ApplyAction(state, game.Action{
+				Type: game.ActionPlayCard, PlayerSeat: p.seat, Card: &card,
+			})
+			require.NoError(t, err, "seat %d play %v", p.seat, card)
+		}
 		require.NotNil(t, state.PendingBelotSeat)
 		assert.Equal(t, 0, *state.PendingBelotSeat)
-		assert.Equal(t, 4, len(state.CurrentTrick))
+		assert.Len(t, state.CurrentTrick, 4)
 		assert.Equal(t, 1, state.TrickNumber)
 
 		state, err = game.ApplyAction(state, game.Action{
@@ -495,10 +474,9 @@ func TestFullTrick1WithDeclarations(t *testing.T) {
 		assert.Nil(t, state.PendingBelotSeat)
 		assert.True(t, state.BelotAnnounced)
 		assert.Equal(t, 2, state.TrickNumber)
-		assert.True(t, state.DeclarationsResolved)
+		assert.False(t, state.AwaitingDeclaration, "the trick-2 leader is not asked either")
 
 		assert.Equal(t, 20, state.BelotPoints[game.TeamA], "Team A belote tracked as a declaration")
-
 		assert.Equal(t, 50, state.DeclarationPoints[game.TeamB])
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA])
 
@@ -604,7 +582,7 @@ func TestDeclarationTiebreakers(t *testing.T) {
 			{Type: game.DeclarationSequence, Cards: makeCards("7S", "8S", "9S"), PlayerSeat: 2, Value: 20},
 			{Type: game.DeclarationSequence, Cards: makeCards("9C", "TC", "JC"), PlayerSeat: 1, Value: 20},
 		}
-		state := completeTrick1(t, decls)
+		state := resolveSeatedDeclarations(t, decls)
 
 		assert.Equal(t, 0, state.DeclarationPoints[game.TeamA], "Ten-topped tierce must lose")
 		assert.Equal(t, 20, state.DeclarationPoints[game.TeamB], "Jack-topped tierce wins (J > T)")
@@ -766,8 +744,8 @@ func TestBelotAtLaterTricks(t *testing.T) {
 	})
 }
 
-func TestSkipDeclareAtTrick2(t *testing.T) {
-	t.Run("skip_declare at trick 2 returns ErrWrongPhase", func(t *testing.T) {
+func TestSkipDeclareAfterDeclarationsResolved(t *testing.T) {
+	t.Run("skip_declare after the hand's declarations resolved returns ErrWrongPhase", func(t *testing.T) {
 		gs := testfixtures.NewGameMidPlay(2)
 		_, err := game.ApplyAction(gs, game.Action{
 			Type: game.ActionSkipDeclare, PlayerSeat: 0,
@@ -943,8 +921,7 @@ func meld(t game.DeclarationType, value int, ids ...string) meldSummary {
 func declareSeat0(t *testing.T, gs *game.GameState, hand []game.Card) *game.GameState {
 	t.Helper()
 	gs.Players[0].Hand = hand
-	gs.ActivePlayerSeat = 0
-	gs.AwaitingDeclaration = true
+	gs = testfixtures.WithDeclarationTurn(gs, 0)
 	state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 	require.NoError(t, err)
 	return state
@@ -1053,16 +1030,17 @@ func TestDeclarationPromptTriggerIsOverlapInvariant(t *testing.T) {
 
 	variants := []struct {
 		label   string
-		newGame func(game.Suit) *game.GameState
+		overlap bool
 	}{
-		{"bitola", testfixtures.NewGameFirstTrick},
-		{"croatia", testfixtures.NewGameCroatianFirstTrick},
+		{"one card, one declaration", false},
+		{"a card may count twice", true},
 	}
 
 	for _, tt := range tests {
 		for _, v := range variants {
 			t.Run(tt.name+"/"+v.label, func(t *testing.T) {
-				gs := v.newGame(game.SuitHearts)
+				gs := testfixtures.NewGameFirstTrick(game.SuitHearts)
+				gs.Rules.DeclarationOverlap = v.overlap
 				gs.Players[2].Hand = tt.hand
 				require.False(t, gs.AwaitingDeclaration, "fixture must start with no prompt pending")
 				require.Equal(t, 1, gs.ActivePlayerSeat, "seat 1 leads trick 1")
@@ -1109,8 +1087,7 @@ func TestDetectedMeldsOverlapOnlyAcrossTypes(t *testing.T) {
 		t.Helper()
 		gs := testfixtures.NewGameCroatianFirstTrick(game.SuitHearts)
 		gs.Players[0].Hand = hand
-		gs.ActivePlayerSeat = 0
-		gs.AwaitingDeclaration = true
+		gs = testfixtures.WithDeclarationTurn(gs, 0)
 		state, err := game.ApplyAction(gs, game.Action{Type: game.ActionDeclare, PlayerSeat: 0})
 		if err != nil {
 			return nil
@@ -1165,8 +1142,8 @@ type seatPlay struct {
 	card string
 }
 
-// resolveTrick1 seats the given hands on the fixture, plays trick 1 through the scripted plays and
-// returns the post-resolution state, declaring for declaringSeats and skipping for everyone else.
+// resolveTrick1 seats the given hands, collects declarations under the fixture's timing and plays trick 1 through the
+// scripted plays, declaring for declaringSeats and skipping for everyone else.
 func resolveTrick1(
 	t *testing.T,
 	gs *game.GameState,
@@ -1189,9 +1166,12 @@ func resolveTrick1(
 	}
 
 	state := gs
+	if state.Rules.DeclarationTiming == game.DeclarationTimingDedicatedPhase {
+		state = answerDeclaringPhase(t, testfixtures.WithDeclarationTurn(state, 0), declares)
+	}
 	for i, p := range plays {
 		switch {
-		case declares[p.seat]:
+		case declares[p.seat] && !state.DeclarationsResolved:
 			if i == 0 {
 				state.AwaitingDeclaration = true
 			}
@@ -1199,7 +1179,7 @@ func resolveTrick1(
 			require.Equal(t, p.seat, state.ActivePlayerSeat)
 			next, err := game.ApplyAction(state, game.Action{Type: game.ActionDeclare, PlayerSeat: p.seat})
 			require.NoError(t, err, "seat %d declare", p.seat)
-			state = next
+			state = answerDeclaringPhase(t, next, declares)
 		case state.AwaitingDeclaration:
 			next, err := game.ApplyAction(state, game.Action{Type: game.ActionSkipDeclare, PlayerSeat: p.seat})
 			require.NoError(t, err, "seat %d skip_declare", p.seat)
@@ -1215,7 +1195,27 @@ func resolveTrick1(
 		state = next
 	}
 
-	require.True(t, state.DeclarationsResolved, "trick 1 must trigger declaration resolution")
+	require.True(t, state.DeclarationsResolved, "the declarations must have resolved by the end of trick 1")
+	return state
+}
+
+// answerDeclaringPhase answers every seat the declaring phase still waits on, declaring for declares and skipping
+// for the rest, and returns the state once the phase has closed.
+func answerDeclaringPhase(t *testing.T, state *game.GameState, declares map[int]bool) *game.GameState {
+	t.Helper()
+	for seat := range state.Players {
+		if state.Phase != game.PhaseDeclaring || state.Players[seat].DeclarationAnswered {
+			continue
+		}
+		actionType := game.ActionSkipDeclare
+		if declares[seat] {
+			actionType = game.ActionDeclare
+		}
+		next, err := game.ApplyAction(state, game.Action{Type: actionType, PlayerSeat: seat})
+		require.NoError(t, err, "seat %d %s", seat, actionType)
+		state = next
+	}
+	require.NotEqual(t, game.PhaseDeclaring, state.Phase, "every answer is in, so the phase must have closed")
 	return state
 }
 

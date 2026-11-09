@@ -105,7 +105,7 @@ type TrumpSelectedPayload struct {
 	CardID     string `json:"cardId"`
 }
 
-// PlayerDeclaredPayload announces that a seat declared during trick 1.
+// PlayerDeclaredPayload announces that a seat declared at a turn prompt inside the declaration window.
 // It carries only the seat; the melds stay secret until EventDeclarationsResolved.
 type PlayerDeclaredPayload struct {
 	PlayerSeat int `json:"playerSeat"`
@@ -148,8 +148,8 @@ type MatchResumedPayload struct {
 	TimedOut  bool `json:"timedOut"`
 }
 
-// AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry; the other seats get "timeout"
-// in place of a skip that would reveal a hand. Card auto-play uses the AutoPlayed flag on EventCardPlayed instead.
+// AutoActionType enumerates the non-card auto-actions emitted on per-move timer expiry; other seats get "timeout" for a
+// skipped Belote and nothing for a skipped declaration, so no hand is revealed. Card auto-play uses AutoPlayed instead.
 type AutoActionType string
 
 const (

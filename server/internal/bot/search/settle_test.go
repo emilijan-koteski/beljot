@@ -229,7 +229,7 @@ func TestSettleMatchesEngineAtTheLastTrick(t *testing.T) {
 
 		gs := game.NewGame(
 			[4]uint{}, [4]string{}, [4]bool{true, true, true, true},
-			variant, "1001", 1, true, false, transfer, clockwise,
+			variant, "1001", 1, true, false, transfer, clockwise, game.DefaultDeclarationLastTrick,
 		)
 		hand, ok := playUntilSettled(t, gs, rng, dominantTeam)
 		if !ok {
@@ -355,7 +355,7 @@ func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
 		}
 		gs := game.NewGame(
 			[4]uint{}, [4]string{}, [4]bool{true, true, true, true},
-			variant, "1001", 1, true, false, hands/2%2 == 0, hands/4%2 == 1,
+			variant, "1001", 1, true, false, hands/2%2 == 0, hands/4%2 == 1, game.DefaultDeclarationLastTrick,
 		)
 		hand, ok := playUntilSettled(t, gs, rng, rng.IntN(2))
 		if !ok {

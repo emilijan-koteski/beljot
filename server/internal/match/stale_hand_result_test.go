@@ -32,7 +32,7 @@ func TestBufferHandResult_StaleResultIsNotRePersisted(t *testing.T) {
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		910, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
+		910, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(910) })
 
@@ -59,7 +59,7 @@ func TestBufferHandResult_StampsTheResultsOwnHand(t *testing.T) {
 
 	mgr := match.NewManager(hub, newMockMatchRepo())
 	require.NoError(t, mgr.StartMatch(
-		911, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false,
+		911, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(911) })
 
@@ -80,7 +80,7 @@ func TestMatchEndPayload_ReportsASaneDuration(t *testing.T) {
 	mgr := match.NewManager(hub, repo)
 	const roomID = uint(912)
 	require.NoError(t, mgr.StartMatch(
-		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false,
+		roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, true, true, false, 3,
 	))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
@@ -132,7 +132,7 @@ func TestMatchRecord_CarriesTheRulesItWasPlayedUnder(t *testing.T) {
 			mgr := match.NewManager(hub, repo)
 			require.NoError(t, mgr.StartMatch(
 				roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0,
-				tt.declarationsEnabled, tt.stopAtTarget, tt.declarationsTransfer, tt.clockwise,
+				tt.declarationsEnabled, tt.stopAtTarget, tt.declarationsTransfer, tt.clockwise, 3,
 			))
 			t.Cleanup(func() { mgr.RemoveSession(roomID) })
 

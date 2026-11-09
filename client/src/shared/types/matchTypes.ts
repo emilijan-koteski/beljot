@@ -31,6 +31,9 @@ export function matchTargetFor(mode: string): number {
   }
 }
 
+export const DECLARATION_LAST_TRICK_OPTIONS = [1, 2, 3] as const;
+export const DEFAULT_DECLARATION_LAST_TRICK = 3;
+
 export const SERVER_PHASES = [
   "dealing",
   "bidding",
@@ -144,6 +147,7 @@ export interface MatchState {
   stopAtTarget: boolean;
   declarationsTransfer: boolean;
   clockwise: boolean;
+  declarationLastTrick: number;
   activePlayerSeat: number;
   trickNumber: number;
   currentTrick: TrickCard[];

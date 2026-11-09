@@ -4,7 +4,7 @@
     "hasTrumpCandidate": true,
     "allPassOutcome": "reshuffle_and_rotate",
     "declarationOverlap": false,
-    "declarationTiming": "during_first_trick",
+    "declarationTiming": "turn_window",
     "tieRule": "hanging_points"
   },
   "croatia": {

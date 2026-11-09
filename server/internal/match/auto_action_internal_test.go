@@ -53,7 +53,6 @@ func TestSendAutoAction_HidesPrivateSkipsFromOtherSeats(t *testing.T) {
 		othersType ws.AutoActionType
 	}{
 		{"skip_belot reaches the others as a plain timeout", ws.AutoActionSkipBelot, ws.AutoActionTimeout},
-		{"skip_declare reaches the others as a plain timeout", ws.AutoActionSkipDeclare, ws.AutoActionTimeout},
 		{"pass_trump is public bidding", ws.AutoActionPassTrump, ws.AutoActionPassTrump},
 		{"pick_trump is public bidding", ws.AutoActionPickTrump, ws.AutoActionPickTrump},
 	}
@@ -70,4 +69,15 @@ func TestSendAutoAction_HidesPrivateSkipsFromOtherSeats(t *testing.T) {
 			assert.Equal(t, []ws.AutoActionType{tc.othersType}, rec.got[40])
 		})
 	}
+}
+
+// TestSendAutoAction_SkippedDeclarationReachesOnlyTheTimedOutSeat checks the others hear nothing at all, just as
+// for a timed-out card play, so the table cannot tell the seat was holding a meld.
+func TestSendAutoAction_SkippedDeclarationReachesOnlyTheTimedOutSeat(t *testing.T) {
+	rec := &perUserRecorder{}
+	m := &Manager{hub: rec}
+
+	m.sendAutoAction([4]uint{10, 20, 0, 40}, 1, ws.AutoActionSkipDeclare)
+
+	assert.Equal(t, map[uint][]ws.AutoActionType{20: {ws.AutoActionSkipDeclare}}, rec.got)
 }

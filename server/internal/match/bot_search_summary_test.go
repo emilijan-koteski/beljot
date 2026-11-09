@@ -29,7 +29,7 @@ func TestBotSearchSummary_EmittedOnceAtMatchEnd(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	mgr.SetDealGraceForTest(false)
 	const roomID = uint(310)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(1, 3), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(1, 3), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 	mgr.CancelBotTimersForTest(roomID)
 
@@ -49,7 +49,7 @@ func TestBotSearchSummary_EmittedWhenAHumanAbandonsABotTable(t *testing.T) {
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	mgr.SetDealGraceForTest(false)
 	const roomID = uint(311)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(1, 3), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", mixedPlayers(1, 3), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 	mgr.CancelBotTimersForTest(roomID)
 
@@ -65,7 +65,7 @@ func TestBotSearchSummary_SilentForAHumanOnlyTable(t *testing.T) {
 	logs := captureLogs(t)
 	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
 	const roomID = uint(312)
-	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	require.NoError(t, mgr.StartMatch(roomID, "bitola", "1001", defaultPlayers(), "relaxed", 0, 10, 120, 0, true, false, true, false, 3))
 	t.Cleanup(func() { mgr.RemoveSession(roomID) })
 
 	endMatchForSummary(t, mgr, roomID)

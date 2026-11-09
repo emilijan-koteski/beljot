@@ -31,6 +31,7 @@ type Room struct {
 	StopAtTarget         bool           `gorm:"not null" json:"stopAtTarget"`
 	DeclarationsTransfer bool           `gorm:"not null" json:"declarationsTransfer"`
 	Clockwise            bool           `gorm:"not null" json:"clockwise"`
+	DeclarationLastTrick int            `gorm:"not null;default:3" json:"declarationLastTrick"`
 	Status               string         `gorm:"size:20;not null;default:waiting;index" json:"status"`
 	PlayerCount          int            `gorm:"not null;default:1" json:"playerCount"`
 	IsQuickPlay          bool           `gorm:"not null;default:false" json:"isQuickPlay"`

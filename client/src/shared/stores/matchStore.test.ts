@@ -22,6 +22,7 @@ const mockMatchState: MatchState = {
   stopAtTarget: false,
   declarationsTransfer: true,
   clockwise: false,
+  declarationLastTrick: 3,
   activePlayerSeat: 1,
   trickNumber: 0,
   currentTrick: [],

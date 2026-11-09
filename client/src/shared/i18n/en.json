@@ -725,6 +725,8 @@
       "declarationsTransferOn": "To the winners",
       "declarationsTransferOff": "Voided",
       "declarationsTransferHint": "On a fall or capot, declarations go to the winners or are voided",
+      "declarationLastTrick": "Declare until trick",
+      "declarationLastTrickHint": "Bitola: declare before your card, up to this trick",
       "matchEnd": "Match end",
       "matchEndFinish": "Finish the hand",
       "matchEndStop": "Stop at target",
@@ -903,6 +905,7 @@
       "title": "You have declarations",
       "declare": "Declare",
       "skip": "Skip",
+      "continue": "Continue",
       "noneTitle": "No declarations",
       "waitingOthers": "Waiting for others… {{answered}}/4",
       "total": "Total",
@@ -915,7 +918,8 @@
       "headlineThem": "They won the declarations",
       "byPlayer": "by {{name}}",
       "dismiss": "Dismiss",
-      "declaredBanner": "{{username}} has a declaration"
+      "declaredBanner": "{{username}} has a declaration",
+      "declaredBy": "{{name}} declared"
     },
     "belot": {
       "titleBelot": "Declare Belote",
@@ -1120,7 +1124,8 @@
     "rules": {
       "stopAtTargetNote": "This table stops at the target: the match ends the moment a team reaches it, without finishing the hand.",
       "noDeclarationsTransferNote": "On this table, the declarations and Belote of a team that goes down or takes no trick are voided instead of going to the other team.",
-      "clockwiseNote": "On this table, play moves to the left: the deal, the bidding, the tricks and the next dealer all go left."
+      "clockwiseNote": "On this table, play moves to the left: the deal, the bidding, the tricks and the next dealer all go left.",
+      "declarationWindowNote": "On this table, declarations close after trick {{n}}."
     }
   },
   "auth": {
@@ -1293,7 +1298,7 @@
       "bitola": {
         "title": "Bitola",
         "b1": "Two bidding rounds on a turned-up card.",
-        "b2": "Declarations shown from trick two.",
+        "b2": "Declare before your card, up to trick three.",
         "b3": "Belote on the queen, Rebelote on the king."
       },
       "croatian": {

@@ -177,6 +177,13 @@ func randomLegalAction(gs *game.GameState, seat int, rng *rand.Rand) game.Action
 		return game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat}
 	}
 
+	if gs.Phase == game.PhaseDeclaring {
+		if game.HasDeclarableCombinations(gs, seat) && rng.IntN(2) == 0 {
+			return game.Action{Type: game.ActionDeclare, PlayerSeat: seat}
+		}
+		return game.Action{Type: game.ActionSkipDeclare, PlayerSeat: seat}
+	}
+
 	legal := game.LegalCards(gs, seat)
 	c := legal[rng.IntN(len(legal))]
 	return game.Action{Type: game.ActionPlayCard, PlayerSeat: seat, Card: &c}
@@ -209,7 +216,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 			[4]uint{0, 0, 0, 0},
 			[4]string{"", "", "", ""},
 			[4]bool{true, true, true, true},
-			game.VariantCroatia, "1001", 1, true, false, true, false,
+			game.VariantCroatia, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick,
 		)
 		require.Equal(t, game.DeclarationTimingDedicatedPhase, gs.Rules.DeclarationTiming)
 		mem := bot.NewMemory()
@@ -248,7 +255,7 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 			}
 		}
 
-		_, _ = playOneHandWith(t, gs, mem, rng, croatianBotDriver, observe)
+		_, _ = playOneHandWith(t, gs, mem, rng, allBotsDriver, observe)
 
 		if enteredPhase {
 			require.Len(t, answered, 4, "the phase opened, so every seat answered exactly once")
@@ -264,29 +271,76 @@ func TestSimulation_CroatianHandWithBotSeats(t *testing.T) {
 	forced := testfixtures.NewGameCroatianMidBidding(3)
 	require.True(t, game.MustPickTrump(forced, forced.ActivePlayerSeat),
 		"the tail fixture must be the state where the dealer has no legal pass")
-	_, _ = playOneHandWith(t, forced, bot.NewMemory(), rng, croatianBotDriver, tailObserver)
+	_, _ = playOneHandWith(t, forced, bot.NewMemory(), rng, allBotsDriver, tailObserver)
 	assert.Greater(t, sawForcedPick, forcedBefore,
 		"the deterministic tail hand must have gone through the forced dealer pick")
 }
 
-// croatianBotDriver plays every seat with bot.Decide, with no substitutions.
-func croatianBotDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
+// allBotsDriver plays every seat with bot.Decide, with no substitutions.
+func allBotsDriver(gs *game.GameState, mem *bot.Memory, rng *rand.Rand) (int, game.Action) {
 	_ = rng
+	seat := actingSeat(gs)
+	return seat, bot.Decide(viewFromState(gs, seat, mem))
+}
 
-	seat := gs.ActivePlayerSeat
-	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
-		seat = *gs.PendingBelotSeat
-	}
-	if gs.Phase == game.PhaseDeclaring {
-		for s := range gs.Players {
-			if !gs.Players[s].DeclarationAnswered {
-				seat = s
-				break
+// TestSimulation_BitolaHandWithBotSeats plays full Bitola hands with bots in every seat under each declaration
+// window, checking that prompts and cycles stay inside the window and that every hand scores without a stall.
+func TestSimulation_BitolaHandWithBotSeats(t *testing.T) {
+	const handsPerWindow = 150
+	rng := rand.New(rand.NewPCG(7, 3))
+
+	for lastTrick := game.MinDeclarationLastTrick; lastTrick <= game.MaxDeclarationLastTrick; lastTrick++ {
+		cycles, prompts, scored := 0, 0, 0
+		for hand := 0; hand < handsPerWindow; hand++ {
+			gs := game.NewGame(
+				[4]uint{0, 0, 0, 0},
+				[4]string{"", "", "", ""},
+				[4]bool{true, true, true, true},
+				game.VariantBitola, "1001", 1, true, false, true, false, lastTrick,
+			)
+			require.Equal(t, game.DeclarationTimingTurnWindow, gs.Rules.DeclarationTiming)
+			require.Equal(t, lastTrick, gs.Rules.DeclarationLastTrick)
+
+			observe := func(t *testing.T, cur *game.GameState, seat int, action game.Action) {
+				switch {
+				case cur.Phase == game.PhaseDeclaring:
+					if cur.Players[cur.ActivePlayerSeat].DeclarationAnswered && answeredCount(cur) == 1 {
+						cycles++
+					}
+					require.GreaterOrEqual(t, cur.TrickNumber, 1, "the cycle opens mid-hand")
+					require.LessOrEqual(t, cur.TrickNumber, lastTrick, "and only inside the window")
+					require.True(t, cur.Players[cur.ActivePlayerSeat].DeclarationAnswered,
+						"the declarer is answered on entry")
+					require.False(t, cur.Players[seat].DeclarationAnswered, "seat %d is never asked twice", seat)
+					require.Contains(t, []string{game.ActionDeclare, game.ActionSkipDeclare}, action.Type)
+				case cur.Phase == game.PhasePlaying && cur.AwaitingDeclaration:
+					prompts++
+					require.LessOrEqual(t, cur.TrickNumber, lastTrick, "no prompt after the window")
+					require.False(t, cur.DeclarationsResolved, "no prompt after the resolution")
+					require.Equal(t, game.ActionDeclare, action.Type, "a bot declares at once at its prompt")
+				}
+			}
+
+			if _, ok := playOneHandWith(t, gs, bot.NewMemory(), rng, allBotsDriver, observe); ok {
+				scored++
 			}
 		}
+		t.Logf("window %d: %d prompts, %d cycles, %d/%d hands scored",
+			lastTrick, prompts, cycles, scored, handsPerWindow)
+		assert.Positive(t, cycles, "no hand ever opened a declaration cycle under window %d", lastTrick)
+		assert.Equal(t, prompts, cycles, "every bot prompt became a declaration and so a cycle")
+		assert.Positive(t, scored)
 	}
+}
 
-	return seat, bot.Decide(viewFromState(gs, seat, mem))
+func answeredCount(gs *game.GameState) int {
+	n := 0
+	for _, p := range gs.Players {
+		if p.DeclarationAnswered {
+			n++
+		}
+	}
+	return n
 }
 
 const (
@@ -299,13 +353,22 @@ func newBitolaGame() *game.GameState {
 		[4]uint{0, 0, 0, 0},
 		[4]string{"", "", "", ""},
 		[4]bool{true, true, true, true},
-		game.VariantBitola, "1001", 1, true, false, true, false,
+		game.VariantBitola, "1001", 1, true, false, true, false, game.DefaultDeclarationLastTrick,
 	)
 }
 
+// actingSeat is the seat the step drives: the Belote announcer, the first seat the declaring phase still waits on,
+// or the active seat.
 func actingSeat(gs *game.GameState) int {
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil {
 		return *gs.PendingBelotSeat
+	}
+	if gs.Phase == game.PhaseDeclaring {
+		for seat := range gs.Players {
+			if !gs.Players[seat].DeclarationAnswered {
+				return seat
+			}
+		}
 	}
 	return gs.ActivePlayerSeat
 }

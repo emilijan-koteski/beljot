@@ -12,7 +12,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui
 import { useFocusTrap } from "@/shared/hooks/useFocusTrap";
 import { variantLabel } from "@/shared/lib/roomLabels";
 import { Z } from "@/shared/lib/zLayers";
-import { normalizeVariant, type Variant, VARIANTS } from "@/shared/types/matchTypes";
+import {
+  DEFAULT_DECLARATION_LAST_TRICK,
+  normalizeVariant,
+  type Variant,
+  VARIANTS,
+} from "@/shared/types/matchTypes";
 
 import { ClassicActions } from "./overlay/ClassicActions";
 import { ClassicPanel } from "./overlay/ClassicPanel";
@@ -25,6 +30,7 @@ interface RulesDialogProps {
   stopAtTarget?: boolean;
   declarationsTransfer?: boolean;
   clockwise?: boolean;
+  declarationLastTrick?: number;
 }
 
 const RULES_PANEL_HEIGHT = 620;
@@ -39,6 +45,7 @@ export function RulesDialog({
   stopAtTarget,
   declarationsTransfer,
   clockwise,
+  declarationLastTrick,
 }: RulesDialogProps) {
   const { t, i18n } = useTranslation();
   const content = getRulesContent(i18n.language);
@@ -172,6 +179,15 @@ export function RulesDialog({
                           {t("match.rules.clockwiseNote")}
                         </TableRuleNote>
                       )}
+                      {declarationLastTrick !== undefined &&
+                        declarationLastTrick < DEFAULT_DECLARATION_LAST_TRICK && (
+                          <TableRuleNote
+                            testId="rules-dialog-declaration-window-note"
+                            icon={RULE_ICONS.declarationWindow}
+                          >
+                            {t("match.rules.declarationWindowNote", { n: declarationLastTrick })}
+                          </TableRuleNote>
+                        )}
                       {VARIANTS.map((v) => (
                         <TabsContent key={v} value={v}>
                           <RulesProvider value={{ content, variant: v, dense: true }}>

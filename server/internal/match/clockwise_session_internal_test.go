@@ -31,7 +31,7 @@ func TestStartMatch_CarriesClockwiseToTheEngineAndTheBotView(t *testing.T) {
 				const roomID = uint(140)
 				m := NewManager(&recordingBroadcaster{}, nil)
 				require.NoError(t, m.StartMatch(roomID, string(variant), "1001", players, "relaxed", 0, 10, 120, 0,
-					true, false, true, clockwise))
+					true, false, true, clockwise, 3))
 				t.Cleanup(func() { m.RemoveSession(roomID) })
 
 				gs := m.GetStateSnapshot(roomID)
