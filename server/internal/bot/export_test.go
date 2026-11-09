@@ -54,3 +54,31 @@ func DeferTrumpDrawForTest(v View, res search.Result, adjusted game.Card, t Sear
 func ChooseCardForTest(v View) game.Card {
 	return chooseCard(v)
 }
+
+func TrickContextOfForTest(v View) TrickContext {
+	return trickContextOf(v)
+}
+
+func BlindTenForTest(v View, c game.Card) bool {
+	return blindTen(v, c, trickContextOf(v))
+}
+
+func AvoidBlindTenForTest(v View, legal []game.Card, trump game.Suit, pick game.Card) game.Card {
+	return avoidBlindTen(v, legal, trump, pick)
+}
+
+func SuitAtRiskForTest(v View, suit game.Suit, trump game.Suit) bool {
+	return suitAtRisk(v, suit, trump)
+}
+
+func CashHighWinnerForTest(v View, c game.Card) bool {
+	return cashHighWinner(v, c, trickContextOf(v))
+}
+
+func ChooseSearchForTest(v View, t SearchTuning) (search.Result, bool) {
+	return chooseSearch(v, samplesFor(v.TrickNumber, t), time.Now().Add(time.Hour), t, trumpDrawClass(v, t))
+}
+
+func BidConsistentForTest(v View) func(hands [4]uint32) bool {
+	return bidConsistent(v)
+}

@@ -152,7 +152,7 @@ func TestDefaultBotSearchSettings(t *testing.T) {
 	assert.GreaterOrEqual(t, s.Workers, 1)
 	assert.LessOrEqual(t, s.Workers, 4)
 	assert.Equal(t, 500*time.Millisecond, s.Deadline)
-	assert.Equal(t, 3, s.FromTrick)
+	assert.Equal(t, 1, s.FromTrick)
 }
 
 func TestBuildBotViewCarriesDeclarationsEnabled(t *testing.T) {
@@ -174,4 +174,119 @@ func TestBuildBotViewCarriesDeclarationsEnabled(t *testing.T) {
 			assert.Equal(t, tt.want, mgr.BuildBotViewForTest(searchRoomID, searchBotSeat).DeclarationsEnabled)
 		})
 	}
+}
+
+// newBeloteMatch starts a Bitola match in which the bot of the calling team has just led the Queen of trump at trick 5,
+// holding the King, with the opponents far ahead; no think delay is armed yet.
+func newBeloteMatch(t *testing.T, tuning bot.SearchTuning, settings match.BotSearchSettings, thinkDelay time.Duration) (*match.Manager, bot.View) {
+	t.Helper()
+	mgr := match.NewManager(&hubSpy{}, newMockMatchRepo())
+	mgr.SetDealGraceForTest(false)
+	mgr.SetBotSearchForTest(settings)
+	mgr.SetBotTuningForTest(tuning)
+	mgr.SetBotDelayForTest(thinkDelay, thinkDelay)
+	require.NoError(t, mgr.StartMatch(searchRoomID, "bitola", "1001", mixedPlayers(searchBotSeat), "relaxed", 0, 10, 120, 0, true, false, true, false))
+	t.Cleanup(func() { mgr.RemoveSession(searchRoomID) })
+
+	gs := markBots(testfixtures.NewGameMidPlay(5), searchBotSeat)
+	queen := game.Card{Rank: game.RankQueen, Suit: game.SuitHearts}
+	require.True(t, slices.Contains(gs.Players[searchBotSeat].Hand, queen))
+	gs.Players[searchBotSeat].Hand = slices.DeleteFunc(slices.Clone(gs.Players[searchBotSeat].Hand), func(c game.Card) bool { return c == queen })
+	caller, pending, lead := searchBotSeat, searchBotSeat, game.SuitHearts
+	gs.TrumpCallerSeat = &caller
+	gs.PendingBelotSeat = &pending
+	gs.BelotAnnounced = false
+	gs.CurrentTrick = []game.TrickCard{{Card: queen, PlayerSeat: searchBotSeat}}
+	gs.LeadSuit = &lead
+	gs.ActivePlayerSeat = searchBotSeat
+	gs.HandPoints, gs.TricksWon = [2]int{0, 120}, [2]int{0, 4}
+	require.True(t, gs.Rules.DeclarationsTransfer)
+	mgr.SetGameStateForTest(searchRoomID, gs)
+	mgr.CancelBotTimersForTest(searchRoomID)
+	mgr.RecordBotPlaysForTest(searchRoomID, cardsOutOfPlay(gs))
+
+	view := mgr.BuildBotViewForTest(searchRoomID, searchBotSeat)
+	require.True(t, view.PendingBelot)
+	return mgr, view
+}
+
+func beloteSkipTuning() bot.SearchTuning {
+	t := bot.DefaultSearchTuning()
+	t.BeloteSkipMargin = 5
+	return t
+}
+
+func awaitBeloteAnswer(t *testing.T, mgr *match.Manager) *game.GameState {
+	t.Helper()
+	var st *game.GameState
+	require.True(t, waitFor(10*time.Second, func() bool {
+		st = mgr.GetStateSnapshot(searchRoomID)
+		return st != nil && st.PendingBelotSeat == nil
+	}), "the bot must answer the Belote")
+	return st
+}
+
+func TestBotSearchAnswersTheCallersBelote(t *testing.T) {
+	tuning := beloteSkipTuning()
+	mgr, view := newBeloteMatch(t, tuning, match.BotSearchSettings{Workers: 1, Deadline: 10 * time.Second, FromTrick: 1}, time.Second)
+	announce, ok := bot.BeloteAnswerWith(view, time.Now().Add(10*time.Second), tuning)
+	require.True(t, ok)
+	require.False(t, announce, "the fixture must skip")
+
+	mgr.BotSchedule(searchRoomID)
+
+	require.True(t, waitFor(5*time.Second, func() bool { return mgr.BotSearchResultForTest(searchRoomID, searchBotSeat) != nil }),
+		"the Belote search must store its answer before the think delay ends")
+	assert.Equal(t, bot.SearchResult{BeloteSkip: true}, *mgr.BotSearchResultForTest(searchRoomID, searchBotSeat))
+
+	st := awaitBeloteAnswer(t, mgr)
+	assert.False(t, st.BelotAnnounced)
+	assert.Zero(t, st.BelotPoints[game.TeamA])
+	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "acting consumes the answer")
+}
+
+func TestBotSearchDropsAStaleBeloteAnswer(t *testing.T) {
+	mgr, _ := newBeloteMatch(t, beloteSkipTuning(), match.BotSearchSettings{FromTrick: 0}, 300*time.Millisecond)
+
+	mgr.BotSchedule(searchRoomID)
+	mgr.StoreBotSearchResultForTest(searchRoomID, searchBotSeat, 1<<40, bot.SearchResult{BeloteSkip: true})
+
+	st := awaitBeloteAnswer(t, mgr)
+	assert.True(t, st.BelotAnnounced, "a stale skip is ignored and the bot announces")
+	assert.Equal(t, 20, st.BelotPoints[game.TeamA])
+	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "a stale answer is cleared when the timer fires")
+}
+
+func TestBotSearchDropsABeloteJobFinishedAfterTheBotActed(t *testing.T) {
+	logs := captureLogs(t)
+	mgr, _ := newBeloteMatch(t, beloteSkipTuning(), match.BotSearchSettings{Workers: 1, Deadline: 10 * time.Second, FromTrick: 1}, time.Millisecond)
+	release := mgr.HoldBotSearchPoolForTest()
+
+	mgr.BotSchedule(searchRoomID)
+	st := awaitBeloteAnswer(t, mgr)
+	assert.True(t, st.BelotAnnounced, "with the job still queued the bot announces at the end of its delay")
+
+	drained := mgr.BotSearchesDrainedForTest()
+	release()
+	select {
+	case <-drained:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the queued Belote job must run")
+	}
+	assert.Len(t, logs.matched(searchRoomID, "bot: stale search result dropped"), 1, "the job ran and its store was refused")
+	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat), "the late skip is dropped when it is stored")
+	assert.True(t, mgr.GetStateSnapshot(searchRoomID).BelotAnnounced)
+}
+
+func TestBotBeloteWithoutASkipMarginQueuesNoSearch(t *testing.T) {
+	mgr, _ := newBeloteMatch(t, bot.DefaultSearchTuning(), match.BotSearchSettings{Workers: 1, Deadline: 10 * time.Second, FromTrick: 1}, time.Second)
+	mgr.SetBotDelayForTest(time.Second, 2*time.Second)
+	started := time.Now()
+
+	mgr.BotSchedule(searchRoomID)
+
+	st := awaitBeloteAnswer(t, mgr)
+	assert.Less(t, time.Since(started), time.Second, "the Belote beat stays")
+	assert.True(t, st.BelotAnnounced)
+	assert.Nil(t, mgr.BotSearchResultForTest(searchRoomID, searchBotSeat))
 }

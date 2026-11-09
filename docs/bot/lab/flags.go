@@ -7,6 +7,8 @@ import (
 	"github.com/emilijan/beljot/server/internal/bot"
 )
 
+const hardVeto = 10_000
+
 // Flags switch experimental rule variants on in the lab bot.
 type Flags struct {
 	set  map[string]bool
@@ -14,6 +16,9 @@ type Flags struct {
 }
 
 func (f Flags) On(name string) bool { return f.set[name] }
+
+// ClearsBounds reports whether the policy plays without the rank bounds: noBounds, or phase3 whose bot had none.
+func (f Flags) ClearsBounds() bool { return f.On("noBounds") || f.On("phase3") }
 
 func ParseFlags(list string) Flags {
 	f := Flags{set: map[string]bool{}, Text: list}
@@ -45,6 +50,14 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t = bot.SearchTuning{}
 		t.SampleCaps[3], t.SampleCaps[4], t.SampleCaps[5] = 16, 30, 40
 	}
+	if f.On("phase3") {
+		t.OpeningSamples = 0
+		t.BlindTenPenalty = 0
+		t.CashHighWinnerBonus = 0
+		t.DecidingHand = false
+		t.BeloteSkipMargin = 0
+		t.BidConsistency = false
+	}
 	switch {
 	case f.On("defTrump3"):
 		t.DefenderTrumpLeadBonus = 3
@@ -52,10 +65,38 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t.DefenderTrumpLeadBonus = 10
 	}
 	if f.On("defTrumpVeto") {
-		t.DefenderTrumpLeadBonus = bot.DefenderTrumpLeadVeto
+		t.DefenderTrumpLeadBonus = bot.ConventionVeto
 	}
 	if f.On("noDefTrump") {
 		t.DefenderTrumpLeadBonus = 0
+	}
+	switch {
+	case f.On("blindTen3"):
+		t.BlindTenPenalty = 3
+	case f.On("blindTen10"):
+		t.BlindTenPenalty = 10
+	}
+	if f.On("blindTenVeto") {
+		t.BlindTenPenalty = bot.ConventionVeto
+	}
+	if f.On("noBlindTen") {
+		t.BlindTenPenalty = 0
+	}
+	switch {
+	case f.On("cashHigh3"):
+		t.CashHighWinnerBonus = 3
+	case f.On("cashHigh10"):
+		t.CashHighWinnerBonus = 10
+	}
+	if f.On("cashHighVeto") {
+		t.CashHighWinnerBonus = bot.ConventionVeto
+	}
+	if f.On("noCashHigh") {
+		t.CashHighWinnerBonus = 0
+	}
+	if f.On("hardVeto") {
+		t.BlindTenPenalty = hardVeto
+		t.CashHighWinnerBonus = hardVeto
 	}
 	if f.On("tenUnder3") {
 		t.TenUnderAceBonus = 3
@@ -81,6 +122,12 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	if f.On("noRace") {
 		t.RaceObjective = false
 	}
+	if f.On("deciding") {
+		t.DecidingHand = true
+	}
+	if f.On("noDeciding") {
+		t.DecidingHand = false
+	}
 	if f.On("opening12") {
 		t.OpeningSamples = 12
 	}
@@ -92,6 +139,18 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noCaps") {
 		t.SampleCaps = [9]int{}
+	}
+	if f.On("beloteGate5") {
+		t.BeloteSkipMargin = 5
+	}
+	if f.On("noBeloteGate") {
+		t.BeloteSkipMargin = 0
+	}
+	if f.On("bidInfer") {
+		t.BidConsistency = true
+	}
+	if f.On("noBidInfer") {
+		t.BidConsistency = false
 	}
 	return t
 }

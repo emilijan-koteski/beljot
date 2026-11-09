@@ -39,9 +39,13 @@ func profileSuit(hand []game.Card, suit game.Suit) suitProfile {
 }
 
 // matchesBidTable reports whether the bid hand fits one of the simulation-calibrated shapes for calling
-// suit. Row 4 is retired; rows 7 to 11 need a face-up candidate, row 12 a candidate-less variant.
+// suit. Row 4 is retired; rows 7, 8, 9, 11 and 13 need a face-up candidate, row 12 a candidate-less variant.
 func matchesBidTable(hand []game.Card, suit game.Suit, hasCandidate bool, pos int) bool {
-	p := profileSuit(hand, suit)
+	return profileMatchesBidTable(profileSuit(hand, suit), hasCandidate, pos)
+}
+
+// profileMatchesBidTable is matchesBidTable on a hand already reduced to its profile for the suit.
+func profileMatchesBidTable(p suitProfile, hasCandidate bool, pos int) bool {
 	return p.jack && p.nine ||
 		p.jack && p.count >= 3 ||
 		p.count >= 4 && p.nine ||
@@ -50,9 +54,10 @@ func matchesBidTable(hand []game.Card, suit game.Suit, hasCandidate bool, pos in
 		hasCandidate && p.nine && p.ace && p.count == 3 && p.sideAces >= 1 ||
 		hasCandidate && p.jack && p.ace && p.count == 2 && p.sideAces >= 1 ||
 		hasCandidate && p.jack && p.count == 2 && p.sideAces >= 2 ||
-		hasCandidate && p.nine && !p.jack && !p.ace && p.count == 3 && p.sideAces >= 1 ||
-		hasCandidate && pos == 2 && p.jack && p.count == 2 && p.sideAces >= 1 ||
-		!hasCandidate && pos == 1 && p.jack && p.count == 2 && p.sideAces >= 1
+		p.nine && !p.jack && !p.ace && p.count == 3 && p.sideAces >= 1 ||
+		hasCandidate && (pos == 1 || pos == 2) && p.jack && p.count == 2 && p.sideAces >= 1 ||
+		!hasCandidate && pos == 1 && p.jack && p.count == 2 && p.sideAces >= 1 ||
+		hasCandidate && p.ace && !p.jack && !p.nine && p.count == 4 && p.sideAces == 0
 }
 
 // trumpSuitScore ranks a suit among those that match the table: trump-order card points plus a

@@ -277,6 +277,25 @@ func (m *Manager) SetBotSearchForTest(s BotSearchSettings) {
 	m.SetBotSearch(s)
 }
 
+// SetBotTuningForTest replaces the search tuning the bots play under.
+func (m *Manager) SetBotTuningForTest(t bot.SearchTuning) {
+	m.botTuning = t
+}
+
+// HoldBotSearchPoolForTest occupies one search worker until release is called, so jobs queued meanwhile wait.
+func (m *Manager) HoldBotSearchPoolForTest() (release func()) {
+	gate := make(chan struct{})
+	m.searchPool.submit(func() { <-gate })
+	return func() { close(gate) }
+}
+
+// BotSearchesDrainedForTest is closed once every search job queued before the call has run, on a one-worker pool.
+func (m *Manager) BotSearchesDrainedForTest() <-chan struct{} {
+	done := make(chan struct{})
+	m.searchPool.submit(func() { close(done) })
+	return done
+}
+
 // BotSearchResultForTest returns a copy of the search result stored for the seat, or nil when there is none.
 func (m *Manager) BotSearchResultForTest(roomID uint, seat int) *bot.SearchResult {
 	m.mu.RLock()
@@ -355,8 +374,22 @@ func (m *Manager) RecordBotPlaysForTest(roomID uint, cards []game.Card) {
 		return
 	}
 	for _, c := range cards {
-		lm.botMemory.ObservePlay(0, c, nil, lm.gameState.TrumpSuit)
+		lm.botMemory.ObservePlay(0, c, nil, lm.gameState.TrumpSuit, nil)
 	}
 }
 
 var errNoSession = errors.New("match: no live session for room")
+
+// RecordBotSearchForTest counts one submitted bot search at the given trick, and its miss when missed is set.
+func (m *Manager) RecordBotSearchForTest(roomID uint, trick int, missed bool) {
+	m.mu.RLock()
+	lm, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return
+	}
+	lm.botSearchStats.noteSubmitted()
+	if missed {
+		lm.botSearchStats.noteMissed(trick)
+	}
+}

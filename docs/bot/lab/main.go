@@ -18,17 +18,24 @@ import (
 )
 
 var (
-	exp     = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability")
-	polA    = flag.String("a", "current", "policy A")
-	polB    = flag.String("b", "random", "policy B")
-	n       = flag.Int("n", 200, "deals")
-	seed    = flag.Uint64("seed", 1, "seed")
-	variant = flag.String("variant", "bitola", "bitola|croatia")
-	flagsA  = flag.String("flagsA", "", "lab flags for A (comma list)")
-	flagsB  = flag.String("flagsB", "", "lab flags for B (comma list)")
-	workers = flag.Int("workers", runtime.NumCPU(), "parallel workers")
-	seeds   = flag.Int("seeds", 5, "seed salts per position for stability")
-	csvOut  = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	exp          = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability|bidpos|bidscore|shapecheck|classcheck")
+	polA         = flag.String("a", "current", "policy A")
+	polB         = flag.String("b", "random", "policy B")
+	n            = flag.Int("n", 200, "deals")
+	seed         = flag.Uint64("seed", 1, "seed")
+	variant      = flag.String("variant", "bitola", "bitola|croatia")
+	flagsA       = flag.String("flagsA", "", "lab flags for A (comma list)")
+	flagsB       = flag.String("flagsB", "", "lab flags for B (comma list)")
+	workers      = flag.Int("workers", runtime.NumCPU(), "parallel workers")
+	seeds        = flag.Int("seeds", 5, "seed salts per position for stability")
+	csvOut       = flag.String("csv", "bidpos.csv", "csv output for bidpos")
+	events       = flag.Bool("events", false, "duplicate: count table events per policy")
+	scoreState   = flag.String("scoreState", "oppClose", "bidscore: oppClose|ownClose|bothClose|neither")
+	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
+	oppSpec      = flag.String("opp", "", "duplicate: policy for seats 1/3 in both games; A and B alternate on seats 0/2 (uses flagsB)")
+	transfer     = flag.String("transfer", "on", "duplicate: on|off, the lab room's declarations-on-a-fall rule")
+	classSpec    = flag.String("class", "", "bidscore: below|table|core|edge, test the first seat of the natural auction whose position is in this hand class")
+	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
 func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
@@ -44,26 +51,37 @@ func makePolicy(name string, rng *rand.Rand, labFlags string) botlab.Policy {
 	case name == "shipped" || strings.HasPrefix(name, "shipped:"):
 		from := 3
 		if t, ok := strings.CutPrefix(name, "shipped:"); ok {
-			from, _ = strconv.Atoi(t)
+			from = policyNumber(name, t)
 		}
 		return botlab.NewShippedBot(from, botlab.ParseFlags(labFlags))
+	case name == "human":
+		return &botlab.HumanBidder{Inner: botlab.NewShippedBot(3, botlab.ParseFlags(labFlags)), Rng: rng}
 	case strings.HasPrefix(name, "pimcs:"):
 		var sched []int
 		for _, part := range strings.Split(strings.TrimPrefix(name, "pimcs:"), ",") {
-			k, _ := strconv.Atoi(part)
+			k := policyNumber(name, part)
 			sched = append(sched, k)
 		}
 		return &botlab.PIMC{Samples: sched[0], Schedule: sched, Rng: rng, Fallback: botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}, Label: name + "[" + labFlags + "]"}
 	case strings.HasPrefix(name, "pimc:"):
 		parts := strings.Split(strings.TrimPrefix(name, "pimc:"), ":")
-		k, _ := strconv.Atoi(parts[0])
+		k := policyNumber(name, parts[0])
 		from := 1
 		if len(parts) > 1 {
-			from, _ = strconv.Atoi(parts[1])
+			from = policyNumber(name, parts[1])
 		}
 		return &botlab.PIMC{Samples: k, FromTrick: from, Rng: rng, Fallback: botlab.LabBot{Flags: botlab.ParseFlags(labFlags)}, Label: name + "[" + labFlags + "]"}
 	}
 	panic("unknown policy " + name)
+}
+
+// policyNumber parses a number in a policy name, panicking on anything else so a typo cannot run a default.
+func policyNumber(name, text string) int {
+	k, err := strconv.Atoi(text)
+	if err != nil {
+		panic(fmt.Sprintf("bad number %q in policy %s", text, name))
+	}
+	return k
 }
 
 func main() {
@@ -89,8 +107,14 @@ func main() {
 		bidtable(v)
 	case "stability":
 		stability(v)
+	case "bidscore":
+		bidscore(v)
 	case "bidpos":
 		bidpos(v, *csvOut)
+	case "shapecheck":
+		shapecheck(v)
+	case "classcheck":
+		classcheck(v)
 	default:
 		fmt.Println("unknown exp")
 		os.Exit(1)
@@ -244,10 +268,10 @@ func (s *stat) se() float64 {
 }
 
 type dupResult struct {
-	pair                                     stat
-	aCalls, aCallWins, bCalls, bCallWins     int
+	pair                                       stat
+	aCalls, aCallWins, bCalls, bCallWins       int
 	passed, played, aPts, bPts, aFails, bFails int
-	aDecl, bDecl                             int
+	aDecl, bDecl                               int
 }
 
 func (r *dupResult) merge(o *dupResult) {
@@ -274,20 +298,24 @@ func addCounts(total *botlab.Counts, p botlab.Policy) bool {
 	total.Decided += got.Decided
 	total.Deferred += got.Deferred
 	total.DefenderTrumpLeads += got.DefenderTrumpLeads
+	total.BeloteSearches += got.BeloteSearches
+	total.BeloteSkips += got.BeloteSkips
+	total.Failed += got.Failed
 	return true
 }
 
 func printCounts(side string, c botlab.Counts) {
-	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d\n",
-		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads)
+	fmt.Printf("  %s counts: applied %d, decided %d, deferred %d, defender trump leads %d, belote searches %d, belote skips %d, failed %d\n",
+		side, c.Applied, c.Decided, c.Deferred, c.DefenderTrumpLeads, c.BeloteSearches, c.BeloteSkips, c.Failed)
 }
 
 func duplicate(v game.Variant) {
 	t0 := time.Now()
 	deals := make([]botlab.Deal, *n)
 	rng := rand.New(rand.NewPCG(*seed, 4))
+	shapeFor := shapeFilter()
 	for i := range deals {
-		deals[i] = botlab.RandomDeal(rng)
+		deals[i] = mustTargetedDeal(rng, v, shapeFor, nil, nil)
 	}
 	results := make([]dupResult, *workers)
 	var wg sync.WaitGroup
@@ -301,18 +329,28 @@ func duplicate(v game.Variant) {
 	var nameA, nameB string
 	var countsA, countsB botlab.Counts
 	var countingA, countingB bool
+	var eventsA, eventsB botlab.EventTally
 	for w := 0; w < *workers; w++ {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
 			A := makePolicy(*polA, rand.New(rand.NewPCG(*seed, uint64(100+w))), *flagsA)
 			B := makePolicy(*polB, rand.New(rand.NewPCG(*seed, uint64(200+w))), *flagsB)
+			oppSource := rand.NewPCG(*seed, uint64(300+w))
+			var opp botlab.Policy
+			if *oppSpec != "" {
+				opp = makePolicy(*oppSpec, rand.New(oppSource), *flagsB)
+			}
+			recA, recB := botlab.NewEventRecorder(A.Name()), botlab.NewEventRecorder(B.Name())
 			if w == 0 {
 				nameA, nameB = A.Name(), B.Name()
 			}
 			defer func() {
 				countsMu.Lock()
 				defer countsMu.Unlock()
+				tallyA, tallyB := recA.Tally(), recB.Tally()
+				eventsA.Merge(&tallyA)
+				eventsB.Merge(&tallyB)
 				countingA = addCounts(&countsA, A) || countingA
 				countingB = addCounts(&countsB, B) || countingB
 			}()
@@ -321,19 +359,42 @@ func duplicate(v game.Variant) {
 				deal := deals[i]
 				total := 0.0
 				for g := 0; g < 2; g++ {
+					oppSource.Seed(*seed, uint64(i))
 					var pol [4]botlab.Policy
 					for s := 0; s < 4; s++ {
-						if (s+g)%2 == 0 {
+						switch {
+						case opp != nil && s%2 == 1:
+							pol[s] = opp
+						case opp != nil && g == 0, opp == nil && (s+g)%2 == 0:
 							pol[s] = A
-						} else {
+						default:
 							pol[s] = B
 						}
 					}
 					gs := botlab.NewDealState(deal, v)
-					out, err := botlab.PlayHand(gs, pol, nil)
+					if *transfer == "off" {
+						gs.Rules.DeclarationsTransfer = false
+						gs.DeclarationsTransfer = false
+					}
+					var hook botlab.PlayHook
+					if *events {
+						if opp != nil {
+							recA.SetSeats(oppSeatsOf(g, 0))
+							recB.SetSeats(oppSeatsOf(g, 1))
+						} else {
+							recA.SetSeats(seatsOf(g, 0))
+							recB.SetSeats(seatsOf(g, 1))
+						}
+						hook = chainHooks(recA.Hook(), recB.Hook())
+					}
+					out, err := botlab.PlayHand(gs, pol, hook)
 					if err != nil {
 						fmt.Println("error:", err)
 						os.Exit(1)
+					}
+					if *events {
+						recA.FinishHand(out, gs)
+						recB.FinishHand(out, gs)
 					}
 					if out.Status != botlab.HandScored {
 						res.passed++
@@ -341,6 +402,10 @@ func duplicate(v game.Variant) {
 					}
 					res.played++
 					a, b := botlab.Award(out)
+					if opp != nil {
+						scoreAgainstOpp(res, out, g, a, b, &total)
+						continue
+					}
 					aTeam := g % 2
 					if aTeam == 0 {
 						total += float64(a - b)
@@ -382,6 +447,55 @@ func duplicate(v game.Variant) {
 	}
 	if countingB {
 		printCounts("B", countsB)
+	}
+	if *events {
+		fmt.Println("  " + eventsA.Line("A"))
+		fmt.Println("  " + eventsB.Line("B"))
+	}
+}
+
+func scoreAgainstOpp(res *dupResult, out botlab.HandOutcome, g, a, b int, total *float64) {
+	if g == 0 {
+		*total += float64(a - b)
+		res.aPts += a
+	} else {
+		*total -= float64(a - b)
+		res.bPts += a
+	}
+	if out.Caller%2 != 0 {
+		return
+	}
+	calls, wins := &res.aCalls, &res.aCallWins
+	if g == 1 {
+		calls, wins = &res.bCalls, &res.bCallWins
+	}
+	*calls++
+	if !out.Score.FailedContract {
+		*wins++
+	}
+}
+
+func oppSeatsOf(g, side int) [4]bool {
+	var seats [4]bool
+	if g == side {
+		seats[0], seats[2] = true, true
+	}
+	return seats
+}
+
+func seatsOf(g, side int) [4]bool {
+	var seats [4]bool
+	for s := range seats {
+		seats[s] = (s+g)%2 == side
+	}
+	return seats
+}
+
+func chainHooks(hooks ...botlab.PlayHook) botlab.PlayHook {
+	return func(gs *game.GameState, seat int, action game.Action, v botlab.View) {
+		for _, h := range hooks {
+			h(gs, seat, action, v)
+		}
 	}
 }
 

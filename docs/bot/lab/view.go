@@ -1,6 +1,9 @@
 package botlab
 
-import "github.com/emilijan/beljot/server/internal/game"
+import (
+	"github.com/emilijan/beljot/server/internal/bot"
+	"github.com/emilijan/beljot/server/internal/game"
+)
 
 // View is the redacted, seat-local projection of the game state handed to Decide.
 // It carries only what a human player in that seat could know.
@@ -34,8 +37,10 @@ type View struct {
 	TricksWon  [2]int
 
 	PlayedCards []game.Card
+	PlayedBy    [4][]game.Card
 	KnownVoids  [4][4]bool
 	KnownCards  [4][]game.Card
+	Bids        []bot.BidRecord
 
 	DeclaredCards [4][]game.Card
 
@@ -49,9 +54,10 @@ type View struct {
 
 	DeclPoints          [2]int
 	KnownVoidsWithTrump [4][4]bool
-	BidRound   int
-	Passed     [4]PassInfo
-	ForcedCall bool
+	RankBounds          [4][4]int
+	BidRound            int
+	Passed              [4]PassInfo
+	ForcedCall          bool
 }
 
 // PassInfo records what a seat refused during bidding: the candidate suit (round 1) and/or every other suit (round 2 / free bidding).

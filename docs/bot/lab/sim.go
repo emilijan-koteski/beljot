@@ -23,7 +23,7 @@ type StateAware interface {
 // CheatBot plays the double-dummy optimum of the actual deal: an upper bound, never fair.
 type CheatBot struct{ Fallback Policy }
 
-func (CheatBot) Name() string             { return "cheat" }
+func (CheatBot) Name() string                { return "cheat" }
 func (c CheatBot) Decide(v View) game.Action { return c.Fallback.Decide(v) }
 func (c CheatBot) DecideState(gs *game.GameState, seat int, v View) game.Action {
 	if gs.Phase != game.PhasePlaying || gs.PendingBelotSeat != nil || gs.AwaitingDeclaration || len(v.LegalCards) <= 1 {
@@ -64,10 +64,10 @@ func toBotView(v View) bot.View {
 		DealerSeat: v.DealerSeat, MustPickTrump: v.MustPickTrump, CurrentTrick: v.CurrentTrick, LeadSuit: v.LeadSuit,
 		ActivePlayerSeat: v.ActivePlayerSeat, AwaitingDeclaration: v.AwaitingDeclaration, HasDeclarations: v.HasDeclarations,
 		PendingBelot: v.PendingBelot, PartnerProposedSurrender: v.PartnerProposedSurrender, TeamScores: v.TeamScores,
-		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
+		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, PlayedBy: v.PlayedBy, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
-		DeclarationsEnabled: v.DeclarationsEnabled,
+		DeclarationsEnabled: v.DeclarationsEnabled, RankBounds: v.RankBounds, Bids: v.Bids,
 	}
 }
 
@@ -223,6 +223,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
+		RankBounds:           bot.NoRankBounds(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -233,10 +234,13 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
+		v.PlayedBy = mem.PlayedBy()
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownVoidsWithTrump = mem.KnownVoidsWithTrump()
+		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
+		v.Bids = mem.Bids()
 	}
 	v.DeclPoints = [2]int{gs.DeclarationPoints[0] + gs.BelotPoints[0], gs.DeclarationPoints[1] + gs.BelotPoints[1]}
 	v.BidRound = gs.BiddingRound
@@ -286,7 +290,21 @@ type HandOutcome struct {
 
 // PlayHand drives one deal to a scored hand with the given seat policies.
 func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, error) {
+	return PlayHandFrom(gs, pol, hook, NewMemory())
+}
+
+// MemoryAfterForcedPick is the memory a hand played on after a pick applied outside PlayHand starts with: the
+// candidate card, when there was one, is known to sit with the caller.
+func MemoryAfterForcedPick(candidate *game.Card, seat int) *Memory {
 	mem := NewMemory()
+	if candidate != nil {
+		mem.ObserveCandidate(seat, *candidate)
+	}
+	return mem
+}
+
+// PlayHandFrom is PlayHand starting from the given memory.
+func PlayHandFrom(gs *game.GameState, pol [4]Policy, hook PlayHook, mem *Memory) (HandOutcome, error) {
 	for steps := 0; steps < 600; steps++ {
 		switch gs.Phase {
 		case game.PhaseDealing:
@@ -301,6 +319,7 @@ func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, er
 				return HandOutcome{Status: HandPassedOut}, nil
 			}
 			cand := gs.TrumpCandidate
+			mem.ObserveBid(seat, action, cand, gs.BiddingRound, gs.BiddingPassCount)
 			next, err := game.ApplyAction(gs, action)
 			if err != nil {
 				return HandOutcome{}, fmt.Errorf("bidding seat %d %s: %w", seat, action.Type, err)
@@ -343,12 +362,13 @@ func PlayHand(gs *game.GameState, pol [4]Policy, hook PlayHook) (HandOutcome, er
 				hook(gs, seat, action, v)
 			}
 			oldLead := gs.LeadSuit
+			oldTrick := slices.Clone(gs.CurrentTrick)
 			next, err := game.ApplyAction(gs, action)
 			if err != nil {
 				return HandOutcome{}, fmt.Errorf("playing seat %d %s %v: %w", seat, action.Type, action.Card, err)
 			}
 			if action.Type == game.ActionPlayCard {
-				mem.ObservePlay(seat, *action.Card, oldLead)
+				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit, oldTrick)
 				mem.ObserveDiscard(seat, *action.Card, oldLead, gs.TrumpSuit)
 			}
 			if action.Type == game.ActionAnnounceBelot && next.TrumpSuit != nil {

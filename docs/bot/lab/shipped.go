@@ -11,8 +11,9 @@ import (
 
 const noDeadline = 24 * time.Hour
 
-// Counts tallies what a search policy did over a run.
-type Counts struct{ Applied, Decided, Deferred, DefenderTrumpLeads int64 }
+// Counts tallies what a search policy did over a run: Applied splits into Decided, Deferred and Failed, the searches
+// that reached no decision before the deadline or found no deal.
+type Counts struct{ Applied, Decided, Deferred, DefenderTrumpLeads, BeloteSearches, BeloteSkips, Failed int64 }
 
 // Counting is implemented by policies that report Counts.
 type Counting interface{ Counts() Counts }
@@ -24,7 +25,7 @@ type ShippedBot struct {
 	Deadline  time.Duration
 	Flags     Flags
 
-	applied, decided, deferred, defenderTrumpLeads atomic.Int64
+	applied, decided, deferred, defenderTrumpLeads, beloteSearches, beloteSkips, failed atomic.Int64
 }
 
 // NewShippedBot builds a ShippedBot whose tuning comes from the flags and whose deadline is unlimited.
@@ -42,21 +43,27 @@ func (s *ShippedBot) Counts() Counts {
 		Decided:            s.decided.Load(),
 		Deferred:           s.deferred.Load(),
 		DefenderTrumpLeads: s.defenderTrumpLeads.Load(),
+		BeloteSearches:     s.beloteSearches.Load(),
+		BeloteSkips:        s.beloteSkips.Load(),
+		Failed:             s.failed.Load(),
 	}
 }
 
 func (s *ShippedBot) Decide(v View) game.Action {
 	bv := toBotView(v)
+	if s.Flags.ClearsBounds() {
+		bv.RankBounds = bot.NoRankBounds()
+	}
+	if bv.PendingBelot {
+		return s.answerBelote(bv)
+	}
 	if !bot.SearchAppliesWith(bv, s.FromTrick, s.Tuning) {
 		return bot.Decide(bv)
 	}
 	s.applied.Add(1)
-	wait := s.Deadline
-	if wait <= 0 {
-		wait = noDeadline
-	}
-	res, ok := bot.SearchCardWith(bv, time.Now().Add(wait), s.Tuning)
+	res, ok := bot.SearchCardWith(bv, s.deadline(), s.Tuning)
 	if !ok {
+		s.failed.Add(1)
 		return bot.Decide(bv)
 	}
 	if res.Deferred {
@@ -68,6 +75,28 @@ func (s *ShippedBot) Decide(v View) game.Action {
 		s.defenderTrumpLeads.Add(1)
 	}
 	return bot.DecideWith(bv, &res)
+}
+
+func (s *ShippedBot) deadline() time.Time {
+	wait := s.Deadline
+	if wait <= 0 {
+		wait = noDeadline
+	}
+	return time.Now().Add(wait)
+}
+
+// answerBelote answers the seat's own Belote through bot.BeloteAnswerWith and bot.DecideWith, as the driver does.
+func (s *ShippedBot) answerBelote(bv bot.View) game.Action {
+	if bv.TrickNumber < s.FromTrick || !bot.BeloteSearchApplies(bv, s.Tuning) {
+		return bot.Decide(bv)
+	}
+	s.beloteSearches.Add(1)
+	announce, ok := bot.BeloteAnswerWith(bv, s.deadline(), s.Tuning)
+	if !ok || announce {
+		return bot.Decide(bv)
+	}
+	s.beloteSkips.Add(1)
+	return bot.DecideWith(bv, &bot.SearchResult{BeloteSkip: true})
 }
 
 func isDefenderTrumpLead(v bot.View, card game.Card) bool {

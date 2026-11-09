@@ -86,12 +86,17 @@ func playOneHandWith(
 				observe(t, gs, seat, action)
 			}
 			oldLead := gs.LeadSuit
+			oldTrick := slices.Clone(gs.CurrentTrick)
 			oldCandidate := gs.TrumpCandidate
+			oldRound, oldPasses := gs.BiddingRound, gs.BiddingPassCount
 			next, err := game.ApplyAction(gs, action)
 			require.NoError(t, err,
 				"ApplyAction must never reject a simulated action (seat %d, %s)", seat, action.Type)
 			if action.Type == game.ActionPlayCard {
-				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit)
+				mem.ObservePlay(seat, *action.Card, oldLead, gs.TrumpSuit, oldTrick)
+			}
+			if action.Type == game.ActionPassTrump || action.Type == game.ActionPickTrump {
+				mem.ObserveBid(seat, action, oldCandidate, oldRound, oldPasses)
 			}
 			if action.Type == game.ActionPickTrump && oldCandidate != nil {
 				mem.ObserveLocatedCard(seat, *oldCandidate)
@@ -347,9 +352,7 @@ func TestSimulation_SearchBeatsRandomBaseline(t *testing.T) {
 	totalPoints := 0
 	handsPlayed := 0
 	for handsPlayed < handsTarget {
-		gs := newBitolaGame()
-		gs.DealerSeat = 0
-		gs.ActivePlayerSeat = (gs.DealerSeat + 1) % 4
+		gs := dealtGame(t, shuffledDeck(rng), 0)
 
 		result, ok := playOneHandWith(t, gs, bot.NewMemory(), rng, drive, nil)
 		if !ok {

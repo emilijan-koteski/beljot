@@ -2,18 +2,28 @@
 
 This document describes exactly how the bot decides, across every scenario, what it
 considers, and with examples, for both the Bitola and the Croatian variant. It reflects the
-current logic including phases 1, 2 and 3 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
+current logic including phases 1 to 4 of bot v2 (`BOT_V2_PROPOSAL.md` §4.7). Phase 1 is the new
 memory facts, the hand-shape bidding table, the led-suit-secure take, the Ace cashed before the
 Ten and the Ten under the Ace on the partner's trick. Phase 2 is the Monte Carlo search that
-plays the cards from trick 3 (§5), with the rule layer as the fallback. Phase 3 is the faster
+plays the cards (§5), with the rule layer as the fallback. Phase 3 is the faster
 solver, two table conventions and the match race inside the search (§5.10), larger sample counts,
-the own Belote in the settlement and a bidding table recalibrated under the search (§4.2). The
+the own Belote in the settlement and a bidding table recalibrated under the search (§4.2).
+Phase 4 starts the search at trick 1, so it now plays every card from the first trick. It adds the
+owner's two table rules as vetoes inside the search (no blind Ten; cash the Ace or Ten when the suit
+will not run, §5.10) and the rank bounds that forced overplays and over-trumps prove (§7). It also
+records the auction in the memory (§7), values the hand's end inside the stop-at-target race (§5.10)
+and adds three bidding rows the owner approved (§4.2). In the stop-at-target race the veto yields
+when the vetoed card's mean beats the other card's by more than 1 500, which in practice needs the
+match won with that card and lost or heavily lost with the other in most samples, and a Ten
+discarded beside nothing but Aces or other blind Tens is not vetoed (§5.10). Three phase-4 items
+were measured and do not ship: the deciding hand, the caller's Belote answer and the auction filter
+(each off in §5.10). Score-aware bidding (§4.4): measured; closed: no rule (owner, 2026-11-09). The
 rule layer also carries the earlier tuning: partner trump-draw with a declaration-inference abort
 when the opponents provably hold the master, boss preservation, uncuttable-boss last-trick
 retention, suppressing trump draws once the opponents are void of trump, leading into a partner's
 void, smearing onto a partner's boss, seat-aware **secure trick takes** with a material-stake gate
-and control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions,
-and never fighting a partner who is **forced to win a trump-led trick**.
+and control-trump economy, the **boss-preserving smear** with its endgame/dead-suit exceptions, and
+never fighting a partner who is **forced to win a trump-led trick**.
 
 Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, J, T (ten), 9, 8, 7.
 
@@ -27,7 +37,7 @@ Suit notation: ♠ spades, ♥ hearts, ♦ diamonds, ♣ clubs. Ranks: A, K, Q, 
 | Bidding (the hand-shape table) | `server/internal/bot/bidding.go` | `decideBid`, `matchesBidTable` |
 | What the bot is allowed to know | `server/internal/bot/view.go` | Redacted, seat-local snapshot |
 | What the bot remembers | `server/internal/bot/memory.go` | Played cards, voids, revealed declarations, located cards |
-| Search layer: solver, belief sampler, settlement, chooser, sample schedule | `server/internal/bot/search/` | `solver.go`, `sampler.go`, `settle.go`, `pimc.go` (`Choose`, `SamplesForTrick`), `cards.go` |
+| Search layer: solver, belief sampler, settlement, chooser, sample schedule | `server/internal/bot/search/` | `solver.go`, `solver_prune.go`, `sampler.go`, `settle.go`, `pimc.go` (`Choose`, `SamplesForTrick`), `cards.go` |
 | View to search input, when the search applies, the searched card | `server/internal/bot/search_bridge.go` | `SearchApplies`, `SearchCard`, `DecideWith` |
 | Worker pool, search settings | `server/internal/match/search_pool.go` | `BotSearchSettings`, bounded queue, panic recovery |
 | Search settings from the environment | `server/internal/config/config.go` | `BELJOT_BOT_SEARCH_*` (§5.6) |
@@ -64,14 +74,21 @@ Every time it is the bot's turn, it checks these in strict priority:
 1. **Partner proposed surrender** -> always accept. The bot never initiates surrender and
    never responds to an opponent's proposal.
 2. **Bidding phase** -> `decideBid` (Scenario A).
-3. **Belote / Rebelote pending** (+20) -> always announce. Unconditional value.
+3. **Belote / Rebelote pending** (+20) -> announce. `Decide` always announces, and so does the
+   shipped bot. The caller's Belote search (`BeloteAnswerWith`) runs only when `BeloteSkipMargin`
+   is above 0, and the margin ships at 0: it was measured and does not ship (5.10). With a margin
+   above 0 (the lab), the seat skips only when its team called trump, the room transfers
+   declarations on a fall, the +20 does not end a stop-at-target match on the spot, and the hand
+   searched without the Belote (`search.Evaluate`, the same deals) beats the hand searched with it
+   by more than the margin; a missed deadline, a dropped job or a stale result announces.
 4. **Awaiting declaration** -> always declare. The engine auto-detects melds; declaring
    always maximizes points.
-5. **Otherwise** -> `chooseCard` (Scenario B). From trick 3 the match layer first offers a card
+5. **Otherwise** -> `chooseCard` (Scenario B). From trick 1 the match layer first offers a card
    play to the search (§5); `chooseCard` then plays only when the search does not apply or does
    not deliver in time.
 
-Scenarios 1, 3, 4 are "always do it" with nothing to tune. The real intelligence is in
+Scenarios 1, 3 and 4 always take the same action in the shipped bot, with nothing to tune; the
+caller's Belote search of rule 3 is off. The real intelligence is in
 **bidding** and **card play**.
 
 ---
@@ -112,14 +129,16 @@ direction of play (`seatsPassedBefore`): 0 for the first seat to speak,
 | 7 | 9 and Ace, exactly 3 cards | at least 1 | Bitola only |
 | 8 | Jack and Ace, exactly 2 cards | at least 1 | Bitola only |
 | 9 | Jack, exactly 2 cards | at least 2 | Bitola only |
-| 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | Bitola only |
-| 11 | Jack, exactly 2 cards | at least 1 | Bitola only, third seat to speak (position 2) |
+| 10 | the 9 but neither Jack nor Ace, exactly 3 cards | at least 1 | both |
+| 11 | Jack, exactly 2 cards | at least 1 | Bitola only, second or third seat to speak (position 1 or 2) |
 | 12 | Jack, exactly 2 cards | at least 1 | Croatian only, dealer's partner (position 1) |
+| 13 | the Ace, exactly 4 cards, no Jack or 9 | none (0) | Bitola only |
 
 Row 4 was retired by the recalibration under the search (`BOT_V2_LAB_RESULTS.md` §3.5); the
-row numbers are kept so the lab results still refer to them. Every other shape passes, for
+row numbers are kept so the lab results still refer to them. Rows 10, 11 and 13 were added or
+extended on the owner's approval of the shapes measured in §3.6. Every other shape passes, for
 example the Jack with one small trump and no side Ace, three small trumps without the Jack or
-the 9, or four small trumps with no side Ace.
+the 9, or four small trumps without the Ace.
 
 | Hand (incl. candidate) | Variant, position | Call? | Why |
 |---|---|---|---|
@@ -128,8 +147,11 @@ the 9, or four small trumps with no side Ace.
 | 7♥ 8♥ Q♥ K♥ + 7♠ 8♠ | Croatian | no | four small trumps, no side Ace |
 | 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Bitola | yes | row 7 |
 | 9♥ A♥ Q♥ + A♠ 7♣ 8♣ | Croatian | no | row 7 is Bitola only |
-| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Croatian | no | row 4 was retired, no side Ace |
-| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 2 (row 11) |
+| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Croatian | no | row 13 is Bitola only, row 4 was retired |
+| A♥ 7♥ 8♥ Q♥ + 7♠ 8♠ | Bitola | yes | row 13, four trumps with the Ace and no side Ace |
+| 9♥ 7♥ 8♥ + A♠ 7♣ 8♣ | Croatian | yes | row 10, now in both variants |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, first to speak | no | needs position 1 or 2 (row 11) |
+| J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, second to speak | yes | row 11 |
 | J♥ 7♥ + A♠ 7♣ 8♣ 9♦ | Bitola, third to speak | yes | row 11 |
 
 ### 4.3 Choosing the suit, and the forced pick
@@ -159,21 +181,22 @@ the 9, or four small trumps with no side Ace.
 - `trumpLengthBonus` (currently 10): raise to favor length, lower to favor points when several
   suits match or the pick is forced.
 - The table considers only the bid hand and the seat's position. It considers no partner or
-  match score.
+  match score. Score-aware bidding (phase 4, `BOT_V2_LAB_RESULTS.md` §2.10, D5): measured;
+  closed: no rule (owner, 2026-11-09).
 
 ---
 
-## 5. The search layer (from trick 3)
+## 5. The search layer (from trick 1)
 
-From the third trick on, a bot seat does not run `chooseCard`. It plays the card found by a Monte
+From the first trick on, a bot seat does not run `chooseCard`. It plays the card found by a Monte
 Carlo search: draw complete deals that agree with everything the seat knows, solve each one
 exactly as if every hand were open, settle the result the way the engine scores a hand, and play
-the card with the best average for the seat's team. Bidding, declarations, Belote, surrender and
-tricks 1 and 2 stay with the rule layer (§3, §4, §6), and the rule layer is also the fallback
-whenever the search does not deliver a card. The search is the phase-2 design of
-`BOT_V2_PROPOSAL.md` §4.7; the lab measurements behind the start at trick 3 are in
-`BOT_V2_LAB_RESULTS.md` §2.2 (searching tricks 1 and 2 as well was worth between 0 and +5 at 12
-samples and costs seconds per decision with the current solver).
+the card with the best average for the seat's team. Bidding, declarations, Belote and surrender
+stay with the rule layer (§3, §4, §6), and the rule layer is also the fallback
+whenever the search does not deliver a card, which on tricks 1 and 2 happens for the slowest
+positions (§5.4). The search is the phase-2 design of
+`BOT_V2_PROPOSAL.md` §4.7; tricks 1 and 2 joined it in phase 4, measured at 4 000 deals per
+variant in `BOT_V2_LAB_RESULTS.md` §2.10 (D2).
 
 `Decide` never calls the search. The search is a separate entry point in
 `server/internal/bot/search_bridge.go` (`SearchApplies`, `SearchCard`, `DecideWith`) that the
@@ -183,7 +206,7 @@ match layer drives (5.5), so `Decide` stays pure and the rule layer needs no sea
 
 All of these must hold, otherwise the rule layer plays:
 
-- the first searched trick (`BELJOT_BOT_SEARCH_FROM_TRICK`, default 3) is above 0 and the current
+- the first searched trick (`BELJOT_BOT_SEARCH_FROM_TRICK`, default 1) is above 0 and the current
   trick (`View.TrickNumber`, 1 to 8) has reached it;
 - the phase is playing, the trump suit is known and it is the seat's own turn;
 - nothing else is pending for the seat: no Belote announcement, no declaration, no partner
@@ -196,6 +219,13 @@ All of these must hold, otherwise the rule layer plays:
   to play plus the +10 for the last trick. With the race objective on those hands are searched
   too (5.10), and the race credits that Belote only when the seat plays the first of the pair.
 
+When the search values the match rather than the hand's points: on a stop-at-target table within
+reach (the race of 5.10), after each of tricks 1 to 7, on the seat's own Belote, and at the hand's
+end, where each sample's settled hand is added to the match scores and a team at or over the target
+decides the match (both over: the higher total, a tie to the caller). On a table that decides only
+at hand ends, `DecidingHand` would do the same at the hand's end when a team could still reach the
+target this hand; it ships off (5.10), so those hands are searched for points.
+
 ### 5.2 What is sampled
 
 `informationFrom` turns the `View` into what the sampler may use:
@@ -205,7 +235,7 @@ All of these must hold, otherwise the rule layer plays:
 | own cards | the seat's hand |
 | gone | cards played this hand and the cards in the current trick |
 | known per seat | the seat's declared and located cards that are still unplayed (`KnownCards`), minus the seat's own hand |
-| cannot hold per seat | every card of a suit the seat is known void in (including a trump void proven by a discard), plus the cards just outside a revealed run (`cardsProvablyAbsent`), minus the known cards |
+| cannot hold per seat | every card of a suit the seat is known void in (including a trump void proven by a discard), every card above a rank bound (`RankBounds`, §7), plus the cards just outside a revealed run (`cardsProvablyAbsent`), minus the known cards |
 | need per seat | the cards the seat still holds (the hand size, one less for a seat that already played to this trick) minus its known cards |
 | unseen | the whole deck minus own, gone and every known card |
 
@@ -218,7 +248,36 @@ has, and with none it reaches no decision and the rules play.
 
 Every deal that satisfies the hard facts is equally likely when the rejection draw succeeds; the
 constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
-how the seats bid or by what they led or discarded (see 5.9).
+what the seats led or discarded (see 5.9).
+
+**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `bid_consistency.go`; off
+in production, see 5.10). When it is on and the hand's auction is recorded (`View.Bids`, §7), the
+chooser and the Belote evaluation pass `search.Options.SampleFilter`, which rejects a sampled deal
+in which another seat's auction action contradicts the bid table of §4.2. A seat's eight cards are
+its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card in the current
+trick. It bid on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick,
+two for the caller), six in Croatian (the two face-down cards join after the pick), and which ones
+is unknown, so the filter tries every bid-time hand those eight cards allow (`matchesBidTable` with
+the recorded passes before the action as the position):
+
+- a pass is explained when at least one bid-time hand matches no suit the seat could call (Bitola
+  round 1: the candidate's suit; Bitola round 2: the other three; Croatian: all four); a deal where
+  every bid-time hand matches is rejected;
+- a call is explained when at least one bid-time hand matches the called suit; in Bitola the hands
+  are five of the caller's cards other than the candidate, plus the candidate; Croatian's forced
+  dealer pick (three passes before it) proves nothing and is not checked (a call after three passes
+  with no candidate is taken as that pick, which holds because the shipped Croatian rules make the
+  dealer pick);
+- a seat with fewer cards in sight and sampled than a bid-time hand is accepted unchecked (never in
+  production, where every seat has a full hand in sight or sampled);
+- the bot's own actions are not checked, and a Bitola auction with no recorded candidate is not
+  filtered.
+
+A rejected deal is never solved and does not count as a sample; the sampler draws again, up to four
+draws per requested sample. When no deal is accepted the search runs once more without the filter on
+the same seed, so an auction no table-consistent deal explains (a human bids differently) plays
+exactly as the unfiltered search would. The filter leaves the random stream unchanged when it
+rejects nothing.
 
 ### 5.3 How a sample is solved and settled
 
@@ -234,8 +293,10 @@ how the seats bid or by what they led or discarded (see 5.9).
   mirroring `scoreHand`. It adds the hand points already banked and both teams' declaration and
   Belote points. A Capot gives the whole hand and the Capot bonus to the sweeping team. A caller
   who does not beat the defenders (a tie loses) concedes the hand: the defenders take all card
-  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own.
-  `TestSettleMatchesEngineAtTheLastTrick` pins the agreement with the engine.
+  points plus either both teams' declarations (`DeclarationsTransfer`) or only their own, and the
+  other side banks nothing. `search.SettleTotals` returns the two teams' awards and `Settle` is
+  their difference. `TestSettleMatchesEngineAtTheLastTrick` and
+  `TestSettleTotalsMatchEngineAtTheLastTrick` pin the agreement with the engine.
 - **Choose** (`search.Choose`): for each legal card, the settled values are averaged over the
   samples, signed for the seat's team, and the best average is played. Equal sums go to the lower
   card index, so ties are deterministic.
@@ -244,7 +305,7 @@ how the seats bid or by what they led or discarded (see 5.9).
 
 | Trick | Samples (at most) |
 |---|---|
-| 1 and 2 | none (rule layer) |
+| 1 and 2 | 12 (`search.OpeningSamples`) |
 | 3 | 32 |
 | 4 | 60 |
 | 5 | 80 |
@@ -256,11 +317,12 @@ four-run pooled duplicate gain was +0.79 ± 0.21 per hand (z 3.8, `BOT_V2_LAB_RE
 they live in `search.SamplesForTrick`, and `SearchTuning.SampleCaps` (all 0 in production)
 overrides them for experiments.
 
-The opening search (tricks 1 and 2 at 12 samples, `search.OpeningSamples`) is measured and off
-(`OpeningSamples = 0`, so `BELJOT_BOT_SEARCH_FROM_TRICK` below 3 still behaves like 3). The
-trick-1 benchmark is 318.5 ms on average and 574 ms at most, over the 500 ms deadline for the
-worst positions, and the duplicate gain against the search from trick 3 is +0.83 ± 0.99 per hand
-(Bitola -0.54 ± 1.33, Croatian +2.56 ± 1.49, z 0.8), under the 2 SE a strength change must clear.
+The opening search (tricks 1 and 2 at 12 samples, `search.OpeningSamples`) ships in phase 4. The
+trick-1 benchmark is about 332 ms on average and 594 to 624 ms at most (§5.8), so the slowest
+positions pass the 500 ms deadline and the rule layer plays them (§5.5). The duplicate gain against
+the search from trick 3 is +1.90 ± 0.48 per hand over 4 000 deals per variant (Bitola +1.40 ± 0.64,
+Croatian +2.52 ± 0.71, z 4.0), past the 2 SE a strength change must clear; the 1 000-deal
+measurement of phase 3 was +0.83 ± 0.99.
 
 The search stops early once at least 8 samples are in and the best card leads the runner-up by
 more than one standard error. The standard error is that of the per-sample difference between
@@ -274,7 +336,10 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
 - When the bot's think timer is armed for a card play (`maybeScheduleBotAction`), the match
   layer builds the seat's view under the session lock and queues a search job. It does so only
   when the seat's turn is a plain card play: playing phase, no pending Belote or declaration, and
-  no open surrender proposal from anyone. The job itself runs on a pool worker without the lock.
+  no open surrender proposal from anyone. The one other job is the caller's Belote answer (§3
+  rule 3), queued the same way when its gate holds, which needs `BeloteSkipMargin` above 0 and so
+  never happens with the shipped margin of 0. The job itself runs on a pool worker
+  without the lock.
   The pool has a fixed number of workers and a bounded queue (four jobs per worker). A full queue
   drops the new job, so a burst of bot turns never grows memory or blocks a timer goroutine.
 - The job has a deadline of `BELJOT_BOT_SEARCH_DEADLINE` (default 500 ms) counted from when it
@@ -292,6 +357,29 @@ The search runs in the match layer (`match/bot_driver.go`, `match/search_pool.go
   default 1 to 2.5 s for a play), if it was dropped, timed out, or panicked (the pool recovers and
   logs it), or if the position changed, the rule layer plays the card. A late result is
   discarded.
+- A search that reaches no decision logs at Debug level only:
+  `bot: search reached no decision; rules played` (card search) or
+  `bot: Belote search reached no decision; announced` (Belote search), each with `roomID`, `seat`
+  and `trick`. A full queue logs `bot: search queue full; rules played` or
+  `bot: search queue full; Belote announced` at Debug, with the same fields. Production's
+  Info-level JSON handler does not print Debug lines, so the summary below is the signal.
+- Each match counts its searches on the session (`botSearchStats` in
+  `match/bot_search_stats.go`): searches queued (card and Belote), searches that reached no
+  decision, and those of them at tricks 1 and 2. When the match ends, normally or by abandonment,
+  after its row is persisted, the server logs once at Info level:
+
+  ```text
+  bot: search summary roomID=<room> matchID=<match> searches=<n> missed=<m> missedOpening=<k>
+  ```
+
+  (text form; the message is `bot: search summary` with the fields `roomID`, `matchID`,
+  `searches`, `missed`, `missedOpening`). `matchID` is 0 when persisting the match failed. A
+  match that queued no search, such as a human-only table or one with the search off, logs no
+  summary. A dropped job (full queue) is neither a search nor a miss, and a miss landing after
+  the summary has fired (a match abandoned mid-search) is not counted. To judge the host after a
+  deploy, grep the logs for `bot: search summary` and compare `missed` and `missedOpening` with
+  `searches`: a `missedOpening` close to the number of trick-1 and trick-2 decisions means the host
+  is too slow for the 12 opening samples (5.4), and the opening plays by the rules.
 
 Only `server/cmd/api/main.go` enables the search, through `Manager.SetBotSearch`. A `Manager`
 that never calls it plays every card by the rules.
@@ -304,11 +392,10 @@ Read once in `server/internal/config` and passed to `SetBotSearch`:
 |---|---|---|
 | `BELJOT_BOT_SEARCH_WORKERS` | `0` | worker count; 0 or less means automatic, `max(1, min(4, GOMAXPROCS/2))` |
 | `BELJOT_BOT_SEARCH_DEADLINE` | `500ms` | time one search may take, from queueing; 0 or less means the default |
-| `BELJOT_BOT_SEARCH_FROM_TRICK` | `3` | first trick the search plays; 0 or less turns the search off |
+| `BELJOT_BOT_SEARCH_FROM_TRICK` | `1` | first trick the search plays; 0 or less turns the search off |
 
-A value below 3 behaves like 3, because no sample count is defined for tricks 1 and 2:
-`SearchApplies` is false there, so no job is queued and the rules play. Phase 3 changed no
-setting: the tuning constants of 5.10 live in `bot.DefaultSearchTuning()`, not in the
+A value of 3 turns the opening search off again (tricks 1 and 2 play by the rules). Phases 3 and 4
+added no setting: the tuning constants of 5.10 live in `bot.DefaultSearchTuning()`, not in the
 environment.
 
 ### 5.7 Determinism
@@ -323,31 +410,44 @@ loaded machine can turn a search into a rule-layer play.
 
 ### 5.8 Measured strength and the gates
 
-Measured at the end of phase 3 (the settings above; lab rows in `BOT_V2_LAB_RESULTS.md` §2.9):
+Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_RESULTS.md` §2.10,
+server code fe8c4d98, and the regression and the simulation gates again at a12fb1ef, the vetoes at
+1500, with the same values; the trick-1 benchmark at 015a7211); the rows marked phase 3 or phase 2
+are older measurements (§2.9) that phase 4 did not repeat:
 
 | Measurement | Result |
 |---|---|
-| search seats 0/2 vs the random baseline, 60 hands (`TestSimulation_SearchBeatsRandomBaseline`) | 74.6% of all points (8583/11510, 406 searched plays); gate: at least 60% |
-| duplicate search vs the rule layer, 40 deals (`TestSimulation_SearchDoesNotLoseToTheRules`) | +7.10 ± 5.35 per deal (10 passed out, 420 searched plays); gate: mean at least −3.0 |
+| search seats 0/2 vs the random baseline, 60 hands (`TestSimulation_SearchBeatsRandomBaseline`) | 74.3% of all points (8312/11190, 418 searched plays); gate: at least 60% |
+| duplicate search vs the rule layer, 40 deals (`TestSimulation_SearchDoesNotLoseToTheRules`) | +12.47 ± 6.22 per deal (8 passed out, 446 searched plays); gate: mean at least −3.0 |
+| phase 4 against the phase-3 bot, 1000 deals per variant (`shipped:1` vs `shipped:3` with `phase3`) | Bitola +1.69 ± 1.28, Croatian +5.18 ± 1.44, pooled +3.23 ± 0.96 per hand (z 3.4), at fe8c4d98 and again at a12fb1ef (the same points); gate: not worse at 2 SE, met |
 | phase 3 against the phase-2 bot, 1000 deals per variant (`shipped:3` vs `shipped:3` with `phase2`) | Bitola +1.84 ± 0.82, Croatian +0.79 ± 0.71, pooled +1.24 ± 0.54 per hand (z 2.3); gate: not worse at 2 SE, met |
-| the race objective on a stop-at-target table (`-exp=race`) | +0.0233 ± 0.0043 match edge per game (z 5.4) |
+| the race objective on a stop-at-target table (`-exp=race`) | +0.0233 ± 0.0043 match edge per game (z 5.4, phase 3); with the hand's end valued (phase 4) Bitola +0.0320 ± 0.0073, Croatian +0.0525 ± 0.0079 |
 | the phase-2 duplicate comparison against the rule layer, 400 deals | +10.05 ± 1.76 per deal (phase 2) |
-| cheat gap (double-dummy on the true deal against the shipped bot, 400 deals) | +27.18 ± 2.72 per hand |
-| stability under a reseed (share of searched positions whose card changes) | tricks 3-4 about 45% (Bitola) and 49% (Croatian), tricks 5-8 about 18% and 21% |
-| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`) | mean 29.8 ms when measured for the schedule decision; 54 ms in a later session on the same machine, load-dependent (max about 190 ms); gate: mean under 250 ms |
-| the same 20 positions as a race, both teams at 940 before the hand on a 1001 table, with the leader's Belote when it holds the pair (`TestSearchTrick3RaceTiming`) | mean 10.7 ms, max 31.5 ms on the reference machine in the session where the plain test read 55.6 ms; logged, not asserted |
+| cheat gap (double-dummy on the true deal against the shipped bot, 400 deals) | +19.80 ± 2.59 per hand (phase 3: +27.18 ± 2.72, another seed and bidding table) |
+| stability under a reseed (share of searched positions whose card changes) | tricks 1-2 about 56% (Bitola) and 54% (Croatian), tricks 3-4 about 45% and 47%, tricks 5-8 about 17% and 17% |
+| trick-1 search over 10 random positions (`TestSearchTrick1StaysUnderTwiceTheDeadline`, 12 samples) | mean 332.73, 331.41 and 332.80 ms on three runs (max 593.5, 623.7 and 602.2 ms), idle machine on the performance power profile; 555.5 ms on the GitHub runner (PR #67's first CI run), above the 500 ms deadline, so on such a host the opening search mostly falls back to the rule layer; gate under `BELJOT_BOT_SIM=1`: mean under 1 000 ms, twice the deadline, a guard against a gross slowdown rather than a deadline check |
+| trick-3 search over 20 random positions (`TestSearchTrick3StaysUnderTheDeadline`, phase 3) | mean 29.8 ms when measured for the schedule decision; 54 ms in a later session on the same machine, load-dependent (max about 190 ms); gate: mean under 250 ms |
+| the same 20 positions as a race, both teams at 940 before the hand on a 1001 table, with the leader's Belote when it holds the pair (`TestSearchTrick3RaceTiming`, phase 3) | mean 10.7 ms, max 31.5 ms on the reference machine in the session where the plain test read 55.6 ms; logged, not asserted |
 
-The two simulation gates run only when `BELJOT_BOT_SIM=1` is set (CI sets it; `make test` skips
-them to stay fast), take about 9 s together, and need no database. The deadline test always runs.
-A deal that passes out in bidding scores 0 in the duplicate comparison, so the per-deal figures
-include passed-out deals. The search share against the random baseline moves with the engine's
-random dealer (64.9 to 84% on repeated runs), which is why its gate is 60%.
+The two search simulation gates and the trick-1 mean assert only when `BELJOT_BOT_SIM=1` is set (CI
+sets it; `make test` skips the gates and only logs the trick-1 time), and need no database. With the
+two rule-layer simulations the four `TestSimulation` tests take about 10 s together. The search
+gates search from trick 3 (`searchFromTrick` in `simulation_test.go`) while production searches from
+trick 1: from trick 1 the four take about 74 s, too long for a gate CI runs on every push, and the
+production setting is measured by the phase regression above (`shipped:1`). The trick-3 deadline
+test always runs. A deal that passes out in bidding scores 0 in the duplicate comparison, so the
+per-deal figures include passed-out deals. The search share against the random baseline is
+deterministic: the deals come from a seeded deck (`rand.NewPCG(42, 1)`, dealer fixed at seat 0) and
+the share is 74.3% (8312 of 11190 points over 60 hands, identical on two runs at 015a7211 and again at fe8c4d98 and a12fb1ef; 73.2%
+when the seeded deck came in, before the phase-4 play changes); its gate stays 60%.
 
 ### 5.9 What the search does not model
 
-- **No bidding or play inference beyond the hard facts of 5.2.** Deals are not weighed by how the
-  seats bid, led, discarded or signalled. The lab measured the bidding-consistency weighting at
-  −1.9 ± 1.9 and left it out (`BOT_V2_LAB_RESULTS.md` §2.6).
+- **No play or bidding inference beyond the hard facts of 5.2.** Deals are not weighed by what the seats led,
+  discarded or signalled, and in production the auction does not shape the samples. The bidding-consistency filter of
+  5.2 is measured and off (`BidConsistency false`); when the lab turns it on it assumes every seat bids by the bot's
+  own table and keeps or rejects a deal outright (no weighting). The phase-1 lab measured a weighting at −1.9 ± 1.9
+  (`BOT_V2_LAB_RESULTS.md` §2.6); the filter's measurement is in §2.10 (D1).
 - **Open-hand solving of each sample.** Every sampled deal is solved as if all four players saw
   all cards, for the opponents too. A card that is best only because the seat would know the
   exact deal later (strategy fusion) can be overrated, and a card that hides information is not
@@ -359,19 +459,37 @@ random dealer (64.9 to 84% on repeated runs), which is why its gate is 60%.
   its own Belote, since the engine never stops the match after the eighth trick. A Belote the seat
   cannot see (its partner's or an opponent's) is not in the race, so a stop on its announcement is
   not foreseen. A hand that reaches the target only in the hand scoring (the last-trick bonus, a
-  Capot, a fall) is valued in points, not as a decided match. In a Bitola trick 1 with declarations
-  still open the engine checks the target only at the end of the trick; the search never runs on
-  tricks 1 and 2, so that case is not modelled.
-- **No bidding, declaration, Belote or surrender decisions**, and no search on tricks 1 and 2
-  (the opening search was measured and left off, 5.4).
+  Capot, a fall) is valued as the decided match since phase 4 (5.10, the hand's end in the race). What
+  remains: the race starts only when a running total is within the card points still to play plus
+  10 of the target, so on a stop-at-target table a fall or a Capot that would carry a team over from
+  further away is valued in points; an opponent's or the partner's Belote is not in the hand's settlement;
+  in a Bitola trick 1 with declarations still open the engine checks the target only at the end of
+  the trick, and the search does not model that case on tricks 1 and 2.
+- **No bidding, declaration, Belote or surrender decisions.** The caller's Belote answer of rule 3
+  (`search.Evaluate` with and without the 20 on the same deals) exists for the lab and ships off
+  (`BeloteSkipMargin 0`).
 
 ### 5.10 Conventions and risk inside the search
 
-`SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the
-search. `bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`,
-`TenUnderAceBonus 3`, `RaceObjective true`, and 0 or false for the rest. The chooser takes the
-card with the best adjusted mean, ties to the lower card index. Every row is in
-`BOT_V2_LAB_RESULTS.md` §2.9, duplicate, 1000 deals per variant, pooled by inverse variance.
+`SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the search.
+`bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`, `TenUnderAceBonus 3`,
+`RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 1500` (the veto),
+`CashHighWinnerBonus 1500` (the veto), and 0 or false for the rest. The chooser takes the card with
+the best adjusted mean, ties to the lower card index. The veto, `ConventionVeto` = 1500 (10000
+before a12fb1ef), outweighs every points margin a hand can produce (about 414–504 without
+declarations and about 854–944 with four Jacks and Belote; 1 500 needs about 550 declared on one
+hand, a holding from which neither a fall nor an opposing capot is reachable, so in points mode the
+veto acts as a rule). In the race, where a sample decided for or against the team is worth plus or
+minus 1000, the veto yields when the vetoed card's mean beats the other card's by more than 1 500,
+which in practice needs the match won with that card and lost or heavily lost with the other in most
+samples. Measured against the old 10000 (lab flag `hardVeto`) on a stop-at-target race, seeds
+1231/1232: 0.0000 ± 0.0000 match edge per game in both variants, identical counts and results (no
+position reached the yield), not worse at 2 SE. The cash-high veto at 1 500 is covered by the race
+run and, in points mode, by the absence of any 1 500 gap. Every row is in `BOT_V2_LAB_RESULTS.md`
+§2.9 (phase 3) or §2.10 (phase 4), duplicate unless the row says match edge, 1000 deals per variant
+unless the row says otherwise, pooled by inverse variance. The rows whose setting ships at 0 or
+false (`LeadRiskLambda`, `TrumpDrawConditional`, `DecidingHand`, `BeloteSkipMargin`,
+`BidConsistency`) were measured and do not ship; their code stays for the lab.
 
 | Setting | Ships | Measured | Why |
 |---|---|---|---|
@@ -380,11 +498,38 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `LeadRiskLambda` | 0 | risk5 +0.06 ± 0.18, risk10 -0.17 ± 0.30 | Would rank leads by mean minus lambda times the spread; not better at 2 SE, the code stays and the constant is 0 |
 | `TrumpDrawConditional` | false | -0.05 ± 0.32 (deferred about 2% of decisions) | Would hand a trump draw that depends on where the top trump sits to the rule layer; not better at 2 SE, the code stays off |
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
-| `OpeningSamples` | 0 | +0.83 ± 0.99 per hand | 5.4 |
+| `DecidingHand` | false | +0.0017 ± 0.0053 match edge per game (z 0.3) | On a table without stop-at-target, value a sample whose settled hand decides the match at plus or minus 1000, when a team could reach the target this hand (`couldDecideThisHand`); not better at 2 SE, the code stays off |
+| `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
+| `BlindTenPenalty` | 1500 (`ConventionVeto`) | +0.19 ± 0.29 per hand, four runs at 3b2eaa87 with the 1500 veto and the exemption beside Aces or other blind Tens, the same points at a12fb1ef (+0.17 ± 0.29 at fe8c4d98 after the predicate fix; earlier predicate -0.37 ± 0.29; 3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is +0.7 SE |
+| `CashHighWinnerBonus` | 1500 (`ConventionVeto`; measured at 10000) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
+| `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
+| `BidConsistency` | false | vs the shipped bidder +1.03 ± 0.73 per hand (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder -0.61 ± 0.56 (z -1.1) | Samples only deals consistent with the auction (5.2); not better at 2 SE against the shipped bidder, so it stays off and the code stays for the lab (§2.10, D1) |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
+**The blind-Ten rule.** A side-suit Ten led, or discarded onto a trick an opponent is winning (void
+in the led suit, or following after a trump cut), while its Ace is unplayed, not in the hand, not
+known with the partner and not in the trick, loses the veto (1500) from its score, so any other
+legal card beats it unless the race is decided for the Ten and against the other card, and a Ten
+that is the only legal card is still played. A Ten that follows the led suit with no trump cut takes
+the trick and is not blind. A Ten discarded (not following the led suit) when every other legal card
+is an Ace or another blind Ten is not vetoed, in the search or in the rule layer's `avoidBlindTen`
+(one predicate, `vetoedBlindTen`): the Ace is the worse discard, 11 points and a sure winner given
+away, and beside another blind Ten the search keeps its better Ten; a lead keeps the veto. With the
+veto, over the four C1 runs (121 440 decisions, `BOT_V2_LAB_RESULTS.md` §2.10), the lab counts 247
+forced blind Tens (no legal card avoids one), 6 beside an Ace (the exemption) and 0 free, about 2.0
+to 2.2 per 1 000 decisions against 8.1 to 8.5 without the veto.
+
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
-applies to the first two rows, the strength rule (ships only if better at 2 SE) to the rest.
+applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.
+
+**The cash-high rule.** Last to play with at least two legal led-suit cards that beat the trick, no
+trump cut and the led suit not trump, the Ace or Ten that wins (never the King or Queen) gains
+`CashHighWinnerBonus` when the suit will not run, because the high card will be ruffed before it
+cashes. The suit will not run when the seat holds three or more cards of it, any seat declared three
+or more of it, or an opponent is known void in it and not void in trumps (`suitAtRisk`; the last
+trigger is the design's addition to the owner's two). With one winner, or after a cut, the search's
+card stands. The rule fires about once in a thousand decisions, so the counter "high kept then
+ruffed" moves little (13 against 18 over 59 424 decisions).
 
 **The race objective.** On a stop-at-target table the engine ends the match the moment a team's
 running total (match score, hand points, declarations, Belote) reaches the target after a trick,
@@ -394,7 +539,11 @@ the match at plus or minus 1000, which the chooser keeps as it is. The seat's ow
 (+20, trump King and Queen still in hand, counted only when `View.DeclarationsEnabled` is on) is in
 the settlement, and the race keeps it out of the root totals: the solver credits it when the seat
 plays the first card of the pair and checks the target at that moment, as the engine does at the
-announcement. Tracking stops after the seventh trick (5.9). The gaps are in 5.9.
+announcement. Tracking of the running totals stops after the seventh trick, since the engine
+does not stop the match after the eighth. At the hand's end the chooser settles each sample into
+both teams' awards (`search.SettleTotals`) and applies the engine's end-of-hand rule to the match
+scores (`search.HandEndDecided`), so a hand that crosses only through the last-trick bonus, a Capot
+or a fall is worth plus or minus 1000 too. The gaps are in 5.9.
 
 ---
 
@@ -445,9 +594,14 @@ over 5,374 two-card information sets lost **2.54 points per changed decision**, 
 fully legal hands was 11 better / 23 worse, and sweeping the threshold showed *never contesting*
 scored best. `TestDecide_TrickSevenRetentionBeatsContesting` pins this — **do not add a contest
 guard here.** Known gaps that a future change might legitimately address (capot, leading trick 7,
-the non-trump over-ruff) are logged in `deferred-work.md`.
+the non-trump over-ruff) are superseded: since phase 4 the search plays every trick and the rule
+layer runs only after a missed deadline. Their entries in
+`_bmad-output/implementation-artifacts/deferred-work.md` are closed.
 
-analogue — a spare that gets over-ruffed — is logged in `deferred-work.md`, not fixed here.
+The trick-7 retention guard checks only a trump-led trick; its non-trump-lead analogue — a spare
+that gets over-ruffed — is superseded the same way: since phase 4 the search plays every trick and
+the rule layer runs only after a missed deadline (closed in
+`_bmad-output/implementation-artifacts/deferred-work.md`).
 
 **Generalization — an uncuttable non-trump boss is also a guaranteed trick-8 winner**
 (`isUncuttableBoss`): a non-trump card that is the boss of its suit **and** cannot be ruffed
@@ -553,11 +707,14 @@ keep the K; the partner overtrumps with J/9.
 Example (step 4): trump ♥, opponent called. Hand 7♦ K♦ 9♣, partner void in ♦ -> lead **7♦**
 so the partner ruffs.
 
-Note: from trick 3 the search plays the lead, and it carries the Ten-under-Ace convention of B3
+Note: the search plays the lead, and it carries the Ten-under-Ace convention of B3
 as a bonus of 3 on the Ten when the values are close, and a penalty of 10 on a defender's
-non-J/9 trump lead (5.10). The rules above are the fallback and the tricks 1 and 2 play.
+non-J/9 trump lead and a veto on a blind Ten (5.10). The rules above are the fallback, and they play tricks 1 and 2
+when the opening search misses its deadline. In that fallback the lead-safe pick passes through `avoidBlindTen` over the non-trump cards, which keeps a blind Ten only when it is the only choice.
 
 ### B3. Following a trick (`chooseFollow`)
+
+The search carries the cash-high rule of 5.10: last to play with a choice of winners in a suit that will not run, it takes with the Ace or Ten, not the King or Queen. The rules below are the fallback.
 
 First it computes who currently wins. Branches:
 
@@ -752,7 +909,9 @@ gamble.
   last -> play **A♠**; the Queen would lose to the last player's King or Ten and the kept Ace would
   be ruffed later. Once the K♠ and T♠ are gone the Queen suffices. A trump cut, or a trump lead,
   leaves it inert.
-- Cannot win: **discard** the lowest value, preserving trump.
+- Cannot win: **discard** the lowest value, preserving trump. A pick that is a blind Ten (5.10)
+  becomes the lowest-value other legal card (`avoidBlindTen`). It stays when it is the only legal
+  card.
 
 **The boss-preserving smear (`bestSmear` + `bossWorthGuarding`)** — used at all three smear
 sites (safe smear, risk-smear, partner-takes-trick). Among non-overtaking legal cards it picks
@@ -821,6 +980,22 @@ what a human in that seat could:
   the led suit is marked void in it (`ObservePlay`). A seat that plays neither the led suit nor
   a trump is void in trump as well: it would have had to cut. Voids are tracked for **all 4
   seats** (including the partner, used by the lead-into-void and smear rules).
+- **The auction** (`Bids`, from `Memory.ObserveBid`): for the current hand, each bid action with its seat,
+  round, the passes before it, the face-up candidate (Bitola, on every record), and either a pass or the called suit
+  (a Bitola round-1 pick records the candidate's suit). A Bitola reshuffle starts a new record, and `SyncHand` clears
+  it with the hand.
+- **Cards played per seat** (`PlayedBy`, from `Memory.ObservePlay`): what each seat has played this hand, which the
+  bidding-consistency filter of 5.2 adds back to a sampled hand when the lab turns it on; production reads the
+  auction and the per-seat plays for nothing else, so both are bookkeeping in the shipped bot.
+- **Rank bounds** (`RankBounds[seat][suit]`, from `Memory`): the strength index (`NonTrumpRankOrder`,
+  `TrumpRankOrder` for the trump suit) of the highest card the seat can still hold in that suit, -1
+  for no bound, only ever lowered. Two exact facts feed it, each following from a follow rule of the
+  engine (`validation.go`): a seat that followed the led suit with a card that did not beat the
+  highest led-suit card, while the led suit could still win (it is trump, or no trump is in the
+  trick), holds nothing higher in that suit (`applyMustOverplayLedSuit`); a seat void in the led
+  suit that played a trump below the highest trump on the table holds no higher trump
+  (`applyOverTrump`). A low follow after a trump has cut the trick proves nothing and records
+  nothing.
 - **Known cards per seat** (`KnownCards` = declared ∪ located). Declared cards
   (`DeclaredCards`) come from the public declaration reveal, and only the winning declaration
   team's cards; the run inference below reads these alone. Located cards are public too: the
@@ -856,13 +1031,13 @@ Reasoning helpers (all pure, in `bot.go`):
 
 What the search sampler consumes (§5.2): the same View and nothing more. It reads the cards played
 and those in the current trick, the void matrix (including trump voids), the known cards per seat
-(declared and located cards, which it puts into that seat's hand and removes from the unseen
-pool), the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand) and
-each seat's remaining card count. These are hard facts: a deal that contradicts one is never
-drawn. Everything else is unknown, and the sampler treats it as uniform. Which unseen cards sit
-with which seat is equally likely under every deal that fits the facts, so no conclusion is drawn
-from how a seat bid or passed, what it led or discarded, or what it signalled, and the scores do
-not shape the samples.
+(declared and located cards, which it puts into that seat's hand and removes from the unseen pool),
+the run neighbours from `cardsProvablyAbsent` (which it forbids in that seat's hand), the rank
+bounds (every card above a bound is forbidden in that seat's hand) and each seat's remaining card
+count. These are hard facts: a deal that contradicts one is never drawn. Everything else is unknown,
+and the sampler treats it as uniform. Which unseen cards sit with which seat is equally likely under
+every deal that fits the facts, so no conclusion is drawn from how a seat bid or passed, what it led
+or discarded, or what it signalled, and the scores do not shape the samples.
 
 ---
 
@@ -873,9 +1048,14 @@ No bearing on which card, only when:
 - Game decisions: uniform random delay in `[botDelayMin, botDelayMax]`.
 - Score-reveal acknowledgements: a single short beat.
 - Generation/context guards ensure the bot never double-acts or acts on a stale decision point.
-- Card plays from trick 3: the search job is queued when the think timer is armed, so the think
+- Card plays: the search job is queued when the think timer is armed, so the think
   delay is the time the search has to finish. A result that is ready and still valid when the
   timer fires is played, otherwise the rule layer plays (§5.5).
+- The bot's own Belote answer: a 150 ms beat and the announcement. With the shipped
+  `BeloteSkipMargin` of 0 no Belote search is queued. Only with a margin above 0 (rule 3 of §3:
+  its team called trump, transfer on) is one queued; then the seat waits the play delay, the job
+  runs through the same pool, deadline, generation and context checks as a card search, and a
+  missing or stale answer announces.
 
 ---
 
@@ -907,13 +1087,23 @@ By impact:
 7. `partnerDrawTrump`: the Q/K/T/A order and the "never the 9" rule.
 8. `retainLastTrickWinner` + `isUncuttableBoss`: capturing the +10 in the last trick.
 9. The search: the `BELJOT_BOT_SEARCH_*` settings, `search.SamplesForTrick` and the early-stop
-   constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength from trick 3
+   constants (`searchEarlyStopAfter`, `searchEarlyStopSE`) trade playing strength
    against CPU time (§5.4, §5.6). Change them only with the simulation gates and the duplicate
    comparison of §5.8.
+10. `bot.DefaultSearchTuning()`: the conventions and objectives inside the search (§5.10), among them
+   `OpeningSamples`, the owner's two vetoes (`BlindTenPenalty`, `CashHighWinnerBonus`, both
+   `ConventionVeto` 1500; in the stop-at-target race the veto yields when the vetoed card's mean
+   beats the other card's by more than 1 500, which in practice needs the match won with that card
+   and lost or heavily lost with the other in most samples; a Ten discarded beside nothing but Aces
+   or other blind Tens is not vetoed), and the measured-and-off switches `DecidingHand`,
+   `BeloteSkipMargin` and `BidConsistency`. Change one only with a lab row under the decision rule
+   its row in §5.10 names.
 
-Blind spots if you want a stronger bot. These belong to the rule layer, which from trick 3 plays
-only as the fallback; the search's own limits are in §5.9. (The first four are logged in
-`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass.)
+Blind spots if you want a stronger bot. These belong to the rule layer, which plays
+only as the fallback; the search's own limits are in §5.9. (The first four were logged in
+`_bmad-output/implementation-artifacts/deferred-work.md` as a simulation-gated tuning pass;
+they are superseded, since phase 4 the search plays every trick and the rule layer runs only
+after a missed deadline, and the entries are closed there.)
 
 - **Addressed** — the stake gate used to have no cost/benefit weighing (any > 0 stake could
   spend a 20-point master to secure a 3-point trick). `trumpEconomyTake` now gates a control
@@ -934,7 +1124,9 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
 - There is **no** general arbitration between spending a master mid-hand and last-trick control —
   the two sites simply do not interact, because retention short-circuits before `chooseFollow` at
   two cards. `retainLastTrickWinner` also ignores **capot** (a swept hand makes the last trick
-  worth +100, not +10) and can lead a spare into an over-ruff; both are in `deferred-work.md`.
+  worth +100, not +10) and can lead a spare into an over-ruff; both are superseded: since phase 4
+  the search plays every trick and the rule layer runs only after a missed deadline (entries
+  closed in `_bmad-output/implementation-artifacts/deferred-work.md`).
 - The endgame boss-guard ignores **who leads trick 8** — a hoarded uncuttable boss converts
   for sure only when the bot itself leads it.
 - `partnerWinIsSafe`'s trump-threat leg is still a **raw unseen scan** (not seat-aware like
@@ -946,7 +1138,8 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
   search uses the hand points and tricks won only to score a sample, not to change its objective.
 - No signalling or inference from the **partner's** discards (only voids are used).
 - No forced pick in Bitola round 2 (weak hands just reshuffle).
-- Belote, declarations, and accepting surrender are unconditional (correct, nothing to tune).
+- Declarations and accepting surrender are unconditional (correct, nothing to tune). The Belote
+  is too: the caller's Belote search (§3 rule 3) ships off.
 
 ---
 
@@ -984,4 +1177,9 @@ only as the fallback; the search's own limits are in §5.9. (The first four are 
 | Pool size, deadline, first searched trick | `BotSearchSettings`, `DefaultBotSearchSettings`, `Manager.SetBotSearch` | `server/internal/match/search_pool.go`, `live_match.go`, `server/internal/config/config.go` |
 | Unit tests for all of the above | `TestDecide_*` | `server/internal/bot/bot_test.go` |
 | Strength check (bot vs. random) | `TestSimulation_*` | `server/internal/bot/simulation_test.go` |
-| Search strength and time gates | `TestSimulation_Search*` (need `BELJOT_BOT_SIM=1`), `TestSearchTrick3StaysUnderTheDeadline` | `server/internal/bot/simulation_test.go`, `server/internal/bot/search/bench_test.go` |
+| Search strength and time gates | `TestSimulation_Search*` and the trick-1 assertion of `TestSearchTrick1StaysUnderTwiceTheDeadline` (need `BELJOT_BOT_SIM=1`), `TestSearchTrick3StaysUnderTheDeadline` | `server/internal/bot/simulation_test.go`, `server/internal/bot/search/bench_test.go` |
+| The owner's table rules inside the search (no blind Ten, cash the Ace or Ten) and the other tuning | `SearchTuning`, `DefaultSearchTuning`, `ConventionVeto`, `vetoedBlindTen`, `blindTen`, `suitAtRisk` | `server/internal/bot/search_tuning.go` |
+| The vetoes at their pre-closeout 10000 in the lab (`hardVeto` is applied after `noBlindTen`/`noCashHigh`, so it overrides them) | lab flag `hardVeto`, `TuningFromFlags` | `docs/bot/lab/flags.go` |
+| The race crossing from tricks 6 and 7 against the engine | `TestRaceCrossingFromTricksSixAndSevenMatchesTheEngine` | `server/internal/bot/search/race_crossing_test.go` |
+| Per-match summary of searches and missed deadlines | `botSearchStats`, `logBotSearchSummary` | `server/internal/match/bot_search_stats.go` |
+| Rank bounds from forced overplays and over-trumps; the auction record | `ObservePlay` (`observeBounds`), `RankBounds`, `ObserveBid`, `Bids` | `server/internal/bot/memory.go` |

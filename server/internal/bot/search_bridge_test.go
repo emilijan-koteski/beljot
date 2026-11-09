@@ -38,12 +38,12 @@ func memoryOfMissingCards(gs *game.GameState, discards ...earlierDiscard) *bot.M
 	}
 	for _, d := range discards {
 		lead := d.lead
-		mem.ObservePlay(d.seat, card(d.card), &lead, gs.TrumpSuit)
+		mem.ObservePlay(d.seat, card(d.card), &lead, gs.TrumpSuit, nil)
 		held[card(d.card)] = true
 	}
 	for _, c := range game.NewDeck() {
 		if !held[c] {
-			mem.ObservePlay(0, c, nil, gs.TrumpSuit)
+			mem.ObservePlay(0, c, nil, gs.TrumpSuit, nil)
 		}
 	}
 	return mem
@@ -219,7 +219,7 @@ func TestSearchAppliesGates(t *testing.T) {
 	}{
 		{"trick 3 from trick 3", 3, func(v *bot.View) {}, true},
 		{"trick 2 from trick 3", 3, func(v *bot.View) { v.TrickNumber = 2 }, false},
-		{"trick 2 from trick 1 has no samples", 1, func(v *bot.View) { v.TrickNumber = 2 }, false},
+		{"trick 2 from trick 1", 1, func(v *bot.View) { v.TrickNumber = 2 }, true},
 		{"trick 3 from trick 1", 1, func(v *bot.View) {}, true},
 		{"from trick 0 never searches", 0, func(v *bot.View) {}, false},
 		{"one legal card", 3, func(v *bot.View) { v.LegalCards = v.LegalCards[:1] }, false},
@@ -263,6 +263,49 @@ func TestSearchAppliesGates(t *testing.T) {
 	}
 }
 
+func giveSeatTheTrumpPair(gs *game.GameState, seat int) {
+	pair := cards("KH", "QH")
+	next := 0
+	for other := range gs.Players {
+		if other == seat {
+			continue
+		}
+		for i, c := range gs.Players[other].Hand {
+			if !slices.Contains(pair, c) {
+				continue
+			}
+			for gs.Players[seat].Hand[next].Suit == game.SuitHearts {
+				next++
+			}
+			gs.Players[other].Hand[i], gs.Players[seat].Hand[next] = gs.Players[seat].Hand[next], c
+		}
+	}
+}
+
+func TestStopAtTargetReachCountsTheBotsOwnBelote(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	giveSeatTheTrumpPair(gs, 0)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.Equal(t, game.SuitHearts, *v.TrumpSuit)
+	require.Subset(t, v.Hand, cards("KH", "QH"))
+	require.True(t, v.DeclarationsEnabled)
+	require.True(t, bot.SearchAppliesWith(v, 3, bot.SearchTuning{}))
+
+	v.StopAtTarget = true
+	banked := v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0]
+	reach := bot.RemainingCardPointsForTest(v) + 10
+	withoutRace := bot.SearchTuning{}
+
+	v.MatchTarget = banked + reach + 20
+	assert.False(t, bot.SearchAppliesWith(v, 3, withoutRace), "the certain Belote's 20 brings the target within reach")
+	v.MatchTarget++
+	assert.True(t, bot.SearchAppliesWith(v, 3, withoutRace), "one point beyond the Belote's reach")
+
+	v.MatchTarget = banked + reach + 20
+	v.DeclarationsEnabled = false
+	assert.True(t, bot.SearchAppliesWith(v, 3, withoutRace), "without declarations there is no Belote to count")
+}
+
 func TestSearchCardPlaysALegalCardDeterministically(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(5)
 	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
@@ -282,8 +325,8 @@ func TestSearchCardPlaysALegalCardDeterministically(t *testing.T) {
 func TestSearchCardDeclinesWhereTheRulesPlay(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(2)
 	early := viewFromState(gs, 0, memoryOfMissingCards(gs))
-	_, ok := bot.SearchCard(early, time.Now().Add(5*time.Second))
-	assert.False(t, ok, "no samples are budgeted before trick 3")
+	_, ok := bot.SearchCardWith(early, time.Now().Add(5*time.Second), bot.SearchTuning{RaceObjective: true})
+	assert.False(t, ok, "no samples are budgeted before trick 3 without opening samples")
 
 	gs = testfixtures.NewGameMidPlay(5)
 	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
@@ -494,6 +537,7 @@ func TestSearchAppliesWithRaceObjective(t *testing.T) {
 	assert.Equal(t, search.Race{
 		Target: v.MatchTarget,
 		Banked: [2]int{v.TeamScores[0] + v.HandPoints[0] + v.DeclPoints[0], v.TeamScores[1] + v.HandPoints[1] + v.DeclPoints[1]},
+		Scores: v.TeamScores,
 		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
 	}, *pos.Race)
 	assert.Nil(t, bot.PositionFromForTest(v, bot.SearchTuning{}).Race)
@@ -522,4 +566,254 @@ func TestRaceCarriesTheBotsOwnBeloteApartFromTheBank(t *testing.T) {
 	require.NotNil(t, pos.Race)
 	assert.Equal(t, [2]int{960, 925}, pos.Race.Banked)
 	assert.Zero(t, pos.Race.BeloteCards)
+}
+
+func TestCannotHoldIncludesCardsAboveTheBound(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(3)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.Equal(t, game.SuitHearts, *v.TrumpSuit)
+	v.RankBounds[1][bot.SuitIndex(game.SuitSpades)] = game.NonTrumpRankOrder[game.RankKing]
+	v.RankBounds[1][bot.SuitIndex(game.SuitHearts)] = game.TrumpRankOrder[game.Rank9]
+
+	in := bot.InformationFromForTest(v)
+
+	cannot := func(id string) bool { return in.CannotHold[1]&(1<<uint(search.CardIdx(card(id)))) != 0 }
+	assert.True(t, cannot("AS"))
+	assert.True(t, cannot("TS"))
+	assert.False(t, cannot("KS"))
+	assert.False(t, cannot("7S"))
+	assert.True(t, cannot("JH"))
+	assert.False(t, cannot("9H"))
+	assert.False(t, cannot("AH"))
+	assert.Zero(t, in.CannotHold[2]&search.SuitMask(search.SuitIdx(game.SuitSpades)))
+}
+
+// shortOfTarget is seat 0's view of a default-table state with each team's running total the given points short of
+// the target.
+func shortOfTarget(t *testing.T, gs *game.GameState, shortA, shortB int) bot.View {
+	t.Helper()
+	require.False(t, gs.Rules.StopAtTarget)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	short := [2]int{shortA, shortB}
+	for team := range v.TeamScores {
+		v.TeamScores[team] = v.MatchTarget - short[team] - v.HandPoints[team] - v.DeclPoints[team]
+	}
+	return v
+}
+
+func TestRaceForTheDecidingHand(t *testing.T) {
+	v := shortOfTarget(t, testfixtures.NewGameMidPlay(3), 500, 60)
+	deciding := bot.SearchTuning{DecidingHand: true}
+	pos := bot.PositionFromForTest(v, deciding)
+	require.NotNil(t, pos.Race)
+	assert.True(t, pos.Race.DecidingHand)
+	assert.Equal(t, v.MatchTarget, pos.Race.Target)
+	assert.Equal(t, v.TeamScores, pos.Race.Scores)
+	assert.Equal(t, game.TeamForSeat(*v.TrumpCallerSeat), pos.Race.Caller)
+
+	assert.Nil(t, bot.PositionFromForTest(v, bot.SearchTuning{RaceObjective: true}).Race)
+
+	v.StopAtTarget = true
+	assert.Nil(t, bot.PositionFromForTest(v, deciding).Race, "a stop-at-target table out of reach does not race")
+}
+
+func TestNoRaceWhenNobodyCanCross(t *testing.T) {
+	v := shortOfTarget(t, testfixtures.NewGameMidPlay(3), 500, 500)
+	deciding := bot.DefaultSearchTuning()
+	deciding.DecidingHand = true
+	noDeciding := deciding
+	noDeciding.DecidingHand = false
+	assert.Nil(t, bot.PositionFromForTest(v, deciding).Race)
+
+	with, ok := bot.SearchCardWith(v, farFuture(), deciding)
+	require.True(t, ok)
+	without, ok := bot.SearchCardWith(v, farFuture(), noDeciding)
+	require.True(t, ok)
+	assert.Equal(t, without, with)
+}
+
+func TestDecidingHandValuesAFallAsTheLostMatch(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(7)
+	caller := 2
+	gs.TrumpCallerSeat = &caller
+	gs.Players[0].Hand = cards("TC", "7D")
+	gs.Players[1].Hand = cards("TS", "9C")
+	gs.Players[2].Hand = cards("QD", "AS")
+	gs.Players[3].Hand = cards("7H", "8C")
+	gs.HandPoints, gs.TricksWon = [2]int{75, 43}, [2]int{3, 3}
+	v := shortOfTarget(t, gs, 500, 100)
+	deciding := bot.DefaultSearchTuning()
+	deciding.DecidingHand = true
+	noDeciding := deciding
+	noDeciding.DecidingHand = false
+
+	points, ok := bot.SearchCardWith(v, farFuture(), noDeciding)
+	require.True(t, ok)
+	require.Equal(t, card("7D"), points.Card, "for points the seven risks the fall; the deals come from the "+
+		"sampler's seed, so after a sampler change re-derive the hands until this holds")
+	match, ok := bot.SearchCardWith(v, farFuture(), deciding)
+	require.True(t, ok)
+	assert.Equal(t, card("TC"), match.Card)
+
+	res, ok := bot.ChooseSearchForTest(v, deciding)
+	require.True(t, ok)
+	assert.Less(t, res.Cards[search.CardIdx(card("7D"))].Mean, res.Cards[search.CardIdx(card("TC"))].Mean)
+	const worstHandAward = 152 + 100
+	assert.Less(t, res.Cards[search.CardIdx(card("7D"))].Mean, -float64(worstHandAward), "some deals lose the match")
+}
+
+// beloteFallView is seat 0 of the calling team just after leading the Queen of trump at trick 7, holding the King,
+// with every unseen card worth nothing and the opponents far ahead, so the contract falls whatever is played.
+func beloteFallView() bot.View {
+	trump, caller := game.SuitHearts, 0
+	lead := game.SuitHearts
+	held := cards("KH", "QH", "7S", "8S", "7D", "8D", "7C", "8C")
+	var played []game.Card
+	for _, c := range game.NewDeck() {
+		if !slices.Contains(held, c) {
+			played = append(played, c)
+		}
+	}
+	return bot.View{
+		Seat: 0, Phase: game.PhasePlaying, TrumpSuit: &trump, TrumpCallerSeat: &caller, LeadSuit: &lead,
+		Hand: cards("KH"), LegalCards: cards("KH"), ActivePlayerSeat: 0, PendingBelot: true,
+		CurrentTrick: []game.TrickCard{{Card: card("QH"), PlayerSeat: 0}},
+		HandPoints:   [2]int{10, 135}, TricksWon: [2]int{1, 5}, TrickNumber: 7, MatchTarget: 1001,
+		DeclarationsEnabled: true, DeclarationsTransfer: true, PlayedCards: played, RankBounds: bot.NoRankBounds(),
+	}
+}
+
+func beloteGate() bot.SearchTuning {
+	t := bot.DefaultSearchTuning()
+	t.BeloteSkipMargin = 5
+	return t
+}
+
+func TestInformationFromViewAfterTheSeatPlayed(t *testing.T) {
+	in := bot.InformationFromForTest(beloteFallView())
+
+	assert.Equal(t, [4]int{0, 2, 2, 2}, in.Need)
+	assert.Equal(t, search.MaskOf(cards("7S", "8S", "7D", "8D", "7C", "8C")), in.Unseen)
+}
+
+func TestBeloteAnswerSkipsWhenTheFallIsCertain(t *testing.T) {
+	announce, ok := bot.BeloteAnswerWith(beloteFallView(), farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.False(t, announce, "skipping keeps the 20 from the opponents")
+
+	announce, ok = bot.BeloteAnswerWith(beloteFallView(), farFuture(), bot.DefaultSearchTuning())
+	assert.False(t, ok)
+	assert.True(t, announce, "a zero margin always announces")
+}
+
+func TestBeloteAnswerDefenderAlwaysAnnounces(t *testing.T) {
+	v := beloteFallView()
+	caller := 1
+	v.TrumpCallerSeat = &caller
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerTransferOffAlwaysAnnounces(t *testing.T) {
+	v := beloteFallView()
+	v.DeclarationsTransfer = false
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerMissedDeadlineAnnounces(t *testing.T) {
+	announce, ok := bot.BeloteAnswerWith(beloteFallView(), time.Now().Add(-time.Second), beloteGate())
+	assert.False(t, ok)
+	assert.True(t, announce)
+}
+
+func TestBeloteAnswerAnnouncesWhenTheBeloteDecidesTheRace(t *testing.T) {
+	v := beloteFallView()
+	v.StopAtTarget = true
+	v.TeamScores = [2]int{v.MatchTarget - 10 - 15, 0}
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.False(t, ok, "the race is decided before any search")
+	assert.True(t, announce)
+
+	v.TeamScores[0] -= 10
+	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	assert.True(t, ok)
+	assert.False(t, announce, "five points short after the Belote, the fall still decides")
+}
+
+func TestBeloteAnswerAnnouncesWhenTheTwentyMakesTheContract(t *testing.T) {
+	v := beloteFallView()
+	v.HandPoints = [2]int{60, 85}
+
+	announce, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.True(t, announce, "77 card points fall against 85, the Belote's 20 makes the contract")
+
+	v.HandPoints = [2]int{40, 85}
+	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.False(t, announce, "57 card points plus the 20 still fall against 85, the Belote would only go to the opponents")
+
+	v.HandPoints = [2]int{75, 70}
+	announce, ok = bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.True(t, announce, "a contract made either way keeps its Belote")
+}
+
+func TestBeloteAnswerIsDeterministic(t *testing.T) {
+	v := beloteFallView()
+	v.HandPoints = [2]int{60, 85}
+	first, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	second, ok := bot.BeloteAnswerWith(v, farFuture(), beloteGate())
+	require.True(t, ok)
+	assert.Equal(t, first, second)
+}
+
+func TestDecideWithSkipsTheBeloteOnASearchedSkip(t *testing.T) {
+	v := beloteFallView()
+	skip := game.Action{Type: game.ActionSkipBelot, PlayerSeat: 0}
+	announce := game.Action{Type: game.ActionAnnounceBelot, PlayerSeat: 0}
+
+	assert.Equal(t, announce, bot.Decide(v))
+	assert.Equal(t, announce, bot.DecideWith(v, nil))
+	assert.Equal(t, announce, bot.DecideWith(v, &bot.SearchResult{}))
+	assert.Equal(t, skip, bot.DecideWith(v, &bot.SearchResult{BeloteSkip: true}))
+
+	v.PendingBelot = false
+	assert.NotEqual(t, skip.Type, bot.DecideWith(v, &bot.SearchResult{BeloteSkip: true}).Type)
+}
+
+func bidConsistency(t bot.SearchTuning) bot.SearchTuning {
+	t.BidConsistency = true
+	return t
+}
+
+func TestSearchFallsBackWhenNoDealFitsTheAuction(t *testing.T) {
+	gs := testfixtures.NewGameMidPlay(5)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.True(t, bot.SearchApplies(v, 3))
+	cand := card("7C")
+	impossible := []bot.BidRecord{passRec(1, 1, 0, &cand), callRec(1, 1, 0, game.SuitClubs, &cand)}
+	v.Bids = impossible
+	require.NotNil(t, bot.BidConsistentForTest(v))
+
+	want, ok := bot.SearchCardWith(v, farFuture(), bot.DefaultSearchTuning())
+	require.True(t, ok)
+	got, ok := bot.SearchCardWith(v, farFuture(), bidConsistency(bot.DefaultSearchTuning()))
+	require.True(t, ok, "a contradictory auction falls back to unfiltered sampling")
+	assert.Equal(t, want, got)
+
+	belote := beloteFallView()
+	belote.Bids = impossible
+	wantAnnounce, ok := bot.BeloteAnswerWith(belote, farFuture(), beloteGate())
+	require.True(t, ok)
+	gotAnnounce, ok := bot.BeloteAnswerWith(belote, farFuture(), bidConsistency(beloteGate()))
+	require.True(t, ok)
+	assert.Equal(t, wantAnnounce, gotAnnounce)
 }

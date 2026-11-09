@@ -36,6 +36,7 @@ type LiveMatch struct {
 	botActionGenerations     [4]uint64
 	botMemory                *bot.Memory
 	botSearchResults         [4]*botSearchEntry
+	botSearchStats           botSearchStats
 	dealGraceUntil           time.Time
 	missedTurns              [4]int
 	mu                       sync.RWMutex
@@ -143,6 +144,7 @@ type Manager struct {
 	botDelayMin      time.Duration
 	botDelayMax      time.Duration
 	botSearch        BotSearchSettings
+	botTuning        bot.SearchTuning
 	searchPool       *searchPool
 	dealGraceEnabled bool
 	mu               sync.RWMutex
@@ -157,6 +159,7 @@ func NewManager(hub Broadcaster, matchRepo MatchRepository) *Manager {
 		matchRepo:        matchRepo,
 		botDelayMin:      time.Second,
 		botDelayMax:      2500 * time.Millisecond,
+		botTuning:        bot.DefaultSearchTuning(),
 		dealGraceEnabled: true,
 	}
 }
@@ -1035,6 +1038,7 @@ func (m *Manager) handleMatchEnd(session *LiveMatch, finalState *game.GameState,
 	} else {
 		slog.Info("session: match persisted", "roomID", session.roomID, "matchID", matchRecord.ID, "hands", len(handsCopy))
 	}
+	session.logBotSearchSummary(matchRecord.ID)
 
 	if m.roomUpdater != nil {
 		if err := m.roomUpdater.UpdateRoomStatus(session.roomID, "completed"); err != nil {

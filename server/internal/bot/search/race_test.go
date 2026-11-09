@@ -1,6 +1,7 @@
 package search_test
 
 import (
+	"fmt"
 	"math/bits"
 	"math/rand/v2"
 	"slices"
@@ -489,4 +490,150 @@ func raceBeloteDeal(rng *rand.Rand) (*game.GameState, int) {
 		gs.TeamScores[team] = target - short[team] - gs.HandPoints[team]
 	}
 	return gs, holder
+}
+
+func TestHandEndDecided(t *testing.T) {
+	race := search.Race{Target: 1001, Banked: [2]int{2000, 2000}, Scores: [2]int{900, 950}, Caller: game.TeamB}
+	tests := []struct {
+		name        string
+		settled     [2]int
+		wantWinner  int
+		wantDecided bool
+	}{
+		{"nobody reaches the target", [2]int{100, 50}, 0, false},
+		{"team A alone reaches it", [2]int{101, 50}, game.TeamA, true},
+		{"team B takes the whole hand", [2]int{0, 162}, game.TeamB, true},
+		{"both reach it and B is higher", [2]int{110, 61}, game.TeamB, true},
+		{"both reach it equally and B called", [2]int{111, 61}, game.TeamB, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			winner, decided := search.HandEndDecided(race, tt.settled)
+			assert.Equal(t, tt.wantDecided, decided)
+			if tt.wantDecided {
+				assert.Equal(t, tt.wantWinner, winner)
+			}
+		})
+	}
+	race.Caller = game.TeamA
+	winner, decided := search.HandEndDecided(race, [2]int{111, 61})
+	assert.True(t, decided)
+	assert.Equal(t, game.TeamA, winner, "a tie goes to the caller")
+}
+
+func TestRaceHandEndCrossingMatchesTheEngine(t *testing.T) {
+	for _, stopAtTarget := range []bool{true, false} {
+		t.Run(fmt.Sprintf("stopAtTarget=%v", stopAtTarget), func(t *testing.T) {
+			rng := rand.New(rand.NewPCG(89, 97))
+			var crossed, open int
+			for i := range 300 {
+				gs := lastTrickDeal(t, rng, stopAtTarget)
+				seat := gs.ActivePlayerSeat
+				hands := handMasks(gs)
+				in := search.Information{Seat: seat, Own: hands[seat]}
+				for other := range hands {
+					if other != seat {
+						in.Known[other] = hands[other]
+					}
+				}
+				race := handEndRace(gs, !stopAtTarget)
+				pos := search.Position{
+					Trump: search.SuitIdx(*gs.TrumpSuit), Clockwise: gs.Rules.Clockwise, Leader: seat,
+					Capot: search.CapotFlag(gs.TricksWon), Race: &race,
+				}
+				settlement, _ := settlementAtTheLastTrick(gs, search.NewSolver(pos.Trump, pos.Clockwise))
+				res, ok := search.Choose(in, pos, game.LegalCards(gs, seat), settlement, search.Options{Samples: 1}, farFuture())
+				require.True(t, ok)
+				value := (1 - 2*game.TeamForSeat(seat)) * int(res.Mean)
+
+				for gs.Phase == game.PhasePlaying {
+					next, err := game.ApplyAction(gs, game.Action{
+						Type: game.ActionPlayCard, PlayerSeat: gs.ActivePlayerSeat, Card: &game.LegalCards(gs, gs.ActivePlayerSeat)[0],
+					})
+					require.NoError(t, err)
+					gs = next
+				}
+				require.NotNil(t, gs.LastHandResult, "deal %d", i)
+				if gs.Phase == game.PhaseMatchEnd {
+					require.Equal(t, (1-2*(*gs.WinnerTeam))*search.RaceWin, value, "deal %d race %+v result %+v", i, race, *gs.LastHandResult)
+					crossed++
+					continue
+				}
+				require.Equal(t, gs.LastHandResult.TeamAHandTotal-gs.LastHandResult.TeamBHandTotal, value, "deal %d race %+v", i, race)
+				open++
+			}
+			assert.Positive(t, crossed)
+			assert.Positive(t, open)
+		})
+	}
+}
+
+// lastTrickDeal plays a random hand with declarations off up to the last trick, then sets the match scores so that
+// each team's running total is 1 to 60 short of the target and only the hand's settlement can reach it.
+func lastTrickDeal(t *testing.T, rng *rand.Rand, stopAtTarget bool) *game.GameState {
+	t.Helper()
+	return endgameDeal(t, rng, stopAtTarget, 8, 60)
+}
+
+// endgameDeal plays a random hand with declarations off up to the start of the given trick, then sets the match
+// scores so that each team's running total is 1 to maxShort short of the target.
+func endgameDeal(t *testing.T, rng *rand.Rand, stopAtTarget bool, trick, maxShort int) *game.GameState {
+	t.Helper()
+	gs := raceDeal(rng, 0, 0)
+	gs.Rules.StopAtTarget, gs.StopAtTarget = stopAtTarget, stopAtTarget
+	gs.Rules.Clockwise = rng.IntN(2) == 1
+	gs.Clockwise = gs.Rules.Clockwise
+	caller := rng.IntN(4)
+	gs.TrumpCallerSeat = &caller
+	gs.ActivePlayerSeat = rng.IntN(4)
+	for gs.TrickNumber < trick || len(gs.CurrentTrick) > 0 {
+		seat := gs.ActivePlayerSeat
+		legal := game.LegalCards(gs, seat)
+		next, err := game.ApplyAction(gs, game.Action{Type: game.ActionPlayCard, PlayerSeat: seat, Card: &legal[rng.IntN(len(legal))]})
+		require.NoError(t, err)
+		gs = next
+	}
+	require.Equal(t, game.PhasePlaying, gs.Phase)
+	target := game.MatchTarget(gs.MatchMode)
+	for team := range gs.TeamScores {
+		gs.TeamScores[team] = target - gs.HandPoints[team] - 1 - rng.IntN(maxShort)
+	}
+	return gs
+}
+
+// handEndRace is the race the bridge builds from an engine state with declarations off: the running totals, the match
+// scores and the caller's team, deciding only at the hand's end when deciding is set.
+func handEndRace(gs *game.GameState, deciding bool) search.Race {
+	race := search.Race{
+		Target: game.MatchTarget(gs.MatchMode), Scores: gs.TeamScores,
+		Caller: game.TeamForSeat(*gs.TrumpCallerSeat), DecidingHand: deciding,
+	}
+	for team := range race.Banked {
+		race.Banked[team] = gs.TeamScores[team] + gs.HandPoints[team]
+	}
+	return race
+}
+
+func TestDecidingHandSkipsMidHandChecks(t *testing.T) {
+	for _, direction := range directions {
+		t.Run(direction.name, func(t *testing.T) {
+			eg := newRaceEndgame(990, 500)
+			solver := search.NewSolver(hearts, direction.clockwise)
+			plain := solver.RootValues(eg.hands, 0, nil, 0)
+
+			solver.SetRace(&eg.race)
+			require.Equal(t, search.RaceWin, solver.RootValues(eg.hands, 0, nil, 0)[eg.spadeAce])
+
+			eg.race.DecidingHand = true
+			solver.SetRace(&eg.race)
+			assert.Equal(t, plain, solver.RootValues(eg.hands, 0, nil, 0))
+
+			belote, _ := newBeloteRaceEndgame()
+			belote.race.DecidingHand = true
+			solver.SetRace(&belote.race)
+			roots := solver.RootValues(belote.hands, 0, nil, 0)
+			solver.SetRace(nil)
+			assert.Equal(t, solver.RootValues(belote.hands, 0, nil, 0), roots)
+		})
+	}
 }

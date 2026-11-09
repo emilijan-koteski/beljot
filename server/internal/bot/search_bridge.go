@@ -14,17 +14,19 @@ const (
 	searchEarlyStopSE    = 1.0
 	lastTrickBonusPoints = 10
 	beloteBonusPoints    = 20
+	capotBonusPoints     = 100
 	allCards             = uint32(1<<search.NCards - 1)
 )
 
 // SearchResult is the card the search chose with the deals behind it, its lead over the runner-up and that lead's
-// standard error.
+// standard error, or for a pending Belote whether the search answered it with a skip.
 type SearchResult struct {
-	Card     game.Card
-	Samples  int
-	Margin   float64
-	SE       float64
-	Deferred bool
+	Card       game.Card
+	Samples    int
+	Margin     float64
+	SE         float64
+	Deferred   bool
+	BeloteSkip bool
 }
 
 // SearchApplies reports whether the Monte Carlo search should pick this card: from the given trick on and only where
@@ -70,21 +72,32 @@ func bankedTotal(v View, team int) int {
 	return v.TeamScores[team] + v.HandPoints[team] + v.DeclPoints[team]
 }
 
-// raceFor is the stop-at-target race the search plays when the tuning races and a team is within reach, else nil.
-// The bot's own certain Belote stays out of the bank: the solver credits it when the first of the pair is played.
+// raceFor is the race the search plays, else nil: a stop-at-target race when the tuning races and a team is within
+// reach, or a deciding-hand race on a table that ends only at a hand's end when the tuning decides and a team could.
 func raceFor(v View, t SearchTuning) *search.Race {
-	if !t.RaceObjective || !withinStopAtTargetReach(v) {
+	deciding := !v.StopAtTarget && t.DecidingHand && couldDecideThisHand(v)
+	if !deciding && (!t.RaceObjective || !withinStopAtTargetReach(v)) {
 		return nil
 	}
 	race := &search.Race{
-		Target: v.MatchTarget,
-		Banked: [2]int{bankedTotal(v, game.TeamA), bankedTotal(v, game.TeamB)},
-		Caller: game.TeamForSeat(*v.TrumpCallerSeat),
+		Target:       v.MatchTarget,
+		Banked:       [2]int{bankedTotal(v, game.TeamA), bankedTotal(v, game.TeamB)},
+		Scores:       v.TeamScores,
+		Caller:       game.TeamForSeat(*v.TrumpCallerSeat),
+		DecidingHand: deciding,
 	}
 	if ownBeloteCertain(v) {
 		race.BeloteSeat, race.BeloteCards = v.Seat, search.MaskOf(belotePair(*v.TrumpSuit))
 	}
 	return race
+}
+
+// couldDecideThisHand is a loose upper bound: some team's match score plus every card point of the hand, a Capot, all
+// declarations and a Belote yet to come reaches the target.
+func couldDecideThisHand(v View) bool {
+	most := v.HandPoints[game.TeamA] + v.HandPoints[game.TeamB] + remainingCardPoints(v) + capotBonusPoints +
+		v.DeclPoints[game.TeamA] + v.DeclPoints[game.TeamB] + beloteBonusPoints
+	return max(v.TeamScores[game.TeamA], v.TeamScores[game.TeamB])+most >= v.MatchTarget
 }
 
 // SearchCard runs the search for the seat's card, reporting false when it reached no decision and the rules should play.
@@ -113,19 +126,101 @@ func SearchCardWith(v View, deadline time.Time, t SearchTuning) (SearchResult, b
 	return SearchResult{Card: card, Samples: res.Samples, Margin: res.Margin, SE: res.SE}, true
 }
 
+// chooseSearch runs the chooser, sampling only deals that fit the auction when the tuning asks, and once more without
+// that filter when no such deal was found.
 func chooseSearch(v View, samples int, deadline time.Time, t SearchTuning, class func(hands [4]uint32) int) (search.Result, bool) {
 	opts := search.Options{Samples: samples, SeedSalt: t.SeedSalt, EarlyStopAfter: searchEarlyStopAfter, EarlyStopSE: searchEarlyStopSE, SampleClass: class}
-	return search.Choose(informationFrom(v), positionFrom(v, t), v.LegalCards, settlementFrom(v), opts, deadline)
+	in, pos, settle := informationFrom(v), positionFrom(v, t), settlementFrom(v)
+	filtered := filteredOptions(v, opts, t)
+	if filtered.SampleFilter != nil {
+		if res, ok := search.Choose(in, pos, v.LegalCards, settle, filtered, deadline); ok {
+			return res, true
+		}
+	}
+	return search.Choose(in, pos, v.LegalCards, settle, opts, deadline)
 }
 
-// DecideWith plays the searched card when it is still a legal play and nothing else is pending, otherwise it decides by
-// the rules.
+// evaluateSearch is search.Evaluate's mean under filtered's auction filter when it has one, falling back to opts when
+// no deal fits the auction, as chooseSearch does.
+func evaluateSearch(in search.Information, pos search.Position, s search.Settlement, opts, filtered search.Options,
+	deadline time.Time) (float64, bool) {
+	if filtered.SampleFilter != nil {
+		if mean, _, _, ok := search.Evaluate(in, pos, s, filtered, deadline); ok {
+			return mean, true
+		}
+	}
+	mean, _, _, ok := search.Evaluate(in, pos, s, opts, deadline)
+	return mean, ok
+}
+
+// DecideWith skips a pending Belote the search answered with a skip and plays the searched card when it is still a legal
+// play and nothing else is pending, otherwise it decides by the rules.
 func DecideWith(v View, pre *SearchResult) game.Action {
+	if pre != nil && pre.BeloteSkip && v.PendingBelot && !v.PartnerProposedSurrender {
+		return game.Action{Type: game.ActionSkipBelot, PlayerSeat: v.Seat}
+	}
 	if pre == nil || !canPlaySearchedCard(v, pre.Card) {
 		return Decide(v)
 	}
 	card := pre.Card
 	return game.Action{Type: game.ActionPlayCard, PlayerSeat: v.Seat, Card: &card}
+}
+
+// BeloteSearchApplies reports whether the seat's pending Belote is worth a search: its team called trump, declarations
+// transfer on a fall and the tuning has a skip margin.
+func BeloteSearchApplies(v View, t SearchTuning) bool {
+	if !v.PendingBelot || v.Phase != game.PhasePlaying || v.TrumpSuit == nil || !myTeamCalledTrump(v) {
+		return false
+	}
+	return v.DeclarationsTransfer && t.BeloteSkipMargin > 0 && samplesFor(v.TrickNumber, t) > 0
+}
+
+// BeloteAnswer answers the seat's pending Belote under the default tuning; ok reports that the search decided it.
+func BeloteAnswer(v View, deadline time.Time) (announce bool, ok bool) {
+	return BeloteAnswerWith(v, deadline, DefaultSearchTuning())
+}
+
+// BeloteAnswerWith skips the caller's Belote only when the hand searched without it beats the hand searched with it by
+// more than the skip margin. It announces when the search does not apply, the Belote decides the race or time runs out.
+func BeloteAnswerWith(v View, deadline time.Time, t SearchTuning) (announce bool, ok bool) {
+	if !BeloteSearchApplies(v, t) {
+		return true, false
+	}
+	announced := withOwnBelote(v)
+	if beloteDecidesTheRace(announced, t) {
+		return true, false
+	}
+	opts := search.Options{Samples: samplesFor(v.TrickNumber, t), SeedSalt: t.SeedSalt}
+	filtered := filteredOptions(v, opts, t)
+	in := informationFrom(v)
+	withBelote, ok := evaluateSearch(in, positionFrom(announced, t), settlementFrom(announced), opts, filtered, deadline)
+	if !ok {
+		return true, false
+	}
+	withoutBelote, ok := evaluateSearch(in, positionFrom(v, t), settlementFrom(v), opts, filtered, deadline)
+	if !ok {
+		return true, false
+	}
+	teamSign := float64(1 - 2*game.TeamForSeat(v.Seat))
+	gain := teamSign * (withoutBelote - withBelote)
+	return gain <= float64(t.BeloteSkipMargin), true
+}
+
+// withOwnBelote is the view after the seat announces: its team's declarations carry the Belote's 20.
+func withOwnBelote(v View) View {
+	v.DeclPoints[game.TeamForSeat(v.Seat)] += beloteBonusPoints
+	return v
+}
+
+// beloteDecidesTheRace reports whether the announced Belote alone ends a stop-at-target match, whatever the tuning races.
+func beloteDecidesTheRace(announced View, t SearchTuning) bool {
+	t.RaceObjective = true
+	race := raceFor(announced, t)
+	if race == nil || race.DecidingHand {
+		return false
+	}
+	_, decided := search.RaceDecided(*race, [2]int{})
+	return decided
 }
 
 func canPlaySearchedCard(v View, card game.Card) bool {
@@ -162,17 +257,47 @@ func cannotHold(v View, seat int) uint32 {
 			mask |= search.SuitMask(suit)
 		}
 	}
+	mask |= cardsAboveBounds(v, seat)
 	for c := range cardsProvablyAbsent(v, seat) {
 		mask |= 1 << uint(search.CardIdx(c))
 	}
 	return mask
 }
 
-func cardsHeldBy(v View, seat int) int {
-	if slices.ContainsFunc(v.CurrentTrick, func(tc game.TrickCard) bool { return tc.PlayerSeat == seat }) {
-		return len(v.Hand) - 1
+func cardsAboveBounds(v View, seat int) uint32 {
+	if v.TrumpSuit == nil {
+		return 0
 	}
-	return len(v.Hand)
+	var mask uint32
+	for _, suit := range game.AllSuits {
+		bound := v.RankBounds[seat][SuitIndex(suit)]
+		if bound < 0 {
+			continue
+		}
+		for _, rank := range game.AllRanks {
+			c := game.Card{Rank: rank, Suit: suit}
+			if strengthOf(c, *v.TrumpSuit) > bound {
+				mask |= 1 << uint(search.CardIdx(c))
+			}
+		}
+	}
+	return mask
+}
+
+// cardsHeldBy counts from the bot's own hand, which is one card short once the bot has played to the trick.
+func cardsHeldBy(v View, seat int) int {
+	held := len(v.Hand)
+	if playedToTrick(v, v.Seat) {
+		held++
+	}
+	if playedToTrick(v, seat) {
+		held--
+	}
+	return held
+}
+
+func playedToTrick(v View, seat int) bool {
+	return slices.ContainsFunc(v.CurrentTrick, func(tc game.TrickCard) bool { return tc.PlayerSeat == seat })
 }
 
 func trickMask(v View) uint32 {

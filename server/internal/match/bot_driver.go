@@ -23,14 +23,17 @@ func (m *Manager) maybeScheduleBotAction(session *LiveMatch) {
 		if session.botActionTimers[seat] != nil {
 			continue
 		}
-		delay := m.botThinkDelay(gs, seat) + session.dealGraceRemaining()
 		gen := session.botActionGenerations[seat]
 		ctx := botDecisionContextFor(gs, seat)
+		delay := m.botThinkDelay(gs, seat)
+		if m.submitBotSearch(session, seat, gen, ctx) {
+			delay = m.botPlayDelay()
+		}
+		delay += session.dealGraceRemaining()
 		s := seat
 		session.botActionTimers[seat] = time.AfterFunc(delay, func() {
 			m.handleBotActionTimer(session, s, gen, ctx)
 		})
-		m.submitBotSearch(session, seat, gen, ctx)
 	}
 }
 
@@ -41,21 +44,51 @@ type botSearchEntry struct {
 	result     bot.SearchResult
 }
 
-// submitBotSearch queues the card search for a seat whose armed decision is a card play, so its result is ready by
-// the time the think delay ends. Call it under session.mu; the search itself runs off the lock.
-func (m *Manager) submitBotSearch(session *LiveMatch, seat int, generation uint64, ctx botDecisionContext) {
+// submitBotSearch queues the search for a seat whose armed decision is a card play or its own Belote answer, so its
+// result is ready by the time the think delay ends; it reports a queued Belote search. Call it under session.mu.
+func (m *Manager) submitBotSearch(session *LiveMatch, seat int, generation uint64, ctx botDecisionContext) bool {
 	gs := session.gameState
-	if m.searchPool == nil || !isCardPlayDecision(gs, seat) {
-		return
+	if m.searchPool == nil {
+		return false
 	}
-	view := buildBotView(gs, seat, session.botMemory)
-	if !bot.SearchApplies(view, m.botSearch.FromTrick) {
+	switch {
+	case isCardPlayDecision(gs, seat):
+		m.submitCardSearch(session, seat, generation, ctx)
+	case isOwnBeloteDecision(gs, seat):
+		return m.submitBeloteSearch(session, seat, generation, ctx)
+	}
+	return false
+}
+
+func (m *Manager) submitCardSearch(session *LiveMatch, seat int, generation uint64, ctx botDecisionContext) {
+	view := buildBotView(session.gameState, seat, session.botMemory)
+	if !bot.SearchAppliesWith(view, m.botSearch.FromTrick, m.botTuning) {
 		return
 	}
 	deadline := time.Now().Add(m.botSearch.Deadline)
-	if !m.searchPool.submit(func() { runBotSearch(session, view, generation, ctx, deadline) }) {
+	tuning := m.botTuning
+	if !m.searchPool.submit(func() { runBotSearch(session, view, generation, ctx, deadline, tuning) }) {
 		slog.Debug("bot: search queue full; rules played", "roomID", session.roomID, "seat", seat, "trick", view.TrickNumber)
+		return
 	}
+	session.botSearchStats.noteSubmitted()
+}
+
+// submitBeloteSearch queues the caller's Belote valuation and reports whether it did; a seat with nothing queued
+// announces at the Belote beat.
+func (m *Manager) submitBeloteSearch(session *LiveMatch, seat int, generation uint64, ctx botDecisionContext) bool {
+	view := buildBotView(session.gameState, seat, session.botMemory)
+	if view.TrickNumber < m.botSearch.FromTrick || !bot.BeloteSearchApplies(view, m.botTuning) {
+		return false
+	}
+	deadline := time.Now().Add(m.botSearch.Deadline)
+	tuning := m.botTuning
+	if !m.searchPool.submit(func() { runBeloteSearch(session, view, generation, ctx, deadline, tuning) }) {
+		slog.Debug("bot: search queue full; Belote announced", "roomID", session.roomID, "seat", seat, "trick", view.TrickNumber)
+		return false
+	}
+	session.botSearchStats.noteSubmitted()
+	return true
 }
 
 func isCardPlayDecision(gs *game.GameState, seat int) bool {
@@ -63,20 +96,43 @@ func isCardPlayDecision(gs *game.GameState, seat int) bool {
 		!gs.AwaitingDeclaration && gs.SurrenderProposerSeat == nil
 }
 
+func isOwnBeloteDecision(gs *game.GameState, seat int) bool {
+	return gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat &&
+		gs.SurrenderProposerSeat == nil
+}
+
 // runBotSearch searches without holding session.mu and stores the result only if the seat is still waiting on the
 // timer it was started for.
-func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time) {
-	result, ok := bot.SearchCard(view, deadline)
+func runBotSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time, t bot.SearchTuning) {
+	result, ok := bot.SearchCardWith(view, deadline, t)
 	if !ok {
-		slog.Info("bot: search reached no decision; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		slog.Debug("bot: search reached no decision; rules played", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		session.botSearchStats.noteMissed(view.TrickNumber)
 		return
 	}
-	session.mu.Lock()
-	defer session.mu.Unlock()
-	if session.closed || session.botActionGenerations[view.Seat] != generation {
+	session.storeBotSearchResult(view.Seat, generation, ctx, result)
+}
+
+// runBeloteSearch values the Belote answer off the lock; a missed deadline stores nothing, so the seat announces.
+func runBeloteSearch(session *LiveMatch, view bot.View, generation uint64, ctx botDecisionContext, deadline time.Time, t bot.SearchTuning) {
+	announce, ok := bot.BeloteAnswerWith(view, deadline, t)
+	if !ok {
+		slog.Debug("bot: Belote search reached no decision; announced", "roomID", session.roomID, "seat", view.Seat, "trick", view.TrickNumber)
+		session.botSearchStats.noteMissed(view.TrickNumber)
 		return
 	}
-	session.botSearchResults[view.Seat] = &botSearchEntry{generation: generation, ctx: ctx, result: result}
+	session.storeBotSearchResult(view.Seat, generation, ctx, bot.SearchResult{BeloteSkip: !announce})
+}
+
+// storeBotSearchResult takes session.mu and keeps the result only while the seat still waits on that generation.
+func (s *LiveMatch) storeBotSearchResult(seat int, generation uint64, ctx botDecisionContext, result bot.SearchResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.botActionGenerations[seat] != generation {
+		slog.Debug("bot: stale search result dropped", "roomID", s.roomID, "seat", seat)
+		return
+	}
+	s.botSearchResults[seat] = &botSearchEntry{generation: generation, ctx: ctx, result: result}
 }
 
 // takeBotSearchResult clears the seat's stored search and returns it when it was made for this generation and context.
@@ -160,9 +216,8 @@ func botDecisionSeats(gs *game.GameState) []int {
 
 const botBelotBeat = 150 * time.Millisecond
 
-// botThinkDelay returns the humanized delay before the bot at seat acts: random in
-// [botDelayMin, botDelayMax] for bids and plays, botDelayMin for fixed-window phases,
-// and botBelotBeat for its own Belote answer, already decided when it played the card.
+// botThinkDelay returns the humanized delay before the bot at seat acts: botPlayDelay for bids and plays,
+// botDelayMin for fixed-window phases and botBelotBeat for its own Belote answer, unless a Belote search is queued.
 func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
 	if gs.Phase == game.PhasePlaying && gs.PendingBelotSeat != nil && *gs.PendingBelotSeat == seat {
 		return min(botBelotBeat, m.botDelayMax)
@@ -171,6 +226,11 @@ func (m *Manager) botThinkDelay(gs *game.GameState, seat int) time.Duration {
 	if phase == game.PhaseHandComplete || phase == game.PhaseDeclaring {
 		return m.botDelayMin
 	}
+	return m.botPlayDelay()
+}
+
+// botPlayDelay is the humanized delay of a bid or a card play, random in [botDelayMin, botDelayMax].
+func (m *Manager) botPlayDelay() time.Duration {
 	spread := m.botDelayMax - m.botDelayMin
 	if spread <= 0 {
 		return m.botDelayMin
@@ -256,6 +316,7 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		StopAtTarget:         gs.Rules.StopAtTarget,
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
+		RankBounds:           bot.NoRankBounds(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -266,9 +327,12 @@ func buildBotView(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
+		v.PlayedBy = mem.PlayedBy()
 		v.KnownVoids = mem.KnownVoids()
+		v.RankBounds = mem.RankBounds()
 		v.KnownCards = mem.KnownCards()
 		v.DeclaredCards = mem.DeclaredCards()
+		v.Bids = mem.Bids()
 	}
 	return v
 }
@@ -298,7 +362,10 @@ func (m *Manager) observeBotMemoryLocked(session *LiveMatch, oldState, newState 
 		return
 	}
 	if action.Type == game.ActionPlayCard && action.Card != nil {
-		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit)
+		mem.ObservePlay(action.PlayerSeat, *action.Card, oldState.LeadSuit, oldState.TrumpSuit, oldState.CurrentTrick)
+	}
+	if action.Type == game.ActionPassTrump || action.Type == game.ActionPickTrump {
+		mem.ObserveBid(action.PlayerSeat, action, oldState.TrumpCandidate, oldState.BiddingRound, oldState.BiddingPassCount)
 	}
 	mem.SyncHand(newState.HandNumber)
 	if action.Type == game.ActionPickTrump && oldState.TrumpCandidate != nil {

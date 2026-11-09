@@ -115,7 +115,7 @@ func Load() *Config {
 
 		BotSearchWorkers:   getEnvInt("BELJOT_BOT_SEARCH_WORKERS", 0),
 		BotSearchDeadline:  getEnvDuration("BELJOT_BOT_SEARCH_DEADLINE", 500*time.Millisecond),
-		BotSearchFromTrick: getEnvInt("BELJOT_BOT_SEARCH_FROM_TRICK", 3),
+		BotSearchFromTrick: getEnvInt("BELJOT_BOT_SEARCH_FROM_TRICK", 1),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

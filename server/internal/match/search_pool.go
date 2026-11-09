@@ -8,7 +8,7 @@ import (
 
 const (
 	defaultBotSearchDeadline  = 500 * time.Millisecond
-	defaultBotSearchFromTrick = 3
+	defaultBotSearchFromTrick = 1
 	maxDefaultSearchWorkers   = 4
 	searchQueuePerWorker      = 4
 )

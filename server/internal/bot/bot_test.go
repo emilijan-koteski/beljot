@@ -47,9 +47,12 @@ func viewFromState(gs *game.GameState, seat int, mem *bot.Memory) bot.View {
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
 		DeclarationsEnabled:  gs.Rules.DeclarationsEnabled,
 		PlayedCards:          mem.PlayedCards(),
+		PlayedBy:             mem.PlayedBy(),
 		KnownVoids:           mem.KnownVoids(),
+		RankBounds:           mem.RankBounds(),
 		KnownCards:           mem.KnownCards(),
 		DeclaredCards:        mem.DeclaredCards(),
+		Bids:                 mem.Bids(),
 	}
 	if gs.SurrenderProposerSeat != nil && (*gs.SurrenderProposerSeat+2)%4 == seat {
 		v.PartnerProposedSurrender = true
@@ -137,14 +140,6 @@ func TestDecide_Bidding(t *testing.T) {
 			round:       1,
 			noCandidate: true,
 			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:      "row 4 retired: four with the Ace and no side Ace passes in Bitola",
-			seat:      1,
-			hand:      cards("AH", "7H", "8H", "7S", "8S"),
-			round:     1,
-			candidate: "QH",
-			wantType:  game.ActionPassTrump,
 		},
 		{
 			name:        "row 4 retired: four with the Ace still calls through row 5 with a side Ace",
@@ -236,9 +231,18 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPickTrump,
 		},
 		{
-			name:        "row 10 negative in Croatian",
+			name:        "row 10: Croatian 9 with two others and a side Ace",
 			seat:        1,
 			hand:        cards("9H", "7H", "8H", "AS", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPickTrump,
+			wantSuit:    suitPtr(game.SuitHearts),
+		},
+		{
+			name:        "row 10 negative in Croatian without a side Ace",
+			seat:        1,
+			hand:        cards("9H", "7H", "8H", "7S", "7C", "8C"),
 			round:       1,
 			noCandidate: true,
 			wantType:    game.ActionPassTrump,
@@ -261,6 +265,34 @@ func TestDecide_Bidding(t *testing.T) {
 			wantType:  game.ActionPassTrump,
 		},
 		{
+			name:         "row 11: second seat J doubleton with one side Ace",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPickTrump,
+		},
+		{
+			name:         "row 11 negative at the dealer's seat",
+			seat:         1,
+			passesBefore: 3,
+			hand:         cards("JH", "AS", "7C", "8C", "9D"),
+			round:        1,
+			candidate:    "7H",
+			wantType:     game.ActionPassTrump,
+		},
+		{
+			name:         "row 10: Croatian second seat 9 with two others and one side Ace",
+			seat:         1,
+			passesBefore: 1,
+			hand:         cards("9H", "7H", "8H", "AS", "7C", "8C"),
+			round:        1,
+			noCandidate:  true,
+			wantType:     game.ActionPickTrump,
+			wantSuit:     suitPtr(game.SuitHearts),
+		},
+		{
 			name:         "row 11 negative in Croatian at the third seat",
 			seat:         1,
 			passesBefore: 2,
@@ -268,6 +300,30 @@ func TestDecide_Bidding(t *testing.T) {
 			round:        1,
 			noCandidate:  true,
 			wantType:     game.ActionPassTrump,
+		},
+		{
+			name:      "row 13: Ace with three small trumps and the candidate, no side Ace",
+			seat:      1,
+			hand:      cards("AH", "7H", "8H", "7C", "8C"),
+			round:     1,
+			candidate: "KH",
+			wantType:  game.ActionPickTrump,
+		},
+		{
+			name:      "row 13 negative with only three trumps",
+			seat:      1,
+			hand:      cards("AH", "7H", "7C", "8C", "9D"),
+			round:     1,
+			candidate: "KH",
+			wantType:  game.ActionPassTrump,
+		},
+		{
+			name:        "row 13 negative in Croatian",
+			seat:        1,
+			hand:        cards("AH", "7H", "8H", "KH", "7C", "8C"),
+			round:       1,
+			noCandidate: true,
+			wantType:    game.ActionPassTrump,
 		},
 		{
 			name:         "row 12: Croatian dealer's partner J doubleton with a side Ace",
@@ -286,15 +342,6 @@ func TestDecide_Bidding(t *testing.T) {
 			round:       1,
 			noCandidate: true,
 			wantType:    game.ActionPassTrump,
-		},
-		{
-			name:         "row 12 negative in Bitola at the second seat",
-			seat:         1,
-			passesBefore: 1,
-			hand:         cards("JH", "AS", "7C", "8C", "9D"),
-			round:        1,
-			candidate:    "7H",
-			wantType:     game.ActionPassTrump,
 		},
 		{
 			name:      "round 2 picks the higher-scoring of two matching suits",
@@ -645,7 +692,7 @@ func TestDecide_CardPlay(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit, nil)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -721,10 +768,10 @@ func TestDecide_PartnerTakesTrick(t *testing.T) {
 
 			mem := bot.NewMemory()
 			if tt.partnerVoidDiam {
-				mem.ObservePlay(2, card("8C"), &lead, nil)
+				mem.ObservePlay(2, card("8C"), &lead, nil, nil)
 			}
 			for _, id := range tt.playedHearts {
-				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(2, card(id), nil, gs.TrumpSuit, nil)
 			}
 			mem.ObserveDeclarations(gs.Players)
 
@@ -828,7 +875,7 @@ func TestDecide_LastTrickRetention(t *testing.T) {
 
 			mem := bot.NewMemory()
 			for _, id := range tt.played {
-				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit)
+				mem.ObservePlay(1, card(id), nil, gs.TrumpSuit, nil)
 			}
 			for seat, ids := range tt.declaredBySeat {
 				gs.Players[seat].Declarations = []game.Declaration{{
@@ -886,7 +933,7 @@ func viewForTweakCase(tt playTweakCase) bot.View {
 
 	mem := bot.NewMemory()
 	for _, o := range tt.observes {
-		mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit)
+		mem.ObservePlay(o.seat, card(o.card), o.lead, gs.TrumpSuit, nil)
 	}
 	for seat, ids := range tt.located {
 		for _, id := range ids {
@@ -1763,16 +1810,16 @@ func TestMemory_VoidInference(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
 
-	mem.ObservePlay(2, card("7H"), &lead, nil)
+	mem.ObservePlay(2, card("7H"), &lead, nil, nil)
 	voids := mem.KnownVoids()
 	assert.True(t, voids[2][bot.SuitIndex(game.SuitSpades)])
 	assert.False(t, voids[2][bot.SuitIndex(game.SuitHearts)])
 
-	mem.ObservePlay(3, card("9S"), &lead, nil)
+	mem.ObservePlay(3, card("9S"), &lead, nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[3][bot.SuitIndex(game.SuitSpades)])
 
-	mem.ObservePlay(0, card("AC"), nil, nil)
+	mem.ObservePlay(0, card("AC"), nil, nil, nil)
 	voids = mem.KnownVoids()
 	assert.False(t, voids[0][bot.SuitIndex(game.SuitClubs)])
 
@@ -1797,7 +1844,7 @@ func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mem := bot.NewMemory()
 			lead := tt.lead
-			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts)
+			mem.ObservePlay(tt.seat, card(tt.card), &lead, &hearts, nil)
 			voids := mem.KnownVoids()
 			for _, s := range game.AllSuits {
 				want := slices.Contains(tt.wantVoids, s)
@@ -1810,7 +1857,7 @@ func TestMemory_DiscardProvesTrumpVoid(t *testing.T) {
 func TestMemory_SyncHandResets(t *testing.T) {
 	mem := bot.NewMemory()
 	lead := game.SuitSpades
-	mem.ObservePlay(2, card("7H"), &lead, nil)
+	mem.ObservePlay(2, card("7H"), &lead, nil, nil)
 	require.NotEmpty(t, mem.PlayedCards())
 
 	mem.SyncHand(1)
@@ -2081,4 +2128,36 @@ func TestCardsProvablyAbsent(t *testing.T) {
 			assert.ElementsMatch(t, cards(tt.want...), keys)
 		})
 	}
+}
+
+func TestChooseFollowDiscardsTheBlindTenRatherThanAnAce(t *testing.T) {
+	tests := []struct {
+		name string
+		hand []game.Card
+		want string
+	}{
+		{"only an Ace beside the ten", cards("AD", "TS"), "TS"},
+		{"a low card beside the ten and the Ace", cards("AD", "TS", "7C"), "7C"},
+		{"another blind ten beside the ten and the Ace", cards("AD", "TS", "TC"), "TS"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := viewForTweakCase(playTweakCase{
+				hand:       tt.hand,
+				trick:      []game.TrickCard{{Card: card("JH"), PlayerSeat: 3}},
+				callerSeat: 1,
+			})
+			assert.Equal(t, tt.want, bot.ChooseCardForTest(v).String())
+		})
+	}
+}
+
+func TestChooseLeadNeverLeadsABlindTen(t *testing.T) {
+	v := viewForTweakCase(playTweakCase{hand: cards("TS", "AD", "7H"), callerSeat: 1})
+	assert.Equal(t, "AD", bot.ChooseCardForTest(v).String())
+}
+
+func TestChooseLeadKeepsTheOnlySideTen(t *testing.T) {
+	v := viewForTweakCase(playTweakCase{hand: cards("TS", "7H"), callerSeat: 1})
+	assert.Equal(t, "TS", bot.ChooseCardForTest(v).String())
 }

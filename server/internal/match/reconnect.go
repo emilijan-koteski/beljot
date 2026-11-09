@@ -557,6 +557,7 @@ func (m *Manager) abandonMatchLocked(session *LiveMatch, abandonedSeat int, reas
 	} else {
 		slog.Info("session: abandoned match persisted", "roomID", roomID, "matchID", matchRecord.ID, "hands", len(handsCopy))
 	}
+	session.logBotSearchSummary(matchRecord.ID)
 
 	if m.roomUpdater != nil {
 		if err := m.roomUpdater.UpdateRoomStatus(roomID, "completed"); err != nil {

@@ -14,8 +14,14 @@ type Settlement struct {
 }
 
 // Settle returns the team A minus team B award the engine banks for a hand whose remainder is worth remDiff.
-// It mirrors scoreHand: a Capot or a failed contract hands one side the whole hand, otherwise both sides keep their own.
 func Settle(s Settlement, remDiff int) int {
+	totals := SettleTotals(s, remDiff)
+	return totals[game.TeamA] - totals[game.TeamB]
+}
+
+// SettleTotals returns what each team banks for a hand whose remainder is worth remDiff. It mirrors scoreHand: a
+// Capot or a failed contract hands one side the whole hand and the other nothing, otherwise both sides keep their own.
+func SettleTotals(s Settlement, remDiff int) [2]int {
 	capotA := s.TricksWon[game.TeamB] == 0 && remDiff == s.RemainingCardPoints+capotBonus
 	capotB := s.TricksWon[game.TeamA] == 0 && remDiff == -(s.RemainingCardPoints+capotBonus)
 	bonus := lastTrickBonus
@@ -33,15 +39,15 @@ func Settle(s Settlement, remDiff int) int {
 
 	switch {
 	case capotA:
-		return s.wholeHand(cardsA+cardsB, game.TeamA)
+		return [2]int{s.wholeHand(cardsA+cardsB, game.TeamA), 0}
 	case capotB:
-		return -s.wholeHand(cardsA+cardsB, game.TeamB)
+		return [2]int{0, s.wholeHand(cardsA+cardsB, game.TeamB)}
 	case s.CallerTeam == game.TeamA && fullA <= fullB:
-		return -s.wholeHand(cardsA+cardsB, game.TeamB)
+		return [2]int{0, s.wholeHand(cardsA+cardsB, game.TeamB)}
 	case s.CallerTeam == game.TeamB && fullB <= fullA:
-		return s.wholeHand(cardsA+cardsB, game.TeamA)
+		return [2]int{s.wholeHand(cardsA+cardsB, game.TeamA), 0}
 	}
-	return fullA - fullB
+	return [2]int{fullA, fullB}
 }
 
 func (s Settlement) wholeHand(cardPoints, winner int) int {
@@ -49,4 +55,11 @@ func (s Settlement) wholeHand(cardPoints, winner int) int {
 		return cardPoints + s.DeclPoints[game.TeamA] + s.DeclPoints[game.TeamB]
 	}
 	return cardPoints + s.DeclPoints[winner]
+}
+
+// CallerMade reports whether the trump caller's team keeps the hand whose remainder is worth remDiff: it banks more
+// than the opponents, so the contract neither falls nor ends in an opposing Capot.
+func CallerMade(s Settlement, remDiff int) bool {
+	totals := SettleTotals(s, remDiff)
+	return totals[s.CallerTeam] > totals[1-s.CallerTeam]
 }
