@@ -106,8 +106,8 @@ func TestHandScoring_FailedContract(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "Team B gets 0 on failed contract")
 }
 
-func TestHandScoring_EqualPointsIsFailure(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianEqualPointsIsFailure(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{80, 49}
 
 	result := playTrick8(t, gs)
@@ -118,8 +118,8 @@ func TestHandScoring_EqualPointsIsFailure(t *testing.T) {
 	assert.True(t, result.LastHandResult.FailedContract, "a tie marks the hand failed for the caller")
 }
 
-func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianTieFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{81, 50}
 	gs.TeamScores = [2]int{0, 0}
 
@@ -132,8 +132,8 @@ func TestHandScoring_TieFailsTrumpCaller(t *testing.T) {
 	assert.Equal(t, 0, result.TeamScores[game.TeamB], "caller scores 0 on the tie")
 }
 
-func TestHandScoring_TieWithDeclarationsFailsTrumpCaller(t *testing.T) {
-	gs := testfixtures.NewGameLastTrick()
+func TestHandScoring_CroatianTieWithDeclarationsFailsTrumpCaller(t *testing.T) {
+	gs := testfixtures.NewGameCroatianLastTrick()
 	gs.HandPoints = [2]int{71, 60}
 	gs.DeclarationPoints = [2]int{20, 0}
 	gs.TeamScores = [2]int{0, 0}

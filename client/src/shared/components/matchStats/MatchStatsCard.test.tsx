@@ -212,6 +212,125 @@ describe("MatchStatsCard", () => {
     });
   });
 
+  describe("hanging points (Bitola tie)", () => {
+    const handRow = (handNumber: number): HTMLElement => {
+      const row = screen
+        .getAllByTestId("match-history-hand-row")
+        .find((r) => r.dataset.handNumber === String(handNumber));
+      if (row === undefined) throw new Error(`no row for hand ${handNumber}`);
+      return row;
+    };
+    const hangingMatch = (viewerSeat: number) =>
+      makeMatch({
+        viewerSeat,
+        status: "abandoned",
+        teamAScore: 262,
+        teamBScore: 62,
+        hands: [
+          makeHand({
+            handNumber: 1,
+            teamACardPoints: 81,
+            teamBCardPoints: 71,
+            teamADeclPoints: 0,
+            lastTrickTeam: 1,
+            contractingTeam: 1,
+            teamAHandTotal: 81,
+            teamBHandTotal: 0,
+            hangingCreated: { amount: 81, team: 1 },
+            hangingPaid: null,
+          }),
+          makeHand({
+            handNumber: 2,
+            teamACardPoints: 90,
+            teamBCardPoints: 62,
+            teamADeclPoints: 0,
+            lastTrickTeam: 0,
+            contractingTeam: 0,
+            teamAHandTotal: 181,
+            teamBHandTotal: 62,
+            hangingCreated: null,
+            hangingPaid: { amount: 81, team: 0 },
+          }),
+        ],
+      });
+
+    it.each([
+      ["stacked", "stacked" as const],
+      ["auto", "auto" as const],
+    ])("notes the tie and the payout per hand in the %s layout", (_name, handsLayout) => {
+      renderCard({ match: hangingMatch(0), isOpen: true, handsLayout });
+
+      expect(within(handRow(1)).getByTestId("match-history-hand-hanging")).toHaveTextContent(
+        "tie · their 81 hangs",
+      );
+      expect(within(handRow(1)).queryByTestId("match-history-hand-hanging-paid")).toBeNull();
+      expect(within(handRow(2)).getByTestId("match-history-hand-hanging-paid")).toHaveTextContent(
+        "+81 hanging · us",
+      );
+      expect(within(handRow(2)).queryByTestId("match-history-hand-hanging")).toBeNull();
+    });
+
+    it("reads the tie and the payout from the other team's seat", () => {
+      renderCard({ match: hangingMatch(1), isOpen: true, handsLayout: "stacked" });
+
+      expect(within(handRow(1)).getByTestId("match-history-hand-hanging")).toHaveTextContent(
+        "tie · our 81 hangs",
+      );
+      expect(within(handRow(2)).getByTestId("match-history-hand-hanging-paid")).toHaveTextContent(
+        "+81 hanging · them",
+      );
+    });
+
+    it.each([
+      [0, "tie · their 81 discarded"],
+      [1, "tie · our 81 discarded"],
+    ])(
+      "marks a tie in the last recorded hand as discarded (viewer seat %i)",
+      (viewerSeat, note) => {
+        const match = makeMatch({
+          viewerSeat,
+          status: "abandoned",
+          teamAScore: 201,
+          teamBScore: 72,
+          hands: [
+            makeHand({ handNumber: 1 }),
+            makeHand({
+              handNumber: 2,
+              teamACardPoints: 81,
+              teamBCardPoints: 71,
+              teamADeclPoints: 0,
+              lastTrickTeam: 1,
+              contractingTeam: 1,
+              teamAHandTotal: 81,
+              teamBHandTotal: 0,
+              hangingCreated: { amount: 81, team: 1 },
+              hangingPaid: null,
+            }),
+          ],
+        });
+
+        renderCard({ match, isOpen: true, handsLayout: "stacked" });
+
+        expect(within(handRow(2)).getByTestId("match-history-hand-hanging")).toHaveTextContent(
+          note,
+        );
+      },
+    );
+
+    it("counts a payout inside the hand totals, leaving no unfinished hand", () => {
+      renderCard({ match: hangingMatch(0), isOpen: true });
+
+      expect(screen.queryByTestId("match-history-unscored-hand")).not.toBeInTheDocument();
+    });
+
+    it("shows no hanging note for a hand from an older server without the fields", () => {
+      renderCard({ match: makeMatch(), isOpen: true });
+
+      expect(screen.queryByTestId("match-history-hand-hanging")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("match-history-hand-hanging-paid")).not.toBeInTheDocument();
+    });
+  });
+
   describe("rules", () => {
     it("names the five match rules on the rule icons, brass where they changed", () => {
       renderCard({

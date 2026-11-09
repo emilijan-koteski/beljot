@@ -27,6 +27,11 @@ import type {
 } from "./wsEvents";
 import { SEASON_RANK_CHANGES, SEASON_SP_REASONS } from "./wsEvents";
 
+const HangingPointsSchema = z.strictObject({
+  amount: z.number(),
+  team: z.number(),
+});
+
 const CardSchema = z.strictObject({
   rank: z.string(),
   suit: z.string(),
@@ -110,8 +115,11 @@ export const EventMatchStateSchema = z.strictObject({
       contractingTeam: z.number(),
       teamAHandTotal: z.number(),
       teamBHandTotal: z.number(),
+      hangingCreated: HangingPointsSchema.nullable(),
+      hangingPaid: HangingPointsSchema.nullable(),
     })
     .nullable(),
+  hangingPoints: HangingPointsSchema.nullable(),
   activePlayerSeat: z.number(),
   turnExpiresAt: z.string().nullable(),
   timerDurationSec: z.number(),
@@ -166,6 +174,8 @@ export const HandScoredPayloadSchema = z.strictObject({
   teamBHandTotal: z.number(),
   teamAMatchScore: z.number(),
   teamBMatchScore: z.number(),
+  hangingCreated: HangingPointsSchema.nullable(),
+  hangingPaid: HangingPointsSchema.nullable(),
 });
 
 export const MatchEndPayloadSchema = z.strictObject({

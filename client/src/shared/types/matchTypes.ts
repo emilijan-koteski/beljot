@@ -111,6 +111,14 @@ export interface PlayerState {
   declarationAnswered: boolean;
 }
 
+/**
+ * A Bitola tied hand's held-over points. `team` owns the half that hangs, or on a payout is the team that took it.
+ */
+export interface HangingPoints {
+  amount: number;
+  team: number;
+}
+
 export interface HandResult {
   teamACardPoints: number;
   teamBCardPoints: number;
@@ -125,6 +133,8 @@ export interface HandResult {
   contractingTeam: number;
   teamAHandTotal: number;
   teamBHandTotal: number;
+  hangingCreated: HangingPoints | null;
+  hangingPaid: HangingPoints | null;
 }
 
 /** The match state as projected for one recipient; the server is authoritative on every rule. */
@@ -165,6 +175,7 @@ export interface MatchState {
   belotAnnounced: boolean;
   winnerTeam: number | null;
   lastHandResult: HandResult | null;
+  hangingPoints: HangingPoints | null;
   turnExpiresAt: string | null;
   timerDurationSec: number;
   previousPhase: Phase;

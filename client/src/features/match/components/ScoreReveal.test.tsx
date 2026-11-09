@@ -11,6 +11,7 @@ vi.mock("react-i18next", () => ({
         "match.scoreReveal.declarationPoints": "Declarations",
         "match.scoreReveal.lastTrickBonus": "Last trick bonus",
         "match.scoreReveal.capotBonus": "Capot bonus",
+        "match.scoreReveal.hangingPaid": "Hanging points",
         "match.scoreReveal.failedContract": "Failed Contract",
         "match.scoreReveal.handTotal": "Hand total",
         "match.scoreReveal.matchTotal": "Match score",
@@ -28,6 +29,18 @@ vi.mock("react-i18next", () => ({
       }
       if (key === "match.scoreReveal.subtitleHeldThem" && opts) {
         return `Made it · they took ${opts.suit}`;
+      }
+      if (key === "match.scoreReveal.subtitleTieUs" && opts) {
+        return `Tie · our ${opts.amount} hangs`;
+      }
+      if (key === "match.scoreReveal.subtitleTieThem" && opts) {
+        return `Tie · their ${opts.amount} hangs`;
+      }
+      if (key === "match.scoreReveal.subtitleTieDiscardedUs" && opts) {
+        return `Tie · our ${opts.amount} is discarded`;
+      }
+      if (key === "match.scoreReveal.subtitleTieDiscardedThem" && opts) {
+        return `Tie · their ${opts.amount} is discarded`;
       }
       return translations[key] ?? key;
     },
@@ -54,6 +67,8 @@ const normalData: HandScoredPayload = {
   contractingTeam: 1,
   teamAHandTotal: 70,
   teamBHandTotal: 92,
+  hangingCreated: null,
+  hangingPaid: null,
   teamAMatchScore: 70,
   teamBMatchScore: 92,
 };
@@ -236,6 +251,84 @@ describe("ScoreReveal", () => {
     const handTotalRow = screen.getByTestId("row-hand-total");
     expect(handTotalRow.querySelector("[data-team='teamA']")).toHaveTextContent("0");
     expect(handTotalRow.querySelector("[data-team='teamB']")).toHaveTextContent("162");
+  });
+
+  it.each([
+    ["teamB" as const, "Tie · our 81 hangs"],
+    ["teamA" as const, "Tie · their 81 hangs"],
+  ])("labels a Bitola tie by the half that hangs (viewer %s)", (viewerTeam, subtitle) => {
+    const tie: HandScoredPayload = {
+      ...normalData,
+      teamACardPoints: 81,
+      teamBCardPoints: 71,
+      lastTrickTeam: 1,
+      contractingTeam: 1,
+      teamAHandTotal: 81,
+      teamBHandTotal: 0,
+      hangingCreated: { amount: 81, team: 1 },
+    };
+    const { container } = render(
+      <ScoreReveal
+        data={tie}
+        viewerTeam={viewerTeam}
+        onContinue={vi.fn()}
+        trumpSuit="H"
+        trumpCallerSeat={1}
+      />,
+    );
+    expect(container.textContent).toContain(subtitle);
+    expect(container.textContent).not.toContain("Made it");
+    expect(screen.queryByTestId("row-hanging-paid")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["teamB" as const, "Tie · our 81 is discarded"],
+    ["teamA" as const, "Tie · their 81 is discarded"],
+  ])(
+    "says the tied half is discarded when the hand ends the match (viewer %s)",
+    (viewerTeam, subtitle) => {
+      const tie: HandScoredPayload = {
+        ...normalData,
+        teamACardPoints: 81,
+        teamBCardPoints: 71,
+        lastTrickTeam: 1,
+        contractingTeam: 1,
+        teamAHandTotal: 81,
+        teamBHandTotal: 0,
+        hangingCreated: { amount: 81, team: 1 },
+        teamAMatchScore: 1031,
+        teamBMatchScore: 640,
+      };
+      const { container } = render(
+        <ScoreReveal data={tie} viewerTeam={viewerTeam} onContinue={vi.fn()} matchOver />,
+      );
+      expect(container.textContent).toContain(subtitle);
+      expect(container.textContent).not.toContain("hangs");
+    },
+  );
+
+  it("shows the hanging points a hand paid out in the taker's column", () => {
+    const payout: HandScoredPayload = {
+      ...normalData,
+      teamBHandTotal: 173,
+      hangingPaid: { amount: 81, team: 1 },
+    };
+    render(<ScoreReveal data={payout} viewerTeam="teamA" onContinue={vi.fn()} />);
+
+    const row = screen.getByTestId("row-hanging-paid");
+    expect(row).toHaveTextContent("Hanging points");
+    expect(row.querySelector("[data-team='teamB']")).toHaveTextContent("+81");
+    expect(row.querySelector("[data-team='teamA']")).toBeNull();
+    const handTotalRow = screen.getByTestId("row-hand-total");
+    expect(handTotalRow.querySelector("[data-team='teamB']")).toHaveTextContent("173");
+  });
+
+  it("renders no hanging row or tie subtitle without hanging data", () => {
+    const { container } = render(
+      <ScoreReveal data={normalData} viewerTeam="teamA" onContinue={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("row-hanging-paid")).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("Tie");
   });
 
   it("shows the contract-held subtitle when the viewer's team called trump", () => {

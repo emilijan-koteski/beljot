@@ -112,6 +112,13 @@ const (
 	TieRuleHangingPoints  TieRule = "hanging_points"
 )
 
+// HangingPoints is a tied Bitola hand's caller half, held over until the next scored hand pays it out. Team is the
+// side whose half hangs on GameState and HandScore.HangingCreated, and the side that received it on HangingPaid.
+type HangingPoints struct {
+	Amount int `json:"amount"`
+	Team   int `json:"team"`
+}
+
 type VariantRules struct {
 	DealShape            DealShape
 	HasTrumpCandidate    bool

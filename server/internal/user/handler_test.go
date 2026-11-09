@@ -2391,6 +2391,59 @@ func TestListMatches_HandsEmbedded(t *testing.T) {
 	assert.Equal(t, "loss", resp.Items[0].Outcome, "viewer is team A, winner is team B -> loss")
 }
 
+func TestListMatches_HandsCarryHangingPoints(t *testing.T) {
+	repo, matchRepo, e := setupUserHandlerWithMatches()
+	viewer := repo.addUser("viewer", "v@example.com", "en")
+	_ = repo.addUser("p2", "p2@example.com", "en")
+	_ = repo.addUser("p3", "p3@example.com", "en")
+	_ = repo.addUser("p4", "p4@example.com", "en")
+
+	seats := [4]uint{viewer.ID, 2, 3, 4}
+	base := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	amount, owner, paidTo := 81, 1, 0
+	hands := []match.HandResult{
+		{HandNumber: 1, TeamACardPoints: 81, TeamBCardPoints: 71, LastTrickTeam: 1, LastTrickBonus: 10,
+			ContractingTeam: 1, TeamAHandTotal: 81, TeamBHandTotal: 0,
+			HangingCreatedAmount: &amount, HangingCreatedTeam: &owner},
+		{HandNumber: 2, TeamACardPoints: 90, TeamBCardPoints: 62, LastTrickTeam: 0, LastTrickBonus: 10,
+			ContractingTeam: 0, TeamAHandTotal: 181, TeamBHandTotal: 62,
+			HangingPaidAmount: &amount, HangingPaidTeam: &paidTo},
+		{HandNumber: 3, TeamACardPoints: 60, TeamBCardPoints: 92, LastTrickTeam: 1, LastTrickBonus: 10,
+			ContractingTeam: 1, TeamAHandTotal: 60, TeamBHandTotal: 102},
+	}
+	matchRepo.matches = []match.Match{
+		seedMatch(1, base, base.Add(20*time.Minute), seats, "abandoned", 0, nil, "bitola", "1001", 322, 164, hands),
+	}
+
+	token, err := auth.GenerateAccessToken(viewer.ID, testJWTSecret)
+	require.NoError(t, err)
+
+	rec := doListMatches(e, strconvUint(viewer.ID), "", token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	resp := decodeMatchesResponse(t, rec.Body.Bytes())
+	require.Len(t, resp.Items, 1)
+	got := resp.Items[0].Hands
+	require.Len(t, got, 3)
+	assert.Equal(t, &user.MatchHangingPointsView{Amount: 81, Team: 1}, got[0].HangingCreated, "the tie hangs team B's 81")
+	assert.Nil(t, got[0].HangingPaid)
+	assert.Nil(t, got[1].HangingCreated)
+	assert.Equal(t, &user.MatchHangingPointsView{Amount: 81, Team: 0}, got[1].HangingPaid, "the next hand pays it to team A")
+	assert.Nil(t, got[2].HangingCreated, "a hand with neither has null fields")
+	assert.Nil(t, got[2].HangingPaid)
+
+	var raw struct {
+		Data struct {
+			Items []struct {
+				Hands []map[string]any `json:"hands"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &raw))
+	require.Len(t, raw.Data.Items, 1)
+	assert.Contains(t, raw.Data.Items[0].Hands[2], "hangingCreated", "the key is always present on the wire")
+	assert.Nil(t, raw.Data.Items[0].Hands[2]["hangingCreated"])
+}
+
 // TestListMatches_ForeignSubject_ViewerRelativeToSubject checks a foreign subject's
 // matches are computed relative to the subject, not the viewer.
 func TestListMatches_ForeignSubject_ViewerRelativeToSubject(t *testing.T) {

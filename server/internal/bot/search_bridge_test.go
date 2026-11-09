@@ -480,6 +480,22 @@ func TestSettlementFromViewCountsTheBotsOwnBelote(t *testing.T) {
 	}
 }
 
+func TestSettlementFromViewCarriesTheTieRuleAndHangingPoints(t *testing.T) {
+	gs := testfixtures.WithHangingPoints(testfixtures.NewGameMidPlay(3), 81, game.TeamB)
+	v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+	require.Equal(t, game.TieRuleHangingPoints, v.TieRule)
+	require.Equal(t, &game.HangingPoints{Amount: 81, Team: game.TeamB}, v.HangingPoints)
+	assert.NotSame(t, gs.HangingPoints, v.HangingPoints, "the view holds its own copy")
+
+	settlement := bot.SettlementFromForTest(v)
+	assert.Equal(t, game.TieRuleHangingPoints, settlement.TieRule)
+	assert.Equal(t, v.HangingPoints, settlement.Hanging)
+
+	croatian := viewFromState(testfixtures.WithCroatianRules(testfixtures.NewGameMidPlay(3)), 0, nil)
+	assert.Equal(t, game.TieRuleAllToOpponents, bot.SettlementFromForTest(croatian).TieRule)
+	assert.Nil(t, bot.SettlementFromForTest(croatian).Hanging)
+}
+
 func TestOwnBeloteSettlementMatchesTheEngine(t *testing.T) {
 	gs := testfixtures.NewGameMidPlay(7)
 	gs.BelotAnnounced = false
@@ -544,6 +560,31 @@ func TestSearchAppliesWithRaceObjective(t *testing.T) {
 
 	v.StopAtTarget = false
 	assert.Nil(t, bot.PositionFromForTest(v, racing).Race)
+}
+
+func TestStopAtTargetReachCountsHangingPoints(t *testing.T) {
+	racing := bot.SearchTuning{RaceObjective: true}
+	reach := func(short int, hanging *game.HangingPoints) bool {
+		gs := testfixtures.NewGameMidPlay(3)
+		v := viewFromState(gs, 0, memoryOfMissingCards(gs))
+		v.StopAtTarget = true
+		for team := range v.TeamScores {
+			v.TeamScores[team] = 0
+		}
+		v.MatchTarget = max(v.HandPoints[0]+v.DeclPoints[0], v.HandPoints[1]+v.DeclPoints[1]) + short
+		v.HangingPoints = hanging
+		return bot.PositionFromForTest(v, racing).Race != nil
+	}
+	short := 1
+	for reach(short, nil) {
+		short++
+		require.Less(t, short, 500, "the reach must end somewhere")
+	}
+
+	payout := &game.HangingPoints{Amount: 81, Team: game.TeamB}
+	assert.True(t, reach(short, payout), "the hanging 81 the hand pays out brings the target within reach")
+	assert.True(t, reach(short+80, payout))
+	assert.False(t, reach(short+81, payout), "the reach grows by exactly the hanging points")
 }
 
 func TestRaceCarriesTheBotsOwnBeloteApartFromTheBank(t *testing.T) {
@@ -615,6 +656,25 @@ func TestRaceForTheDecidingHand(t *testing.T) {
 
 	v.StopAtTarget = true
 	assert.Nil(t, bot.PositionFromForTest(v, deciding).Race, "a stop-at-target table out of reach does not race")
+}
+
+func TestDecidingHandBoundCountsHangingPoints(t *testing.T) {
+	deciding := bot.SearchTuning{DecidingHand: true}
+	reach := func(short int, hanging *game.HangingPoints) bool {
+		v := shortOfTarget(t, testfixtures.NewGameMidPlay(3), 900, short)
+		v.HangingPoints = hanging
+		return bot.PositionFromForTest(v, deciding).Race != nil
+	}
+	short := 60
+	for reach(short, nil) {
+		short++
+		require.Less(t, short, 900, "the bound must end somewhere below the target")
+	}
+
+	payout := &game.HangingPoints{Amount: 81, Team: game.TeamA}
+	assert.True(t, reach(short, payout), "the hanging 81 the hand pays out puts the target back in reach")
+	assert.True(t, reach(short+80, payout))
+	assert.False(t, reach(short+81, payout), "the bound grows by exactly the hanging points")
 }
 
 func TestNoRaceWhenNobodyCanCross(t *testing.T) {

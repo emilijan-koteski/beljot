@@ -54,6 +54,9 @@ func withinStopAtTargetReach(v View) bool {
 		return false
 	}
 	reach := remainingCardPoints(v) + lastTrickBonusPoints
+	if v.HangingPoints != nil {
+		reach += v.HangingPoints.Amount
+	}
 	for team := range 2 {
 		if v.MatchTarget-runningTotal(v, team) <= reach {
 			return true
@@ -93,10 +96,13 @@ func raceFor(v View, t SearchTuning) *search.Race {
 }
 
 // couldDecideThisHand is a loose upper bound: some team's match score plus every card point of the hand, a Capot, all
-// declarations and a Belote yet to come reaches the target.
+// declarations, a Belote yet to come and any hanging points the hand pays out reaches the target.
 func couldDecideThisHand(v View) bool {
 	most := v.HandPoints[game.TeamA] + v.HandPoints[game.TeamB] + remainingCardPoints(v) + capotBonusPoints +
 		v.DeclPoints[game.TeamA] + v.DeclPoints[game.TeamB] + beloteBonusPoints
+	if v.HangingPoints != nil {
+		most += v.HangingPoints.Amount
+	}
 	return max(v.TeamScores[game.TeamA], v.TeamScores[game.TeamB])+most >= v.MatchTarget
 }
 
@@ -335,6 +341,8 @@ func settlementFrom(v View) search.Settlement {
 		TricksWon:            v.TricksWon,
 		CallerTeam:           game.TeamForSeat(*v.TrumpCallerSeat),
 		DeclarationsTransfer: v.DeclarationsTransfer,
+		TieRule:              v.TieRule,
+		Hanging:              v.HangingPoints,
 		RemainingCardPoints:  remainingCardPoints(v),
 	}
 }

@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown> & { defaultValue?: string }) => {
+      if (key === "match.score.hangingUs") return `Our ${String(opts?.amount)} hangs`;
+      if (key === "match.score.hangingThem") return `Their ${String(opts?.amount)} hangs`;
       const translations: Record<string, string> = {
         "team.us": "Us",
         "team.them": "Them",
@@ -305,5 +307,40 @@ describe("ScorePanel", () => {
 
     expect(screen.queryByTestId("score-a-potential")).not.toBeInTheDocument();
     expect(screen.queryByTestId("score-b-potential")).not.toBeInTheDocument();
+  });
+  it.each([
+    ["teamB" as const, "Our 81 hangs"],
+    ["teamA" as const, "Their 81 hangs"],
+  ])("shows the points still hanging relative to the viewer (%s)", (viewerTeam, label) => {
+    render(
+      <ScorePanel
+        viewerTeam={viewerTeam}
+        teamAScore={81}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        hangingPoints={{ amount: 81, team: 1 }}
+      />,
+    );
+
+    expect(screen.getByTestId("score-hanging")).toHaveTextContent(label);
+    expect(screen.getByTestId("score-hanging")).toHaveAttribute("data-team", "teamB");
+    expect(screen.getByTestId("score-hanging-mobile")).toHaveTextContent(label);
+  });
+
+  it("shows no hanging chip when nothing hangs", () => {
+    render(
+      <ScorePanel
+        viewerTeam="teamA"
+        teamAScore={0}
+        teamBScore={0}
+        teamATricks={0}
+        teamBTricks={0}
+        hangingPoints={null}
+      />,
+    );
+
+    expect(screen.queryByTestId("score-hanging")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("score-hanging-mobile")).not.toBeInTheDocument();
   });
 });

@@ -723,22 +723,24 @@ func (m *Manager) broadcastActionResult(playerIDs [4]uint, oldState, newState *g
 			(newState.Phase == game.PhaseHandComplete || newState.Phase == game.PhaseMatchEnd)
 		if handJustScored {
 			hr := newState.LastHandResult
-			handScored := map[string]interface{}{
-				"teamACardPoints": hr.TeamACardPoints,
-				"teamBCardPoints": hr.TeamBCardPoints,
-				"teamADeclPoints": hr.TeamADeclPoints,
-				"teamBDeclPoints": hr.TeamBDeclPoints,
-				"lastTrickTeam":   hr.LastTrickTeam,
-				"lastTrickBonus":  hr.LastTrickBonus,
-				"capot":           hr.Capot,
-				"capotTeam":       hr.CapotTeam,
-				"capotBonus":      hr.CapotBonus,
-				"failedContract":  hr.FailedContract,
-				"contractingTeam": hr.ContractingTeam,
-				"teamAHandTotal":  hr.TeamAHandTotal,
-				"teamBHandTotal":  hr.TeamBHandTotal,
-				"teamAMatchScore": newState.TeamScores[game.TeamA],
-				"teamBMatchScore": newState.TeamScores[game.TeamB],
+			handScored := ws.HandScoredPayload{
+				TeamACardPoints: hr.TeamACardPoints,
+				TeamBCardPoints: hr.TeamBCardPoints,
+				TeamADeclPoints: hr.TeamADeclPoints,
+				TeamBDeclPoints: hr.TeamBDeclPoints,
+				LastTrickTeam:   hr.LastTrickTeam,
+				LastTrickBonus:  hr.LastTrickBonus,
+				Capot:           hr.Capot,
+				CapotTeam:       hr.CapotTeam,
+				CapotBonus:      hr.CapotBonus,
+				FailedContract:  hr.FailedContract,
+				ContractingTeam: hr.ContractingTeam,
+				TeamAHandTotal:  hr.TeamAHandTotal,
+				TeamBHandTotal:  hr.TeamBHandTotal,
+				TeamAMatchScore: newState.TeamScores[game.TeamA],
+				TeamBMatchScore: newState.TeamScores[game.TeamB],
+				HangingCreated:  hangingPointsPayload(hr.HangingCreated),
+				HangingPaid:     hangingPointsPayload(hr.HangingPaid),
 			}
 			m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventHandScored, handScored))
 		}
@@ -917,6 +919,14 @@ func (m *Manager) broadcastDeclarationsResolvedIfTransition(oldState, newState *
 	m.hub.BroadcastToUsers(userIDs, buildMessage(ws.EventDeclarationsResolved, payload))
 }
 
+// hangingPointsPayload converts hanging points for the wire, keeping nil as null.
+func hangingPointsPayload(h *game.HangingPoints) *ws.HangingPointsPayload {
+	if h == nil {
+		return nil
+	}
+	return &ws.HangingPointsPayload{Amount: h.Amount, Team: h.Team}
+}
+
 // bufferHandResultIfScored appends the completed hand's result to session.handResults
 // when the transition scored a hand; otherwise it does nothing.
 func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newState *game.GameState) {
@@ -934,21 +944,27 @@ func (m *Manager) bufferHandResultIfScored(session *LiveMatch, oldState, newStat
 		v := *hr.CapotTeam
 		capotTeam = &v
 	}
+	createdAmount, createdTeam := hangingColumns(hr.HangingCreated)
+	paidAmount, paidTeam := hangingColumns(hr.HangingPaid)
 	row := HandResult{
-		HandNumber:      hr.HandNumber,
-		TeamACardPoints: hr.TeamACardPoints,
-		TeamBCardPoints: hr.TeamBCardPoints,
-		TeamADeclPoints: hr.TeamADeclPoints,
-		TeamBDeclPoints: hr.TeamBDeclPoints,
-		LastTrickTeam:   hr.LastTrickTeam,
-		LastTrickBonus:  hr.LastTrickBonus,
-		Capot:           hr.Capot,
-		CapotTeam:       capotTeam,
-		CapotBonus:      hr.CapotBonus,
-		FailedContract:  hr.FailedContract,
-		ContractingTeam: hr.ContractingTeam,
-		TeamAHandTotal:  hr.TeamAHandTotal,
-		TeamBHandTotal:  hr.TeamBHandTotal,
+		HandNumber:           hr.HandNumber,
+		TeamACardPoints:      hr.TeamACardPoints,
+		TeamBCardPoints:      hr.TeamBCardPoints,
+		TeamADeclPoints:      hr.TeamADeclPoints,
+		TeamBDeclPoints:      hr.TeamBDeclPoints,
+		LastTrickTeam:        hr.LastTrickTeam,
+		LastTrickBonus:       hr.LastTrickBonus,
+		Capot:                hr.Capot,
+		CapotTeam:            capotTeam,
+		CapotBonus:           hr.CapotBonus,
+		FailedContract:       hr.FailedContract,
+		ContractingTeam:      hr.ContractingTeam,
+		TeamAHandTotal:       hr.TeamAHandTotal,
+		TeamBHandTotal:       hr.TeamBHandTotal,
+		HangingCreatedAmount: createdAmount,
+		HangingCreatedTeam:   createdTeam,
+		HangingPaidAmount:    paidAmount,
+		HangingPaidTeam:      paidTeam,
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()

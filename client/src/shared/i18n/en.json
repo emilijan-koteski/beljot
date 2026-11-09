@@ -247,7 +247,12 @@
           "us": "us",
           "them": "them",
           "failedUs": "failed · us",
-          "failedThem": "failed · them"
+          "failedThem": "failed · them",
+          "hangingUs": "tie · our {{points}} hangs",
+          "hangingThem": "tie · their {{points}} hangs",
+          "hangingDiscardedUs": "tie · our {{points}} discarded",
+          "hangingDiscardedThem": "tie · their {{points}} discarded",
+          "hangingPaid": "+{{points}} hanging"
         },
         "unfinished": "Unfinished hand: target reached"
       }
@@ -958,7 +963,9 @@
       "trick": "trick",
       "thisHand": "this hand",
       "handLabel": "Hand {{hand}}",
-      "handVariant": "Hand {{hand}} · {{variant}}"
+      "handVariant": "Hand {{hand}} · {{variant}}",
+      "hangingUs": "Our {{amount}} hangs",
+      "hangingThem": "Their {{amount}} hangs"
     },
     "scoreReveal": {
       "title": "Hand score",
@@ -968,10 +975,15 @@
       "subtitleFailedThem": "Went down · all points to them",
       "subtitleFailedCardsUs": "Went down · card points to us",
       "subtitleFailedCardsThem": "Went down · card points to them",
+      "subtitleTieUs": "Tie · our {{amount}} hangs",
+      "subtitleTieThem": "Tie · their {{amount}} hangs",
+      "subtitleTieDiscardedUs": "Tie · our {{amount}} is discarded",
+      "subtitleTieDiscardedThem": "Tie · their {{amount}} is discarded",
       "cardPoints": "Card points",
       "declarationPoints": "Declarations",
       "lastTrickBonus": "Last trick bonus",
       "capotBonus": "Capot bonus",
+      "hangingPaid": "Hanging points",
       "handTotal": "Hand total",
       "matchTotal": "Match score",
       "continue": "Continue",

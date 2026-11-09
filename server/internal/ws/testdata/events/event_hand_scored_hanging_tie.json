@@ -1,0 +1,22 @@
+{
+  "teamACardPoints": 71,
+  "teamBCardPoints": 81,
+  "teamADeclPoints": 20,
+  "teamBDeclPoints": 0,
+  "lastTrickTeam": 1,
+  "lastTrickBonus": 10,
+  "capot": false,
+  "capotTeam": null,
+  "capotBonus": 0,
+  "failedContract": false,
+  "contractingTeam": 0,
+  "teamAHandTotal": 0,
+  "teamBHandTotal": 91,
+  "teamAMatchScore": 312,
+  "teamBMatchScore": 371,
+  "hangingCreated": {
+    "amount": 91,
+    "team": 0
+  },
+  "hangingPaid": null
+}

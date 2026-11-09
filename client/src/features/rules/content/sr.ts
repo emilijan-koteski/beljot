@@ -174,6 +174,15 @@ export const sr: RulesLangData = {
           kind: "list",
           items: [
             {
+              variant: "bitola",
+              otherVariantNote: "Hrvatska: i nerešeno je pad.",
+              t: "Ko zove adut mora da prođe",
+              d: "Tim koji je zvao adut mora imati više poena. Manje je pad: drugi tim uzima celu ruku. Kod nerešenog (81:81) drugi tim zadržava svoju polovinu, a polovina onoga ko zove adut visi: u sledećoj ruci dobija je ko zove adut ako prođe, inače njegovi protivnici.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote:
+                "Bitola: kod nerešenog polovina onoga ko zove adut visi do sledeće ruke.",
               t: "Ko zove adut mora da prođe",
               d: "Tim koji je zvao adut mora imati više poena. Isto ili manje je pad: drugi tim uzima celu ruku.",
             },

@@ -90,6 +90,7 @@ function makeState(args: {
     belotAnnounced: false,
     winnerTeam: null,
     lastHandResult: null,
+    hangingPoints: null,
     turnExpiresAt: null,
     timerDurationSec: 30,
     previousPhase: "",

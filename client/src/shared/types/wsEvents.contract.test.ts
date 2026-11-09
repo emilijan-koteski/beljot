@@ -7,6 +7,7 @@ import cardPlayedGolden from "../../../../server/internal/ws/testdata/events/car
 import coinSettlementGolden from "../../../../server/internal/ws/testdata/events/coin_settlement.json";
 import declarationsResolvedGolden from "../../../../server/internal/ws/testdata/events/declarations_resolved.json";
 import eventHandScoredGolden from "../../../../server/internal/ws/testdata/events/event_hand_scored.json";
+import eventHandScoredHangingTieGolden from "../../../../server/internal/ws/testdata/events/event_hand_scored_hanging_tie.json";
 import eventMatchStateGolden from "../../../../server/internal/ws/testdata/events/event_match_state.json";
 import honorUpdatedGolden from "../../../../server/internal/ws/testdata/events/honor_updated.json";
 import matchAbandonedGolden from "../../../../server/internal/ws/testdata/events/match_abandoned.json";
@@ -56,6 +57,7 @@ const cases = [
   ["CardPlayedPayload", CardPlayedPayloadSchema, cardPlayedGolden],
   ["TrickResolvedPayload", TrickResolvedPayloadSchema, trickResolvedGolden],
   ["HandScoredPayload", HandScoredPayloadSchema, eventHandScoredGolden],
+  ["HandScoredPayload (hanging tie)", HandScoredPayloadSchema, eventHandScoredHangingTieGolden],
   ["MatchEndPayload", MatchEndPayloadSchema, matchEndGolden],
   ["MatchAbandonedPayload", MatchAbandonedPayloadSchema, matchAbandonedGolden],
   ["TrumpSelectedPayload", TrumpSelectedPayloadSchema, trumpSelectedGolden],

@@ -42,21 +42,23 @@ type TrickCard struct {
 // HandScore captures the scoring breakdown for a completed hand.
 // HandNumber says which hand it describes, because LastHandResult survives into later hands.
 type HandScore struct {
-	HandNumber      int  `json:"-"`
-	TeamACardPoints int  `json:"teamACardPoints"`
-	TeamBCardPoints int  `json:"teamBCardPoints"`
-	TeamADeclPoints int  `json:"teamADeclPoints"`
-	TeamBDeclPoints int  `json:"teamBDeclPoints"`
-	LastTrickTeam   int  `json:"lastTrickTeam"`
-	LastTrickBonus  int  `json:"lastTrickBonus"`
-	LastTrickSeat   int  `json:"-"`
-	Capot           bool `json:"capot"`
-	CapotTeam       *int `json:"capotTeam"`
-	CapotBonus      int  `json:"capotBonus"`
-	FailedContract  bool `json:"failedContract"`
-	ContractingTeam int  `json:"contractingTeam"`
-	TeamAHandTotal  int  `json:"teamAHandTotal"`
-	TeamBHandTotal  int  `json:"teamBHandTotal"`
+	HandNumber      int            `json:"-"`
+	TeamACardPoints int            `json:"teamACardPoints"`
+	TeamBCardPoints int            `json:"teamBCardPoints"`
+	TeamADeclPoints int            `json:"teamADeclPoints"`
+	TeamBDeclPoints int            `json:"teamBDeclPoints"`
+	LastTrickTeam   int            `json:"lastTrickTeam"`
+	LastTrickBonus  int            `json:"lastTrickBonus"`
+	LastTrickSeat   int            `json:"-"`
+	Capot           bool           `json:"capot"`
+	CapotTeam       *int           `json:"capotTeam"`
+	CapotBonus      int            `json:"capotBonus"`
+	FailedContract  bool           `json:"failedContract"`
+	ContractingTeam int            `json:"contractingTeam"`
+	TeamAHandTotal  int            `json:"teamAHandTotal"`
+	TeamBHandTotal  int            `json:"teamBHandTotal"`
+	HangingCreated  *HangingPoints `json:"hangingCreated"`
+	HangingPaid     *HangingPoints `json:"hangingPaid"`
 }
 
 // GameState is the complete, serializable game state. ProjectForSeat masks by enumeration, so every new
@@ -97,16 +99,17 @@ type GameState struct {
 
 	Players [4]PlayerState `json:"players"`
 
-	TeamScores        [2]int     `json:"teamScores"`
-	HandPoints        [2]int     `json:"handPoints"`
-	DeclarationPoints [2]int     `json:"declarationPoints"`
-	BelotPoints       [2]int     `json:"belotPoints"`
-	TricksWon         [2]int     `json:"tricksWon"`
-	PendingBelotSeat  *int       `json:"pendingBelotSeat"`
-	BelotAnnounced    bool       `json:"belotAnnounced"`
-	WinnerTeam        *int       `json:"winnerTeam"`
-	LastHandResult    *HandScore `json:"lastHandResult"`
-	HandCompleteReady [4]bool    `json:"-"`
+	TeamScores        [2]int         `json:"teamScores"`
+	HandPoints        [2]int         `json:"handPoints"`
+	DeclarationPoints [2]int         `json:"declarationPoints"`
+	BelotPoints       [2]int         `json:"belotPoints"`
+	TricksWon         [2]int         `json:"tricksWon"`
+	PendingBelotSeat  *int           `json:"pendingBelotSeat"`
+	BelotAnnounced    bool           `json:"belotAnnounced"`
+	WinnerTeam        *int           `json:"winnerTeam"`
+	LastHandResult    *HandScore     `json:"lastHandResult"`
+	HangingPoints     *HangingPoints `json:"hangingPoints"`
+	HandCompleteReady [4]bool        `json:"-"`
 
 	ActivePlayerSeat int        `json:"activePlayerSeat"`
 	TurnExpiresAt    *time.Time `json:"turnExpiresAt"`

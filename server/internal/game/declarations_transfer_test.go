@@ -17,6 +17,7 @@ const (
 	scenarioPlayedOut transferScenario = iota
 	scenarioTeamBCapot
 	scenarioTeamACapot
+	scenarioCroatianPlayedOut
 )
 
 // teamATakerLastTrick returns a last-trick state with team A as taker, where trick 8 hands team B
@@ -87,8 +88,12 @@ func TestDeclarationsTransfer_HandAwards(t *testing.T) {
 			declPoints: [2]int{0, 50}, belotPoints: [2]int{20, 0}, wantAwarded: [2]int{0, 212}, wantFailed: true,
 		},
 		{
-			name: "flag off, tie fails", transfer: false, aCards: 71, bCards: 91,
+			name: "flag off, Croatian tie fails", transfer: false, scenario: scenarioCroatianPlayedOut, aCards: 71, bCards: 91,
 			declPoints: [2]int{20, 0}, wantAwarded: [2]int{0, 162}, wantFailed: true,
+		},
+		{
+			name: "flag off, Bitola tie hangs the taker's half", transfer: false, aCards: 71, bCards: 91,
+			declPoints: [2]int{20, 0}, wantAwarded: [2]int{0, 91}, wantFailed: false,
 		},
 		{
 			name: "flag on, B capots A", transfer: true, scenario: scenarioTeamBCapot,
@@ -120,6 +125,8 @@ func TestDeclarationsTransfer_HandAwards(t *testing.T) {
 				gs = teamBCapotsTeamATaker()
 			case scenarioTeamACapot:
 				gs = testfixtures.NewGameCapotInProgress()
+			case scenarioCroatianPlayedOut:
+				gs = testfixtures.WithCroatianRules(teamATakerLastTrick(t, tt.aCards, tt.bCards))
 			default:
 				gs = teamATakerLastTrick(t, tt.aCards, tt.bCards)
 			}

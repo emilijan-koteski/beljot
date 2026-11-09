@@ -117,6 +117,7 @@ func handlePickTrump(state *GameState, action Action) (*GameState, error) {
 		newState.WinnerTeam = winnerTeam
 		newState.Phase = PhaseMatchEnd
 		newState.WonByInstantWin = true
+		newState.HangingPoints = nil
 		return newState, nil
 	}
 
@@ -226,8 +227,11 @@ func cloneGameState(state *GameState) *GameState {
 	}
 	if state.LastHandResult != nil {
 		v := *state.LastHandResult
+		v.HangingCreated = cloneHangingPoints(v.HangingCreated)
+		v.HangingPaid = cloneHangingPoints(v.HangingPaid)
 		newState.LastHandResult = &v
 	}
+	newState.HangingPoints = cloneHangingPoints(state.HangingPoints)
 	if state.SurrenderProposerSeat != nil {
 		v := *state.SurrenderProposerSeat
 		newState.SurrenderProposerSeat = &v
@@ -247,4 +251,13 @@ func cloneGameState(state *GameState) *GameState {
 	}
 
 	return &newState
+}
+
+// cloneHangingPoints returns a copy of h, or nil when no points hang.
+func cloneHangingPoints(h *HangingPoints) *HangingPoints {
+	if h == nil {
+		return nil
+	}
+	v := *h
+	return &v
 }

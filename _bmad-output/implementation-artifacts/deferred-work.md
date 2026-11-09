@@ -1271,3 +1271,6 @@ Spun out while scoping `spec-improve-bot-bidding-and-lead-heuristics` (Goal A â€
 - source_spec: `_bmad-output/implementation-artifacts/spec-bitola-declaration-window.md`
   summary: A timed-out Belote prompt still sends other seats `auto_action` "timeout", while a plain card-play timeout sends them nothing, which reveals that the seat held both trump King and Queen.
   evidence: Pre-existing, found while verifying the declaration-prompt timeout leak in this story's review. `isPrivateAutoAction` masks `skip_belot` as "timeout" rather than suppressing it, and the seat has just played a trump King or Queen. The fix is to send `skip_belot` to the timed-out seat only, as this story now does for `skip_declare`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-bitola-hanging-points.md`
+  summary: Document (and test) that Bitola hanging points are a fixed amount that ignores "Declarations on a fall: Off" when paid to the other side.
+  evidence: `SettleHand` hangs the caller's full total, declarations and Belote included; if the next hand pays it to the opponents, the caller's declarations reach them although the Off rule voids the falling side's declarations. Owner spec reads "H is written to B", so the code is right, but `.claude/rules/game-rules.md` does not say which rule wins and no test pays an entry under Off.

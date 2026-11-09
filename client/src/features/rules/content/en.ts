@@ -175,6 +175,14 @@ export const en: RulesLangData = {
           kind: "list",
           items: [
             {
+              variant: "bitola",
+              otherVariantNote: "Croatian: a tie is a fall too.",
+              t: "The taker must win the hand",
+              d: "The team that chose trump needs more points. Less is a fall: the other team takes the whole hand. On a tie (81:81) the other team keeps its half and the taker's half hangs: the next hand's taker gets it by winning that hand, otherwise their opponents do.",
+            },
+            {
+              variant: "croatia",
+              otherVariantNote: "Bitola: on a tie the taker's half hangs until the next hand.",
               t: "The taker must win the hand",
               d: "The team that chose trump needs more points. A tie or less is a fall: the other team takes the whole hand.",
             },

@@ -49,20 +49,72 @@ func TestSettleHandCases(t *testing.T) {
 			remDiff: -26, wantOn: 2, wantOff: 2,
 		},
 		{
-			name: "caller A ties and the opponents take the whole hand",
+			name: "caller A ties under the Croatian rule and the opponents take the whole hand",
 			settle: search.Settlement{
 				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
-				CallerTeam: callerA, RemainingCardPoints: 40,
+				CallerTeam: callerA, TieRule: game.TieRuleAllToOpponents, RemainingCardPoints: 40,
 			},
 			remDiff: -28, wantOn: -182, wantOff: -162,
 		},
 		{
-			name: "caller B ties and the opponents take the whole hand",
+			name: "caller B ties under the Croatian rule and the opponents take the whole hand",
 			settle: search.Settlement{
 				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{0, 20}, TricksWon: [2]int{3, 4},
-				CallerTeam: callerB, RemainingCardPoints: 40,
+				CallerTeam: callerB, TieRule: game.TieRuleAllToOpponents, RemainingCardPoints: 40,
 			},
 			remDiff: 12, wantOn: 182, wantOff: 162,
+		},
+		{
+			name: "caller A ties under the Bitola rule and the opponents bank only their own half",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: callerA, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+			},
+			remDiff: -28, wantOn: -91, wantOff: -91,
+		},
+		{
+			name: "caller B ties under the Bitola rule and the opponents bank only their own half",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{0, 20}, TricksWon: [2]int{3, 4},
+				CallerTeam: callerB, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+			},
+			remDiff: 12, wantOn: 91, wantOff: 91,
+		},
+		{
+			name: "caller B ties with team B's 81 hanging, so team A takes it as well",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{0, 20}, TricksWon: [2]int{3, 4},
+				CallerTeam: callerB, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+				Hanging: &game.HangingPoints{Amount: 81, Team: game.TeamB},
+			},
+			remDiff: 12, wantOn: 172, wantOff: 172,
+		},
+		{
+			name: "caller A makes the contract by two points and takes its own hanging 81 back",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: callerA, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+				Hanging: &game.HangingPoints{Amount: 81, Team: game.TeamA},
+			},
+			remDiff: -26, wantOn: 83, wantOff: 83,
+		},
+		{
+			name: "caller A fails and team B takes the whole hand and A's hanging 81",
+			settle: search.Settlement{
+				HandPoints: [2]int{30, 82}, DeclPoints: [2]int{50, 40}, TricksWon: [2]int{3, 4},
+				CallerTeam: callerA, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+				Hanging: &game.HangingPoints{Amount: 81, Team: game.TeamA},
+			},
+			remDiff: -30, wantOn: -333, wantOff: -283,
+		},
+		{
+			name: "team A wins every trick and takes the whole hand and B's hanging 81",
+			settle: search.Settlement{
+				HandPoints: [2]int{132, 0}, DeclPoints: [2]int{20, 50}, TricksWon: [2]int{7, 0},
+				CallerTeam: callerB, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 20,
+				Hanging: &game.HangingPoints{Amount: 81, Team: game.TeamB},
+			},
+			remDiff: 120, wantOn: 403, wantOff: 353,
 		},
 		{
 			name: "caller B fails and team A banks the whole hand",
@@ -146,6 +198,8 @@ func settlementAtTheLastTrick(gs *game.GameState, solver *search.Solver) (search
 		TricksWon:            gs.TricksWon,
 		CallerTeam:           game.TeamForSeat(*gs.TrumpCallerSeat),
 		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		TieRule:              gs.Rules.TieRule,
+		Hanging:              gs.HangingPoints,
 	}
 	for team := range s.DeclPoints {
 		s.DeclPoints[team] = gs.DeclarationPoints[team] + gs.BelotPoints[team]
@@ -278,7 +332,11 @@ func randomSettlement(rng *rand.Rand) (search.Settlement, int) {
 		TricksWon:            [2]int{rng.IntN(5), rng.IntN(4)},
 		CallerTeam:           rng.IntN(2),
 		DeclarationsTransfer: rng.IntN(2) == 0,
+		TieRule:              []game.TieRule{game.TieRuleAllToOpponents, game.TieRuleHangingPoints}[rng.IntN(2)],
 		RemainingCardPoints:  remaining,
+	}
+	if s.TieRule == game.TieRuleHangingPoints && rng.IntN(3) == 0 {
+		s.Hanging = &game.HangingPoints{Amount: 81 + rng.IntN(60), Team: rng.IntN(2)}
 	}
 	winner := rng.IntN(2)
 	if rng.IntN(4) == 0 {
@@ -293,8 +351,9 @@ func randomSettlement(rng *rand.Rand) (search.Settlement, int) {
 }
 
 // expectedTotals is the engine's hand award worked out by hand: the whole hand to a Capot or to the side of a failed
-// contract, with both sides' declarations when they transfer and the winner's own otherwise, else each side's total.
-func expectedTotals(s search.Settlement, remDiff int) [2]int {
+// contract, the opponents' half alone on a Bitola tie, else each side's total, plus any hanging points to the taker.
+// It also reports whether the hand was a Bitola tie.
+func expectedTotals(s search.Settlement, remDiff int) ([2]int, bool) {
 	cards, wholeTo := 152+10, -1
 	if remDiff == s.RemainingCardPoints+100 || remDiff == -(s.RemainingCardPoints+100) {
 		cards += 90
@@ -308,28 +367,46 @@ func expectedTotals(s search.Settlement, remDiff int) [2]int {
 		s.HandPoints[game.TeamA] + remA + s.DeclPoints[game.TeamA],
 		s.HandPoints[game.TeamB] + s.RemainingCardPoints + 10 - remA + s.DeclPoints[game.TeamB],
 	}
-	if wholeTo < 0 && full[s.CallerTeam] <= full[1-s.CallerTeam] {
-		wholeTo = 1 - s.CallerTeam
-	}
-	if wholeTo < 0 {
-		return full
-	}
+	caller, opponents := s.CallerTeam, 1-s.CallerTeam
+	taker := wholeTo
+	bitolaTie := false
 	var totals [2]int
-	totals[wholeTo] = cards + s.DeclPoints[wholeTo]
-	if s.DeclarationsTransfer {
-		totals[wholeTo] += s.DeclPoints[1-wholeTo]
+	switch {
+	case wholeTo >= 0:
+	case full[caller] > full[opponents]:
+		totals, taker = full, caller
+	case full[caller] == full[opponents] && s.TieRule == game.TieRuleHangingPoints:
+		totals[opponents], taker, bitolaTie = full[opponents], opponents, true
+	default:
+		wholeTo, taker = opponents, opponents
 	}
-	return totals
+	if wholeTo >= 0 {
+		totals[wholeTo] = cards + s.DeclPoints[wholeTo]
+		if s.DeclarationsTransfer {
+			totals[wholeTo] += s.DeclPoints[1-wholeTo]
+		}
+	}
+	if s.Hanging != nil {
+		totals[taker] += s.Hanging.Amount
+	}
+	return totals, bitolaTie
 }
 
 func TestSettleTotalsAgreesWithSettle(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1151, 9))
-	var capots, falls, splits int
+	var capots, falls, splits, bitolaTies, payouts int
 	for i := range 20000 {
 		s, remDiff := randomSettlement(rng)
 		totals := search.SettleTotals(s, remDiff)
 		require.Equal(t, search.Settle(s, remDiff), totals[game.TeamA]-totals[game.TeamB], "case %d %+v remDiff %d", i, s, remDiff)
-		require.Equal(t, expectedTotals(s, remDiff), totals, "case %d %+v remDiff %d", i, s, remDiff)
+		want, bitolaTie := expectedTotals(s, remDiff)
+		require.Equal(t, want, totals, "case %d %+v remDiff %d", i, s, remDiff)
+		if bitolaTie {
+			bitolaTies++
+		}
+		if s.Hanging != nil {
+			payouts++
+		}
 		switch {
 		case remDiff == s.RemainingCardPoints+100 || remDiff == -(s.RemainingCardPoints+100):
 			capots++
@@ -342,11 +419,13 @@ func TestSettleTotalsAgreesWithSettle(t *testing.T) {
 	assert.Positive(t, capots)
 	assert.Positive(t, falls)
 	assert.Positive(t, splits)
+	assert.Positive(t, bitolaTies)
+	assert.Positive(t, payouts)
 }
 
 func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1152, 11))
-	var hands, wholeHands int
+	var hands, wholeHands, payouts int
 	for attempts := 0; hands < 200; attempts++ {
 		require.Less(t, attempts, 400, "too many deals ended before the last trick")
 		variant := game.VariantBitola
@@ -357,6 +436,9 @@ func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
 			[4]uint{}, [4]string{}, [4]bool{true, true, true, true},
 			variant, "1001", 1, true, false, hands/2%2 == 0, hands/4%2 == 1, game.DefaultDeclarationLastTrick,
 		)
+		if gs.Rules.TieRule == game.TieRuleHangingPoints && hands/8%2 == 0 {
+			gs.HangingPoints = &game.HangingPoints{Amount: 81 + attempts%40, Team: hands / 16 % 2}
+		}
 		hand, ok := playUntilSettled(t, gs, rng, rng.IntN(2))
 		if !ok {
 			continue
@@ -368,8 +450,12 @@ func TestSettleTotalsMatchEngineAtTheLastTrick(t *testing.T) {
 		if hand.result.Capot || hand.result.FailedContract {
 			wholeHands++
 		}
+		if hand.result.HangingPaid != nil {
+			payouts++
+		}
 	}
 	assert.Positive(t, wholeHands)
+	assert.Positive(t, payouts, "some Bitola hands must pay out hanging points")
 }
 
 func TestCallerMade(t *testing.T) {
@@ -388,12 +474,29 @@ func TestCallerMade(t *testing.T) {
 			remDiff: -26, want: true,
 		},
 		{
-			name: "caller A ties and falls",
+			name: "caller A ties and falls under the Croatian rule",
 			settle: search.Settlement{
 				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
-				CallerTeam: game.TeamA, RemainingCardPoints: 40,
+				CallerTeam: game.TeamA, TieRule: game.TieRuleAllToOpponents, RemainingCardPoints: 40,
 			},
 			remDiff: -28, want: false,
+		},
+		{
+			name: "caller A ties under the Bitola rule and banks nothing",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: game.TeamA, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+			},
+			remDiff: -28, want: false,
+		},
+		{
+			name: "caller A passes and takes back the points it left hanging",
+			settle: search.Settlement{
+				HandPoints: [2]int{60, 52}, DeclPoints: [2]int{20, 0}, TricksWon: [2]int{3, 4},
+				CallerTeam: game.TeamA, TieRule: game.TieRuleHangingPoints, RemainingCardPoints: 40,
+				Hanging: &game.HangingPoints{Amount: 81, Team: game.TeamA},
+			},
+			remDiff: -26, want: true,
 		},
 		{
 			name: "caller B makes on its declarations",

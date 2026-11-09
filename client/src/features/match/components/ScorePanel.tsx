@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 import { MOTION, motionDuration } from "@/shared/lib/motion";
 import { Z } from "@/shared/lib/zLayers";
-import { type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
+import { type HangingPoints, type TeamString, teamStringForIndex } from "@/shared/types/matchTypes";
 
 import { floatingPanelStyle } from "../lib/floatingPanel";
 import { TEAM_GOLD, TEAM_SILVER, type TeamGradient } from "../lib/tableTheme";
@@ -22,6 +22,7 @@ interface ScorePanelProps {
   matchTarget?: number;
   handNumber?: number;
   variantLabel?: string;
+  hangingPoints?: HangingPoints | null;
 }
 
 const INK = "var(--ink-light)";
@@ -143,9 +144,20 @@ export function ScorePanel({
   matchTarget = 1001,
   handNumber,
   variantLabel,
+  hangingPoints = null,
 }: ScorePanelProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
+  const hangingLabel =
+    hangingPoints === null
+      ? null
+      : t(
+          teamStringForIndex(hangingPoints.team) === viewerTeam
+            ? "match.score.hangingUs"
+            : "match.score.hangingThem",
+          { amount: hangingPoints.amount },
+        );
+  const hangingTeam = hangingPoints === null ? null : teamStringForIndex(hangingPoints.team);
 
   const [showBonus, setShowBonus] = useState<{ team: 0 | 1; amount: number } | null>(null);
 
@@ -245,6 +257,16 @@ export function ScorePanel({
             </span>
           </div>
         ))}
+        {hangingLabel !== null && (
+          <span
+            className="text-2xs font-semibold uppercase tracking-wider tabular-nums"
+            style={{ color: BRASS_LABEL }}
+            data-testid="score-hanging-mobile"
+            data-team={hangingTeam ?? undefined}
+          >
+            {hangingLabel}
+          </span>
+        )}
       </div>
 
       <div
@@ -342,6 +364,23 @@ export function ScorePanel({
               matchTarget={matchTarget}
             />
           </>
+        )}
+
+        {hangingLabel !== null && (
+          <div className="px-4 pb-2.5" style={{ borderTop: "1px solid var(--sheen-6)" }}>
+            <span
+              className="mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider tabular-nums"
+              style={{
+                color: BRASS_LABEL,
+                background: "var(--sheen-6)",
+                border: "1px solid var(--sheen-10)",
+              }}
+              data-testid="score-hanging"
+              data-team={hangingTeam ?? undefined}
+            >
+              {hangingLabel}
+            </span>
+          </div>
         )}
 
         {showBonus !== null && bonusTeamString !== null && bonusGradient !== null && (

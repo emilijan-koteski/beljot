@@ -35,7 +35,7 @@ func perfectInformationChoice(t *testing.T, gs *game.GameState, deciding bool) (
 	}
 	settlement := search.Settlement{
 		HandPoints: gs.HandPoints, TricksWon: gs.TricksWon, CallerTeam: game.TeamForSeat(*gs.TrumpCallerSeat),
-		DeclarationsTransfer: gs.Rules.DeclarationsTransfer,
+		DeclarationsTransfer: gs.Rules.DeclarationsTransfer, TieRule: gs.Rules.TieRule, Hanging: gs.HangingPoints,
 	}
 	for _, c := range append(search.CardsOf(hands[0]|hands[1]|hands[2]|hands[3]), trickCards(gs)...) {
 		settlement.RemainingCardPoints += search.Points(search.CardIdx(c), pos.Trump)

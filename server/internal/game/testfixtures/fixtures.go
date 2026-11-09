@@ -341,6 +341,31 @@ func NewGameLastTrick() *game.GameState {
 	}
 }
 
+// NewGameCroatianLastTrick returns NewGameLastTrick under the Croatian preset, where a tied hand is a fall.
+func NewGameCroatianLastTrick() *game.GameState {
+	return WithCroatianRules(NewGameLastTrick())
+}
+
+// WithCroatianRules moves a fixture onto the Croatian preset, keeping its room overrides. Use it on fixtures past
+// bidding and declarations, where only the scoring rules still differ.
+func WithCroatianRules(gs *game.GameState) *game.GameState {
+	rules := game.RulesFor(game.VariantCroatia)
+	rules.DeclarationsEnabled = gs.Rules.DeclarationsEnabled
+	rules.StopAtTarget = gs.Rules.StopAtTarget
+	rules.DeclarationsTransfer = gs.Rules.DeclarationsTransfer
+	rules.Clockwise = gs.Rules.Clockwise
+	gs.Variant = game.VariantCroatia
+	gs.Rules = rules
+	gs.DeclarationLastTrick = rules.DeclarationLastTrick
+	return gs
+}
+
+// WithHangingPoints leaves amount points of team hanging from an earlier tied hand.
+func WithHangingPoints(gs *game.GameState, amount, team int) *game.GameState {
+	gs.HangingPoints = &game.HangingPoints{Amount: amount, Team: team}
+	return gs
+}
+
 func NewGameCapotInProgress() *game.GameState {
 	trumpSuit := game.SuitHearts
 	callerSeat := 0

@@ -1,17 +1,22 @@
 {
-  "capot": false,
-  "capotBonus": 0,
-  "capotTeam": null,
-  "contractingTeam": 0,
-  "failedContract": false,
-  "lastTrickBonus": 10,
-  "lastTrickTeam": 0,
   "teamACardPoints": 82,
-  "teamADeclPoints": 20,
-  "teamAHandTotal": 112,
-  "teamAMatchScore": 312,
   "teamBCardPoints": 80,
+  "teamADeclPoints": 20,
   "teamBDeclPoints": 0,
+  "lastTrickTeam": 0,
+  "lastTrickBonus": 10,
+  "capot": false,
+  "capotTeam": null,
+  "capotBonus": 0,
+  "failedContract": false,
+  "contractingTeam": 0,
+  "teamAHandTotal": 193,
   "teamBHandTotal": 80,
-  "teamBMatchScore": 280
+  "teamAMatchScore": 393,
+  "teamBMatchScore": 280,
+  "hangingCreated": null,
+  "hangingPaid": {
+    "amount": 81,
+    "team": 0
+  }
 }
