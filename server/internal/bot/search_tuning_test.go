@@ -563,6 +563,8 @@ func TestBlindTenIsTheBetterDiscardThanAnAce(t *testing.T) {
 		{"a discard with only an Ace beside the ten", []string{"AD", "TS"}, onClubs, map[string]float64{"AD": 0, "TS": 4}, "TS"},
 		{"a discard with a low card available", []string{"AD", "TS", "7C"}, []game.TrickCard{{Card: card("8H"), PlayerSeat: 3}},
 			map[string]float64{"AD": 0, "TS": 4, "7C": 1}, "7C"},
+		{"a discard beside an Ace and another blind ten throws the better ten", []string{"TS", "TC", "AD"},
+			[]game.TrickCard{{Card: card("8H"), PlayerSeat: 3}}, map[string]float64{"AD": 0, "TS": 4, "TC": 6}, "TC"},
 		{"a lead keeps the veto", []string{"TS", "AD"}, nil, map[string]float64{"AD": 0, "TS": 4}, "AD"},
 		{"a ten following after a trump cut keeps the veto", []string{"TS", "7S"},
 			[]game.TrickCard{{Card: card("8S"), PlayerSeat: 2}, {Card: card("7H"), PlayerSeat: 3}}, map[string]float64{"7S": 0, "TS": 4}, "7S"},

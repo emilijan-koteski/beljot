@@ -87,22 +87,28 @@ func blindTen(v View, c game.Card, ctx TrickContext) bool {
 	return true
 }
 
-// blindTenDiscardExempt reports a Ten discarded while every other legal card is an Ace, the worse discard to give away.
-func blindTenDiscardExempt(c game.Card, legal []game.Card, ctx TrickContext) bool {
+// blindTenDiscardExempt reports a Ten discarded while every other legal card is an Ace or another blind Ten, so the
+// discard gives away a Ten rather than an Ace.
+func blindTenDiscardExempt(v View, c game.Card, legal []game.Card, ctx TrickContext) bool {
 	if ctx.Position == 0 || ctx.Led == nil || c.Suit == *ctx.Led {
 		return false
 	}
 	for _, other := range legal {
-		if other != c && other.Rank != game.RankAce {
+		if other != c && other.Rank != game.RankAce && !blindTen(v, other, ctx) {
 			return false
 		}
 	}
 	return true
 }
 
-// vetoedBlindTen reports a blind Ten that is not exempt as a discard beside nothing but Aces.
+// BlindTenDiscardExempt reports whether the card, played from the view, is a discard the blind-Ten veto exempts.
+func BlindTenDiscardExempt(v View, c game.Card) bool {
+	return blindTenDiscardExempt(v, c, v.LegalCards, trickContextOf(v))
+}
+
+// vetoedBlindTen reports a blind Ten that is not exempt as a discard beside nothing but Aces and other blind Tens.
 func vetoedBlindTen(v View, c game.Card, legal []game.Card, ctx TrickContext) bool {
-	return blindTen(v, c, ctx) && !blindTenDiscardExempt(c, legal, ctx)
+	return blindTen(v, c, ctx) && !blindTenDiscardExempt(v, c, legal, ctx)
 }
 
 func countSuit(cards []game.Card, suit game.Suit) int {

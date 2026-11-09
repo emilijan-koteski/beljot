@@ -2138,6 +2138,7 @@ func TestChooseFollowDiscardsTheBlindTenRatherThanAnAce(t *testing.T) {
 	}{
 		{"only an Ace beside the ten", cards("AD", "TS"), "TS"},
 		{"a low card beside the ten and the Ace", cards("AD", "TS", "7C"), "7C"},
+		{"another blind ten beside the ten and the Ace", cards("AD", "TS", "TC"), "TS"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
