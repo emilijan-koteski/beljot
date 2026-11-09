@@ -105,12 +105,13 @@ func (r *EventRecorder) Hook() PlayHook {
 			return
 		}
 		r.tally.Decisions++
-		if bot.BlindTen(toBotView(v), card) {
+		bv := toBotView(v)
+		if bot.BlindTen(bv, card) {
 			r.tally.BlindTens++
 			switch {
-			case len(v.LegalCards) == 1:
+			case everyLegalCardIsABlindTen(bv):
 				r.tally.ForcedBlindTens++
-			case bot.BlindTenDiscardExempt(toBotView(v), card):
+			case bot.BlindTenDiscardExempt(bv, card):
 				r.tally.BlindTensBesideAce++
 			}
 		}
@@ -194,6 +195,16 @@ func (r *EventRecorder) keepHighCards(gs *game.GameState, seat int, card game.Ca
 			r.pending = append(r.pending, k)
 		}
 	}
+}
+
+// everyLegalCardIsABlindTen reports a play where no legal card avoids a blind Ten, so the Ten played is forced.
+func everyLegalCardIsABlindTen(v bot.View) bool {
+	for _, c := range v.LegalCards {
+		if !bot.BlindTen(v, c) {
+			return false
+		}
+	}
+	return true
 }
 
 func trickWinnerSeat(trick []game.TrickCard, trump game.Suit) int {
