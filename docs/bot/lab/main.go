@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	exp          = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability|bidpos|bidscore")
+	exp          = flag.String("exp", "bench", "bench|ddcheck|duplicate|race|regret|stability|bidpos|bidscore|shapecheck|classcheck")
 	polA         = flag.String("a", "current", "policy A")
 	polB         = flag.String("b", "random", "policy B")
 	n            = flag.Int("n", 200, "deals")
@@ -34,6 +34,7 @@ var (
 	stopAtTarget = flag.Bool("stopAtTarget", true, "race/bidscore: end the match mid-hand when a team reaches the target")
 	oppSpec      = flag.String("opp", "", "duplicate: policy for seats 1/3 in both games; A and B alternate on seats 0/2 (uses flagsB)")
 	transfer     = flag.String("transfer", "on", "duplicate: on|off, the lab room's declarations-on-a-fall rule")
+	classSpec    = flag.String("class", "", "bidscore: below|table|core, test the first seat of the natural auction whose position is in this hand class")
 	shapeSpec    = flag.String("shape", "", "bidpos/duplicate: keep only deals with a bidding position of this shape, e.g. A,c4,noJ,no9,sA0,pos1")
 )
 
@@ -103,6 +104,8 @@ func main() {
 		bidpos(v, *csvOut)
 	case "shapecheck":
 		shapecheck(v)
+	case "classcheck":
+		classcheck(v)
 	default:
 		fmt.Println("unknown exp")
 		os.Exit(1)

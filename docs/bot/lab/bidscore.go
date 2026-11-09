@@ -25,6 +25,7 @@ type bidCase struct {
 	deal    botlab.Deal
 	seat    int
 	prefix  []game.Action
+	call    game.Action
 	scores  [2]int
 	pairIdx int
 }
@@ -88,20 +89,24 @@ func shapeFitsSeat(gs *game.GameState, step int, s *Shape, seat int) bool {
 	return false
 }
 
-// bidScoreWalk plays the natural auction of pol until the first seat whose position fits the shape (seat 0 without a
-// shape) and returns the actions before it; ok is false when the auction ends first or the seat has no free choice.
-func bidScoreWalk(gs *game.GameState, s *Shape, pol botlab.Policy) (prefix []game.Action, seat int, ok bool) {
+// bidScoreWalk plays the natural auction of pol until the first seat whose position fits the class, else the shape
+// (seat 0 without either), and returns the actions before it and the class's call; ok is false when the auction ends
+// first or the seat has no free choice.
+func bidScoreWalk(gs *game.GameState, s *Shape, class string, pol botlab.Policy) (prefix []game.Action, seat int, call game.Action, ok bool) {
 	gs.Phase = game.PhaseBidding
 	game.RefreshDerivedFlags(gs)
 	for step := 0; step < 8; step++ {
 		seat = gs.ActivePlayerSeat
 		forced := game.MustPickTrump(gs, seat)
-		if shapeFitsSeat(gs, step, s, seat) {
-			return prefix, seat, !forced
+		if class == "" && shapeFitsSeat(gs, step, s, seat) {
+			return prefix, seat, game.Action{}, !forced
 		}
 		natural := pol.Decide(botlab.BuildView(gs, seat, botlab.NewMemory()))
+		if act, in := classCall(class, gs, step, seat, natural); in {
+			return prefix, seat, act, !forced
+		}
 		if natural.Type == game.ActionPickTrump || forced || isLastReshuffleSeat(gs) {
-			return nil, 0, false
+			return nil, 0, game.Action{}, false
 		}
 		next, err := game.ApplyAction(gs, natural)
 		if err != nil {
@@ -110,7 +115,7 @@ func bidScoreWalk(gs *game.GameState, s *Shape, pol botlab.Policy) (prefix []gam
 		prefix = append(prefix, natural)
 		gs = next
 	}
-	return nil, 0, false
+	return nil, 0, game.Action{}, false
 }
 
 func isLastReshuffleSeat(gs *game.GameState) bool {
@@ -174,7 +179,11 @@ func bidScoreMatch(c bidCase, v game.Variant, call bool, pol [4]botlab.Policy) (
 	switch {
 	case call:
 		candidate := gs.TrumpCandidate
-		forced, e := game.ApplyAction(gs, forcedCall(gs, c.seat))
+		act := c.call
+		if act.Type != game.ActionPickTrump {
+			act = forcedCall(gs, c.seat)
+		}
+		forced, e := game.ApplyAction(gs, act)
 		if e != nil {
 			panic(e)
 		}
@@ -218,16 +227,16 @@ func bidScoreCases(v game.Variant, shape *Shape) []bidCase {
 	cases := make([]bidCase, 0, *n)
 	for len(cases) < *n {
 		var d botlab.Deal
-		if shape == nil {
+		if shape == nil || *classSpec != "" {
 			d = botlab.RandomDeal(rng)
 		} else {
 			d = mustTargetedDeal(rng, v, shape, reach, nil)
 		}
-		prefix, seat, ok := bidScoreWalk(botlab.NewDealState(d, v), shape, reach)
+		prefix, seat, call, ok := bidScoreWalk(botlab.NewDealState(d, v), shape, *classSpec, reach)
 		if !ok {
 			continue
 		}
-		cases = append(cases, bidCase{deal: d, seat: seat, prefix: prefix, scores: bidScoreStart(*scoreState, seat%2, rng), pairIdx: len(cases)})
+		cases = append(cases, bidCase{deal: d, seat: seat, prefix: prefix, call: call, scores: bidScoreStart(*scoreState, seat%2, rng), pairIdx: len(cases)})
 	}
 	return cases
 }
@@ -235,6 +244,10 @@ func bidScoreCases(v game.Variant, shape *Shape) []bidCase {
 func bidscore(v game.Variant) {
 	if !validScoreState(*scoreState) {
 		fmt.Fprintf(os.Stderr, "-scoreState must be oppClose, ownClose, bothClose or neither, got %q\n", *scoreState)
+		os.Exit(1)
+	}
+	if !validClass(*classSpec) || (*classSpec != "" && *shapeSpec != "") {
+		fmt.Fprintf(os.Stderr, "-class must be below, table or core and excludes -shape, got %q\n", *classSpec)
 		os.Exit(1)
 	}
 	t0 := time.Now()
@@ -281,8 +294,8 @@ func bidscore(v game.Variant) {
 	}
 	fmt.Printf("bidscore %s: %d pairs, call-minus-pass match wins %+.3f ± %.3f, call wins %d/%d, pass wins %d/%d\n",
 		*scoreState, tot.diff.n, tot.diff.mean(), tot.diff.se(), tot.callWins, tot.diff.n, tot.passWins, tot.diff.n)
-	fmt.Printf("  %s, stopAtTarget=%t, open after %d hands: call %d, pass %d; mean hands per match: call %.2f, pass %.2f; forced pass at the reshuffle seat %d; %.1fs (%.2fs per pair)\n",
-		v, *stopAtTarget, bidScoreHandCap, tot.callOpen, tot.passOpen, float64(tot.callHands)/float64(tot.diff.n),
+	fmt.Printf("  %s, class=%s, stopAtTarget=%t, open after %d hands: call %d, pass %d; mean hands per match: call %.2f, pass %.2f; forced pass at the reshuffle seat %d; %.1fs (%.2fs per pair)\n",
+		v, *classSpec, *stopAtTarget, bidScoreHandCap, tot.callOpen, tot.passOpen, float64(tot.callHands)/float64(tot.diff.n),
 		float64(tot.passHands)/float64(tot.diff.n), tot.passedOutForcedBranch, time.Since(t0).Seconds(), time.Since(t0).Seconds()/float64(tot.diff.n))
 	if shape != nil {
 		fmt.Printf("WARNING: targeted deals (-shape=%s): the result is valid only for the targeted cell\n", *shapeSpec)
