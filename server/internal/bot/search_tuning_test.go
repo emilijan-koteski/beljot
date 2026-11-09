@@ -540,6 +540,10 @@ func TestConventionVetoYieldsOnlyToADecidedRace(t *testing.T) {
 		{"the ten wins the match in every sample and the alternative loses it", search.RaceWin, -search.RaceWin, "TS"},
 		{"a race gap short of decided keeps the veto", 600, -600, "7D"},
 		{"a points margin of 600 keeps the veto", 600, 0, "7D"},
+		{"a gap one past the veto yields", -search.RaceWin + bot.ConventionVeto + 1, -search.RaceWin, "TS"},
+		{"a gap one short of the veto holds", -search.RaceWin + bot.ConventionVeto - 1, -search.RaceWin, "7D"},
+		{"a gap equal to the veto ties and the lower card index, the spade ten, wins", -search.RaceWin + bot.ConventionVeto, -search.RaceWin, "TS"},
+		{"the match won in most samples with the ten and lost with the alternative yields", mostlyWonMean(), -mostlyWonMean(), "TS"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -549,6 +553,12 @@ func TestConventionVetoYieldsOnlyToADecidedRace(t *testing.T) {
 			assert.Equal(t, tt.want, got.String())
 		})
 	}
+}
+
+// mostlyWonMean is a card's mean when it wins the match in 70 % of the samples and banks a points margin otherwise.
+func mostlyWonMean() float64 {
+	const wonShare, pointsOtherwise = 0.7, 300
+	return wonShare*search.RaceWin + (1-wonShare)*pointsOtherwise
 }
 
 func TestBlindTenIsTheBetterDiscardThanAnAce(t *testing.T) {
