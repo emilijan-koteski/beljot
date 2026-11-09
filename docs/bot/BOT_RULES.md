@@ -406,14 +406,14 @@ loaded machine can turn a search into a rule-layer play.
 ### 5.8 Measured strength and the gates
 
 Measured at the end of phase 4 with the settings above (lab rows in `BOT_V2_LAB_RESULTS.md` §2.10,
-server code fe8c4d98; the trick-1 benchmark at 015a7211); the rows marked phase 3 or phase 2 are older measurements (§2.9) that phase 4
+server code fe8c4d98, and the regression and the simulation gates again at a12fb1ef, the vetoes at 1500, with the same values; the trick-1 benchmark at 015a7211); the rows marked phase 3 or phase 2 are older measurements (§2.9) that phase 4
 did not repeat:
 
 | Measurement | Result |
 |---|---|
 | search seats 0/2 vs the random baseline, 60 hands (`TestSimulation_SearchBeatsRandomBaseline`) | 74.3% of all points (8312/11190, 418 searched plays); gate: at least 60% |
 | duplicate search vs the rule layer, 40 deals (`TestSimulation_SearchDoesNotLoseToTheRules`) | +12.47 ± 6.22 per deal (8 passed out, 446 searched plays); gate: mean at least −3.0 |
-| phase 4 against the phase-3 bot, 1000 deals per variant (`shipped:1` vs `shipped:3` with `phase3`) | Bitola +1.69 ± 1.28, Croatian +5.18 ± 1.44, pooled +3.23 ± 0.96 per hand (z 3.4); gate: not worse at 2 SE, met |
+| phase 4 against the phase-3 bot, 1000 deals per variant (`shipped:1` vs `shipped:3` with `phase3`) | Bitola +1.69 ± 1.28, Croatian +5.18 ± 1.44, pooled +3.23 ± 0.96 per hand (z 3.4), at fe8c4d98 and again at a12fb1ef (the same points); gate: not worse at 2 SE, met |
 | phase 3 against the phase-2 bot, 1000 deals per variant (`shipped:3` vs `shipped:3` with `phase2`) | Bitola +1.84 ± 0.82, Croatian +0.79 ± 0.71, pooled +1.24 ± 0.54 per hand (z 2.3); gate: not worse at 2 SE, met |
 | the race objective on a stop-at-target table (`-exp=race`) | +0.0233 ± 0.0043 match edge per game (z 5.4, phase 3); with the hand's end valued (phase 4) Bitola +0.0320 ± 0.0073, Croatian +0.0525 ± 0.0079 |
 | the phase-2 duplicate comparison against the rule layer, 400 deals | +10.05 ± 1.76 per deal (phase 2) |
@@ -432,7 +432,7 @@ production setting is measured by the phase regression above (`shipped:1`). The 
 test always runs. A deal that passes out in bidding scores 0 in the duplicate comparison, so the
 per-deal figures include passed-out deals. The search share against the random baseline is
 deterministic: the deals come from a seeded deck (`rand.NewPCG(42, 1)`, dealer fixed at seat 0) and
-the share is 74.3% (8312 of 11190 points over 60 hands, identical on two runs at 015a7211 and again at fe8c4d98; 73.2%
+the share is 74.3% (8312 of 11190 points over 60 hands, identical on two runs at 015a7211 and again at fe8c4d98 and a12fb1ef; 73.2%
 when the seeded deck came in, before the phase-4 play changes); its gate stays 60%.
 
 ### 5.9 What the search does not model
@@ -467,8 +467,14 @@ when the seeded deck came in, before the phase-4 play changes); its gate stays 6
 
 `SearchTuning` (`server/internal/bot/search_tuning.go`) layers the phase-3 behaviours on the
 search. `bot.DefaultSearchTuning()` is what ships: `DefenderTrumpLeadBonus 10`,
-`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 10000` (the veto), `CashHighWinnerBonus 10000` (the veto), and 0 or false for the rest. The chooser takes the
-card with the best adjusted mean, ties to the lower card index. Every row is in
+`TenUnderAceBonus 3`, `RaceObjective true`, `OpeningSamples 12`, `BlindTenPenalty 1500` (the veto), `CashHighWinnerBonus 1500` (the veto), and 0 or false for the rest. The chooser takes the
+card with the best adjusted mean, ties to the lower card index. The veto, `ConventionVeto` = 1500 (10000 before a12fb1ef),
+outweighs every points margin a hand can produce (at most about 250), so in points the vetoed card is never chosen while an
+alternative exists; in the race, where a sample decided for or against the team is worth plus or minus 1000, it yields when
+the vetoed card's mean beats the alternative's by more than 1500, which needs the vetoed card to win the match in nearly every
+sample and the alternative to lose it in nearly every sample. Measured against the old 10000 (lab flag `hardVeto`) on a
+stop-at-target race, seeds 1231/1232: 0.0000 ± 0.0000 match edge per game in both variants, identical play (no position
+reached the yield), not worse at 2 SE. Every row is in
 `BOT_V2_LAB_RESULTS.md` §2.9 (phase 3) or §2.10 (phase 4), duplicate unless the row says match
 edge, 1000 deals per variant unless the row says otherwise, pooled by inverse variance. The rows
 whose setting ships at 0 or false (`LeadRiskLambda`, `TrumpDrawConditional`, `DecidingHand`,
@@ -483,16 +489,20 @@ whose setting ships at 0 or false (`LeadRiskLambda`, `TrumpDrawConditional`, `De
 | `RaceObjective` | true | +0.0233 ± 0.0043 match edge per game (z 5.4) | See below; better at 2 SE in both variants |
 | `DecidingHand` | false | +0.0017 ± 0.0053 match edge per game (z 0.3) | On a table without stop-at-target, value a sample whose settled hand decides the match at plus or minus 1000, when a team could reach the target this hand (`couldDecideThisHand`); not better at 2 SE, the code stays off |
 | `OpeningSamples` | 12 | +1.90 ± 0.48 per hand (4 000 deals per variant) | 5.4 |
-| `BlindTenPenalty` | 10000 (`ConventionVeto`) | +0.17 ± 0.29 per hand, four runs after the predicate fix (earlier predicate -0.37 ± 0.29; 3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is +0.6 SE |
-| `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
+| `BlindTenPenalty` | 1500 (`ConventionVeto`) | +0.19 ± 0.29 per hand, four runs at a12fb1ef with the 1500 veto and the Ace-discard exemption (+0.17 ± 0.29 at fe8c4d98 after the predicate fix; earlier predicate -0.37 ± 0.29; 3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is +0.7 SE |
+| `CashHighWinnerBonus` | 1500 (`ConventionVeto`; measured at 10000) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
 | `BidConsistency` | false | vs the shipped bidder +1.03 ± 0.73 per hand (z 1.4; Bitola +1.55 ± 1.08, Croatian +0.60 ± 0.98); vs the human-like bidder -0.61 ± 0.56 (z -1.1) | Samples only deals consistent with the auction (5.2); not better at 2 SE against the shipped bidder, so it stays off and the code stays for the lab (§2.10, D1) |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 **The blind-Ten rule.** A side-suit Ten led, or discarded onto a trick an opponent is winning (void in the led suit, or
 following after a trump cut), while its Ace is unplayed, not in the hand, not known with the partner and not in the trick, loses
-10000 from its score, so any other legal card beats it and a Ten that is the only legal card is still played. A Ten that follows
-the led suit with no trump cut takes the trick and is not blind. Blind Tens per 1 000 decisions (Bitola, Croatian), counted as
+the veto (1500) from its score, so any other legal card beats it unless the race is decided for the Ten and against the other card,
+and a Ten that is the only legal card is still played. A Ten that follows the led suit with no trump cut takes the trick and is not
+blind. A Ten discarded (not following the led suit) when every other legal card is an Ace is not vetoed, in the search or in the
+rule layer's `avoidBlindTen` (one predicate, `vetoedBlindTen`): the Ace is the worse discard, 11 points and a sure winner given
+away; a lead keeps the veto. At a12fb1ef the veto plays 246 forced and 7 free blind Tens over 121 440 decisions, the free ones
+Tens discarded beside an Ace. Blind Tens per 1 000 decisions (Bitola, Croatian), counted as
 from fe8c4d98 (leads and discards only; earlier counts also included following Tens and are not comparable): 2.0 to 2.2 with
 the veto and 8.1 to 8.5 without it; with the veto 248 of 121 440 decisions are forced Tens and 4 are free, without it 103 forced
 and 906 free (0.8 and 7.5 per 1 000).
