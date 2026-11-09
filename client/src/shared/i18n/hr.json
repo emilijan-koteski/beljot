@@ -248,10 +248,10 @@
           "them": "oni",
           "failedUs": "pali · mi",
           "failedThem": "pali · oni",
-          "hangingUs": "neriješeno · visi naših {{points}}",
-          "hangingThem": "neriješeno · visi njihovih {{points}}",
-          "hangingDiscardedUs": "neriješeno · naših {{points}} se briše",
-          "hangingDiscardedThem": "neriješeno · njihovih {{points}} se briše",
+          "hangingUs": "neriješeno · vise naših {{points}}",
+          "hangingThem": "neriješeno · vise njihovih {{points}}",
+          "hangingDiscardedUs": "neriješeno · naših {{points}} se brišu",
+          "hangingDiscardedThem": "neriješeno · njihovih {{points}} se brišu",
           "hangingPaid": "+{{points}} visećih"
         },
         "unfinished": "Nedovršena ruka: cilj je dosegnut"
@@ -964,8 +964,8 @@
       "thisHand": "ovo dijeljenje",
       "handLabel": "Dijeljenje {{hand}}",
       "handVariant": "Dijeljenje {{hand}} · {{variant}}",
-      "hangingUs": "Visi naših {{amount}}",
-      "hangingThem": "Visi njihovih {{amount}}"
+      "hangingUs": "Vise naših {{amount}}",
+      "hangingThem": "Vise njihovih {{amount}}"
     },
     "scoreReveal": {
       "title": "Rezultat dijeljenja",
@@ -975,10 +975,10 @@
       "subtitleFailedThem": "Pali · svi bodovi za njih",
       "subtitleFailedCardsUs": "Pali · bodovi iz karata za nas",
       "subtitleFailedCardsThem": "Pali · bodovi iz karata za njih",
-      "subtitleTieUs": "Neriješeno · visi naših {{amount}}",
-      "subtitleTieThem": "Neriješeno · visi njihovih {{amount}}",
-      "subtitleTieDiscardedUs": "Neriješeno · naših {{amount}} se briše",
-      "subtitleTieDiscardedThem": "Neriješeno · njihovih {{amount}} se briše",
+      "subtitleTieUs": "Neriješeno · vise naših {{amount}}",
+      "subtitleTieThem": "Neriješeno · vise njihovih {{amount}}",
+      "subtitleTieDiscardedUs": "Neriješeno · naših {{amount}} se brišu",
+      "subtitleTieDiscardedThem": "Neriješeno · njihovih {{amount}} se brišu",
       "cardPoints": "Bodovi karata",
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus posljednjeg štiha",

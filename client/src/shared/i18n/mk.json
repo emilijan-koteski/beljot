@@ -248,8 +248,8 @@
           "them": "тие",
           "failedUs": "паднаа · ние",
           "failedThem": "паднаа · тие",
-          "hangingUs": "нерешено · виси нашите {{points}}",
-          "hangingThem": "нерешено · виси нивните {{points}}",
+          "hangingUs": "нерешено · висат нашите {{points}}",
+          "hangingThem": "нерешено · висат нивните {{points}}",
           "hangingDiscardedUs": "нерешено · нашите {{points}} се бришат",
           "hangingDiscardedThem": "нерешено · нивните {{points}} се бришат",
           "hangingPaid": "+{{points}} висечки"
@@ -964,8 +964,8 @@
       "thisHand": "ова делење",
       "handLabel": "Делење {{hand}}",
       "handVariant": "Делење {{hand}} · {{variant}}",
-      "hangingUs": "Виси нашите {{amount}}",
-      "hangingThem": "Виси нивните {{amount}}"
+      "hangingUs": "Висат нашите {{amount}}",
+      "hangingThem": "Висат нивните {{amount}}"
     },
     "scoreReveal": {
       "title": "Резултат на делењето",
@@ -975,8 +975,8 @@
       "subtitleFailedThem": "Падната · сите поени за нив",
       "subtitleFailedCardsUs": "Падната · поените од карти за нас",
       "subtitleFailedCardsThem": "Падната · поените од карти за нив",
-      "subtitleTieUs": "Нерешено · виси нашите {{amount}}",
-      "subtitleTieThem": "Нерешено · виси нивните {{amount}}",
+      "subtitleTieUs": "Нерешено · висат нашите {{amount}}",
+      "subtitleTieThem": "Нерешено · висат нивните {{amount}}",
       "subtitleTieDiscardedUs": "Нерешено · нашите {{amount}} се бришат",
       "subtitleTieDiscardedThem": "Нерешено · нивните {{amount}} се бришат",
       "cardPoints": "Поени од карти",

@@ -248,10 +248,10 @@
           "them": "oni",
           "failedUs": "pali · mi",
           "failedThem": "pali · oni",
-          "hangingUs": "nerešeno · visi naših {{points}}",
-          "hangingThem": "nerešeno · visi njihovih {{points}}",
-          "hangingDiscardedUs": "nerešeno · naših {{points}} se briše",
-          "hangingDiscardedThem": "nerešeno · njihovih {{points}} se briše",
+          "hangingUs": "nerešeno · vise naših {{points}}",
+          "hangingThem": "nerešeno · vise njihovih {{points}}",
+          "hangingDiscardedUs": "nerešeno · naših {{points}} se brišu",
+          "hangingDiscardedThem": "nerešeno · njihovih {{points}} se brišu",
           "hangingPaid": "+{{points}} visećih"
         },
         "unfinished": "Nedovršena ruka: cilj je dostignut"
@@ -964,8 +964,8 @@
       "thisHand": "ovo deljenje",
       "handLabel": "Deljenje {{hand}}",
       "handVariant": "Deljenje {{hand}} · {{variant}}",
-      "hangingUs": "Visi naših {{amount}}",
-      "hangingThem": "Visi njihovih {{amount}}"
+      "hangingUs": "Vise naših {{amount}}",
+      "hangingThem": "Vise njihovih {{amount}}"
     },
     "scoreReveal": {
       "title": "Rezultat deljenja",
@@ -975,10 +975,10 @@
       "subtitleFailedThem": "Pali · svi poeni za njih",
       "subtitleFailedCardsUs": "Pali · poeni iz karata za nas",
       "subtitleFailedCardsThem": "Pali · poeni iz karata za njih",
-      "subtitleTieUs": "Nerešeno · visi naših {{amount}}",
-      "subtitleTieThem": "Nerešeno · visi njihovih {{amount}}",
-      "subtitleTieDiscardedUs": "Nerešeno · naših {{amount}} se briše",
-      "subtitleTieDiscardedThem": "Nerešeno · njihovih {{amount}} se briše",
+      "subtitleTieUs": "Nerešeno · vise naših {{amount}}",
+      "subtitleTieThem": "Nerešeno · vise njihovih {{amount}}",
+      "subtitleTieDiscardedUs": "Nerešeno · naših {{amount}} se brišu",
+      "subtitleTieDiscardedThem": "Nerešeno · njihovih {{amount}} se brišu",
       "cardPoints": "Poeni karata",
       "declarationPoints": "Zvanja",
       "lastTrickBonus": "Bonus poslednjeg štiha",
