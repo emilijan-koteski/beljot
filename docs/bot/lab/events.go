@@ -105,7 +105,7 @@ func (r *EventRecorder) Hook() PlayHook {
 			return
 		}
 		r.tally.Decisions++
-		if isBlindTen(gs, seat, card, v) {
+		if bot.BlindTen(toBotView(v), card) {
 			r.tally.BlindTens++
 			switch {
 			case len(v.LegalCards) == 1:
@@ -194,35 +194,6 @@ func (r *EventRecorder) keepHighCards(gs *game.GameState, seat int, card game.Ca
 			r.pending = append(r.pending, k)
 		}
 	}
-}
-
-func isBlindTen(gs *game.GameState, seat int, card game.Card, v View) bool {
-	trump := *gs.TrumpSuit
-	if card.Rank != game.RankTen || card.Suit == trump {
-		return false
-	}
-	if len(gs.CurrentTrick) > 0 && trickWinnerSeat(gs.CurrentTrick, trump)%2 == seat%2 {
-		return false
-	}
-	if len(gs.CurrentTrick) > 0 && gs.CurrentTrick[0].Card.Suit == card.Suit && !trumpCut(gs.CurrentTrick, trump) {
-		return false
-	}
-	ace := game.Card{Rank: game.RankAce, Suit: card.Suit}
-	partner := (seat + 2) % 4
-	return !slices.Contains(v.PlayedCards, ace) && !slices.Contains(v.Hand, ace) && !slices.Contains(v.KnownCards[partner], ace)
-}
-
-// trumpCut reports whether a trump lies on a trick whose led suit is not trump.
-func trumpCut(trick []game.TrickCard, trump game.Suit) bool {
-	if trick[0].Card.Suit == trump {
-		return false
-	}
-	for _, tc := range trick {
-		if tc.Card.Suit == trump {
-			return true
-		}
-	}
-	return false
 }
 
 func trickWinnerSeat(trick []game.TrickCard, trump game.Suit) int {

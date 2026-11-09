@@ -101,6 +101,11 @@ func blindTenDiscardExempt(v View, c game.Card, legal []game.Card, ctx TrickCont
 	return true
 }
 
+// BlindTen reports whether the card, played from the view, is a blind Ten under the production predicate.
+func BlindTen(v View, c game.Card) bool {
+	return blindTen(v, c, trickContextOf(v))
+}
+
 // BlindTenDiscardExempt reports whether the card, played from the view, is a discard the blind-Ten veto exempts.
 func BlindTenDiscardExempt(v View, c game.Card) bool {
 	return blindTenDiscardExempt(v, c, v.LegalCards, trickContextOf(v))
