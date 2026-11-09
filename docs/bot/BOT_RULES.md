@@ -514,13 +514,10 @@ that is the only legal card is still played. A Ten that follows the led suit wit
 the trick and is not blind. A Ten discarded (not following the led suit) when every other legal card
 is an Ace or another blind Ten is not vetoed, in the search or in the rule layer's `avoidBlindTen`
 (one predicate, `vetoedBlindTen`): the Ace is the worse discard, 11 points and a sure winner given
-away, and beside another blind Ten the search keeps its better Ten; a lead keeps the veto. At
-3b2eaa87 the veto plays 246 forced, 6 beside an Ace (the exemption) and 1 free blind Tens over
-121 440 decisions (lab counter, `BOT_V2_LAB_RESULTS.md` §2.10). Blind Tens per 1 000 decisions
-(Bitola, Croatian), counted as from fe8c4d98 (leads and discards only; earlier counts also included
-following Tens and are not comparable): 2.0 to 2.2 with the veto and 8.1 to 8.5 without it; with the
-veto 248 of 121 440 decisions are forced Tens and 4 are free, without it 103 forced and 906 free
-(0.8 and 7.5 per 1 000).
+away, and beside another blind Ten the search keeps its better Ten; a lead keeps the veto. With the
+veto, over the four C1 runs (121 440 decisions, `BOT_V2_LAB_RESULTS.md` §2.10), the lab counts 247
+forced blind Tens (no legal card avoids one), 6 beside an Ace (the exemption) and 0 free, about 2.0
+to 2.2 per 1 000 decisions against 8.1 to 8.5 without the veto.
 
 The convention rule (a convention ships unless the variant without it is better at 2 SE)
 applies to the first two rows and to `BlindTenPenalty`, the strength rule (ships only if better at 2 SE) to the rest.

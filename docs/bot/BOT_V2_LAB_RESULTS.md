@@ -774,7 +774,9 @@ Belote, declarations transfer on, the hand fell). Belote is seen at the next car
 Belote announced with the very last card is not counted. From fe8c4d98 the counter does not count a Ten that follows the
 led suit with no trump cut (it takes the trick), so counts before and after that commit are not comparable. From 3b2eaa87 the
 line has a `beside an Ace` bucket (a blind Ten that `bot.BlindTenDiscardExempt` exempts) between `forced` and `free`;
-earlier rows' `free` counts include Tens discarded beside an Ace.
+earlier rows' `free` counts include Tens discarded beside an Ace. From be7ee402 a blind Ten is decided by production's
+`bot.BlindTen`, and from ca5068ac `forced` means no legal card avoids a blind Ten (every legal card is one; before, only
+the one-legal-card case).
 
 | variant | seed | commit | command | result |
 |---|---|---|---|---|
@@ -1271,6 +1273,9 @@ Closeout (2026-11-09), on the owner's instruction to finish bot v2 with nothing 
   - ec11047d `chore(match): say what the per-match search summary counts`: dropped jobs and misses after the summary.
   - `docs(bot): re-measure after the exemption and fix the veto wording`: this pass (the yield and points-bound wording,
     the `bot: search summary` line as the signal for missed opening searches, the counter bucket).
+  - be7ee402 `fix(bot): count blind Tens in the lab with the production predicate`: the lab counter calls `bot.BlindTen`.
+  - ca5068ac `fix(bot): count a blind Ten as forced when every legal card is one`: the last free Ten of Bitola 1125
+    was a lead from {T♦, T♥}; traced in "After the exemption for Tens beside Aces or other Tens".
 - D5 closed: no rule (owner, 2026-11-09), and no open item is left in the three bot documents, in the closing docs
   pass (`docs(bot): close every open item of bot v2`).
 
@@ -1581,9 +1586,46 @@ C1 pooled over the four runs (weights 1/SE²): w = 2.520, 3.429, 2.873, 3.078 (s
 SE = 1 / √11.899 = **0.29**; z = 0.7. Gate (the veto not worse at 2 SE): met. E3 pooled: w = 0.610 and 0.482 (sum
 1.093); 3.530 / 1.093 = **+3.23**; SE = 1 / √1.093 = **0.96**; z = 3.4. Gate (not worse at 2 SE): met. The points banked
 are the same as at a12fb1ef in all six runs, so the widened exemption changed no result on these deals. With the veto
-the four C1 runs play 246 forced, 6 beside an Ace and 1 free blind Tens over 121 440 decisions; the free one (Bitola
-1125) is not explained by the exemption; one candidate is that the lab's `isBlindTen` does not check for the Ace in the
-current trick, as production's `blindTen` does (not traced).
+the four C1 runs above read 246 forced, 6 beside an Ace and 1 free blind Tens over 121 440 decisions; the free one
+(Bitola 1125) is traced below.
+
+The last free blind Ten, Bitola 1125. Since be7ee402 the lab counts blind Tens with production's predicate
+(`bot.BlindTen`, a wrapper over `blindTen`), so the earlier candidate, the lab's own `isBlindTen` without production's
+Ace-in-the-trick check, is ruled out: the be7ee402 re-run still reads free 1. A temporary print in a scratch lab copy
+(not committed) gave the position: trick 7, seat 2 on lead, trump ♠, hand and legal cards {T♦, T♥}, both Aces out, the
+T♦ played. Every legal card was a blind Ten, a lead is never exempt and both Tens carry the same veto, so the play was
+forced in every sense but the counter's, which called a Ten forced only when it was the only legal card. From ca5068ac
+the counter calls a blind Ten forced when no legal card avoids a blind Ten (every legal card is one by `bot.BlindTen`);
+the re-run reads forced 56, beside an Ace 1, free 0 with identical points. The other three C1 runs had no free Ten, and
+a Ten that moves into `forced` can only come from `free`, so their buckets are the same under the new counter; with the
+veto the four runs play **247 forced, 6 beside an Ace and 0 free** blind Tens over 121 440 decisions.
+
+| Run | Variant | Seed | Commit | Command | Result |
+|---|---|---|---|---|---|
+| C1 veto, production predicate | Bitola | 1125 | be7ee402 | `-exp=duplicate -a=shipped:1 -flagsA=blindTenVeto -b=shipped:1 -flagsB=noBlindTen -events -n=1000 -seed=1125 -workers=6` | +0.35 ± 0.63 (A share 50.1%), 304 s; forced 55, beside an Ace 1, free 1 |
+| C1 veto, forced when every legal card is blind | Bitola | 1125 | ca5068ac | `-exp=duplicate -a=shipped:1 -flagsA=blindTenVeto -b=shipped:1 -flagsB=noBlindTen -events -n=1000 -seed=1125 -workers=6` | +0.35 ± 0.63 (A share 50.1%), 307 s; forced 56, beside an Ace 1, free 0 |
+
+```
+shipped:1[blindTenVeto] vs shipped:1[noBlindTen] (bitola, 1000 deals x2, 304s)
+  A advantage per hand: +0.35 ± 0.63 (95% CI ±1.24)
+  points banked: A 179208  B 178506  (A share 50.1%)
+  A called 891 (made 83%), B called 891 (made 83%), passed out 218 / 2000
+  A counts: applied 17345, decided 17345, deferred 0, defender trump leads 152, belote searches 0, belote skips 0, failed 0
+  B counts: applied 17397, decided 17397, deferred 0, defender trump leads 142, belote searches 0, belote skips 0, failed 0
+  events A: decisions 28512, blind tens 57 (2.0 per 1000; forced 55, beside an Ace 1, free 1), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 55/56, caller belote then fell 9
+  events B: decisions 28512, blind tens 236 (8.3 per 1000; forced 22, beside an Ace 0, free 214), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 56/55, caller belote then fell 10
+```
+
+```
+shipped:1[blindTenVeto] vs shipped:1[noBlindTen] (bitola, 1000 deals x2, 307s)
+  A advantage per hand: +0.35 ± 0.63 (95% CI ±1.24)
+  points banked: A 179208  B 178506  (A share 50.1%)
+  A called 891 (made 83%), B called 891 (made 83%), passed out 218 / 2000
+  A counts: applied 17345, decided 17345, deferred 0, defender trump leads 152, belote searches 0, belote skips 0, failed 0
+  B counts: applied 17397, decided 17397, deferred 0, defender trump leads 142, belote searches 0, belote skips 0, failed 0
+  events A: decisions 28512, blind tens 57 (2.0 per 1000; forced 56, beside an Ace 1, free 0), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 55/56, caller belote then fell 9
+  events B: decisions 28512, blind tens 236 (8.3 per 1000; forced 23, beside an Ace 0, free 213), high kept then ruffed 5 (0.2 per 1000), capots made/conceded 56/55, caller belote then fell 10
+```
 
 The simulation gates at a12fb1ef (`BELJOT_BOT_SIM=1 go test -tags nodynamic ./internal/bot/ -run TestSimulation -count=1
 -v` from `server/`, 9.9 s): `search share over 60 hands: 74.3% (8312/11190 points); search ran at 418 card plays and
