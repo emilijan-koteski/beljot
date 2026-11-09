@@ -54,6 +54,7 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 		t.CashHighWinnerBonus = 0
 		t.DecidingHand = false
 		t.BeloteSkipMargin = 0
+		t.BidConsistency = false
 	}
 	switch {
 	case f.On("defTrump3"):
@@ -138,6 +139,12 @@ func TuningFromFlags(f Flags) bot.SearchTuning {
 	}
 	if f.On("noBeloteGate") {
 		t.BeloteSkipMargin = 0
+	}
+	if f.On("bidInfer") {
+		t.BidConsistency = true
+	}
+	if f.On("noBidInfer") {
+		t.BidConsistency = false
 	}
 	return t
 }

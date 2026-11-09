@@ -9,7 +9,10 @@ import (
 	"github.com/emilijan/beljot/server/internal/game"
 )
 
-const samplerStream = 0x5EED
+const (
+	samplerStream       = 0x5EED
+	sampleAttemptFactor = 4
+)
 
 // Position is the trick in progress as the solver sees it: trump suit index, direction of play, the trick's leader,
 // its card indexes and the capot flag, plus Race when the solver should race for a stop-at-target match.
@@ -24,12 +27,13 @@ type Position struct {
 
 // Options bound the search: at most Samples deals, and a stop once at least EarlyStopAfter are in and the best card
 // leads the runner-up by more than EarlyStopSE standard errors. SampleClass optionally sorts each deal into class 0
-// or 1, and SeedSalt is mixed into the sampler seed.
+// or 1, SampleFilter optionally rejects a deal before it is solved, and SeedSalt is mixed into the sampler seed.
 type Options struct {
 	Samples        int
 	EarlyStopAfter int
 	EarlyStopSE    float64
 	SampleClass    func(hands [4]uint32) int
+	SampleFilter   func(hands [4]uint32) bool
 	SeedSalt       uint64
 }
 
@@ -91,11 +95,12 @@ func Choose(
 	rng := rand.New(rand.NewPCG(in.Seed()^opts.SeedSalt, samplerStream))
 	solver := NewSolver(pos.Trump, pos.Clockwise)
 	solver.SetRace(pos.Race)
+	attempts := 0
 	for votes.n < opts.Samples {
 		if time.Now().After(deadline) {
 			return Result{}, false
 		}
-		hands, ok := Sample(rng, in)
+		hands, ok := drawAccepted(rng, in, opts, &attempts)
 		if !ok {
 			break
 		}
@@ -128,12 +133,12 @@ func Evaluate(in Information, pos Position, s Settlement, opts Options, deadline
 	solver := NewSolver(pos.Trump, pos.Clockwise)
 	solver.SetRace(pos.Race)
 	values := make([]int, 0, opts.Samples)
-	madeCount := 0
+	madeCount, attempts := 0, 0
 	for len(values) < opts.Samples {
 		if time.Now().After(deadline) {
 			return 0, 0, 0, false
 		}
-		hands, sampled := Sample(rng, in)
+		hands, sampled := drawAccepted(rng, in, opts, &attempts)
 		if !sampled {
 			break
 		}
@@ -149,6 +154,19 @@ func Evaluate(in Information, pos Position, s Settlement, opts Options, deadline
 	}
 	stats := statsOf(values)
 	return stats.Mean, stats.SE, float64(madeCount) / float64(len(values)), true
+}
+
+// drawAccepted samples deals until the filter accepts one, every draw counting toward a cap of sampleAttemptFactor
+// draws per requested sample; it reports false when the sampler fails or the cap is reached.
+func drawAccepted(rng *rand.Rand, in Information, opts Options, attempts *int) ([4]uint32, bool) {
+	for *attempts < sampleAttemptFactor*opts.Samples {
+		*attempts++
+		hands, ok := Sample(rng, in)
+		if !ok || opts.SampleFilter == nil || opts.SampleFilter(hands) {
+			return hands, ok
+		}
+	}
+	return [4]uint32{}, false
 }
 
 // rootValue solves the position as it stands; a full trick is valued by replaying its last card, which closes it.

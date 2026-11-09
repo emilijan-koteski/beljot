@@ -78,3 +78,7 @@ func CashHighWinnerForTest(v View, c game.Card) bool {
 func ChooseSearchForTest(v View, t SearchTuning) (search.Result, bool) {
 	return chooseSearch(v, samplesFor(v.TrickNumber, t), time.Now().Add(time.Hour), t, trumpDrawClass(v, t))
 }
+
+func BidConsistentForTest(v View) func(hands [4]uint32) bool {
+	return bidConsistent(v)
+}

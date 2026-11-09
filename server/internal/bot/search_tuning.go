@@ -24,6 +24,7 @@ type SearchTuning struct {
 	CashHighWinnerBonus    int
 	SampleCaps             [9]int
 	BeloteSkipMargin       int
+	BidConsistency         bool
 	SeedSalt               uint64
 }
 

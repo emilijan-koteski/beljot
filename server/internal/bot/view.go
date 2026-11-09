@@ -40,6 +40,7 @@ type View struct {
 	DeclarationsEnabled  bool
 
 	PlayedCards   []game.Card
+	PlayedBy      [4][]game.Card
 	KnownVoids    [4][4]bool
 	KnownCards    [4][]game.Card
 	DeclaredCards [4][]game.Card

@@ -17,15 +17,18 @@ type Memory struct {
 	located    [4][]game.Card
 	bounds     [4][4]int8
 	bids       []BidRecord
+	playedBy   [4][]game.Card
 }
 
-// BidRecord is one auction action: who acted, in which round, after how many passes, and the called suit unless it passed.
+// BidRecord is one auction action: who acted, in which round, after how many passes, the called suit unless it passed,
+// and the face-up candidate of a Bitola auction.
 type BidRecord struct {
 	Seat         int
 	Round        int
 	Passed       bool
 	Suit         *game.Suit
 	PassesBefore int
+	Candidate    *game.Card
 }
 
 // NewMemory returns a Memory primed for the first hand.
@@ -55,6 +58,7 @@ func (m *Memory) SyncHand(handNumber int) {
 		m.located = [4][]game.Card{}
 		m.bounds = noRankBounds()
 		m.bids = nil
+		m.playedBy = [4][]game.Card{}
 	}
 }
 
@@ -63,6 +67,9 @@ func (m *Memory) SyncHand(handNumber int) {
 // trump nil only when unknown, and trick is the trick as it stood before the card.
 func (m *Memory) ObservePlay(seat int, card game.Card, leadSuit, trump *game.Suit, trick []game.TrickCard) {
 	m.played = append(m.played, card)
+	if seat >= 0 && seat < len(m.playedBy) {
+		m.playedBy[seat] = append(m.playedBy[seat], card)
+	}
 	if leadSuit == nil || trump == nil {
 		if leadSuit != nil && card.Suit != *leadSuit {
 			m.markVoid(seat, *leadSuit)
@@ -223,30 +230,47 @@ func (m *Memory) KnownCards() [4][]game.Card {
 	return out
 }
 
-// ObserveBid records a trump auction action; round and passesBefore are the engine's bidding round and pass count before it.
-// The first action of an auction (round 1, no passes) starts a fresh record, which covers a Bitola reshuffle within one hand.
-func (m *Memory) ObserveBid(seat int, action game.Action, round int, passesBefore int) {
+// ObserveBid records a trump auction action with the face-up candidate, nil without one; round and passesBefore are the
+// engine's bidding round and pass count before it. A first action (round 1, no passes) starts a fresh record.
+func (m *Memory) ObserveBid(seat int, action game.Action, candidate *game.Card, round, passesBefore int) {
 	if round == 1 && passesBefore == 0 {
 		m.bids = nil
 	}
 	rec := BidRecord{Seat: seat, Round: round, PassesBefore: passesBefore, Passed: action.Type == game.ActionPassTrump}
-	if !rec.Passed && action.Suit != nil {
-		suit := *action.Suit
-		rec.Suit = &suit
+	if candidate != nil {
+		c := *candidate
+		rec.Candidate = &c
+	}
+	if !rec.Passed {
+		rec.Suit = calledSuit(action, candidate)
 	}
 	m.bids = append(m.bids, rec)
 }
 
-// BidActionWithCandidate returns the action with the trump candidate's suit filled in when a round-1 pick carries none.
-func BidActionWithCandidate(action game.Action, candidate *game.Card) game.Action {
-	if action.Type == game.ActionPickTrump && action.Suit == nil && candidate != nil {
-		suit := candidate.Suit
-		action.Suit = &suit
+// calledSuit is a copy of the pick's suit, the candidate's suit for a suitless round-1 pick, else nil.
+func calledSuit(action game.Action, candidate *game.Card) *game.Suit {
+	var suit game.Suit
+	switch {
+	case action.Suit != nil:
+		suit = *action.Suit
+	case candidate != nil:
+		suit = candidate.Suit
+	default:
+		return nil
 	}
-	return action
+	return &suit
 }
 
 // Bids returns a copy of this hand's auction records in order.
 func (m *Memory) Bids() []BidRecord {
 	return slices.Clone(m.bids)
+}
+
+// PlayedBy returns a copy of the cards each seat has played this hand.
+func (m *Memory) PlayedBy() [4][]game.Card {
+	var out [4][]game.Card
+	for seat := range m.playedBy {
+		out[seat] = slices.Clone(m.playedBy[seat])
+	}
+	return out
 }

@@ -37,6 +37,7 @@ type View struct {
 	TricksWon  [2]int
 
 	PlayedCards []game.Card
+	PlayedBy    [4][]game.Card
 	KnownVoids  [4][4]bool
 	KnownCards  [4][]game.Card
 	Bids        []bot.BidRecord

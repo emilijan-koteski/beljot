@@ -113,15 +113,18 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 
 	t.Run("bitola two rounds", func(t *testing.T) {
 		mem := bot.NewMemory()
+		cand := card("QS")
 		for i := 0; i < 4; i++ {
-			mem.ObserveBid(i, bidPass(i), 1, i)
+			mem.ObserveBid(i, bidPass(i), &cand, 1, i)
 		}
-		mem.ObserveBid(0, bidPick(0, &hearts), 2, 0)
+		mem.ObserveBid(0, bidPick(0, &hearts), &cand, 2, 0)
 		bids := mem.Bids()
 		require.Len(t, bids, 5)
 		for i := 0; i < 4; i++ {
-			assert.Equal(t, bot.BidRecord{Seat: i, Round: 1, Passed: true, PassesBefore: i}, bids[i])
+			assert.Equal(t, bot.BidRecord{Seat: i, Round: 1, Passed: true, PassesBefore: i, Candidate: &cand}, bids[i])
 		}
+		require.NotNil(t, bids[4].Candidate)
+		assert.Equal(t, cand, *bids[4].Candidate)
 		assert.False(t, bids[4].Passed)
 		assert.Equal(t, 2, bids[4].Round)
 		assert.Equal(t, 0, bids[4].PassesBefore)
@@ -132,9 +135,9 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 	t.Run("croatian forced dealer pick", func(t *testing.T) {
 		mem := bot.NewMemory()
 		for i := 0; i < 3; i++ {
-			mem.ObserveBid(i+1, bidPass(i+1), 1, i)
+			mem.ObserveBid(i+1, bidPass(i+1), nil, 1, i)
 		}
-		mem.ObserveBid(0, bidPick(0, &spades), 1, 3)
+		mem.ObserveBid(0, bidPick(0, &spades), nil, 1, 3)
 		bids := mem.Bids()
 		require.Len(t, bids, 4)
 		for i, b := range bids {
@@ -144,14 +147,20 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 		assert.True(t, bids[2].Passed)
 		assert.False(t, bids[3].Passed)
 		assert.Equal(t, spades, *bids[3].Suit)
+		for _, b := range bids {
+			assert.Nil(t, b.Candidate)
+		}
 	})
 
 	t.Run("round one pick takes the candidate suit", func(t *testing.T) {
 		mem := bot.NewMemory()
 		cand := card("QD")
-		mem.ObserveBid(1, bot.BidActionWithCandidate(bidPick(1, nil), &cand), 1, 0)
+		mem.ObserveBid(1, bidPick(1, nil), &cand, 1, 0)
+		cand = card("7C")
 		bids := mem.Bids()
 		require.Len(t, bids, 1)
+		require.NotNil(t, bids[0].Candidate)
+		assert.Equal(t, card("QD"), *bids[0].Candidate, "the record keeps its own copy of the candidate")
 		require.NotNil(t, bids[0].Suit)
 		assert.Equal(t, game.SuitDiamonds, *bids[0].Suit)
 		assert.False(t, bids[0].Passed)
@@ -160,12 +169,12 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 	t.Run("a new auction replaces a passed-out one", func(t *testing.T) {
 		mem := bot.NewMemory()
 		for i := 0; i < 4; i++ {
-			mem.ObserveBid(i, bidPass(i), 1, i)
+			mem.ObserveBid(i, bidPass(i), nil, 1, i)
 		}
 		for i := 0; i < 4; i++ {
-			mem.ObserveBid(i, bidPass(i), 2, i)
+			mem.ObserveBid(i, bidPass(i), nil, 2, i)
 		}
-		mem.ObserveBid(1, bidPass(1), 1, 0)
+		mem.ObserveBid(1, bidPass(1), nil, 1, 0)
 		bids := mem.Bids()
 		require.Len(t, bids, 1)
 		assert.Equal(t, 1, bids[0].Seat)
@@ -173,7 +182,7 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 
 	t.Run("sync hand clears the record", func(t *testing.T) {
 		mem := bot.NewMemory()
-		mem.ObserveBid(0, bidPass(0), 1, 0)
+		mem.ObserveBid(0, bidPass(0), nil, 1, 0)
 		mem.SyncHand(1)
 		assert.Len(t, mem.Bids(), 1)
 		mem.SyncHand(2)
@@ -183,9 +192,30 @@ func TestMemoryRecordsTheAuction(t *testing.T) {
 	t.Run("bids returns a copy", func(t *testing.T) {
 		mem := bot.NewMemory()
 		assert.Empty(t, mem.Bids())
-		mem.ObserveBid(0, bidPass(0), 1, 0)
+		mem.ObserveBid(0, bidPass(0), nil, 1, 0)
 		got := mem.Bids()
 		got[0].Seat = 3
 		assert.Equal(t, 0, mem.Bids()[0].Seat)
 	})
+}
+
+func TestMemoryRecordsThePlaysPerSeat(t *testing.T) {
+	spades, hearts := game.SuitSpades, game.SuitHearts
+	mem := bot.NewMemory()
+	mem.ObservePlay(0, card("KS"), nil, &hearts, nil)
+	mem.ObservePlay(1, card("8S"), &spades, &hearts, trickOf(0, "KS"))
+	mem.ObservePlay(0, card("7D"), nil, &hearts, nil)
+
+	played := mem.PlayedBy()
+	assert.Equal(t, cards("KS", "7D"), played[0])
+	assert.Equal(t, cards("8S"), played[1])
+	assert.Empty(t, played[2])
+
+	played[0][0] = card("AH")
+	assert.Equal(t, card("KS"), mem.PlayedBy()[0][0], "PlayedBy returns copies")
+
+	mem.SyncHand(1)
+	assert.Len(t, mem.PlayedBy()[0], 2)
+	mem.SyncHand(2)
+	assert.Equal(t, [4][]game.Card{}, mem.PlayedBy())
 }

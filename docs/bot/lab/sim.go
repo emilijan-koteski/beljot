@@ -64,7 +64,7 @@ func toBotView(v View) bot.View {
 		DealerSeat: v.DealerSeat, MustPickTrump: v.MustPickTrump, CurrentTrick: v.CurrentTrick, LeadSuit: v.LeadSuit,
 		ActivePlayerSeat: v.ActivePlayerSeat, AwaitingDeclaration: v.AwaitingDeclaration, HasDeclarations: v.HasDeclarations,
 		PendingBelot: v.PendingBelot, PartnerProposedSurrender: v.PartnerProposedSurrender, TeamScores: v.TeamScores,
-		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
+		HandPoints: v.HandPoints, TricksWon: v.TricksWon, PlayedCards: v.PlayedCards, PlayedBy: v.PlayedBy, KnownVoids: v.KnownVoidsWithTrump, KnownCards: v.KnownCards,
 		HasTrumpCandidate: v.HasTrumpCandidate, DeclaredCards: v.DeclaredCards, Clockwise: v.Clockwise, TrickNumber: v.TrickNumber,
 		DeclPoints: v.DeclPoints, MatchTarget: v.MatchTarget, StopAtTarget: v.StopAtTarget, DeclarationsTransfer: v.DeclarationsTransfer,
 		DeclarationsEnabled: v.DeclarationsEnabled, RankBounds: v.RankBounds, Bids: v.Bids,
@@ -234,6 +234,7 @@ func BuildView(gs *game.GameState, seat int, mem *Memory) View {
 	v.MustPickTrump = game.MustPickTrump(gs, seat)
 	if mem != nil {
 		v.PlayedCards = mem.PlayedCards()
+		v.PlayedBy = mem.PlayedBy()
 		v.KnownVoids = mem.KnownVoids()
 		v.KnownVoidsWithTrump = mem.KnownVoidsWithTrump()
 		v.RankBounds = mem.RankBounds()
@@ -318,7 +319,7 @@ func PlayHandFrom(gs *game.GameState, pol [4]Policy, hook PlayHook, mem *Memory)
 				return HandOutcome{Status: HandPassedOut}, nil
 			}
 			cand := gs.TrumpCandidate
-			mem.ObserveBid(seat, bot.BidActionWithCandidate(action, cand), gs.BiddingRound, gs.BiddingPassCount)
+			mem.ObserveBid(seat, action, cand, gs.BiddingRound, gs.BiddingPassCount)
 			next, err := game.ApplyAction(gs, action)
 			if err != nil {
 				return HandOutcome{}, fmt.Errorf("bidding seat %d %s: %w", seat, action.Type, err)

@@ -39,9 +39,14 @@ func (m *Memory) SyncHand(handNumber int) {
 	m.bounds.SyncHand(handNumber)
 }
 
-// ObserveBid records a trump auction action in the production memory.
-func (m *Memory) ObserveBid(seat int, action game.Action, round int, passesBefore int) {
-	m.bounds.ObserveBid(seat, action, round, passesBefore)
+// ObserveBid records a trump auction action and the face-up candidate in the production memory.
+func (m *Memory) ObserveBid(seat int, action game.Action, candidate *game.Card, round, passesBefore int) {
+	m.bounds.ObserveBid(seat, action, candidate, round, passesBefore)
+}
+
+// PlayedBy returns the cards each seat has played this hand, from the production memory.
+func (m *Memory) PlayedBy() [4][]game.Card {
+	return m.bounds.PlayedBy()
 }
 
 // Bids returns a copy of this hand's auction records.

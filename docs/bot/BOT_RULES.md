@@ -237,7 +237,28 @@ has, and with none it reaches no decision and the rules play.
 
 Every deal that satisfies the hard facts is equally likely when the rejection draw succeeds; the
 constructive fallback is close to uniform but not exactly. The sampler does not weigh deals by
-how the seats bid or by what they led or discarded (see 5.9).
+what the seats led or discarded (see 5.9).
+
+**Bidding consistency** (`SearchTuning.BidConsistency`, `bidConsistent` in `search_bridge.go`). When it is on and the
+hand's auction is recorded (`View.Bids`, §7), the chooser and the Belote evaluation pass `search.Options.SampleFilter`,
+which rejects a sampled deal in which another seat's auction action contradicts the bid table of §4.2. A seat's eight
+cards are its sampled remaining cards, the cards it played (`View.PlayedBy`) and its card in the current trick. It bid
+on fewer: five plus the face-up candidate in Bitola (three more arrive after the pick, two for the caller), six in
+Croatian (the two face-down cards join after the pick), and which ones is unknown, so the filter tries every bid-time
+hand those eight cards allow (`matchesBidTable` with the recorded passes before the action as the position):
+
+- a pass is explained when at least one bid-time hand matches no suit the seat could call (Bitola round 1: the
+  candidate's suit; Bitola round 2: the other three; Croatian: all four); a deal where every bid-time hand matches is
+  rejected;
+- a call is explained when at least one bid-time hand matches the called suit; in Bitola the hands are five of the
+  caller's cards other than the candidate, plus the candidate; Croatian's forced dealer pick (three passes before it)
+  proves nothing and is not checked;
+- the bot's own actions are not checked, and a Bitola auction with no recorded candidate is not filtered.
+
+A rejected deal is never solved and does not count as a sample; the sampler draws again, up to four draws per requested
+sample. When no deal is accepted the search runs once more without the filter on the same seed, so an auction no
+table-consistent deal explains (a human bids differently) plays exactly as the unfiltered search would. The filter
+leaves the random stream unchanged when it rejects nothing.
 
 ### 5.3 How a sample is solved and settled
 
@@ -369,9 +390,10 @@ hands, identical on three repeated runs); its gate stays 60%.
 
 ### 5.9 What the search does not model
 
-- **No bidding or play inference beyond the hard facts of 5.2.** Deals are not weighed by how the
-  seats bid, led, discarded or signalled. The lab measured the bidding-consistency weighting at
-  −1.9 ± 1.9 and left it out (`BOT_V2_LAB_RESULTS.md` §2.6).
+- **No play inference beyond the hard facts of 5.2, and bidding only as a hard filter.** Deals are not weighed by what
+  the seats led, discarded or signalled. The auction enters only through the bidding-consistency filter of 5.2, which
+  assumes every seat bids by the bot's own table and keeps or rejects a deal outright (no weighting). The phase-1 lab
+  measured a weighting at −1.9 ± 1.9 (`BOT_V2_LAB_RESULTS.md` §2.6); the filter's measurement is in §2.10 (D1).
 - **Open-hand solving of each sample.** Every sampled deal is solved as if all four players saw
   all cards, for the opponents too. A card that is best only because the seat would know the
   exact deal later (strategy fusion) can be overrated, and a card that hides information is not
@@ -412,6 +434,7 @@ card with the best adjusted mean, ties to the lower card index. Every row is in
 | `BlindTenPenalty` | 10000 (`ConventionVeto`) | -0.37 ± 0.29 per hand, four runs (3 +0.44 ± 0.28, 10 +0.32 ± 0.23) | The table rule against a blind Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `CashHighWinnerBonus` | 10000 (`ConventionVeto`) | -0.04 ± 0.03 per hand, six runs (two per value, seeds 1131–1136); 3 +0.01 ± 0.01, 10 Bitola identical points on both sides (SE 0, no pool) and Croatian -0.02 ± 0.14; all within noise of zero | The table rule for cashing the Ace or Ten (below); a convention ships unless worse at 2 SE, and the veto is 1.3 SE |
 | `BeloteSkipMargin` | 0 | +5: -0.02 ± 0.04 per hand (z -0.4; Bitola -0.01 ± 0.04, Croatian -0.11 ± 0.17); 5 and 7 skips in 152 and 140 Belote searches | The caller skips its Belote when the hand searched without it beats the hand with it by more than the margin (§3 rule 3); not better at 2 SE, so 0 (always announce) ships and the code stays for the lab |
+| `BidConsistency` | false | measured in `BOT_V2_LAB_RESULTS.md` §2.10 (D1) | Samples only deals consistent with the auction (5.2) |
 | `SampleCaps` | all 0 | | Experiments only; the schedule of 5.4 applies |
 
 **The blind-Ten rule.** A side-suit Ten, led or played onto a trick the seat's side is not winning, while its Ace is unplayed, not
@@ -873,8 +896,11 @@ what a human in that seat could:
   a trump is void in trump as well: it would have had to cut. Voids are tracked for **all 4
   seats** (including the partner, used by the lead-into-void and smear rules).
 - **The auction** (`Bids`, from `Memory.ObserveBid`): for the current hand, each bid action with its seat,
-  round, the passes before it, and either a pass or the called suit (a Bitola round-1 pick records the
-  candidate's suit). A Bitola reshuffle starts a new record, and `SyncHand` clears it with the hand.
+  round, the passes before it, the face-up candidate (Bitola, on every record), and either a pass or the called suit
+  (a Bitola round-1 pick records the candidate's suit). A Bitola reshuffle starts a new record, and `SyncHand` clears
+  it with the hand.
+- **Cards played per seat** (`PlayedBy`, from `Memory.ObservePlay`): what each seat has played this hand, which the
+  bidding-consistency filter of 5.2 adds back to a sampled hand.
 - **Rank bounds** (`RankBounds[seat][suit]`, from `Memory`): the strength index (`NonTrumpRankOrder`,
   `TrumpRankOrder` for the trump suit) of the highest card the seat can still hold in that suit, -1
   for no bound, only ever lowered. Two exact facts feed it, each following from a follow rule of the

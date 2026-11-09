@@ -443,3 +443,59 @@ func TestEvaluateTimesOut(t *testing.T) {
 	_, _, _, ok = search.Evaluate(c.in, c.pos, c.settle, opts, time.Now().Add(-time.Second))
 	assert.False(t, ok)
 }
+
+func everyOther() func(hands [4]uint32) bool {
+	draws := 0
+	return func(hands [4]uint32) bool {
+		draws++
+		return draws%2 == 0
+	}
+}
+
+func TestChooseAppliesTheSampleFilter(t *testing.T) {
+	c := newKeepTheMaster(0, false, unseenWithClubs(rand.New(rand.NewPCG(5, 5))))
+	base := search.Options{Samples: 12, EarlyStopAfter: 13, EarlyStopSE: 1}
+
+	t.Run("a filter rejecting every deal leaves no answer", func(t *testing.T) {
+		opts := base
+		opts.SampleFilter = func(hands [4]uint32) bool { return false }
+		_, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+		assert.False(t, ok)
+		_, _, _, ok = search.Evaluate(c.in, c.pos, c.settle, opts, farFuture())
+		assert.False(t, ok)
+	})
+
+	t.Run("rejected deals are replaced up to the requested count", func(t *testing.T) {
+		opts := base
+		opts.SampleFilter = everyOther()
+		res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+		require.True(t, ok)
+		assert.Equal(t, base.Samples, res.Samples)
+	})
+
+	t.Run("a filter accepting every deal changes nothing", func(t *testing.T) {
+		opts := base
+		opts.SampleFilter = func(hands [4]uint32) bool { return true }
+		want, ok := search.Choose(c.in, c.pos, c.legal, c.settle, base, farFuture())
+		require.True(t, ok)
+		got, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+		require.True(t, ok)
+		assert.Equal(t, want, got)
+		wantMean, _, _, _ := search.Evaluate(c.in, c.pos, c.settle, base, farFuture())
+		gotMean, _, _, _ := search.Evaluate(c.in, c.pos, c.settle, opts, farFuture())
+		assert.InDelta(t, wantMean, gotMean, 1e-9)
+	})
+
+	t.Run("the filter sees at most four draws per requested deal", func(t *testing.T) {
+		opts := base
+		draws := 0
+		opts.SampleFilter = func(hands [4]uint32) bool {
+			draws++
+			return draws > 4*base.Samples-3
+		}
+		res, ok := search.Choose(c.in, c.pos, c.legal, c.settle, opts, farFuture())
+		require.True(t, ok)
+		assert.Equal(t, 4*base.Samples, draws)
+		assert.Equal(t, 3, res.Samples)
+	})
+}
