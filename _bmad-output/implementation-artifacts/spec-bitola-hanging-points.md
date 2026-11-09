@@ -106,6 +106,8 @@ A = owner of H, B = the other team. The prior entry is H = 81.
 
 ## Spec Change Log
 
+- 2026-11-09 owner follow-up (after `62bf879a`): a Capot always takes the whole hand and never fails its team in either variant (declarations are confirmed only once a trick is won), so `FailedContract` on a Capot is `CapotTeam != caller`. mk UI strings use the plural "висат" and sr/hr "vise"/"se brišu" with a plural subject. Client tests made Node 24-safe (native-signal `Request` in `test-setup.ts`).
+
 ## Review Triage Log
 
 | # | Finding (layer) | Verdict | Evidence | Route |
@@ -122,7 +124,7 @@ A = owner of H, B = the other team. The prior entry is H = 81.
 | 10 | Impossible fixtures (blind) | low | `MatchPage.test.tsx:1830` caller team 1 with entry team 0; `gorm_repo_test.go:590` payout hand at 162/162 | patch |
 | 11 | `team` is owner or recipient by context (blind) | low | Documented on every type; fix is a cross-contract rename | reject |
 | 12 | Migration lacks CHECKs (blind) | false | The only writer (`hangingColumns`) sets both columns or neither; a half-set row is unreachable | reject |
-| 13 | H under "Declarations on a fall: Off" (blind) | low | H is a fixed amount per owner spec ("H is written to B"); the rules file doesn't say so | defer |
+| 13 | H under "Declarations on a fall: Off" (blind) | low | H is a fixed amount per owner spec ("H is written to B"); the rules file doesn't say so | defer, then fixed in follow-up (rules line + `TestHangingPoints_PayoutIsFixedWhenDeclarationsDoNotTransfer`) |
 | 14 | `CallerMade` doc stale (blind) | low | Doc names fall/Capot only; a Bitola tie also returns false | patch |
 | 15 | Tie column doesn't add up in overlay (blind) | false | A fall already shows caller rows then 0, with the subtitle explaining; same shape | reject |
 
