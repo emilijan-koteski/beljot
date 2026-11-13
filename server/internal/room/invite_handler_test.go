@@ -467,7 +467,7 @@ func TestInviteToRoom_SecondInviteToNonFriendWhilePendingIsRejected(t *testing.T
 	assert.Equal(t, "INVITE_ALREADY_PENDING", errorCode(t, rec.Body.Bytes()))
 }
 
-func TestListInvitablePlayers_ListsIdleNonFriendsWhoAllowIt(t *testing.T) {
+func TestListInvitablePlayers_ListsIdleFriendsAndNonFriendsWhoAllowIt(t *testing.T) {
 	h := setupInviteTest(nil)
 	r := seedInviteRoom(t, h.repo, 100, "", 0, true)
 	h.idleInLobby(100, "owner")
@@ -479,6 +479,12 @@ func TestListInvitablePlayers_ListsIdleNonFriendsWhoAllowIt(t *testing.T) {
 	h.available(204)
 	h.befriend(100, "owner", 205, "buddy")
 	h.idleInLobby(205, "buddy")
+	h.befriend(100, "owner", 211, "shyFriend")
+	h.registerPlayer(211, "shyFriend", false)
+	h.available(211)
+	h.befriend(100, "owner", 212, "busyFriend")
+	h.idleInLobby(212, "busyFriend")
+	h.presence.inMatch[212] = true
 
 	h.idleInLobby(206, "offline")
 	h.presence.online[206] = false
@@ -498,7 +504,8 @@ func TestListInvitablePlayers_ListsIdleNonFriendsWhoAllowIt(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	rows := decodeInvitableRows(t, rec)
-	assert.Equal(t, []string{"Ana", "marko", "zora"}, rowUsernames(rows), "sorted case-insensitively by username")
+	assert.Equal(t, []string{"Ana", "buddy", "marko", "shyFriend", "zora"}, rowUsernames(rows),
+		"friends are listed whatever their opt-in, sorted case-insensitively by username")
 	for _, row := range rows {
 		assert.True(t, row.Available)
 		assert.Empty(t, row.Reason)

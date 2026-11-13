@@ -48,8 +48,8 @@ export function listInvitableFriends(roomId: number): Promise<InvitableFriend[]>
 }
 
 /**
- * Idle lobby players who are not the caller's friends and accept their invites, filtered by an
- * optional username substring. The server sorts and caps the list; opted-out players are absent.
+ * Idle lobby players, friends included, filtered by an optional username substring. The server
+ * sorts and caps the list; non-friends who opted out of invites are absent.
  */
 export function listInvitablePlayers(roomId: number, search: string): Promise<InvitableFriend[]> {
   return axiosClient.get(`/rooms/${roomId}/invitable-players`, {

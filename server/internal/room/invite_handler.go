@@ -168,16 +168,19 @@ func (h *InviteHandler) ListInvitableFriends(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": items})
 }
 
-// ListInvitablePlayers handles GET /rooms/:id/invitable-players?search=, returning idle
-// lobby players who are not the caller's friends and accept non-friend invites. Opted-out
-// players are simply absent; the result is sorted by username and capped.
+// ListInvitablePlayers handles GET /rooms/:id/invitable-players?search=, returning idle lobby
+// players: the caller's friends and anyone else who accepts non-friend invites, sorted and capped.
 func (h *InviteHandler) ListInvitablePlayers(c echo.Context) error {
 	callerID, roomID, _, err := h.requireRoomMember(c)
 	if err != nil {
 		return err
 	}
 
-	candidates, err := h.idleNonFriendIDs(callerID)
+	candidates, err := h.idleLobbyIDs(callerID)
+	if err != nil {
+		return err
+	}
+	friendIDs, err := h.friendIDSet(callerID)
 	if err != nil {
 		return err
 	}
@@ -190,7 +193,7 @@ func (h *InviteHandler) ListInvitablePlayers(c echo.Context) error {
 	search := strings.ToLower(strings.TrimSpace(c.QueryParam("search")))
 	items := make([]InvitableFriendDTO, 0, len(players))
 	for _, p := range players {
-		if !p.AllowsNonFriendInvites {
+		if _, isFriend := friendIDs[p.UserID]; !isFriend && !p.AllowsNonFriendInvites {
 			continue
 		}
 		if search != "" && !strings.Contains(strings.ToLower(p.Username), search) {
@@ -391,9 +394,9 @@ func (h *InviteHandler) acceptsInviteFrom(inviterID, inviteeID uint) (bool, erro
 	return len(found) == 1 && found[0].AllowsNonFriendInvites, nil
 }
 
-// idleNonFriendIDs returns the connected users who are in neither a match nor a waiting or playing room,
-// excluding callerID and callerID's friends. Without a connection tracker nobody is known to be online.
-func (h *InviteHandler) idleNonFriendIDs(callerID uint) ([]uint, error) {
+// idleLobbyIDs returns the connected users other than callerID who are in neither a match nor a
+// waiting or playing room. Without a connection tracker nobody is known to be online.
+func (h *InviteHandler) idleLobbyIDs(callerID uint) ([]uint, error) {
 	if h.connections == nil {
 		return []uint{}, nil
 	}
@@ -412,13 +415,6 @@ func (h *InviteHandler) idleNonFriendIDs(callerID uint) ([]uint, error) {
 			excluded[uid] = struct{}{}
 		}
 	}
-	friends, err := h.friends.ListFriends(callerID)
-	if err != nil {
-		return nil, fmt.Errorf("listing friends for invite panel: %w", err)
-	}
-	for _, f := range friends {
-		excluded[f.UserID] = struct{}{}
-	}
 
 	idle := make([]uint, 0)
 	for _, uid := range h.connections.ConnectedUserIDs() {
@@ -428,6 +424,19 @@ func (h *InviteHandler) idleNonFriendIDs(callerID uint) ([]uint, error) {
 		idle = append(idle, uid)
 	}
 	return idle, nil
+}
+
+// friendIDSet returns the IDs of callerID's accepted friends.
+func (h *InviteHandler) friendIDSet(callerID uint) (map[uint]struct{}, error) {
+	friends, err := h.friends.ListFriends(callerID)
+	if err != nil {
+		return nil, fmt.Errorf("listing friends for invite panel: %w", err)
+	}
+	ids := make(map[uint]struct{}, len(friends))
+	for _, f := range friends {
+		ids[f.UserID] = struct{}{}
+	}
+	return ids, nil
 }
 
 // markUnavailableWhenFull disables every row with reason room_full once the room
