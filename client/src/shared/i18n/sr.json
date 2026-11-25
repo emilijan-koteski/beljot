@@ -201,14 +201,14 @@
       "you": "Ti",
       "teammate": "Saigrač",
       "opponents": "Protivnici",
-      "noHandDetails": "Nema detalja o deljenjima za ovaj meč",
+      "noHandDetails": "Nema detalja o rukama za ovaj meč",
       "outcomeWin": "Pobeda",
       "outcomeLoss": "Poraz",
       "outcomeAbandoned": "Prekinut",
       "endedEarlyAbandonment": "Završen ranije jer je igrač napustio meč",
       "endedEarlySurrender": "Završen ranije predajom",
-      "expandRow": "Prikaži detalje deljenja",
-      "collapseRow": "Sakrij detalje deljenja",
+      "expandRow": "Prikaži detalje ruku",
+      "collapseRow": "Sakrij detalje ruku",
       "filter": {
         "all": "Svi",
         "win": "Pobede",
@@ -221,16 +221,16 @@
         "oldest": "Najstarije prvo"
       },
       "hand": {
-        "number": "Deljenje {{number}}",
+        "number": "Ruka {{number}}",
         "cardPoints": "Poeni iz karata",
         "declarationPoints": "Zvanja",
         "lastTrickBonus": "Poslednji štih",
         "capot": "Kapot",
         "failedContract": "Pala ruka",
-        "handTotal": "Ukupno deljenje",
+        "handTotal": "Ukupno za ruku",
         "col": {
           "number": "#",
-          "hand": "Deljenje",
+          "hand": "Ruka",
           "cards": "Karte",
           "declarations": "Zvanja",
           "notes": "Beleške"
@@ -307,7 +307,7 @@
       "capotsLabel": "Ostvareni kapoti",
       "capotsHint": "ruke s maksimumom",
       "bestHandLabel": "Najbolja ruka",
-      "bestHandHint": "Deljenje {{hand}} · {{date}}",
+      "bestHandHint": "Ruka {{hand}} · {{date}}",
       "bestHandHintEmpty": "još nema ruku",
       "bestHandEmpty": "–",
       "avgLengthLabel": "Pros. trajanje meča",
@@ -733,9 +733,9 @@
       "declarationLastTrick": "Zvanja do štiha",
       "declarationLastTrickHint": "Bitola: zvanja pre karte, do ovog štiha",
       "matchEnd": "Kraj meča",
-      "matchEndFinish": "Dovrši deljenje",
+      "matchEndFinish": "Dovrši ruku",
       "matchEndStop": "Dosta",
-      "matchEndHint": "Uz „dosta“ meč završava čim tim dostigne cilj, i usred deljenja",
+      "matchEndHint": "Uz „dosta“ meč završava čim tim dostigne cilj, i usred ruke",
       "direction": "Smer deljenja",
       "directionCounterClockwise": "Udesno",
       "directionClockwise": "Ulevo",
@@ -961,14 +961,14 @@
       "heading": "Rezultat",
       "tricks": "štihovi",
       "trick": "štih",
-      "thisHand": "ovo deljenje",
-      "handLabel": "Deljenje {{hand}}",
-      "handVariant": "Deljenje {{hand}} · {{variant}}",
+      "thisHand": "ova ruka",
+      "handLabel": "Ruka {{hand}}",
+      "handVariant": "Ruka {{hand}} · {{variant}}",
       "hangingUs": "Vise naših {{amount}}",
       "hangingThem": "Vise njihovih {{amount}}"
     },
     "scoreReveal": {
-      "title": "Rezultat deljenja",
+      "title": "Rezultat ruke",
       "subtitleHeldUs": "Prošli · mi smo zvali {{suit}}",
       "subtitleHeldThem": "Prošli · oni su zvali {{suit}}",
       "subtitleFailedUs": "Pali · svi poeni za nas",
@@ -984,7 +984,7 @@
       "lastTrickBonus": "Bonus poslednjeg štiha",
       "capotBonus": "Kapot bonus",
       "hangingPaid": "Viseći poeni",
-      "handTotal": "Ukupno deljenje",
+      "handTotal": "Ukupno za ruku",
       "matchTotal": "Rezultat meča",
       "continue": "Nastavi",
       "waiting": "Čekaju se ostali…"
@@ -1035,9 +1035,9 @@
       "returnToRoomAlreadyStarted": "Sledeći meč je već počeo bez tebe.",
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
       "surrenderNote": "Predaja: {{username}}",
-      "statsShow": "Prikaži detalje deljenja",
-      "statsHide": "Sakrij detalje deljenja",
-      "targetReachedNote": "Meč je završen usred deljenja, kad je tim dostigao cilj."
+      "statsShow": "Prikaži detalje ruku",
+      "statsHide": "Sakrij detalje ruku",
+      "targetReachedNote": "Meč je završen usred ruke, kad je tim dostigao cilj."
     },
     "emote": {
       "button": "Pošalji emotikon",
@@ -1076,7 +1076,7 @@
       "errors": {
         "exhausted": "Predaja je već iskorišćena.",
         "actionRequired": "Prvo odgovori na predlog predaje.",
-        "wrongPhase": "Predaja je moguća samo tokom deljenja."
+        "wrongPhase": "Predaja je moguća samo tokom ruke."
       },
       "unknownProposer": "protivnik"
     },

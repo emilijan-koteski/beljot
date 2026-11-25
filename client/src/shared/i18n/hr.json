@@ -201,14 +201,14 @@
       "you": "Ti",
       "teammate": "Suigrač",
       "opponents": "Protivnici",
-      "noHandDetails": "Nema detalja o dijeljenjima za ovaj meč",
+      "noHandDetails": "Nema detalja o rukama za ovaj meč",
       "outcomeWin": "Pobjeda",
       "outcomeLoss": "Poraz",
       "outcomeAbandoned": "Prekinut",
       "endedEarlyAbandonment": "Završen ranije jer je igrač napustio meč",
       "endedEarlySurrender": "Završen ranije predajom",
-      "expandRow": "Prikaži detalje dijeljenja",
-      "collapseRow": "Sakrij detalje dijeljenja",
+      "expandRow": "Prikaži detalje ruku",
+      "collapseRow": "Sakrij detalje ruku",
       "filter": {
         "all": "Svi",
         "win": "Pobjede",
@@ -221,16 +221,16 @@
         "oldest": "Najstarije prvo"
       },
       "hand": {
-        "number": "Dijeljenje {{number}}",
+        "number": "Ruka {{number}}",
         "cardPoints": "Bodovi iz karata",
         "declarationPoints": "Zvanja",
         "lastTrickBonus": "Posljednji štih",
         "capot": "Štiglja",
         "failedContract": "Pala ruka",
-        "handTotal": "Ukupno dijeljenje",
+        "handTotal": "Ukupno za ruku",
         "col": {
           "number": "#",
-          "hand": "Dijeljenje",
+          "hand": "Ruka",
           "cards": "Karte",
           "declarations": "Zvanja",
           "notes": "Bilješke"
@@ -733,9 +733,9 @@
       "declarationLastTrick": "Zvanja do štiha",
       "declarationLastTrickHint": "Bitola: zvanja prije karte, do ovog štiha",
       "matchEnd": "Kraj meča",
-      "matchEndFinish": "Dovrši dijeljenje",
+      "matchEndFinish": "Dovrši ruku",
       "matchEndStop": "Dosta",
-      "matchEndHint": "Uz „dosta“ meč završava čim tim dosegne cilj, i usred dijeljenja",
+      "matchEndHint": "Uz „dosta“ meč završava čim tim dosegne cilj, i usred ruke",
       "direction": "Smjer dijeljenja",
       "directionCounterClockwise": "Udesno",
       "directionClockwise": "Ulijevo",
@@ -961,14 +961,14 @@
       "heading": "Rezultat",
       "tricks": "štihovi",
       "trick": "štih",
-      "thisHand": "ovo dijeljenje",
-      "handLabel": "Dijeljenje {{hand}}",
-      "handVariant": "Dijeljenje {{hand}} · {{variant}}",
+      "thisHand": "ova ruka",
+      "handLabel": "Ruka {{hand}}",
+      "handVariant": "Ruka {{hand}} · {{variant}}",
       "hangingUs": "Vise naših {{amount}}",
       "hangingThem": "Vise njihovih {{amount}}"
     },
     "scoreReveal": {
-      "title": "Rezultat dijeljenja",
+      "title": "Rezultat ruke",
       "subtitleHeldUs": "Prošli · mi smo zvali {{suit}}",
       "subtitleHeldThem": "Prošli · oni su zvali {{suit}}",
       "subtitleFailedUs": "Pali · svi bodovi za nas",
@@ -984,7 +984,7 @@
       "lastTrickBonus": "Bonus posljednjeg štiha",
       "capotBonus": "Bonus za štiglju",
       "hangingPaid": "Viseći bodovi",
-      "handTotal": "Ukupno dijeljenje",
+      "handTotal": "Ukupno za ruku",
       "matchTotal": "Rezultat meča",
       "continue": "Nastavi",
       "waiting": "Čekaju se ostali…"
@@ -1035,9 +1035,9 @@
       "returnToRoomAlreadyStarted": "Sljedeći meč je već počeo bez tebe.",
       "returnToRoomNotInRoom": "Više nisi u ovoj sobi.",
       "surrenderNote": "Predaja: {{username}}",
-      "statsShow": "Prikaži detalje dijeljenja",
-      "statsHide": "Sakrij detalje dijeljenja",
-      "targetReachedNote": "Meč je završio usred dijeljenja, kad je tim dosegao cilj."
+      "statsShow": "Prikaži detalje ruku",
+      "statsHide": "Sakrij detalje ruku",
+      "targetReachedNote": "Meč je završio usred ruke, kad je tim dosegao cilj."
     },
     "emote": {
       "button": "Pošalji emotikon",
@@ -1076,7 +1076,7 @@
       "errors": {
         "exhausted": "Predaja je već iskorištena.",
         "actionRequired": "Prvo odgovori na prijedlog predaje.",
-        "wrongPhase": "Predaja je moguća samo tijekom dijeljenja."
+        "wrongPhase": "Predaja je moguća samo tijekom ruke."
       },
       "unknownProposer": "protivnik"
     },

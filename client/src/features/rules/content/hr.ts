@@ -73,7 +73,7 @@ export const hr: RulesLangData = {
             },
             {
               variant: "bitola",
-              otherVariantNote: "Hrvatska: svako dijeljenje se igra.",
+              otherVariantNote: "Hrvatska: svaka ruka se igra.",
               t: "Nitko nije uzeo",
               d: "Karte se miješaju i dijeli sljedeći igrač.",
             },

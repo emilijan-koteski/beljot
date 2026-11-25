@@ -201,14 +201,14 @@
       "you": "Ти",
       "teammate": "Партнер",
       "opponents": "Противници",
-      "noHandDetails": "Нема детали за делењата на овој меч",
+      "noHandDetails": "Нема детали за рацете на овој меч",
       "outcomeWin": "Победа",
       "outcomeLoss": "Пораз",
       "outcomeAbandoned": "Напуштено",
       "endedEarlyAbandonment": "Заврши предвреме бидејќи играч го напушти мечот",
       "endedEarlySurrender": "Заврши предвреме со предавање",
-      "expandRow": "Прикажи детали за делењата",
-      "collapseRow": "Сокриј детали за делењата",
+      "expandRow": "Прикажи детали за рацете",
+      "collapseRow": "Сокриј детали за рацете",
       "filter": {
         "all": "Сите",
         "win": "Победи",
@@ -221,16 +221,16 @@
         "oldest": "Најстари прво"
       },
       "hand": {
-        "number": "Делење {{number}}",
+        "number": "Рака {{number}}",
         "cardPoints": "Поени од карти",
         "declarationPoints": "Најави",
         "lastTrickBonus": "Последен штих",
         "capot": "Чаљо",
         "failedContract": "Падната рака",
-        "handTotal": "Вкупно делење",
+        "handTotal": "Вкупно за раката",
         "col": {
           "number": "#",
-          "hand": "Делење",
+          "hand": "Рака",
           "cards": "Карти",
           "declarations": "Најави",
           "notes": "Белешки"
@@ -307,7 +307,7 @@
       "capotsLabel": "Направени чаљо",
       "capotsHint": "раце со максимум поени",
       "bestHandLabel": "Најдобра рака",
-      "bestHandHint": "Делење {{hand}} · {{date}}",
+      "bestHandHint": "Рака {{hand}} · {{date}}",
       "bestHandHintEmpty": "сѐ уште нема раце",
       "bestHandEmpty": "–",
       "avgLengthLabel": "Просечно траење на меч",
@@ -733,9 +733,9 @@
       "declarationLastTrick": "Најави до штих",
       "declarationLastTrickHint": "Битола: се најавува пред картата, до овој штих",
       "matchEnd": "Крај на мечот",
-      "matchEndFinish": "Доиграј",
+      "matchEndFinish": "Доиграј ја раката",
       "matchEndStop": "Доста",
-      "matchEndHint": "Со „доста“ мечот завршува штом тим ја достигне целта, и среде делење",
+      "matchEndHint": "Со „доста“ мечот завршува штом тим ја достигне целта, и среде рака",
       "direction": "Насока на делење",
       "directionCounterClockwise": "Надесно",
       "directionClockwise": "Налево",
@@ -961,14 +961,14 @@
       "heading": "Резултат",
       "tricks": "штихови",
       "trick": "штих",
-      "thisHand": "ова делење",
-      "handLabel": "Делење {{hand}}",
-      "handVariant": "Делење {{hand}} · {{variant}}",
+      "thisHand": "оваа рака",
+      "handLabel": "Рака {{hand}}",
+      "handVariant": "Рака {{hand}} · {{variant}}",
       "hangingUs": "Висат нашите {{amount}}",
       "hangingThem": "Висат нивните {{amount}}"
     },
     "scoreReveal": {
-      "title": "Резултат на делењето",
+      "title": "Резултат на раката",
       "subtitleHeldUs": "Извадена · ние зедовме {{suit}}",
       "subtitleHeldThem": "Извадена · тие зедоа {{suit}}",
       "subtitleFailedUs": "Падната · сите поени за нас",
@@ -984,7 +984,7 @@
       "lastTrickBonus": "Бонус за последен штих",
       "capotBonus": "Чаљо бонус",
       "hangingPaid": "Висечки поени",
-      "handTotal": "Вкупно делење",
+      "handTotal": "Вкупно за раката",
       "matchTotal": "Резултат на меч",
       "continue": "Продолжи",
       "waiting": "Се чекаат другите…"
@@ -1035,9 +1035,9 @@
       "returnToRoomAlreadyStarted": "Следниот меч веќе започна без тебе.",
       "returnToRoomNotInRoom": "Веќе не си во оваа соба.",
       "surrenderNote": "{{username}} се предаде во мечот",
-      "statsShow": "Прикажи детали за делењата",
-      "statsHide": "Сокриј детали за делењата",
-      "targetReachedNote": "Мечот заврши среде делење, кога тим ја достигна целта."
+      "statsShow": "Прикажи детали за рацете",
+      "statsHide": "Сокриј детали за рацете",
+      "targetReachedNote": "Мечот заврши среде рака, кога тим ја достигна целта."
     },
     "emote": {
       "button": "Прати емотикон",
@@ -1076,7 +1076,7 @@
       "errors": {
         "exhausted": "Веќе го искористи предавањето.",
         "actionRequired": "Прво одговори на предлогот за предавање.",
-        "wrongPhase": "Предавање е можно само за време на делење."
+        "wrongPhase": "Предавање е можно само за време на рака."
       },
       "unknownProposer": "противник"
     },

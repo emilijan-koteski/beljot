@@ -73,7 +73,7 @@ export const mk: RulesLangData = {
             },
             {
               variant: "bitola",
-              otherVariantNote: "Хрватска: секое делење се игра.",
+              otherVariantNote: "Хрватска: секоја рака се игра.",
               t: "Никој не зеде",
               d: "Картите се мешаат и дели следниот играч.",
             },
