@@ -228,7 +228,7 @@ export const sr: RulesLangData = {
     sumCards: "karte",
     sumLastTrick: "poslednji štih",
     sumDeclarations: "zvanja",
-    optionsFoot: "Standard je prvi. Kartica sobe označava svaku promenu mesinganom bojom.",
+    optionsFoot: "Standard je prvi. Kartica sobe označava svaku promenu zlatnom bojom.",
     footerTitle: "Spreman za igru?",
     footerBody: "U meču dodirni ? da otvoriš ova pravila.",
     footerCta: "Igraj",
