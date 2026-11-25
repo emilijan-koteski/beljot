@@ -73,7 +73,7 @@ export const hr: RulesLangData = {
             },
             {
               variant: "bitola",
-              otherVariantNote: "Hrvatska: svako dijeljenje se igra.",
+              otherVariantNote: "Hrvatska: svaka ruka se igra.",
               t: "Nitko nije uzeo",
               d: "Karte se miješaju i dijeli sljedeći igrač.",
             },
@@ -127,7 +127,7 @@ export const hr: RulesLangData = {
         {
           kind: "p",
           text: "Boduje samo tim s najjačim zvanjem, i to sva svoja zvanja.",
-          help: "Isti bodovi: četiri iste pobjeđuju niz, zatim duži niz, viša najjača karta, niz u adutu i na kraju igrač koji je prvi na redu.",
+          help: "Isti bodovi: četiri iste pobjeđuju niz, zatim dulji niz, viša najjača karta, niz u adutu i na kraju igrač koji je prvi na redu.",
         },
         {
           kind: "list",
@@ -210,7 +210,7 @@ export const hr: RulesLangData = {
 
   ui: {
     heroEyebrow: "Pravila",
-    heroTitle: "Kako se igra Bela",
+    heroTitle: "Kako se igra bela",
     heroIntro: "Dva tima po dvoje, 32 karte. Nosi štihove, zovi kombinacije, stigni prvi do 1001.",
     facts: [
       { value: "4", label: "igrača" },
@@ -229,11 +229,11 @@ export const hr: RulesLangData = {
     sumCards: "karte",
     sumLastTrick: "posljednji štih",
     sumDeclarations: "zvanja",
-    optionsFoot: "Standard je prvi. Kartica sobe označava svaku promjenu mjedenom bojom.",
+    optionsFoot: "Standard je prvi. Kartica sobe označava svaku promjenu zlatnom bojom.",
     footerTitle: "Spreman za igru?",
     footerBody: "U meču dodirni ? da otvoriš ova pravila.",
     footerCta: "Igraj",
-    ovTitle: "Pravila Bele",
+    ovTitle: "Pravila bele",
     ovClose: "Zatvori",
   },
 };

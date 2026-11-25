@@ -220,7 +220,7 @@ describe("PlayingCard", () => {
     await i18n.changeLanguage("hr");
     render(<PlayingCard card={kingOfSpades} state="default" size="md" />);
 
-    expect(screen.getByTestId("playing-card-KS")).toHaveAttribute("aria-label", "Pik kralj");
+    expect(screen.getByTestId("playing-card-KS")).toHaveAttribute("aria-label", "pik kralj");
   });
 
   it("names the Croatian suit in the player's language", async () => {
