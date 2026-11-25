@@ -878,7 +878,7 @@
     "trumpReveal": {
       "unknownPlayer": "Adut zvan",
       "eyebrow": "Adut zvan",
-      "isTrump": "<suit>{{suit}}</suit> je adut",
+      "isTrump": "Adut je <suit>{{suit}}</suit>",
       "dismiss": "Zatvori"
     },
     "dealerIndicator": {
@@ -929,7 +929,7 @@
     "belot": {
       "titleBelot": "Zovi Belu",
       "titleRebelot": "Zovi Rebelu",
-      "subtitle": "Imaš Kralja i Damu u adutu.",
+      "subtitle": "Imaš kralja i damu u adutu.",
       "announce": "Zovi +20",
       "decline": "Preskoči",
       "reveal": {
@@ -1011,10 +1011,10 @@
       },
       "suit": {
         "french": {
-          "S": "Pik",
-          "H": "Herc",
-          "D": "Karo",
-          "C": "Tref"
+          "S": "pik",
+          "H": "herc",
+          "D": "karo",
+          "C": "tref"
         },
         "croatian": {
           "S": "zelje",
