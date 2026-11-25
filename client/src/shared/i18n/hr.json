@@ -1194,7 +1194,7 @@
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
         "consentRequired": "Moraš prihvatiti Uvjete korištenja i Pravila privatnosti",
-        "registrationFailed": "Registracija nije uspjela. Pokušaj ponovno."
+        "registrationFailed": "Stvaranje računa nije uspjelo. Pokušaj ponovno."
       },
       "eyebrow": "Privuci stolac",
       "altPrompt": "Već imaš račun?",
@@ -1278,7 +1278,7 @@
   "landing": {
     "nav": {
       "login": "Prijava",
-      "signup": "Otvori besplatan račun",
+      "signup": "Stvori besplatan račun",
       "rules": "Pravila"
     },
     "hero": {
@@ -1286,7 +1286,7 @@
       "title": "Sjedni za",
       "titleAccent": "stol.",
       "subtitle": "Bela za četvero, u tvom pregledniku. Igraj s prijateljima, strancima ili botovima.",
-      "cta": "Otvori besplatan račun",
+      "cta": "Stvori besplatan račun",
       "tableAlt": "Meč bele u tijeku",
       "phoneAlt": "Isti stol na mobitelu, hrvatske karte"
     },
@@ -1355,7 +1355,7 @@
       "title1": "Tvoja četvorka",
       "title2": "te čeka.",
       "body": "Podijeli prvu ruku večeras.",
-      "cta": "Otvori besplatan račun"
+      "cta": "Stvori besplatan račun"
     },
     "foot": {
       "rules": "Pravila",

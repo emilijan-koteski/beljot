@@ -1161,18 +1161,18 @@
       },
       "eyebrow": "Dobrodošao nazad",
       "altPrompt": "Nov si na Beljotu?",
-      "altCta": "Kreiraj nalog",
+      "altCta": "Napravi nalog",
       "forgotLink": "Zaboravljena?"
     },
     "register": {
-      "title": "Kreiraj nalog",
+      "title": "Napravi nalog",
       "emailLabel": "Email",
       "emailPlaceholder": "ime@primer.com",
       "usernameLabel": "Korisničko ime",
       "usernamePlaceholder": "Izaberi korisničko ime",
       "passwordLabel": "Lozinka",
       "passwordPlaceholder": "Najmanje 8 znakova",
-      "submitButton": "Kreiraj nalog",
+      "submitButton": "Napravi nalog",
       "submitting": "Kreiranje…",
       "consent": {
         "prefix": "Prihvatam ",
@@ -1194,7 +1194,7 @@
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
         "consentRequired": "Moraš da prihvatiš Uslove korišćenja i Politiku privatnosti",
-        "registrationFailed": "Registracija nije uspela. Pokušaj ponovo."
+        "registrationFailed": "Pravljenje naloga nije uspelo. Pokušaj ponovo."
       },
       "eyebrow": "Privuci stolicu",
       "altPrompt": "Već imaš nalog?",
