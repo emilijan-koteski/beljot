@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import en from "./en.json";
 import hr from "./hr.json";
-import { i18n, LANGUAGE_STORAGE_KEY, normalizeLanguage } from "./i18n";
+import { i18n, LANGUAGE_STORAGE_KEY, normalizeLanguage, pickInitialLanguage } from "./i18n";
 import mk from "./mk.json";
 import sr from "./sr.json";
 
@@ -126,5 +126,21 @@ describe("i18n", () => {
         [],
       );
     }
+  });
+});
+
+describe("pickInitialLanguage", () => {
+  it("prefers the stored language over the browser", () => {
+    expect(pickInitialLanguage("hr", ["mk-MK", "en"])).toBe("hr");
+  });
+
+  it("uses the first supported browser language", () => {
+    expect(pickInitialLanguage(null, ["de-DE", "mk-MK", "hr"])).toBe("mk");
+    expect(pickInitialLanguage(null, ["hr-HR"])).toBe("hr");
+  });
+
+  it("falls back to English when no browser language is supported", () => {
+    expect(pickInitialLanguage(null, ["de-DE", "fr"])).toBe("en");
+    expect(pickInitialLanguage(null, [])).toBe("en");
   });
 });
