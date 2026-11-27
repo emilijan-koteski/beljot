@@ -10,6 +10,7 @@ import { getRulesContent } from "@/features/rules/content/rulesContent";
 import { RulesProvider } from "@/features/rules/RulesContext";
 import { Segmented } from "@/shared/components/ui/segmented";
 import { useLayoutBand } from "@/shared/hooks/useLayoutBand";
+import { usePageMeta } from "@/shared/hooks/usePageMeta";
 import { variantLabel } from "@/shared/lib/roomLabels";
 import { cn } from "@/shared/lib/utils";
 import { type Variant, VARIANTS } from "@/shared/types/matchTypes";
@@ -22,6 +23,7 @@ const SCROLL_SPY_OFFSET_PX = 140;
  */
 export function RulesPage() {
   const { t, i18n } = useTranslation();
+  usePageMeta(t("meta.rules.title"), t("meta.rules.description"));
   const band = useLayoutBand();
   const content = getRulesContent(i18n.language);
   const { sections, ui } = content;

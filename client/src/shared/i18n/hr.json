@@ -1550,5 +1550,11 @@
       "label": "Mjedena tema",
       "hint": "Tamna čoha i mjed na svim stranicama izvan meča."
     }
+  },
+  "meta": {
+    "rules": {
+      "title": "Pravila bele: bitolska i hrvatska",
+      "description": "Kako se igra bela: dijeljenje, adut, zvanja i bodovanje za bitolsku i hrvatsku belu."
+    }
   }
 }

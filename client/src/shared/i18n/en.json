@@ -1550,5 +1550,11 @@
       "label": "Brass mode",
       "hint": "Dark felt and brass on every page outside a match."
     }
+  },
+  "meta": {
+    "rules": {
+      "title": "Belot rules: Bitola and Croatian",
+      "description": "How to play Belot: dealing, trumps, declarations and scoring for the Bitola and Croatian variants."
+    }
   }
 }
