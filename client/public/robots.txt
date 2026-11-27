@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /lobby
+Disallow: /profile
+Disallow: /settings
+Disallow: /leaderboard
+Disallow: /players/
+Disallow: /rooms/
+Disallow: /matchmaking/
+Disallow: /match/
+Disallow: /forgot-password
+Disallow: /reset-password
+
+Sitemap: https://beljot.online/sitemap.xml

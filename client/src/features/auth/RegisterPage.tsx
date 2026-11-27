@@ -12,6 +12,7 @@ import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useRegisterMutation } from "@/shared/hooks/mutations/useAuth";
+import { usePageMeta } from "@/shared/hooks/usePageMeta";
 import { normalizeLanguage } from "@/shared/i18n/i18n";
 import { reconcileThemePreference } from "@/shared/lib/themePreference";
 import {
@@ -31,6 +32,7 @@ interface FieldErrors {
 
 export function RegisterPage() {
   const { t, i18n } = useTranslation();
+  usePageMeta(t("auth.register.title"));
   const navigate = useNavigate();
   const registerMutation = useRegisterMutation();
   const { handleGoogleCredential, linkDialogProps } = useGoogleSso();
