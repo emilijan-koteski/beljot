@@ -1363,7 +1363,13 @@
       "terms": "Uslovi",
       "contact": "Kontakt",
       "support": "Podrži",
-      "copyright": "© 2026 Beljot.online"
+      "copyright": "© 2026 Beljot.online",
+      "social": {
+        "label": "Beljot.online na društvenim mrežama",
+        "instagram": "Beljot.online na Instagramu",
+        "facebook": "Beljot.online na Facebooku",
+        "youtube": "Beljot.online na YouTubeu"
+      }
     },
     "contact": {
       "title": "Kontakt",
