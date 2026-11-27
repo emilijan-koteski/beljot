@@ -37,7 +37,25 @@ function readStoredLanguage(): SupportedLanguage | null {
   }
 }
 
-const initialLng: SupportedLanguage = readStoredLanguage() ?? "en";
+function readBrowserLanguages(): readonly string[] {
+  if (typeof navigator === "undefined") return [];
+  return navigator.languages?.length ? navigator.languages : [navigator.language];
+}
+
+/** Picks the stored choice, else the first supported browser language, else English. */
+export function pickInitialLanguage(
+  stored: SupportedLanguage | null,
+  browserLanguages: readonly string[],
+): SupportedLanguage {
+  if (stored) return stored;
+  for (const lng of browserLanguages) {
+    const supported = normalizeLanguage(lng);
+    if (supported) return supported;
+  }
+  return "en";
+}
+
+const initialLng = pickInitialLanguage(readStoredLanguage(), readBrowserLanguages());
 
 i18n.use(initReactI18next).init({
   resources: {
