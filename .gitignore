@@ -61,3 +61,5 @@ _review_diff.tmp
 # Claude superpowers artifacts (plans, specs, brainstorms, etc.)
 docs/superpowers/
 docs/temp/
+# Ad video pipeline, kept local
+marketing/
