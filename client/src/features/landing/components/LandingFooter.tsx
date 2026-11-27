@@ -4,11 +4,12 @@ import { Link } from "react-router";
 
 import { BrandLockup } from "@/features/landing/components/BrandLockup";
 import { ContactDialog } from "@/features/landing/components/ContactDialog";
+import { SocialLinks } from "@/features/landing/components/SocialLinks";
 import { LanguageSelector } from "@/shared/components/LanguageSelector";
 import { SupportDialog } from "@/shared/components/support/SupportDialog";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
 
-/** Felt footer with the brand, rules, legal, contact and support links, language, theme and copyright. */
+/** Felt footer with the brand, rules, legal, contact, support and social links, language, theme and copyright. */
 export function LandingFooter() {
   const { t } = useTranslation();
   const [supportOpen, setSupportOpen] = useState(false);
@@ -40,6 +41,7 @@ export function LandingFooter() {
           </button>
         </nav>
         <div className="flex items-center gap-2">
+          <SocialLinks />
           <LanguageSelector persistToServer={false} testIdPrefix="landing-footer-language" />
           <ThemeToggle testId="landing-footer-theme-toggle" />
         </div>

@@ -105,6 +105,23 @@ describe("LandingPage", () => {
     expect(within(footer).getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
   });
 
+  it("links the footer to the social profiles in a new tab", () => {
+    renderAt("/");
+
+    const footer = screen.getByRole("contentinfo");
+    const profiles = [
+      ["Beljot.online on Instagram", "https://www.instagram.com/beljot.online"],
+      ["Beljot.online on Facebook", "https://www.facebook.com/beljot.online"],
+      ["Beljot.online on YouTube", "https://www.youtube.com/@beljot.online"],
+    ];
+    for (const [name, href] of profiles) {
+      const link = within(footer).getByRole("link", { name });
+      expect(link).toHaveAttribute("href", href);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+  });
+
   it("opens a contact dialog with email, LinkedIn and a beta disclaimer", async () => {
     const user = userEvent.setup();
     renderAt("/");

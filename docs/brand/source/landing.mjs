@@ -17,8 +17,8 @@ mkdirSync(mascotOut, { recursive: true });
 
 const DAY = 86400000;
 const now = Date.now();
-const user = (theme, deck = "french") => ({
-  token: "t", id: 1, username: "emilijan", email: "emilijan@example.com", languagePreference: "en",
+const user = (theme, deck = "french", lang = "en") => ({
+  token: "t", id: 1, username: "emilijan", email: "emilijan@example.com", languagePreference: lang,
   cardDeckPreference: deck, themePreference: theme, soundEnabled: false, musicEnabled: false,
   soundVolume: 0, musicVolume: 0, allowNonFriendInvites: true, walletBalance: 171554,
   loginStreakDays: 6, totalXp: 3400, level: 20, honorScore: 95, honorTier: "exemplary",
@@ -88,7 +88,8 @@ const player = (s, userId, username, level, hand, handCount) => ({
   hand, seat: s, userId, username, avatarUrl: null, team: s % 2 === 0 ? "teamA" : "teamB",
   declarations: [], connected: true, isBot: false, level, faceDownCount: 0, handCount, declarationAnswered: true,
 });
-const matchState = () => ({
+const MATCH_NAMES = { self: "emilijan", right: "Kiro", partner: "Natalija", left: "Irena" };
+const matchState = (names = MATCH_NAMES) => ({
   id: 1, roomId: 100, variant: "croatia", matchMode: "1001", phase: "playing", handNumber: 4, dealerSeat: 3,
   trumpSuit: "H", trumpCallerSeat: 2, trumpCandidate: null, biddingRound: 1, biddingPassCount: 0,
   mustPickTrump: false, declarationsEnabled: true, stopAtTarget: false, declarationsTransfer: true,
@@ -96,8 +97,8 @@ const matchState = () => ({
   currentTrick: [{ playerSeat: 1, card: card("KD") }, { playerSeat: 2, card: card("AD") }, { playerSeat: 3, card: card("9D") }],
   leadSuit: "D", trickWinnerSeat: null, awaitingDeclaration: false, declarationsResolved: true,
   players: [
-    player(0, 1, "emilijan", 20, ["JH", "9H", "AH", "TS", "KC", "8D"].map(card), 6),
-    player(1, 11, "Kiro", 32, [], 5), player(2, 7, "Natalija", 24, [], 5), player(3, 12, "Irena", 28, [], 5),
+    player(0, 1, names.self, 20, ["JH", "9H", "AH", "TS", "KC", "8D"].map(card), 6),
+    player(1, 11, names.right, 32, [], 5), player(2, 7, names.partner, 24, [], 5), player(3, 12, names.left, 28, [], 5),
   ],
   teamScores: [462, 318], handPoints: [34, 21], declarationPoints: [0, 0], belotPoints: [0, 0], tricksWon: [1, 1],
   pendingBelotSeat: null, belotAnnounced: false, winnerTeam: null, lastHandResult: null,
@@ -109,12 +110,12 @@ const matchState = () => ({
 });
 
 /** Answers every API call the captured pages make with the sample data above. */
-function mockApi(page, theme, deck) {
+function mockApi(page, theme, deck, lang) {
   return page.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace("/api/v1", "");
     const ok = (data) => route.fulfill({ json: { data } });
-    if (path === "/auth/refresh") return ok(user(theme, deck));
+    if (path === "/auth/refresh") return ok(user(theme, deck, lang));
     if (path === "/rooms") return ok(rooms);
     if (path === "/lobby/stats") return ok({ inLobby: 12, inRoom: 5, inMatch: 8, online: 25, registered: 400 });
     if (path === "/friends") return ok(friends);
@@ -163,18 +164,18 @@ async function encodeWebp(page, bytes, mime, width, quality, crop = [0, 0, 1, 1]
 const VIEWPORTS = { phone: [390, 844, 2], desktop: [1440, 900, 1], wide: [1280, 900, 2] };
 
 /** Opens one app route as the sample player and returns its PNG screenshot. */
-async function capture(browser, base, { path, viewport, theme = "parchment", deck = "french", match = false }) {
+async function capture(browser, base, { path, viewport, theme = "parchment", deck = "french", match = false, lang = "en", names }) {
   const [width, height, scale] = VIEWPORTS[viewport];
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: scale });
-  await page.addInitScript(() => localStorage.setItem("beljot.lang", "en"));
-  await mockApi(page, theme, deck);
+  await page.addInitScript((lng) => localStorage.setItem("beljot.lang", lng), lang);
+  await mockApi(page, theme, deck, lang);
   await page.goto(base + path);
   await page.waitForTimeout(1500);
   if (match) {
     await page.evaluate(async (state) => {
       const { useMatchStore } = await import("/src/shared/stores/matchStore.ts");
       useMatchStore.setState({ matchState: state, myPlayerSeat: 0, roomId: 100, isLoading: false });
-    }, matchState());
+    }, matchState(names));
     await page.waitForTimeout(2500);
   }
   const png = await page.screenshot();
@@ -196,6 +197,9 @@ async function imageSize(page, bytes, mime) {
 }
 
 const mascotsOnly = process.argv.includes("--mascots");
+const socialOnly = process.argv.includes("--social");
+const socialOut = join(here, "build", "social");
+const SOCIAL_NAMES = { self: "Elena", right: "Luka", partner: "Ana", left: "Marko" };
 const browser = await chromium.launch();
 const encoder = await browser.newPage();
 
@@ -209,6 +213,20 @@ for (const theme of ["parchment", "brass"]) {
   shots.push([`lobby-phone-${theme}`, { path: "/lobby", viewport: "phone", theme }, 560]);
   shots.push([`profile-phone-${theme}`, { path: "/profile", viewport: "phone", theme }, 580]);
   shots.push([`leaderboard-phone-${theme}`, { path: "/leaderboard", viewport: "phone", theme }, 580]);
+}
+if (socialOnly) {
+  const server = await createServer({ root: clientDir, logLevel: "silent", server: { port: 5199 } });
+  await server.listen();
+  const base = server.resolvedUrls.local[0].replace(/\/$/, "");
+  mkdirSync(socialOut, { recursive: true });
+  for (const deck of ["french", "croatian"]) {
+    const png = await capture(browser, base, { path: "/match/100", viewport: "phone", deck, match: true, lang: "mk", names: SOCIAL_NAMES });
+    writeFileSync(join(socialOut, `match-phone-${deck}.png`), png);
+    console.log(`build/social/match-phone-${deck}.png`);
+  }
+  await server.close();
+  await browser.close();
+  process.exit(0);
 }
 if (!mascotsOnly) {
   const server = await createServer({ root: clientDir, logLevel: "silent", server: { port: 5199 } });
