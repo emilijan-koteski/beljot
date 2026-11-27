@@ -1,8 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { usePageMeta } from "@/shared/hooks/usePageMeta";
+
 export function TermsPage() {
   const { t } = useTranslation();
+  usePageMeta(t("legal.terms.title"));
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">

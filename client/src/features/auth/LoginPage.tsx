@@ -14,6 +14,7 @@ import { Button } from "@/shared/components/ui/button";
 import { FormError } from "@/shared/components/ui/form-error";
 import { Input } from "@/shared/components/ui/input";
 import { useLoginMutation } from "@/shared/hooks/mutations/useAuth";
+import { usePageMeta } from "@/shared/hooks/usePageMeta";
 import { reconcileThemePreference } from "@/shared/lib/themePreference";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,6 +30,7 @@ interface FieldErrors {
  */
 export function LoginPage() {
   const { t, i18n } = useTranslation();
+  usePageMeta(t("auth.login.title"));
   const navigate = useNavigate();
   const loginMutation = useLoginMutation();
   const { handleGoogleCredential, linkDialogProps } = useGoogleSso();

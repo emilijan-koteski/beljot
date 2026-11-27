@@ -1550,5 +1550,11 @@
       "label": "Mesing tema",
       "hint": "Tamna čoja i mesing na svim stranama van meča."
     }
+  },
+  "meta": {
+    "rules": {
+      "title": "Pravila bele: bitoljska i hrvatska",
+      "description": "Kako se igra bela: deljenje, adut, zvanja i bodovanje za bitoljsku i hrvatsku belu."
+    }
   }
 }

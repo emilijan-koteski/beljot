@@ -53,13 +53,21 @@ i18n.use(initReactI18next).init({
   },
 });
 
-applyDayjsLocale(initialLng);
+/** Sets the page's lang attribute so screen readers and search engines read the right language. */
+function applyDocumentLanguage(lng: SupportedLanguage) {
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = lng;
+}
 
-/** Applies a language switch to dayjs and persists it to localStorage. */
+applyDayjsLocale(initialLng);
+applyDocumentLanguage(initialLng);
+
+/** Applies a language switch to dayjs and the document, and persists it to localStorage. */
 function syncLanguage(lng: string) {
   const normalized = normalizeLanguage(lng);
   if (!normalized) return;
   applyDayjsLocale(normalized);
+  applyDocumentLanguage(normalized);
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
