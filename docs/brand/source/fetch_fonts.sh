@@ -6,3 +6,4 @@ base=https://raw.githubusercontent.com/google/fonts/main/ofl
 curl -fsSL -o fonts/Cinzel.ttf "$base/cinzel/Cinzel%5Bwght%5D.ttf"
 curl -fsSL -o fonts/BodoniModa.ttf "$base/bodonimoda/BodoniModa%5Bopsz,wght%5D.ttf"
 curl -fsSL -o fonts/PlayfairDisplay.ttf "$base/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf"
+curl -fsSL -o fonts/CormorantGaramond.ttf "$base/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf"
