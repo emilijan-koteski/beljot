@@ -1175,9 +1175,9 @@
       "submitButton": "Create account",
       "submitting": "Creating…",
       "consent": {
-        "prefix": "I agree to the ",
+        "prefix": "I am 16 or older, I agree to the ",
         "termsLink": "Terms of Service",
-        "and": " and ",
+        "and": " and I have read the ",
         "privacyLink": "Privacy Policy",
         "suffix": "."
       },
@@ -1193,7 +1193,7 @@
         "passwordRequired": "Password is required",
         "passwordTooShort": "Password must be at least 8 characters",
         "passwordTooLong": "Password must be at most 72 characters",
-        "consentRequired": "You must accept the Terms of Service and Privacy Policy",
+        "consentRequired": "Confirm you are 16 or older, accept the Terms of Service and have read the Privacy Policy",
         "registrationFailed": "Couldn't create your account. Try again."
       },
       "eyebrow": "Pull up a chair",
@@ -1203,9 +1203,9 @@
     "sso": {
       "divider": "or",
       "consent": {
-        "prefix": "By continuing with Google, you agree to the ",
+        "prefix": "By continuing with Google, you confirm you are 16 or older, agree to the ",
         "termsLink": "Terms of Service",
-        "and": " and ",
+        "and": " and have read the ",
         "privacyLink": "Privacy Policy",
         "suffix": "."
       },

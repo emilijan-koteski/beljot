@@ -1175,9 +1175,9 @@
       "submitButton": "Stvori račun",
       "submitting": "Stvaranje…",
       "consent": {
-        "prefix": "Prihvaćam ",
+        "prefix": "Imam najmanje 16 godina, prihvaćam ",
         "termsLink": "Uvjete korištenja",
-        "and": " i ",
+        "and": " i pročitao/la sam ",
         "privacyLink": "Pravila privatnosti",
         "suffix": "."
       },
@@ -1193,7 +1193,7 @@
         "passwordRequired": "Lozinka je obavezna",
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
-        "consentRequired": "Moraš prihvatiti Uvjete korištenja i Pravila privatnosti",
+        "consentRequired": "Potvrdi da imaš najmanje 16 godina, da prihvaćaš Uvjete korištenja i da si pročitao/la Pravila privatnosti",
         "registrationFailed": "Stvaranje računa nije uspjelo. Pokušaj ponovno."
       },
       "eyebrow": "Privuci stolac",
@@ -1203,9 +1203,9 @@
     "sso": {
       "divider": "ili",
       "consent": {
-        "prefix": "Nastavkom s Google računom prihvaćaš ",
+        "prefix": "Nastavkom s Google računom potvrđuješ da imaš najmanje 16 godina, da prihvaćaš ",
         "termsLink": "Uvjete korištenja",
-        "and": " i ",
+        "and": " i da si pročitao/la ",
         "privacyLink": "Pravila privatnosti",
         "suffix": "."
       },

@@ -254,7 +254,7 @@ describe("RegisterPage", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("consent-error")).toHaveTextContent(
-        "You must accept the Terms of Service and Privacy Policy",
+        "Confirm you are 16 or older, accept the Terms of Service and have read the Privacy Policy",
       );
     });
 

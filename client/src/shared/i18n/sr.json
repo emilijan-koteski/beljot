@@ -1175,9 +1175,9 @@
       "submitButton": "Napravi nalog",
       "submitting": "Kreiranje…",
       "consent": {
-        "prefix": "Prihvatam ",
+        "prefix": "Imam najmanje 16 godina, prihvatam ",
         "termsLink": "Uslove korišćenja",
-        "and": " i ",
+        "and": " i pročitao/la sam ",
         "privacyLink": "Politiku privatnosti",
         "suffix": "."
       },
@@ -1193,7 +1193,7 @@
         "passwordRequired": "Lozinka je obavezna",
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
-        "consentRequired": "Moraš da prihvatiš Uslove korišćenja i Politiku privatnosti",
+        "consentRequired": "Potvrdi da imaš najmanje 16 godina, da prihvataš Uslove korišćenja i da si pročitao/la Politiku privatnosti",
         "registrationFailed": "Pravljenje naloga nije uspelo. Pokušaj ponovo."
       },
       "eyebrow": "Privuci stolicu",
@@ -1203,9 +1203,9 @@
     "sso": {
       "divider": "ili",
       "consent": {
-        "prefix": "Nastavkom sa Google nalogom prihvataš ",
+        "prefix": "Nastavkom sa Google nalogom potvrđuješ da imaš najmanje 16 godina, da prihvataš ",
         "termsLink": "Uslove korišćenja",
-        "and": " i ",
+        "and": " i da si pročitao/la ",
         "privacyLink": "Politiku privatnosti",
         "suffix": "."
       },

@@ -1,5 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import { Switch } from "@/shared/components/ui/switch";
 import {
@@ -11,8 +12,8 @@ import { useAuthStore } from "@/shared/stores/authStore";
 import { SettingsGroup, SettingsRow } from "./SettingsGroup";
 
 /**
- * The Privacy group of Settings: whether players who are not friends can invite you, saved optimistically.
- * It is a private preference, so it never appears on a public profile.
+ * The Privacy group of Settings: the non-friend invite switch, saved optimistically, then links to the legal pages.
+ * The switch is a private preference, so it never appears on a public profile.
  */
 export function PrivacySection() {
   const { t } = useTranslation();
@@ -37,6 +38,17 @@ export function PrivacySection() {
           />
         }
       />
+      <div
+        className="text-ink-mute flex flex-wrap gap-x-5 gap-y-2 px-4 py-3 text-xs"
+        data-testid="settings-legal-links"
+      >
+        <Link to="/privacy" className="hover:text-ink underline-offset-2 hover:underline">
+          {t("legal.privacy.title")}
+        </Link>
+        <Link to="/terms" className="hover:text-ink underline-offset-2 hover:underline">
+          {t("legal.terms.title")}
+        </Link>
+      </div>
     </SettingsGroup>
   );
 }
