@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -64,6 +64,8 @@ export function ResetPasswordPage() {
           setErrors({ password: t("auth.resetPassword.errors.passwordTooShort") });
         } else if (err.code === "PASSWORD_TOO_LONG") {
           setErrors({ password: t("auth.resetPassword.errors.passwordTooLong") });
+        } else if (isRateLimited(err)) {
+          toast.error(t("common.tooManyAttempts"));
         } else {
           toast.error(t("auth.resetPassword.errors.resetFailed"));
         }

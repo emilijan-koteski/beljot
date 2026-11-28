@@ -152,4 +152,21 @@ describe("DeleteAccountSection", () => {
       "That password is not correct.",
     );
   });
+
+  it("asks the player to wait after too many attempts", async () => {
+    mockDeleteAccount.mockRejectedValue(
+      new FetchError(429, "TOO_MANY_ATTEMPTS", "too many attempts, try again later"),
+    );
+    const user = userEvent.setup();
+    renderSection();
+    const dialog = await openDialog(user);
+
+    await user.type(within(dialog).getByTestId("delete-account-input"), "wrong-pw");
+    await user.click(within(dialog).getByTestId("delete-account-confirm"));
+
+    expect(await within(dialog).findByTestId("delete-account-error")).toHaveTextContent(
+      "Too many attempts. Try again in a few minutes.",
+    );
+    expect(useAuthStore.getState().user).not.toBeNull();
+  });
 });

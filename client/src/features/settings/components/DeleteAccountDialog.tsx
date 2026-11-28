@@ -2,7 +2,7 @@ import { UserX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { AppDialog } from "@/shared/components/ui/app-dialog";
 import { Input } from "@/shared/components/ui/input";
@@ -24,6 +24,9 @@ const LOST_ITEMS = ["account", "profile", "friends", "seasons", "avatar"] as con
 /** Maps a failed deletion to the line shown under the confirmation field. */
 function errorKey(error: unknown, confirm: DeleteAccountConfirm): string | null {
   if (error === null || error === undefined) return null;
+  if (isRateLimited(error)) {
+    return "common.tooManyAttempts";
+  }
   if (error instanceof FetchError && error.code === "ACCOUNT_DELETE_IN_ROOM") {
     return "settings.deleteAccount.errors.inRoom";
   }

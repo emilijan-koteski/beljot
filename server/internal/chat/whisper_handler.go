@@ -88,7 +88,7 @@ func (h *WhisperHandler) HandleAction(client *ws.Client, msg ws.WSMessage) {
 
 	target, err := h.userRepo.FindByUsername(toUsername)
 	if err != nil {
-		slog.Warn("whisper: target lookup failed", "toUsername", toUsername, "error", err)
+		slog.Warn("whisper: target lookup failed", "userID", senderID, "error", err)
 		return
 	}
 	if target == nil {

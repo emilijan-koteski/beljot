@@ -64,6 +64,7 @@ type AuthHandler struct {
 	absoluteTTL  time.Duration
 
 	usernameSuffix func() string
+	checkPassword  func(hash, password string) error
 }
 
 func NewAuthHandler(
@@ -89,6 +90,7 @@ func NewAuthHandler(
 		absoluteTTL:  absoluteTTL,
 
 		usernameSuffix: randomUsernameSuffix,
+		checkPassword:  CheckPassword,
 	}
 }
 
@@ -291,11 +293,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("finding user: %w", err)
 	}
-	if u == nil {
+	if u == nil || u.PasswordHash == "" {
+		_ = h.checkPassword(dummyPasswordHash, req.Password)
 		return apperr.ErrInvalidCredentials
 	}
 
-	if err := CheckPassword(u.PasswordHash, req.Password); err != nil {
+	if err := h.checkPassword(u.PasswordHash, req.Password); err != nil {
 		return apperr.ErrInvalidCredentials
 	}
 

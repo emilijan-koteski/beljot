@@ -51,6 +51,26 @@ func (c *Config) SMTPConfigured() bool {
 	return c.SMTPHost != "" && c.SMTPUsername != "" && c.SMTPPassword != ""
 }
 
+// missingSMTPVars names every unset variable the SMTP mailer needs to send mail.
+func (c *Config) missingSMTPVars() []string {
+	vars := []struct {
+		name  string
+		value string
+	}{
+		{"BELJOT_SMTP_HOST", c.SMTPHost},
+		{"BELJOT_SMTP_USERNAME", c.SMTPUsername},
+		{"BELJOT_SMTP_PASSWORD", c.SMTPPassword},
+		{"BELJOT_SMTP_FROM", c.SMTPFrom},
+	}
+	var missing []string
+	for _, v := range vars {
+		if v.value == "" {
+			missing = append(missing, v.name)
+		}
+	}
+	return missing
+}
+
 // AvatarStorageConfigured reports whether every avatar-storage setting is
 // present. When false the server runs without an object store and both avatar
 // endpoints answer 503 (development only; Load exits outside it).
@@ -82,7 +102,7 @@ func (c *Config) missingAvatarStorageVars() []string {
 }
 
 // Load reads the config from the environment and exits when a required
-// production setting, such as the JWT secret or avatar storage, is missing.
+// production setting, such as the JWT secret, SMTP or avatar storage, is missing.
 func Load() *Config {
 	cfg := &Config{
 		DatabaseURL: getEnv("BELJOT_DB_URL", "postgres://beljot:beljot_dev_password@localhost:5433/beljot?sslmode=disable"),
@@ -136,6 +156,13 @@ func Load() *Config {
 		if cfg.S3Endpoint != "" {
 			slog.Warn("avatar storage is partly configured — avatar uploads are disabled", "missing", missing)
 		}
+	}
+
+	if missing := cfg.missingSMTPVars(); len(missing) > 0 && cfg.Environment != "development" {
+		for _, name := range missing {
+			slog.Error(name+" must be set in non-development environments, or password reset links would be written to the log", "variable", name)
+		}
+		os.Exit(1)
 	}
 
 	if cfg.Environment != "development" && (cfg.AppBaseURL == "" || strings.Contains(cfg.AppBaseURL, "localhost")) {

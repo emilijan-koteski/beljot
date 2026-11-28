@@ -10,7 +10,8 @@
       "backToLobby": "Nazad u lobi"
     },
     "done": "Gotovo",
-    "cancel": "Otkaži"
+    "cancel": "Otkaži",
+    "tooManyAttempts": "Previše pokušaja. Pokušaj ponovo za nekoliko minuta."
   },
   "team": {
     "us": "Mi",

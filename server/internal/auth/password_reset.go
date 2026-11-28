@@ -109,12 +109,12 @@ func (h *PasswordResetHandler) issueAndSend(u *user.User) error {
 	}
 
 	link := fmt.Sprintf("%s/reset-password?token=%s", h.appBaseURL, raw)
-	email, lang := u.Email, u.LanguagePreference
+	userID, email, lang := u.ID, u.Email, u.LanguagePreference
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := h.mailer.SendPasswordReset(ctx, email, lang, link); err != nil {
-			slog.Error("failed to send password reset email", "error", err, "email", email)
+			slog.Error("failed to send password reset email", "error", err, "userID", userID)
 		}
 	}()
 	return nil

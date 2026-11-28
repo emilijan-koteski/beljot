@@ -125,6 +125,9 @@ func TestLoad_ProductionMissingAvatarVarExits(t *testing.T) {
 			os.Setenv(k, v)
 		}
 		os.Unsetenv(name)
+		for k, v := range smtpEnv() {
+			os.Setenv(k, v)
+		}
 		os.Setenv("BELJOT_ENV", "production")
 		os.Setenv("BELJOT_JWT_SECRET", "a-secure-test-secret")
 		Load()
@@ -144,6 +147,76 @@ func TestLoad_ProductionMissingAvatarVarExits(t *testing.T) {
 				t.Errorf("output does not name %s:\n%s", name, out)
 			}
 		})
+	}
+}
+
+// smtpEnv is a complete SMTP environment. Tests delete one entry to exercise a
+// single missing variable.
+func smtpEnv() map[string]string {
+	return map[string]string{
+		"BELJOT_SMTP_HOST":     "smtp.example.com",
+		"BELJOT_SMTP_USERNAME": "mailer",
+		"BELJOT_SMTP_PASSWORD": "secret",
+		"BELJOT_SMTP_FROM":     "noreply@example.com",
+	}
+}
+
+// TestLoad_ProductionMissingSMTPVarExits re-runs this test binary as a child
+// process, because Load calls os.Exit(1) on the failure path.
+func TestLoad_ProductionMissingSMTPVarExits(t *testing.T) {
+	if name := os.Getenv("BELJOT_SMTP_EXIT_CHILD"); name != "" {
+		for k, v := range avatarEnv() {
+			os.Setenv(k, v)
+		}
+		for k, v := range smtpEnv() {
+			os.Setenv(k, v)
+		}
+		os.Unsetenv(name)
+		os.Setenv("BELJOT_ENV", "production")
+		os.Setenv("BELJOT_JWT_SECRET", "a-secure-test-secret")
+		Load()
+		os.Exit(0)
+	}
+
+	for name := range smtpEnv() {
+		t.Run(name, func(t *testing.T) {
+			cmd := exec.Command(os.Args[0], "-test.run=^TestLoad_ProductionMissingSMTPVarExits$")
+			cmd.Env = append(os.Environ(), "BELJOT_SMTP_EXIT_CHILD="+name)
+			out, err := cmd.CombinedOutput()
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+				t.Fatalf("child exit = %v, want status 1; output:\n%s", err, out)
+			}
+			if !strings.Contains(string(out), name) {
+				t.Errorf("output does not name %s:\n%s", name, out)
+			}
+		})
+	}
+}
+
+func TestLoad_ProductionWithFullSMTPStarts(t *testing.T) {
+	t.Setenv("BELJOT_ENV", "production")
+	t.Setenv("BELJOT_JWT_SECRET", "a-secure-test-secret")
+	for k, v := range avatarEnv() {
+		t.Setenv(k, v)
+	}
+	for k, v := range smtpEnv() {
+		t.Setenv(k, v)
+	}
+	cfg := Load()
+	if !cfg.SMTPConfigured() || cfg.SMTPFrom == "" {
+		t.Error("SMTP should be configured with all four variables set")
+	}
+}
+
+func TestLoad_DevelopmentWithoutSMTPKeepsLogMailerFallback(t *testing.T) {
+	t.Setenv("BELJOT_ENV", "development")
+	for k := range smtpEnv() {
+		t.Setenv(k, "")
+	}
+	cfg := Load()
+	if cfg.SMTPConfigured() {
+		t.Error("SMTPConfigured() = true with no SMTP variables set")
 	}
 }
 

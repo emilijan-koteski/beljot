@@ -38,6 +38,7 @@ var (
 	ErrUsernameTooLong      = NewAppError("USERNAME_TOO_LONG", "username must be at most 20 characters", http.StatusBadRequest)
 	ErrUsernameInvalidChars = NewAppError("USERNAME_INVALID_CHARS", "username can only contain letters, numbers, and underscores", http.StatusBadRequest)
 	ErrInvalidResetToken    = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
+	ErrTooManyAttempts      = NewAppError("TOO_MANY_ATTEMPTS", "too many attempts, try again later", http.StatusTooManyRequests)
 
 	ErrSSOInvalidCredential = NewAppError("SSO_INVALID_CREDENTIAL", "sign-in credential is invalid or expired", http.StatusUnauthorized)
 	ErrSSOLinkRequired      = NewAppError("SSO_LINK_REQUIRED", "an account with this email already exists — confirm its password to link", http.StatusConflict)

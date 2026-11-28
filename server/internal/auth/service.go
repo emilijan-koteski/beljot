@@ -27,6 +27,8 @@ func CheckPassword(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
+const dummyPasswordHash = "$2a$10$ZEfoW2xIT1oqWTKG2KQTNujV4sRdu42ktCGAP3qB8jg.ozAhWGjAq"
+
 // GenerateAccessToken mints an access JWT with the default 15-minute lifetime.
 func GenerateAccessToken(userID uint, secret string) (string, error) {
 	return GenerateAccessTokenWithTTL(userID, secret, defaultAccessTokenTTL)

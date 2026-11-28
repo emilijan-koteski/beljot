@@ -3,6 +3,7 @@ package mailer
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	mail "github.com/wneessen/go-mail"
@@ -37,7 +38,7 @@ func (m *SMTPMailer) SendPasswordReset(ctx context.Context, to, lang, resetLink 
 		return fmt.Errorf("setting from address: %w", err)
 	}
 	if err := msg.To(to); err != nil {
-		return fmt.Errorf("setting to address: %w", err)
+		return fmt.Errorf("setting to address: %w", redactRecipient(err, to))
 	}
 	msg.Subject(subject)
 	msg.SetBodyString(mail.TypeTextHTML, body)
@@ -55,7 +56,27 @@ func (m *SMTPMailer) SendPasswordReset(ctx context.Context, to, lang, resetLink 
 	}
 
 	if err := client.DialAndSendWithContext(ctx, msg); err != nil {
-		return fmt.Errorf("sending password reset email: %w", err)
+		return fmt.Errorf("sending password reset email: %w", redactRecipient(err, to))
 	}
 	return nil
+}
+
+// recipientRedactedError keeps the wrapped SMTP error for errors.Is and errors.As
+// but prints it with the recipient address masked, so logs never carry it.
+type recipientRedactedError struct {
+	err  error
+	text string
+}
+
+func (e *recipientRedactedError) Error() string { return e.text }
+
+func (e *recipientRedactedError) Unwrap() error { return e.err }
+
+// redactRecipient masks every occurrence of the recipient address in err's message.
+func redactRecipient(err error, to string) error {
+	text := err.Error()
+	if to != "" {
+		text = strings.ReplaceAll(text, to, "[recipient]")
+	}
+	return &recipientRedactedError{err: err, text: text}
 }

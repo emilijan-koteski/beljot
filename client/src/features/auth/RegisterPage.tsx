@@ -7,7 +7,7 @@ import { AltLink, AuthCard, Checkbox, Field } from "@/features/auth/components/A
 import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButton";
 import { LinkAccountDialog } from "@/features/auth/components/LinkAccountDialog";
 import { useGoogleSso } from "@/features/auth/useGoogleSso";
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -121,6 +121,8 @@ export function RegisterPage() {
           setErrors({ username: t("auth.register.errors.usernameTooLong") });
         } else if (err.code === "USERNAME_INVALID_CHARS") {
           setErrors({ username: t("auth.register.errors.usernameInvalidChars") });
+        } else if (isRateLimited(err)) {
+          toast.error(t("common.tooManyAttempts"));
         } else {
           toast.error(t("auth.register.errors.registrationFailed"));
         }

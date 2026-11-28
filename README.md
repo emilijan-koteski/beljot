@@ -47,7 +47,7 @@ make dev
 | PostgreSQL | localhost:5433 |
 | Garage S3 API | localhost:3900 (public bucket web endpoint on :3902) |
 
-Configuration comes from `BELJOT_*` environment variables, read once in `server/internal/config/config.go`. In development every variable has a usable default or is optional: the database URL points at the Compose Postgres, SMTP falls back to logging reset links, and avatar endpoints answer 503 until all `BELJOT_S3_*` and `BELJOT_PUBLIC_ASSETS_URL` values are set. Outside development (`BELJOT_ENV` other than `development`), a default JWT secret or any missing avatar-storage variable stops the server. The binary applies pending migrations at startup.
+Configuration comes from `BELJOT_*` environment variables, read once in `server/internal/config/config.go`. In development every variable has a usable default or is optional: the database URL points at the Compose Postgres, SMTP falls back to logging reset links, and avatar endpoints answer 503 until all `BELJOT_S3_*` and `BELJOT_PUBLIC_ASSETS_URL` values are set. Outside development (`BELJOT_ENV` other than `development`), a default JWT secret, any missing `BELJOT_SMTP_HOST`, `BELJOT_SMTP_USERNAME`, `BELJOT_SMTP_PASSWORD` or `BELJOT_SMTP_FROM`, or any missing avatar-storage variable stops the server. The binary applies pending migrations at startup.
 
 ## Common commands
 

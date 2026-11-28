@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { refreshAccessToken } from "@/shared/api/axiosClient";
+import { isRateLimited, refreshAccessToken } from "@/shared/api/axiosClient";
 import { recordServerNow } from "@/shared/lib/clockSync";
 import { useAuthStore } from "@/shared/stores/authStore";
 import type { AuthenticatedPayload, AuthFailedPayload, WsMessage } from "@/shared/types/wsEvents";
@@ -136,7 +136,11 @@ export function useWebSocket({ onMessage }: UseWebSocketOptions): UseWebSocketRe
       await refreshAccessToken();
       reconnectAttemptRef.current = 0;
       scheduleReconnect();
-    } catch {
+    } catch (error) {
+      if (isRateLimited(error)) {
+        scheduleReconnect();
+        return;
+      }
       useAuthStore.getState().logout();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

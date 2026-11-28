@@ -30,6 +30,14 @@ export class FetchError extends Error {
   }
 }
 
+const TOO_MANY_REQUESTS = 429;
+
+/** Reports whether a request, or a raw refresh call, was refused by the server's rate limit. */
+export function isRateLimited(error: unknown): boolean {
+  if (error instanceof FetchError) return error.status === TOO_MANY_REQUESTS;
+  return axios.isAxiosError(error) && error.response?.status === TOO_MANY_REQUESTS;
+}
+
 let authRedirect: (() => void) | null = null;
 let hasRedirected = false;
 
@@ -204,7 +212,10 @@ axiosClient.interceptors.response.use(
         config.headers.Authorization = `Bearer ${newToken}`;
         const retryResponse = await axiosClient.request(config);
         return retryResponse;
-      } catch {
+      } catch (refreshError) {
+        if (isRateLimited(refreshError)) {
+          throw new FetchError(TOO_MANY_REQUESTS, "TOO_MANY_ATTEMPTS", "Too many attempts");
+        }
         useAuthStore.getState().logout();
         redirectToLogin();
         throw new FetchError(401, "UNAUTHORIZED", "Session expired");

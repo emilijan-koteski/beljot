@@ -61,6 +61,7 @@ func main() {
 				SlowThreshold:             200 * time.Millisecond,
 				IgnoreRecordNotFoundError: true,
 				LogLevel:                  gormlogger.Warn,
+				ParameterizedQueries:      true,
 			},
 		),
 	})
@@ -126,38 +127,7 @@ func main() {
 	e.HideBanner = true
 	e.IPExtractor = clientIPExtractor()
 
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     cfg.CORSOrigins,
-		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
-		AllowCredentials: true,
-	}))
-
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus:   true,
-		LogURI:      true,
-		LogMethod:   true,
-		LogError:    true,
-		LogRemoteIP: true,
-		HandleError: true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			attrs := []any{"method", v.Method, "uri", v.URI, "status", v.Status, "ip", v.RemoteIP}
-			if v.Error != nil {
-				attrs = append(attrs, "error", v.Error.Error())
-			}
-			switch {
-			case v.Status >= 500:
-				slog.Error("request", attrs...)
-			case v.Status >= 400:
-				slog.Warn("request", attrs...)
-			default:
-				slog.Info("request", attrs...)
-			}
-			return nil
-		},
-	}))
-
-	e.HTTPErrorHandler = appErrorHandler
+	useCoreMiddleware(e, cfg.CORSOrigins)
 
 	health := healthHandler(sqlDB)
 	e.GET("/health", health)
@@ -165,15 +135,16 @@ func main() {
 	e.GET("/healthz", health)
 	e.HEAD("/healthz", health)
 
+	limits := newAuthRateLimits()
 	authGroup := e.Group("/api/v1/auth")
-	authGroup.POST("/register", authHandler.Register)
-	authGroup.POST("/login", authHandler.Login)
-	authGroup.POST("/refresh", authHandler.Refresh)
+	authGroup.POST("/register", authHandler.Register, limits.register)
+	authGroup.POST("/login", authHandler.Login, limits.login)
+	authGroup.POST("/refresh", authHandler.Refresh, limits.refresh)
 	authGroup.POST("/logout", authHandler.Logout)
-	authGroup.POST("/forgot-password", passwordResetHandler.ForgotPassword)
-	authGroup.POST("/reset-password", passwordResetHandler.ResetPassword)
-	authGroup.POST("/sso/:provider", authHandler.SSOLogin)
-	authGroup.POST("/sso/:provider/link", authHandler.SSOLink)
+	authGroup.POST("/forgot-password", passwordResetHandler.ForgotPassword, limits.forgotPassword)
+	authGroup.POST("/reset-password", passwordResetHandler.ResetPassword, limits.resetPassword)
+	authGroup.POST("/sso/:provider", authHandler.SSOLogin, limits.sso)
+	authGroup.POST("/sso/:provider/link", authHandler.SSOLink, limits.sso)
 
 	matchRepo := match.NewGormMatchRepository(db)
 	seasonRepo := season.NewGormRepository(db)
@@ -220,7 +191,7 @@ func main() {
 	e.GET("/ws", wsHandler.HandleWS)
 
 	accountDeletionHandler := auth.NewAccountDeletionHandler(userRepo, account.NewGormRepository(db), hub, avatarHandler, revokedUsers, cfg.Environment)
-	api.DELETE("/users/:id", accountDeletionHandler.DeleteAccount)
+	api.DELETE("/users/:id", accountDeletionHandler.DeleteAccount, limits.deleteAccount)
 
 	roomRepo := room.NewGormRepository(db)
 	sessionManager := match.NewManager(hub, matchRepo)
@@ -376,6 +347,57 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("server stopped")
+}
+
+// useCoreMiddleware installs, in load-bearing order, CORS, the request logger,
+// panic recovery and the error handler; auth and rate limits attach per route.
+func useCoreMiddleware(e *echo.Echo, corsOrigins []string) {
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     corsOrigins,
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowCredentials: true,
+	}))
+
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogStatus:   true,
+		LogMethod:   true,
+		LogError:    true,
+		LogRemoteIP: true,
+		HandleError: true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			attrs := []any{"method", v.Method, "path", c.Request().URL.Path, "status", v.Status, "ip", v.RemoteIP}
+			if v.Error != nil {
+				attrs = append(attrs, "error", v.Error.Error())
+			}
+			switch {
+			case v.Status >= 500:
+				slog.Error("request", attrs...)
+			case v.Status >= 400:
+				slog.Warn("request", attrs...)
+			default:
+				slog.Info("request", attrs...)
+			}
+			return nil
+		},
+	}))
+
+	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		DisableStackAll:     true,
+		DisableErrorHandler: true,
+		LogErrorFunc:        logRecoveredPanic,
+	}))
+
+	e.HTTPErrorHandler = appErrorHandler
+}
+
+var errRecoveredPanic = errors.New("recovered panic")
+
+// logRecoveredPanic logs a handler panic with its stack and path, never the
+// query string or body, and hands the request logger a generic 500 error.
+func logRecoveredPanic(c echo.Context, err error, stack []byte) error {
+	slog.Error("panic recovered", "method", c.Request().Method, "path", c.Request().URL.Path, "panic", err.Error(), "stack", string(stack))
+	return errRecoveredPanic
 }
 
 // logSeasonRecalculation logs one finished recalculation job: how many rows it

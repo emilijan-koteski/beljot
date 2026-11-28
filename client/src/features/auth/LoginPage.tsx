@@ -8,7 +8,7 @@ import { GoogleSignInButton } from "@/features/auth/components/GoogleSignInButto
 import { LinkAccountDialog } from "@/features/auth/components/LinkAccountDialog";
 import { reconcileLanguagePreference } from "@/features/auth/reconcileLanguage";
 import { useGoogleSso } from "@/features/auth/useGoogleSso";
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { FormError } from "@/shared/components/ui/form-error";
@@ -85,6 +85,8 @@ export function LoginPage() {
       if (err instanceof FetchError) {
         if (err.status === 401) {
           setFormError(t("auth.login.errors.invalidCredentials"));
+        } else if (isRateLimited(err)) {
+          setFormError(t("common.tooManyAttempts"));
         } else {
           toast.error(t("auth.login.errors.loginFailed"));
         }
