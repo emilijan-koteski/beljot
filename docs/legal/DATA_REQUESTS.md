@@ -19,7 +19,12 @@ How Beljot handles GDPR requests from players (access, export, erasure) and what
 
 Use this when the player cannot use the Settings button. `server/scripts/erase_user.sql` runs exactly what the server code does.
 
-1. **Find the user id:** `SELECT id, username, deleted_at FROM users WHERE email = '<email>';`
+1. **Find the user id.** Match the address against both the account email and a linked Google email, since a player may write from either:
+   ```sql
+   SELECT u.id, u.username, u.deleted_at FROM users u
+   WHERE lower(u.email) = lower('<email>')
+      OR u.id IN (SELECT user_id FROM user_identities WHERE lower(email) = lower('<email>'));
+   ```
 2. **Erase:**
    ```bash
    psql "$BELJOT_DB_URL" -X -v uid=<id> -f server/scripts/erase_user.sql

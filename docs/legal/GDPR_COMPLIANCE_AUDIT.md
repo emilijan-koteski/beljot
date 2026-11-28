@@ -547,3 +547,167 @@ G-02, G-10 (Google's sign-in script loads on the login, register and settings pa
 ### Then
 
 Re-run `gdpr-legal-expert` against this document. When it is all green, draft the Privacy Policy and Terms in en, sr, hr and mk.
+
+---
+
+## 14. Re-audit run 2 (2026-11-28)
+
+**Branch:** `fix/client-privacy` @ `fcaf7416`. **Scope:** every change in `62606e78..HEAD` under `client/` and `server/`, plus a fresh sweep of schema, client build, storage and dependencies.
+
+**Verdict: GREEN. Ready to draft the Privacy Policy and Terms.** No finding is OPEN. G-02 (placeholder legal pages) is still the one launch blocker, and the documents themselves close it. One new WARNING (G-32) is closed by either a Cloudflare cache rule or a single sentence in the policy.
+
+**Counts (G-01 to G-31):** 16 CLOSED (code), 2 CLOSED (owner), 9 POLICY, 4 ACCEPTED, 0 OPEN.
+
+### 14.1 Status of run 1 findings
+
+Each status was checked against the code, not against the DONE notes in §13.
+
+| ID | Status | Evidence (run 2) |
+|---|---|---|
+| G-01 | CLOSED (code) | Links removed from `client/index.html`; `client/src/fonts.css` imports `@fontsource/*`; a fresh `npm run build` `dist/` has no `fonts.googleapis`/`fonts.gstatic` |
+| G-02 | POLICY | `PrivacyPage.tsx`/`TermsPage.tsx` and `legal.*` still show "Work in progress". Closes when both documents are published in en, sr, hr and mk and the WIP strings are removed |
+| G-03 | CLOSED (code) | `account/gorm_repo.go` `Erase` (one transaction, row lock, seated recheck); `auth/account_delete_handler.go` (revocation, WS close, avatar delete, cookie clear); `DELETE /users/:id` is behind auth and the per-user limit. `TestErase_*` pass against `beljot_test`. The erase covers every `users` column and every FK table in `pg_constraint` |
+| G-04 | CLOSED (owner) | False positive; the fixture is now obviously fake |
+| G-05 | CLOSED (code) | `909b97f5` placeholders; the screenshot players consented (§9 #11). History not rewritten: accepted |
+| G-06 | POLICY | Nightly DB and Garage backups, 14 days, same VPS (§9 #3) |
+| G-07 | CLOSED (code) | The request logger now logs the path without the query string (`cmd/api/main.go` `useCoreMiddleware`); `access_log off` (`client/nginx.conf:11`); reset failures log `userID` (`password_reset.go:117`); SMTP errors mask the recipient (`mailer/smtp.go`); `ParameterizedQueries: true`. The 14-day log retention goes in the policy |
+| G-08 | CLOSED (owner) | Resend, EU region |
+| G-09 | POLICY | Cloudflare plus `__cf_bm` |
+| G-10 | POLICY | `googleIdentity.ts:35,50` still loads GIS when the page opens (owner decision). `accounts.google.com` is the only third-party script host in `dist/` |
+| G-11 | CLOSED (code) | `sso_handler.go` `generateSSOUsername` gives `player_` plus 6 random characters and never reads the Google name. Note: Google accounts created **before** this change keep name-derived usernames (1 of 1 locally). Owner: count them in production; their first rename is free |
+| G-12 | CLOSED (code) | 16+ in the register checkbox and the Google note, in 4 locales (`auth.register.consent`, `auth.sso.consent`). The Terms state 16+ |
+| G-13 | POLICY | Honor profiling text (§14.3) |
+| G-14 | CLOSED (code) | `retention/purger.go` runs at start and every 24 h. `refreshtoken.PurgeStale`: `family_expires_at < now OR revoked_at < now-30d`. `passwordreset.PurgeStale`: `used_at IS NOT NULL OR expires_at < now-24h`. Purge tests pass |
+| G-15 | POLICY | Matches kept for the life of the service, anonymised on erasure |
+| G-16 | CLOSED (code) | `server/scripts/export_user.sql` ran read-only against a local user: profile, identities, friends, seasons, matches, rooms owned, sessions. The only email in the output is the user's own; other players appear by username, and erased players as null |
+| G-17 | ACCEPTED | No EU representative (owner, §9 #12) |
+| G-18 | CLOSED (code) | Wording "I agree to the Terms and have read the Privacy Policy". Storing acceptance stays optional (consent is not the legal basis) |
+| G-19 | CLOSED (code) | `config.go` `missingSMTPVars` exits outside development, so the LogMailer is development-only |
+| G-20 | CLOSED (code) | `cmd/api/ratelimits.go`: per-IP limits on login, register, SSO, forgot, reset and refresh; per-user limit on delete |
+| G-21 | CLOSED (code) | `settings/components/PrivacySection.tsx:45-49` links /privacy and /terms |
+| G-22 | POLICY | Email change by request |
+| G-23 | POLICY | `allow_non_friend_invites` still defaults to `true` (DB default) |
+| G-24 | CLOSED (code) | Dummy bcrypt compare on unknown or passwordless login (`handler.go`). `EMAIL_TAKEN` on register stays: accepted, and rate-limited |
+| G-25 | POLICY | The Terms name the report email |
+| G-26 | CLOSED (code) | `RecoverWithConfig` logs the method, path, panic and stack, never the query string or body |
+| G-27 | ACCEPTED | No CSP; optional |
+| G-28 | CLOSED (code) | Breach runbook in `docs/legal/DATA_REQUESTS.md` §6 |
+| G-29 | CLOSED (code) | The processor inventory lives in `docs/legal/` (§3 of this file) |
+| G-30 | ACCEPTED | Low risk, noted |
+| G-31 | ACCEPTED | Accounts are kept until the user deletes them; the policy says so |
+
+### 14.2 New findings
+
+**G-32 WARNING: an erased avatar stays in Cloudflare's edge cache.** Art. 17.
+- Evidence: avatar objects carry `public, max-age=31536000, immutable` (`avatar/handler.go:48`). Self-service erasure deletes the S3 pair, but the Cloudflare purge is manual and depends on the owner noticing the `account erased … avatarPrefix=` log line (`DATA_REQUESTS.md` §2). In practice nobody watches for it. The URL is a random UUID, so the exposure is small.
+- Fix (smallest, owner, no code): a Cloudflare Cache Rule on `assets.beljot.online` with Edge TTL 1 day. It also covers existing objects. Browser caches of other players are out of reach and do not need action.
+- Policy: "A deleted profile picture may remain in our CDN cache for up to 1 day [or: until purged] and in the browser cache of players who saw it."
+- **Fixed 2026-11-28:** new avatar uploads carry `Cache-Control: public, max-age=86400`, so Cloudflare and browsers drop them within a day (`avatar/handler.go`). Avatars uploaded before this keep their 1-year header, so for those the runbook's manual Cloudflare purge still applies. The policy says a deleted picture can stay in caches for up to a day.
+
+**G-33 RECOMMENDATION: erasure can drift from the schema.** Art. 17, Art. 25.
+- Evidence: `scrubUser` and `erase_user.sql` list `users` columns by hand, and `TestErase_AnonymisesInPlaceAndKeepsOpponentsStats` asserts only some of them. It does not check `last_login_at`, `username_changed_at`, the preferences, the honor weights or `created_at`.
+- A future personal column would survive erasure unnoticed. `export_user.sql` uses `to_jsonb`, so the export would pick the column up.
+- Fix: a test that compares `information_schema.columns` for `users` (and the FK list to `users`) with a pinned list, so the next migration forces a decision. Also assert the remaining scrubbed columns.
+- **Fixed 2026-11-28:** `server/internal/account/schema_coverage_test.go` reads the live schema. It fails if a `users` column is not reset by `scrubUser`, or if a foreign key to `users` is neither deleted by the erase nor on the kept-reference list.
+
+**G-34 RECOMMENDATION: runbook lookup and wording.**
+- `DATA_REQUESTS.md` §3 step 1 finds the user only by `users.email`. A request sent from a linked Google address misses. Add `OR id IN (SELECT user_id FROM user_identities WHERE email = '<email>')`.
+- §6 step 5 says to keep the register "next to this file, outside the public repository". Say "outside the repository".
+- §5 should name the 180-day absolute session limit.
+- **Fixed 2026-11-28:** the runbook lookup matches both the account email and a linked Google email, case-insensitively.
+
+### 14.3 OK, new in run 2 (re-check each audit)
+
+- **Schema:** still version 38, with no migration after `000038`. No new table or column. `room_bots`, `seasons` and `season_recalculations` hold no personal data.
+- **Dependencies:** the only new ones are `@fontsource/{inter,jetbrains-mono,cormorant-garamond}` (bundled, no network calls). No `go.mod` change.
+- **Client build:** the only third-party hosts in the built bundle are `accounts.google.com` (GIS) and plain outbound social and donation links. Browser storage keys are unchanged from §2.4.
+- **In-memory state:**
+  - Rate-limit buckets hold `ip:<addr>` with timestamps for at most one window (15 min at most), are swept on use, and are lost on restart.
+  - The revocation list holds user ids for the access-token TTL plus 1 minute.
+  - Invite grants expire after 60 s.
+  - The WebSocket client holds only the user id.
+  - None of this is persisted.
+- **Erasure:** blocked while seated, rechecked under a row lock. `abandoned_by`/`surrendered_by` keep the tombstone id. Opponents' stats are unchanged (asserted). A second erase returns not found.
+- **Account deletion is safe:** the password from the delete request is never logged. The request logger has no body, and the recover log has no query string.
+- **Account erased log line:** carries only the user id and the random avatar prefix.
+
+### 14.4 Policy must state (checklist for drafting)
+
+**Controller and contact**
+- [ ] Controller: Emilijan Koteski, an individual, North Macedonia. [ACTION REQUIRED: postal address as in the Monexa policy]
+- [ ] Contact and rights requests: emilijankoteski@pm.me (Proton AG, Switzerland).
+- [ ] No DPO (Art. 37 reasoning as in Monexa).
+- [ ] No EU representative (Art. 27).
+- [ ] Complaints: АЗЛП (Агенција за заштита на личните податоци, North Macedonia), or the user's own EU/EEA supervisory authority.
+
+**Data, purposes and legal bases**
+- [ ] Data, purposes and legal bases from §2.1 and §4.
+- [ ] Not collected: chat, whispers and emotes are never stored; no real name, birthdate, phone or payment data; no analytics, ads or tracking.
+- [ ] Google sign-in: only `sub`, email and verification status are used. The Google name and picture are not used; the username is generated.
+
+**Processors and recipients**
+- [ ] Contabo GmbH, Germany: hosting, database, avatars, logs, backups.
+- [ ] Cloudflare, Inc., US / global edge: DNS, proxy, TLS, avatar CDN, bot protection; EU-US DPF plus SCCs.
+- [ ] Resend (Plus Five Five, Inc., US), EU sending region: password-reset email; DPF plus SCCs.
+- [ ] Google (Google Ireland Ltd for EEA users): **independent controller** for Sign in with Google. Its script loads on the login, register and settings pages.
+- [ ] Proton AG, Switzerland (adequacy decision): the contact mailbox.
+
+**Retention**
+- [ ] Account: until the user deletes it.
+- [ ] Server and proxy logs (IP address, request path, time), including Traefik: 14 days.
+- [ ] Backups (database and avatars), nightly, same German VPS: 14 days. Erasure reaches backups when they rotate out.
+- [ ] Login sessions: deleted at the latest 180 days after sign-in, or 30 days after logout or revocation.
+- [ ] Password-reset tokens: valid 1 hour, deleted within about 2 days.
+- [ ] Rate-limit IP data: memory only, at most 15 minutes.
+- [ ] Matches, hand results and season standings: life of the service. On erasure they are anonymised (no name, no link to the person).
+- [ ] Rooms the user owned: renamed on erasure.
+- [ ] Avatars: deleted on replace, remove or erasure; CDN cache note (G-32).
+- [ ] Resend sending logs: per Resend's retention.
+
+**Cookies and storage (strictly necessary, so no banner)**
+- [ ] `refresh_token`: httpOnly cookie, up to 30 days idle and 180 days absolute; keeps the user signed in.
+- [ ] `__cf_bm`: Cloudflare bot protection, about 30 minutes.
+- [ ] localStorage `beljot.lang`, `beljot.theme`: UI preferences.
+- [ ] sessionStorage `beljot.theme.picked`, `beljot:preload-error-reload`, `beljot:version-reloaded-for`, `beljot:lobby-idx`: UI state.
+- [ ] Google's own cookies inside the sign-in frame: under Google's policy.
+
+**Honor score (profiling, Art. 4(4))**
+- [ ] Computed from completed and abandoned matches, with a 90-day half-life decay.
+- [ ] Shown on the profile.
+- [ ] Room owners may set a minimum honor to join.
+- [ ] No legal or similarly significant effect, so Art. 22 does not apply.
+- [ ] The right to object (Art. 21) by email.
+
+**What other players see**
+- [ ] Username, avatar, join date, level and XP, honor (including completed and abandoned counts), match history and stats, leaderboard rank.
+- [ ] Online status to friends.
+- [ ] "Invitable" status to room owners while `allow_non_friend_invites` is on, which is the default and can be switched off in Settings.
+- [ ] Email is never shown.
+
+**Rights and how to use them (reply within one month)**
+- [ ] Access and portability: JSON export by email.
+- [ ] Rectification: self-service username (30-day cooldown, the first change is free), avatar and preferences; password via reset; **email change by request**.
+- [ ] Erasure: self-service **Settings → Danger zone → Delete account**, or by email. Not possible while seated in a room or match. Match results stay for the other players without a name.
+- [ ] Restriction and objection: by email.
+- [ ] Requests are acted on only from the account's email address.
+
+**Security**
+- [ ] bcrypt passwords, hashed tokens, TLS, access token held in memory only, rate limiting on sign-in and reset, and a breach procedure with 72-hour notice to АЗЛП.
+
+**Age**
+- [ ] 16+, confirmed at signup on both the email and Google paths. No birthdate is collected.
+
+**Terms of Service**
+- [ ] Minimum age 16.
+- [ ] Virtual coins have no monetary value and cannot be bought, sold, transferred for value or cashed out (still no payment code: verified).
+- [ ] Username and chat conduct.
+- [ ] Report contact (DSA): emilijankoteski@pm.me.
+- [ ] Honor system and penalties for abandoning.
+- [ ] Suspension or termination.
+- [ ] Self-service deletion.
+- [ ] Service provided "as is".
+- [ ] [ACTION REQUIRED: governing law and jurisdiction]
+- [ ] "Last updated" date and version.
+
+**Before publication**
+- [ ] Have both documents reviewed by a qualified lawyer.

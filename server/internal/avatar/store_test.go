@@ -75,14 +75,14 @@ func TestS3Store_PutIsPathStyleWithPlainBody(t *testing.T) {
 	key := "avatars/0f8b6c1e-2a4d-4e6f-9a1b-3c5d7e9f1a2b/256.webp"
 	body := []byte("RIFF....WEBPVP8 fake")
 
-	require.NoError(t, store.Put(context.Background(), key, contentTypeWebP, cacheControlImmutable, body))
+	require.NoError(t, store.Put(context.Background(), key, contentTypeWebP, cacheControlAvatar, body))
 
 	require.Len(t, fake.requests, 1)
 	req := fake.requests[0]
 	assert.Equal(t, http.MethodPut, req.method)
 	assert.Equal(t, "/beljot-public/"+key, req.path, "path-style addressing")
 	assert.Equal(t, "image/webp", req.header.Get("Content-Type"))
-	assert.Equal(t, "public, max-age=31536000, immutable", req.header.Get("Cache-Control"))
+	assert.Equal(t, "public, max-age=86400", req.header.Get("Cache-Control"))
 	assert.Equal(t, body, req.body)
 	assert.NotContains(t, req.header.Get("Content-Encoding"), "aws-chunked")
 	for name := range req.header {
@@ -97,7 +97,7 @@ func TestS3Store_PutIsPathStyleWithPlainBody(t *testing.T) {
 func TestS3Store_PutFailureIsReturned(t *testing.T) {
 	fake := &fakeS3{respond: func(*http.Request) int { return http.StatusForbidden }}
 	store := newTestS3Store(t, fake)
-	err := store.Put(context.Background(), "avatars/x/128.webp", contentTypeWebP, cacheControlImmutable, []byte("x"))
+	err := store.Put(context.Background(), "avatars/x/128.webp", contentTypeWebP, cacheControlAvatar, []byte("x"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "avatars/x/128.webp")
 }
