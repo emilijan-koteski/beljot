@@ -11,3 +11,5 @@ tsconfig.tsbuildinfo
 .env
 .env.*
 *.log
+
+public/legal

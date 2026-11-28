@@ -511,6 +511,10 @@ describe("LoginPage", () => {
       expect(screen.getByTestId("sso-consent-note")).toBeInTheDocument();
       expect(screen.getByTestId("sso-terms-link")).toHaveAttribute("href", "/terms");
       expect(screen.getByTestId("sso-privacy-link")).toHaveAttribute("href", "/privacy");
+      for (const id of ["sso-terms-link", "sso-privacy-link"]) {
+        expect(screen.getByTestId(id)).toHaveAttribute("target", "_blank");
+        expect(screen.getByTestId(id)).toHaveAttribute("rel", "noopener noreferrer");
+      }
     });
 
     it("ignores a second GIS callback while the first sign-in is pending", async () => {

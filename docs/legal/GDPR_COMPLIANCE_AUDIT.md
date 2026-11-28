@@ -331,6 +331,7 @@ Severity is after verification. Source IDs from the scanner reports are in brack
 **G-02 Privacy Policy and Terms are placeholders, with no controller identity and no rights channel.** Arts. 12, 13. [C-02, R-02, C-08]
 - Evidence: `client/src/features/legal/PrivacyPage.tsx`, `TermsPage.tsx`, and `legal.*` in all four locales: "Work in progress… testing purposes only". `RegisterPage.tsx:222-268` and `:288-312` and `LoginPage.tsx:198-222` require agreeing to them.
 - Fix: write both documents after this audit is green (§10).
+- **Closed 2026-11-28:** Privacy Policy and Terms v1.0 (en, mk) render at `/privacy` and `/terms` as public pages. The texts are not in the repo: they are served from `/legal/*.md`, a Dokploy file mount in production and the gitignored `client/public/legal/` locally. Serbian and Croatian UI users see English with a note. No re-acceptance flow: major changes are announced by email at least 14 days ahead (Terms §13, Privacy §15). A lawyer's review is still recommended before the public announcement.
 
 **G-03 No erasure mechanism.** Art. 17. [R-01, C-04, G-S06, G-S07, R-09, R-03, I-04]
 - Evidence: no delete route in `server/cmd/api/main.go`. `user/gorm_repo.go:41-51` is a soft delete that keeps email and password hash. `pg_constraint` shows 8 NO ACTION FKs to `users` (`rooms.owner_id`, `room_players.user_id`, `matches.player1-4_id`, `abandoned_by`, `surrendered_by`, `password_reset_tokens.user_id`).
@@ -389,6 +390,7 @@ Severity is after verification. Source IDs from the scanner reports are in brack
 **G-11 Google real name becomes the public username.** Arts. 5(1)(c), 25(2). [G-S04]
 - Evidence: `auth/sso_handler.go:254-268` builds it from the Google `name`, or else the email local part. The first rename is free and immediate.
 - Fix: generate a neutral username (e.g. `player_ab12cd`) or show a pick-your-username step on first Google sign-in. The minimum is to disclose it.
+- **Closed 2026-11-28:** new Google sign-ups get `player_xxxxxx`. Owner: the only existing accounts with Google-derived names belong to friends who are fine with it. Postal address and governing law come from Monexa, minus the defunct EU ODR line.
 
 **G-12 No minimum age.** Art. 8 and LPDP; contractual capacity. [C-05, R-13]
 - Fix: extend the signup checkbox to "I am 16 or older and agree to the Terms…", include the Google path, and state 16+ in the Terms. No birthdate field.

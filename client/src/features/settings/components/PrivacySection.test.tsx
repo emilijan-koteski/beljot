@@ -158,4 +158,15 @@ describe("PrivacySection", () => {
       "/terms",
     );
   });
+
+  it("opens the legal pages in a new tab", () => {
+    renderSection();
+
+    const links = within(screen.getByTestId("settings-legal-links")).getAllByRole("link");
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+  });
 });

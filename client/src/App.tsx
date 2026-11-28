@@ -15,8 +15,6 @@ import { RegisterPage } from "@/features/auth/RegisterPage";
 import { ResetPasswordPage } from "@/features/auth/ResetPasswordPage";
 import { LandingPage } from "@/features/landing/LandingPage";
 import { LeaderboardPage } from "@/features/leaderboard/LeaderboardPage";
-import { PrivacyPage } from "@/features/legal/PrivacyPage";
-import { TermsPage } from "@/features/legal/TermsPage";
 import { LobbyPage } from "@/features/lobby/LobbyPage";
 import { MatchmakingPage } from "@/features/lobby/MatchmakingPage";
 import { MatchPage } from "@/features/match/MatchPage";
@@ -62,14 +60,24 @@ function AppShell() {
   return <Outlet />;
 }
 
+/** Loads the Terms page in its own chunk, so the Markdown renderer stays out of the main bundle. */
+async function loadTermsRoute() {
+  const { TermsPage } = await import("@/features/legal/TermsPage");
+  return { Component: TermsPage };
+}
+
+/** Loads the Privacy Policy page in its own chunk, so the Markdown renderer stays out of the main bundle. */
+async function loadPrivacyRoute() {
+  const { PrivacyPage } = await import("@/features/legal/PrivacyPage");
+  return { Component: PrivacyPage };
+}
+
 // Builds the data router that useBlocker needs; called lazily from App() because
 // createBrowserRouter writes to window.history on construction.
 function createAppRouter() {
   return createBrowserRouter(
     createRoutesFromElements(
       <Route element={<AppShell />}>
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
         <Route element={<GuestRoute />}>
           <Route path="/" element={<LandingPage />} />
           <Route element={<AuthLayout />}>
@@ -81,6 +89,8 @@ function createAppRouter() {
         </Route>
         <Route element={<PublicContentLayout />}>
           <Route path="/rules" element={<RulesPage />} />
+          <Route path="/terms" lazy={loadTermsRoute} />
+          <Route path="/privacy" lazy={loadPrivacyRoute} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>

@@ -14,10 +14,10 @@ export function LandingFooter() {
   const { t } = useTranslation();
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const links: Array<{ label: string; to: string }> = [
-    { label: t("landing.foot.rules"), to: "/rules" },
-    { label: t("landing.foot.privacy"), to: "/privacy" },
-    { label: t("landing.foot.terms"), to: "/terms" },
+  const links: Array<{ label: string; to: string; newTab: boolean }> = [
+    { label: t("landing.foot.rules"), to: "/rules", newTab: false },
+    { label: t("landing.foot.privacy"), to: "/privacy", newTab: true },
+    { label: t("landing.foot.terms"), to: "/terms", newTab: true },
   ];
 
   return (
@@ -26,7 +26,13 @@ export function LandingFooter() {
         <BrandLockup wordmarkSize={18} showSuffix />
         <nav className="text-ink-mute flex w-full flex-wrap items-center gap-x-5.5 gap-y-2 text-sm md:ml-auto md:w-auto">
           {links.map((l) => (
-            <Link key={l.label} to={l.to} className="hover:text-ink transition-colors">
+            <Link
+              key={l.label}
+              to={l.to}
+              target={l.newTab ? "_blank" : undefined}
+              rel={l.newTab ? "noopener noreferrer" : undefined}
+              className="hover:text-ink transition-colors"
+            >
               {l.label}
             </Link>
           ))}

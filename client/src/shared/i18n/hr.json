@@ -629,17 +629,19 @@
     "reinviteSent": "Poziv je poslan igraču {{username}}."
   },
   "legal": {
-    "wipBadge": "U izradi",
-    "back": "Natrag",
+    "eyebrow": "Pravne informacije",
+    "languageNote": "Ovaj je dokument dostupan na engleskom i makedonskom jeziku.",
+    "switchLabel": "Jezik dokumenta",
+    "loading": "Učitavanje dokumenta…",
+    "unavailable": {
+      "title": "Dokument trenutačno nije dostupan.",
+      "contact": "Pokušaj ponovno kasnije ili nam piši na"
+    },
     "terms": {
-      "title": "Uvjeti korištenja",
-      "wipNotice": "Ovo je aplikacija u izradi koja se koristi samo za testiranje.",
-      "comingSoon": "Puni Uvjeti korištenja se pripremaju i bit će objavljeni ovdje uskoro."
+      "title": "Uvjeti korištenja"
     },
     "privacy": {
-      "title": "Pravila privatnosti",
-      "wipNotice": "Ovo je aplikacija u izradi koja se koristi samo za testiranje.",
-      "comingSoon": "Puna Pravila privatnosti se pripremaju i bit će objavljena ovdje uskoro."
+      "title": "Pravila privatnosti"
     }
   },
   "lobby": {

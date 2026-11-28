@@ -629,17 +629,19 @@
     "reinviteSent": "Invite sent to {{username}}."
   },
   "legal": {
-    "wipBadge": "Work in progress",
-    "back": "Back",
+    "eyebrow": "Legal",
+    "languageNote": "This document is available in English and Macedonian.",
+    "switchLabel": "Document language",
+    "loading": "Loading document…",
+    "unavailable": {
+      "title": "This document is temporarily unavailable.",
+      "contact": "Try again later, or email us at"
+    },
     "terms": {
-      "title": "Terms of Service",
-      "wipNotice": "This is a work-in-progress application used for testing purposes only.",
-      "comingSoon": "The full Terms of Service are being drafted and will be published here soon."
+      "title": "Terms of Service"
     },
     "privacy": {
-      "title": "Privacy Policy",
-      "wipNotice": "This is a work-in-progress application used for testing purposes only.",
-      "comingSoon": "The full Privacy Policy is being drafted and will be published here soon."
+      "title": "Privacy Policy"
     }
   },
   "lobby": {

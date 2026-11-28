@@ -42,10 +42,20 @@ export function PrivacySection() {
         className="text-ink-mute flex flex-wrap gap-x-5 gap-y-2 px-4 py-3 text-xs"
         data-testid="settings-legal-links"
       >
-        <Link to="/privacy" className="hover:text-ink underline-offset-2 hover:underline">
+        <Link
+          to="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-ink underline-offset-2 hover:underline"
+        >
           {t("legal.privacy.title")}
         </Link>
-        <Link to="/terms" className="hover:text-ink underline-offset-2 hover:underline">
+        <Link
+          to="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-ink underline-offset-2 hover:underline"
+        >
           {t("legal.terms.title")}
         </Link>
       </div>

@@ -63,3 +63,5 @@ docs/superpowers/
 docs/temp/
 # Ad video pipeline, kept local
 marketing/
+# Legal texts are served from a Dokploy file mount in production
+client/public/legal/
