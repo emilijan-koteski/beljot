@@ -474,7 +474,7 @@ Every owner question is answered. These are the closures in order. "Policy" mean
 |---|---|
 | Set up Resend for `beljot.online` (EU region): add its DNS records in Cloudflare, set `BELJOT_SMTP_HOST=smtp.resend.com`, `PORT=587`, `USERNAME=resend`, `PASSWORD=<API key>` and the From address in Dokploy, then test a password reset. Afterwards revoke the Gmail App password and delete the reset emails from Sent. | G-08 |
 
-### PR 1: client privacy (`fix/client-privacy`)
+### PR 1: client privacy (`fix/client-privacy`): DONE 2026-11-28 (`1c0d43ad`)
 
 | Change | Closes |
 |---|---|
@@ -483,7 +483,16 @@ Every owner question is answered. These are the closures in order. "Policy" mean
 | Privacy and Terms links in the in-app footer or settings | G-21 |
 | Optional: Content-Security-Policy in `client/nginx.conf` | G-27 |
 
-### PR 2: erasure, export and retention (`feat/gdpr-data-lifecycle`)
+### PR 2: erasure, export and retention: DONE 2026-11-28 (stacked on `fix/client-privacy`)
+
+Implemented:
+- `DELETE /api/v1/users/:id` with password or username confirmation, blocked while seated. One-transaction tombstone erase in `server/internal/account/`.
+- An in-memory revocation list, so the still-valid access token is rejected immediately; it is lifted again if the erase fails.
+- The user's WebSocket is disconnected, the avatar deleted and the refresh cookie cleared.
+- Daily purge in `server/internal/retention/`.
+- Generated `player_xxxxxx` usernames for Google sign-ups, and a hard delete on SSO rollback.
+- `server/scripts/{erase,export}_user.sql` and `docs/legal/DATA_REQUESTS.md`.
+- Known limit: revocation is per API instance and resets on restart. Acceptable with a single instance, because the refresh tokens are already gone and lookups hide the tombstone.
 
 | Change | Closes |
 |---|---|
