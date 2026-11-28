@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "close": "Close",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
@@ -24,7 +24,7 @@
     "leaderboard": "Leaderboard",
     "profile": "Profile",
     "rules": "Rules",
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "logout": "Log out",
     "signedInAs": "Signed in as",
     "menu": "Menu",
@@ -1163,7 +1163,7 @@
         "loginFailed": "Couldn't log in. Try again."
       },
       "eyebrow": "Welcome back",
-      "altPrompt": "New to Beljot?",
+      "altPrompt": "New to Beljot.online?",
       "altCta": "Create an account",
       "forgotLink": "Forgot?"
     },
@@ -1288,9 +1288,9 @@
       "eyebrow": "2 v 2 · Free",
       "title": "Deal me",
       "titleAccent": "in.",
-      "subtitle": "Beljot for four, in your browser. Play with friends, strangers or bots.",
+      "subtitle": "Belot for four, in your browser. Play with friends, strangers or bots.",
       "cta": "Create free account",
-      "tableAlt": "A Beljot match in play",
+      "tableAlt": "A Belot match in play",
       "phoneAlt": "The same table on a phone, Croatian deck"
     },
     "facts": {

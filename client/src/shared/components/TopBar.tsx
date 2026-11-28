@@ -99,7 +99,7 @@ export function TopBar({
           className={cn("text-ink", showFullBrand ? "inline-flex" : "hidden xl:inline-flex")}
           data-testid="app-name"
         >
-          <span className="sr-only">{t("nav.appName")}.online</span>
+          <span className="sr-only">{t("nav.appName")}</span>
           <BrandWordmark height={WORDMARK_NAV_HEIGHT} />
         </span>
       </Link>

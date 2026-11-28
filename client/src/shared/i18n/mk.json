@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "close": "Затвори",
     "showPassword": "Прикажи ја лозинката",
     "hidePassword": "Скриј ја лозинката",
@@ -24,7 +24,7 @@
     "leaderboard": "Ранг-листа",
     "profile": "Профил",
     "rules": "Правила",
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "logout": "Одјави се",
     "signedInAs": "Најавен како",
     "menu": "Мени",
@@ -1163,7 +1163,7 @@
         "loginFailed": "Најавата не успеа. Обиди се повторно."
       },
       "eyebrow": "Добредојде назад",
-      "altPrompt": "Нов си на Beljot?",
+      "altPrompt": "Нов си на Beljot.online?",
       "altCta": "Креирај сметка",
       "forgotLink": "Заборавена?"
     },
