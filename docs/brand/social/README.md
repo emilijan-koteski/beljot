@@ -13,6 +13,8 @@ The same URLs appear in two other places. If a handle changes, update all three:
 
 ## Files
 
+The images are not kept in git. Run the commands under **Regenerate** to build them into this folder, which ignores everything except this guide.
+
 | File | Size | Use |
 | --- | --- | --- |
 | `profile-1080.png` | 1080×1080 | Instagram and Facebook profile picture. |
@@ -23,6 +25,8 @@ The same URLs appear in two other places. If a handle changes, update all three:
 | `post-01-welcome.jpg` | 1080×1350 | Launch post 1: welcome. |
 | `post-02-decks.jpg` | 1080×1350 | Launch post 2: French or Croatian deck. |
 | `post-03-bots.jpg` | 1080×1350 | Launch post 3: bots fill the empty seat. |
+| `instagram-grid.jpg` | 3240×4320 | Preview of the 3×3 Instagram mosaic: Dama, the chip and the taglines. |
+| `instagram-grid/post-N-of-9.jpg` | 1080×1440 each | The mosaic cut into 3:4 tiles, numbered in posting order. |
 
 The link preview (`client/public/og-image.jpg`) stays in English because it shows wherever the site is shared.
 
@@ -132,6 +136,13 @@ Dodaj botove na prazna mjesta i meč počinje odmah. Kad prijatelj stigne, makni
 ```
 
 Alt text: Дама дели карти, а до неа е месингана икона на бот. Натпис: Фали четврти? Ботот седнува веднаш.
+
+## Instagram grid mosaic
+
+The profile grid shows 3:4 tiles, so the mosaic is cut into 1080×1440 parts that the grid shows whole. The newest post sits top-left, so post the parts in file order: `post-1-of-9.jpg` (bottom-right) first and `post-9-of-9.jpg` (top-left) last.
+
+- Post them one by one as single photos, not as a carousel. In the crop step, pick the original 3:4 shape so nothing is trimmed.
+- Post later content in groups of three so the mosaic moves down whole rows, and don't pin posts, because pinned posts jump to the top-left and break the picture.
 
 ## Setup by platform
 

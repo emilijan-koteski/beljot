@@ -215,6 +215,31 @@ def post_bots():
     return canvas(w, h, body, (cx, 620, 760))
 
 
+GRID_TILE = (1080, 1440)
+
+
+def stacked(lines, cx, first_base, size, fill, leading=1.0):
+    return "".join(line(text, cx, first_base + i * size * leading, size, fill) for i, text in enumerate(lines))
+
+
+def instagram_grid():
+    """One 3x3 mosaic of 3:4 tiles; the right column carries the chip, taglines and sign-off one tile each."""
+    tw, th = GRID_TILE
+    w, h = tw * 3, th * 3
+    col3 = tw * 2.5
+    body = (bokeh(71, (0, 0, w, h), 120, 3)
+            + dama("dama-welcome", 542, 407, 3300)
+            + f'<g filter="url(#lift)">{chip_mark("s", col3, 700, 360)}</g>'
+            + stacked(["Седни на", "масата."], col3, th + 560, 150, CREAM)
+            + divider(col3, th + 820, 330)
+            + line(TAGLINE_HR, col3, th + 960, 96, BRASS)
+            + trump_fan(tw * 0.5, 760, 250)
+            + line("2 на 2 · бесплатно", col3, th * 2 + 600, 92, CREAM)
+            + line("2 na 2 · besplatno", col3, th * 2 + 720, 74, BRASS)
+            + brand(col3, th * 2 + 940, 46))
+    return canvas(w, h, body, (w * 0.45, h * 0.3, w * 0.75))
+
+
 JOBS = {
     "profile-1080": (profile(1080), 1080, 1080, "png"),
     "profile-800": (profile(800), 800, 800, "png"),
@@ -224,6 +249,7 @@ JOBS = {
     "post-01-welcome": (post_welcome(), 1080, 1350, "jpeg"),
     "post-02-decks": (post_decks(), 1080, 1350, "jpeg"),
     "post-03-bots": (post_bots(), 1080, 1350, "jpeg"),
+    "instagram-grid": (instagram_grid(), 3240, 4320, "jpeg"),
 }
 
 
@@ -236,7 +262,10 @@ if __name__ == "__main__":
         path = os.path.join(OUT, f"{name}.svg")
         with open(path, "w") as fh:
             fh.write(svg)
-        manifest.append({"name": name, "svg": path, "width": w, "height": h, "type": kind})
+        job = {"name": name, "svg": path, "width": w, "height": h, "type": kind}
+        if name == "instagram-grid":
+            job["tiles"] = {"width": GRID_TILE[0], "height": GRID_TILE[1], "dir": "instagram-grid"}
+        manifest.append(job)
     with open(os.path.join(OUT, "jobs.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
     print("ok", len(manifest))
