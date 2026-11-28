@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
@@ -15,13 +15,25 @@ interface FieldErrors {
   confirm?: string;
 }
 
+/** Reads the reset token from the URL fragment, falling back to the legacy ?token= query. */
+function readResetToken(hash: string, search: URLSearchParams): string {
+  return new URLSearchParams(hash.replace(/^#/, "")).get("token") ?? search.get("token") ?? "";
+}
+
 export function ResetPasswordPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const resetMutation = useResetPasswordMutation();
 
-  const token = searchParams.get("token") ?? "";
+  const [token] = useState(() => readResetToken(location.hash, searchParams));
+
+  useEffect(() => {
+    if (location.hash !== "" || searchParams.has("token")) {
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.hash, location.pathname, navigate, searchParams]);
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");

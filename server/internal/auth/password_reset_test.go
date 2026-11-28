@@ -141,7 +141,9 @@ func tokenFromLink(t *testing.T, link string) string {
 	t.Helper()
 	u, err := url.Parse(link)
 	require.NoError(t, err)
-	return u.Query().Get("token")
+	fragment, err := url.ParseQuery(u.Fragment)
+	require.NoError(t, err)
+	return fragment.Get("token")
 }
 
 func TestForgotPassword_KnownEmail_SendsLinkInUserLanguage(t *testing.T) {
@@ -156,7 +158,7 @@ func TestForgotPassword_KnownEmail_SendsLinkInUserLanguage(t *testing.T) {
 	sent := fm.sent()[0]
 	assert.Equal(t, "test@example.com", sent.to)
 	assert.Equal(t, "mk", sent.lang, "email language must follow the user's stored preference")
-	assert.Contains(t, sent.link, "http://localhost:5173/reset-password?token=")
+	assert.Contains(t, sent.link, "http://localhost:5173/reset-password#token=")
 	require.Len(t, resetRepo.tokens, 1, "a token row must be persisted")
 	assert.NotEmpty(t, resetRepo.tokens[0].TokenHash)
 }

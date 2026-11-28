@@ -108,7 +108,7 @@ func (h *PasswordResetHandler) issueAndSend(u *user.User) error {
 		return fmt.Errorf("persisting reset token: %w", err)
 	}
 
-	link := fmt.Sprintf("%s/reset-password?token=%s", h.appBaseURL, raw)
+	link := fmt.Sprintf("%s/reset-password#token=%s", h.appBaseURL, raw)
 	userID, email, lang := u.ID, u.Email, u.LanguagePreference
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -34,7 +34,7 @@ vi.mock("sonner", () => ({
 
 import { toast } from "sonner";
 
-function renderResetPage(entry = "/reset-password?token=tok123") {
+function renderResetPage(entry = "/reset-password#token=tok123") {
   return render(
     <QueryWrapper>
       <MemoryRouter initialEntries={[entry]}>
@@ -104,6 +104,29 @@ describe("ResetPasswordPage", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/login");
   });
 
+  it("still accepts a legacy ?token= link", async () => {
+    const user = userEvent.setup();
+    mockResetPassword.mockResolvedValueOnce(undefined);
+
+    renderResetPage("/reset-password?token=legacy456");
+    await user.type(screen.getByTestId("password-input"), "brandnewpass1");
+    await user.type(screen.getByTestId("confirm-input"), "brandnewpass1");
+    await user.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => {
+      expect(mockResetPassword).toHaveBeenCalledWith({
+        token: "legacy456",
+        password: "brandnewpass1",
+      });
+    });
+  });
+
+  it("removes the token from the address once it is read", () => {
+    renderResetPage();
+    expect(mockNavigate).toHaveBeenCalledWith("/reset-password", { replace: true });
+    expect(screen.getByTestId("password-input")).toBeInTheDocument();
+  });
+
   it("shows the invalid-link state when the server rejects the token", async () => {
     const user = userEvent.setup();
     mockResetPassword.mockRejectedValueOnce(
@@ -118,6 +141,6 @@ describe("ResetPasswordPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("request-new-link")).toBeInTheDocument();
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalledWith("/login");
   });
 });
