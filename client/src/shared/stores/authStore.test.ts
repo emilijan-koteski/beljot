@@ -41,6 +41,16 @@ describe("authStore", () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
+  it("endSession clears the session without calling the backend", () => {
+    useAuthStore.setState({ token: "test-token", user: makeUser() });
+
+    useAuthStore.getState().endSession();
+
+    expect(useAuthStore.getState().token).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(mockLogoutApi).not.toHaveBeenCalled();
+  });
+
   it("logout calls backend /auth/logout endpoint", () => {
     useAuthStore.setState({ token: "test-token" });
 

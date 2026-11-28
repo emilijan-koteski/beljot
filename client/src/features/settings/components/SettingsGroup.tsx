@@ -2,7 +2,7 @@ import { cloneElement, isValidElement, type ReactNode, useId } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
-export type SettingsSectionId = "account" | "signIn" | "game" | "sound" | "privacy";
+export type SettingsSectionId = "account" | "signIn" | "game" | "sound" | "privacy" | "danger";
 
 type SettingsGroupProps = {
   id: SettingsSectionId;

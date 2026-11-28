@@ -1534,7 +1534,8 @@
       "signIn": "Prijava",
       "game": "Igra",
       "sound": "Zvuk",
-      "privacy": "Privatnost"
+      "privacy": "Privatnost",
+      "danger": "Opasna zona"
     },
     "password": {
       "label": "Lozinka",
@@ -1549,6 +1550,37 @@
     "theme": {
       "label": "Mesing tema",
       "hint": "Tamna čoja i mesing na svim stranama van meča."
+    },
+    "deleteAccount": {
+      "label": "Brisanje naloga",
+      "hint": "Trajno obriši nalog i lične podatke.",
+      "open": "Obriši nalog",
+      "deletedToast": "Nalog je obrisan.",
+      "dialog": {
+        "title": "Obrisati nalog?",
+        "description": "Tvoj nalog i lični podaci biće obrisani.",
+        "lostTitle": "Šta se briše",
+        "lost": {
+          "account": "Nalog, imejl i načini prijave",
+          "profile": "Profil: korisničko ime, nivo, novčići i čast",
+          "friends": "Prijatelji i zahtevi za prijateljstvo",
+          "seasons": "Plasmani u sezonama",
+          "avatar": "Profilna slika"
+        },
+        "kept": "Rezultati mečeva ostaju ostalim igračima, bez tvog imena.",
+        "permanent": "Ovo je trajno i ne može da se poništi.",
+        "passwordLabel": "Unesi lozinku za potvrdu",
+        "usernameLabel": "Upiši korisničko ime „{{username}}“ za potvrdu",
+        "confirm": "Obriši zauvek",
+        "submitting": "Brišem…",
+        "cancel": "Otkaži"
+      },
+      "errors": {
+        "inRoom": "Prvo izađi iz sobe ili meča, pa pokušaj ponovo.",
+        "wrongPassword": "Lozinka nije tačna.",
+        "wrongUsername": "To nije tvoje korisničko ime.",
+        "failed": "Nalog nije obrisan. Pokušaj ponovo."
+      }
     }
   },
   "meta": {

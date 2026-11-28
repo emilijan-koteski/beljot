@@ -82,3 +82,13 @@ func (r *GormRepository) RevokeFamily(familyID string) error {
 func lockFamily(tx *gorm.DB, familyID string) error {
 	return tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", familyID).Error
 }
+
+const RevokedRetention = 30 * 24 * time.Hour
+
+// PurgeStale deletes tokens of families past their absolute cap and tokens revoked over RevokedRetention ago.
+// Rotated tokens of live families stay, since replay detection depends on them.
+func (r *GormRepository) PurgeStale(now time.Time) (int64, error) {
+	res := r.db.Where("family_expires_at < ? OR revoked_at < ?", now, now.Add(-RevokedRetention)).
+		Delete(&RefreshToken{})
+	return res.RowsAffected, res.Error
+}

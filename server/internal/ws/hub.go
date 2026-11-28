@@ -120,6 +120,24 @@ func (h *Hub) Run() {
 	}
 }
 
+// DisconnectUser closes the user's live connection, if any, with a policy-violation close.
+// The read pump then unregisters it through the normal disconnect path.
+func (h *Hub) DisconnectUser(userID uint) {
+	h.mu.RLock()
+	client, ok := h.clients[userID]
+	h.mu.RUnlock()
+	if !ok {
+		return
+	}
+	go func() {
+		if err := client.conn.Close(websocket.StatusPolicyViolation, "account deleted"); err != nil {
+			_ = client.conn.CloseNow()
+		}
+		client.markClosed()
+	}()
+	slog.Info("ws: disconnected user", "userID", userID)
+}
+
 // Shutdown signals the hub to stop and close all client connections.
 func (h *Hub) Shutdown() {
 	close(h.done)

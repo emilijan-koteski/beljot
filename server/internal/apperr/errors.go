@@ -54,6 +54,9 @@ var (
 	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
 	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
 
+	ErrAccountDeleteConfirmation = NewAppError("ACCOUNT_DELETE_CONFIRMATION_MISMATCH", "the password or username does not match this account", http.StatusBadRequest)
+	ErrAccountDeleteInRoom       = NewAppError("ACCOUNT_DELETE_IN_ROOM", "leave your room or match before deleting your account", http.StatusConflict)
+
 	ErrAvatarMissing            = NewAppError("AVATAR_MISSING", "the request has no avatar file", http.StatusBadRequest)
 	ErrAvatarTooSmall           = NewAppError("AVATAR_TOO_SMALL", "the image must be at least 128 pixels on its shorter side", http.StatusBadRequest)
 	ErrAvatarTooLarge           = NewAppError("AVATAR_TOO_LARGE", "the image file must be at most 2 MiB", http.StatusRequestEntityTooLarge)

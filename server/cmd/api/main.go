@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
+	"github.com/emilijan/beljot/server/internal/account"
 	"github.com/emilijan/beljot/server/internal/apperr"
 	"github.com/emilijan/beljot/server/internal/auth"
 	"github.com/emilijan/beljot/server/internal/avatar"
@@ -31,6 +33,7 @@ import (
 	"github.com/emilijan/beljot/server/internal/match"
 	"github.com/emilijan/beljot/server/internal/passwordreset"
 	"github.com/emilijan/beljot/server/internal/refreshtoken"
+	"github.com/emilijan/beljot/server/internal/retention"
 	"github.com/emilijan/beljot/server/internal/room"
 	"github.com/emilijan/beljot/server/internal/season"
 	"github.com/emilijan/beljot/server/internal/user"
@@ -177,7 +180,8 @@ func main() {
 	seasonService := season.NewService(seasonRepo)
 	seasonService.SetAvatarURLResolver(user.SmallAvatarURL)
 	userHandler := user.NewUserHandler(userRepo, matchRepo, seasonService)
-	api := e.Group("/api/v1", auth.AuthMiddleware(cfg.JWTSecret))
+	revokedUsers := auth.NewRevokedUsers(cfg.AccessTokenTTL + time.Minute)
+	api := e.Group("/api/v1", auth.AuthMiddlewareWithRevocations(cfg.JWTSecret, revokedUsers))
 	api.GET("/users", userHandler.SearchUsers)
 	api.GET("/users/:id/profile", userHandler.GetProfile)
 	api.GET("/users/:id/career", userHandler.GetCareer)
@@ -207,10 +211,16 @@ func main() {
 			if err != nil {
 				return nil, "", err
 			}
+			if revokedUsers.IsRevoked(subjectUserID(claims.Subject)) {
+				return nil, "", errors.New("account deleted")
+			}
 			return []string(claims.Audience), claims.Subject, nil
 		},
 	}
 	e.GET("/ws", wsHandler.HandleWS)
+
+	accountDeletionHandler := auth.NewAccountDeletionHandler(userRepo, account.NewGormRepository(db), hub, avatarHandler, revokedUsers, cfg.Environment)
+	api.DELETE("/users/:id", accountDeletionHandler.DeleteAccount)
 
 	roomRepo := room.NewGormRepository(db)
 	sessionManager := match.NewManager(hub, matchRepo)
@@ -228,6 +238,12 @@ func main() {
 
 	seasonRollover := season.NewRollover(seasonRepo, 0, nil)
 	seasonRollover.Start()
+
+	tokenPurger := retention.NewPurger([]retention.Task{
+		{Name: "refresh_tokens", Purge: refreshRepo.PurgeStale},
+		{Name: "password_reset_tokens", Purge: resetRepo.PurgeStale},
+	}, 0, nil)
+	tokenPurger.Start()
 
 	recalculations, err := season.RunPendingRecalculations(db, time.Now())
 	for _, r := range recalculations {
@@ -352,6 +368,7 @@ func main() {
 	slog.Info("shutting down server")
 	hub.Shutdown()
 	seasonRollover.Shutdown()
+	tokenPurger.Shutdown()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {
@@ -382,6 +399,15 @@ func logSeasonRecalculation(r season.RecalculationResult) {
 			"season", r.SeasonName,
 			"userIds", r.Untouched)
 	}
+}
+
+// subjectUserID parses a JWT subject into a user id, answering 0 for anything malformed.
+func subjectUserID(subject string) uint {
+	id, err := strconv.ParseUint(subject, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(id)
 }
 
 // chatRoomMembership adapts room.RoomRepository to chat.RoomMembership.

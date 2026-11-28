@@ -7,8 +7,6 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"net/mail"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,14 +18,14 @@ import (
 	"github.com/emilijan/beljot/server/internal/user"
 )
 
-var ssoUsernameStripRegex = regexp.MustCompile(`[^a-zA-Z0-9_]`)
-
 const (
-	ssoUsernameMaxSequentialAttempts = 20
-	ssoUsernameMaxRandomAttempts     = 20
-	ssoRegisterMaxAttempts           = 3
-	ssoCredentialMaxLen              = 4096
-	ssoEmailMaxLen                   = 255
+	ssoUsernamePrefix      = "player_"
+	ssoUsernameAlphabet    = "abcdefghijklmnopqrstuvwxyz0123456789"
+	ssoUsernameSuffixLen   = 6
+	ssoUsernameMaxAttempts = 20
+	ssoRegisterMaxAttempts = 3
+	ssoCredentialMaxLen    = 4096
+	ssoEmailMaxLen         = 255
 )
 
 type SSOLoginRequest struct {
@@ -92,7 +90,7 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 		return apperr.ErrSSOLinkRequired
 	}
 
-	u, err := h.createSSOUser(email, ext.DisplayName)
+	u, err := h.createSSOUser(email)
 	if err != nil {
 		return err
 	}
@@ -112,12 +110,12 @@ func (h *AuthHandler) SSOLogin(c echo.Context) error {
 
 // createSSOUser inserts a passwordless user seeded like Register, with a generated username.
 // A lost email race returns ErrSSOLinkRequired; a lost username race regenerates and retries.
-func (h *AuthHandler) createSSOUser(email, displayName string) (*user.User, error) {
+func (h *AuthHandler) createSSOUser(email string) (*user.User, error) {
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	var lastErr error
 	for attempt := 0; attempt < ssoRegisterMaxAttempts; attempt++ {
-		username, err := h.generateSSOUsername(displayName, email)
+		username, err := h.generateSSOUsername()
 		if err != nil {
 			return nil, err
 		}
@@ -249,38 +247,11 @@ func normalizeSSOEmail(raw string) string {
 	return email
 }
 
-// generateSSOUsername derives a unique 3-20 char username from the display name, email local-part, or "player".
-// It tries sequential numeric suffixes first, then random ones once the sequential space is crowded.
-func (h *AuthHandler) generateSSOUsername(displayName, email string) (string, error) {
-	base := ssoUsernameStripRegex.ReplaceAllString(displayName, "")
-	if len(base) < 3 {
-		local := email
-		if at := strings.Index(email, "@"); at >= 0 {
-			local = email[:at]
-		}
-		base = ssoUsernameStripRegex.ReplaceAllString(local, "")
-	}
-	if len(base) < 3 {
-		base = "player"
-	}
-	if len(base) > 20 {
-		base = base[:20]
-	}
-
-	candidate := base
-	for i := 1; i <= ssoUsernameMaxSequentialAttempts; i++ {
-		existing, err := h.userRepo.FindByUsername(candidate)
-		if err != nil {
-			return "", fmt.Errorf("checking username: %w", err)
-		}
-		if existing == nil {
-			return candidate, nil
-		}
-		candidate = suffixUsername(base, strconv.Itoa(i))
-	}
-
-	for i := 0; i < ssoUsernameMaxRandomAttempts; i++ {
-		candidate = suffixUsername(base, strconv.Itoa(rand.IntN(100_000_000)))
+// generateSSOUsername picks a free neutral username, never one derived from the Google name or email.
+// The first rename stays free because username_changed_at is left unset.
+func (h *AuthHandler) generateSSOUsername() (string, error) {
+	for i := 0; i < ssoUsernameMaxAttempts; i++ {
+		candidate := ssoUsernamePrefix + h.usernameSuffix()
 		existing, err := h.userRepo.FindByUsername(candidate)
 		if err != nil {
 			return "", fmt.Errorf("checking username: %w", err)
@@ -289,16 +260,14 @@ func (h *AuthHandler) generateSSOUsername(displayName, email string) (string, er
 			return candidate, nil
 		}
 	}
-	return "", fmt.Errorf("no free username after %d attempts for base %q",
-		ssoUsernameMaxSequentialAttempts+ssoUsernameMaxRandomAttempts, base)
+	return "", fmt.Errorf("no free generated username after %d attempts", ssoUsernameMaxAttempts)
 }
 
-// suffixUsername appends a numeric suffix to base, trimming base so the result
-// stays within the 20-char username cap. base is always >= 3 chars and the
-// suffix at most 8 digits, so the result stays inside the 3-20 window.
-func suffixUsername(base, suffix string) string {
-	if len(base)+len(suffix) > 20 {
-		base = base[:20-len(suffix)]
+// randomUsernameSuffix returns ssoUsernameSuffixLen lowercase letters and digits.
+func randomUsernameSuffix() string {
+	b := make([]byte, ssoUsernameSuffixLen)
+	for i := range b {
+		b[i] = ssoUsernameAlphabet[rand.IntN(len(ssoUsernameAlphabet))]
 	}
-	return base + suffix
+	return string(b)
 }

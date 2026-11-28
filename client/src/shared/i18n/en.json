@@ -1534,7 +1534,8 @@
       "signIn": "Sign-in",
       "game": "Game",
       "sound": "Sound",
-      "privacy": "Privacy"
+      "privacy": "Privacy",
+      "danger": "Danger zone"
     },
     "password": {
       "label": "Password",
@@ -1549,6 +1550,37 @@
     "theme": {
       "label": "Brass mode",
       "hint": "Dark felt and brass on every page outside a match."
+    },
+    "deleteAccount": {
+      "label": "Delete account",
+      "hint": "Permanently erase your account and personal data.",
+      "open": "Delete account",
+      "deletedToast": "Your account has been deleted.",
+      "dialog": {
+        "title": "Delete your account?",
+        "description": "Your account and personal data will be erased.",
+        "lostTitle": "What gets deleted",
+        "lost": {
+          "account": "Your account, email and sign-in methods",
+          "profile": "Your profile: username, level, coins and honor",
+          "friends": "Your friends and friend requests",
+          "seasons": "Your season standings",
+          "avatar": "Your profile picture"
+        },
+        "kept": "Match results stay for the other players, without your name.",
+        "permanent": "This is permanent and cannot be undone.",
+        "passwordLabel": "Enter your password to confirm",
+        "usernameLabel": "Type your username \"{{username}}\" to confirm",
+        "confirm": "Delete forever",
+        "submitting": "Deleting…",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "inRoom": "Leave your room or match first, then try again.",
+        "wrongPassword": "That password is not correct.",
+        "wrongUsername": "That is not your username.",
+        "failed": "The account could not be deleted. Try again."
+      }
     }
   },
   "meta": {

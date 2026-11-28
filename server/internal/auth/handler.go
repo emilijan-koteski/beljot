@@ -62,6 +62,8 @@ type AuthHandler struct {
 	accessTTL    time.Duration
 	idleTTL      time.Duration
 	absoluteTTL  time.Duration
+
+	usernameSuffix func() string
 }
 
 func NewAuthHandler(
@@ -85,6 +87,8 @@ func NewAuthHandler(
 		accessTTL:    accessTTL,
 		idleTTL:      idleTTL,
 		absoluteTTL:  absoluteTTL,
+
+		usernameSuffix: randomUsernameSuffix,
 	}
 }
 
@@ -101,12 +105,17 @@ func (h *AuthHandler) setRefreshCookie(c echo.Context, token string, maxAge int)
 }
 
 func (h *AuthHandler) clearRefreshCookie(c echo.Context) {
+	clearRefreshCookie(c, h.env)
+}
+
+// clearRefreshCookie expires the httpOnly refresh cookie with the same attributes that set it.
+func clearRefreshCookie(c echo.Context, env string) {
 	c.SetCookie(&http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/api/v1/auth",
 		HttpOnly: true,
-		Secure:   h.env != "development",
+		Secure:   env != "development",
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})

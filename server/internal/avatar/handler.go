@@ -281,6 +281,16 @@ func (h *Handler) putPair(ctx context.Context, prefix string, large, small []byt
 	return h.store.Put(ctx, user.AvatarObjectKey(prefix, user.AvatarSizeSmall), contentTypeWebP, cacheControlImmutable, small)
 }
 
+// DeleteStored removes the pair under prefix for a caller outside this package, such as account erasure.
+// Without object storage configured it only logs the orphaned prefix.
+func (h *Handler) DeleteStored(ctx context.Context, userID uint, prefix, reason string) {
+	if h.store == nil {
+		slog.Warn("avatar: storage not configured, objects left in place", "userID", userID, "prefix", prefix, "reason", reason)
+		return
+	}
+	h.deletePair(ctx, userID, prefix, reason)
+}
+
 // deletePair removes both derivatives under prefix, best-effort: a failure is
 // logged and never fails the request. It runs detached from the request's
 // cancellation, so a client that hangs up cannot leave the cleanup half done.

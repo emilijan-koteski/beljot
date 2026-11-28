@@ -135,7 +135,7 @@ func TestGormUserRepository_SearchByUsername(t *testing.T) {
 	mk("zzbeta")
 	mk("zzgamma")
 	ghost := mk("ghostali")
-	require.NoError(t, repo.Delete(ghost.ID))
+	require.NoError(t, db.Delete(&User{}, ghost.ID).Error)
 
 	usernames := func(us []User) []string {
 		out := make([]string, len(us))
@@ -519,4 +519,18 @@ func TestGormUserRepository_ThemePreference_DefaultsToParchmentAndUpdates(t *tes
 	assert.Equal(t, ThemeParchment, reloaded.ThemePreference)
 	assert.Equal(t, "hr", reloaded.LanguagePreference, "a theme update must not touch the language")
 	assert.Equal(t, CardDeckFrench, reloaded.CardDeckPreference)
+}
+
+func TestGormUserRepository_DeleteLeavesNoRow(t *testing.T) {
+	db := getTestDB(t)
+	repo := NewGormUserRepository(db)
+	u := &User{Email: "hard-delete@delete.test", Username: "hard_delete_user", PasswordHash: "", LanguagePreference: "en"}
+	require.NoError(t, repo.Create(u))
+
+	require.NoError(t, repo.Delete(u.ID))
+
+	var n int64
+	require.NoError(t, db.Unscoped().Model(&User{}).Where("id = ?", u.ID).Count(&n).Error)
+	assert.Zero(t, n, "the sign-up rollback must not leave a soft-deleted row holding the email")
+	assert.ErrorIs(t, repo.Delete(u.ID), apperr.ErrUserNotFound)
 }
