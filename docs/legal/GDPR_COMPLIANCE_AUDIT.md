@@ -713,3 +713,98 @@ Each status was checked against the code, not against the DONE notes in §13.
 
 **Before publication**
 - [ ] Have both documents reviewed by a qualified lawyer.
+
+---
+
+## 15. Final check run 3 (2026-11-28)
+
+**Branch:** `fix/client-privacy` @ `6f93f410`. **Scope:** every factual statement in the final Privacy Policy and Terms of Service (en and mk, `client/public/legal/*.md`, not in git), checked sentence by sentence against the code, the config defaults and the owner answers in §9. Also the changes in `690eb454`, `8f4f8682` and `6f93f410`.
+
+**Verdict: READY for the pull request.** About 120 concrete claims were checked. 11 were wrong or overstated and are now corrected in both languages. No CRITICAL finding is open. Four new code-side items are RECOMMENDATIONS, and one owner deploy step remains (G-38). The texts are still drafts until a qualified lawyer has reviewed them.
+
+### 15.1 Corrections made to the texts
+
+Every correction was made in en and mk. Version stays 1.0, 28 November 2026, because nothing is published yet.
+
+| # | Where | Old → new | Code evidence |
+|---|---|---|---|
+| 1 | Privacy 3.1 | "when you last signed in" → "the date of your last daily login reward" | `last_login_at` is only written by the daily-login claim, as a UTC date (`wallet/gorm_repo.go:53`); sign-in never touches it |
+| 2 | Privacy 3.2 | Google sends "your name" → "your name and your profile picture" (the text already said the picture is not used) | GIS ID token carries `name` and `picture`; only `sub`, `email`, `email_verified` are used (`identity/google.go:47-49`, `DisplayName` is never read) |
+| 3 | Privacy 3.6 logs | "requested page or API path (without query parameters) … user agent" → requested address; the proxy log also has the referring page and keeps the full address, which can include a player search term or a password-reset link; the app log drops the query | App log uses `URL.Path` (`cmd/api/main.go:369`). The Traefik access log (on, §9 #7) logs the full request URI, `Referer` and `User-Agent`. The reset link is `/reset-password?token=…` (`auth/password_reset.go:111`); search uses `?search=` (`user/handler.go:712`, `room/invite_handler.go:193`) |
+| 4 | Privacy 3.6 rate limits | "sign-in and password-reset attempts per IP … for at most 15 minutes" → sign-in, registration and password-reset per IP, account deletion per account; in memory only; an attempt stops counting after at most 15 minutes | `cmd/api/ratelimits.go:11-45` (`ByUserOrIP` for delete); the sweep is lazy (`ratelimit/limiter.go:53-61`), see G-36 |
+| 5 | Privacy 5 | Invitable status visible to "room owners" → "players waiting in a room" | `ListInvitablePlayers` only requires room membership (`room/invite_handler.go:171-176`, `requireRoomMember`) |
+| 6 | Privacy 5 | Added: the room or match you sit in is shown with your username in the lobby room list | `ListRooms` attaches seated players to `waiting`/`playing`/`completed` rooms for every signed-in user (`room/handler.go:31,604`) |
+| 7 | Privacy 6 | "The box you tick when you sign up" → the box (email sign-up) and the notice next to the Google button | Google path has a notice, not a checkbox (`auth.sso.consent` in `LoginPage.tsx:204-222`); the checkbox is on `RegisterPage.tsx:225` |
+| 8 | Privacy 7 and Terms 6.1 | "only … matches against human players"; "leaving a match … lowers it" → every match including bot matches; on an abandonment, every player not at the table is charged | `computeHonorEvents` skips only bot seats, not bot matches, and charges every absent seat (`match/honor_record.go:20-29`); called for every match end (`live_match.go:1006`, `reconnect.go:487`) |
+| 9 | Privacy 8.2 and the cookie table | Google script on "login, registration and settings pages" → login and registration, and Settings only while no Google account is linked | `GoogleAccountRow.tsx:134-138` renders the button only when `!google` |
+| 10 | Privacy 9 | Season standings moved from "kept for the life of the service, anonymised" to the account row ("until you delete your account") | Erase **deletes** `player_seasons` (`account/gorm_repo.go` `satelliteDeletes`) |
+| 11 | Privacy 9 | Rate-limit row → "in memory only; an attempt stops counting after at most 15 minutes" | as #4 |
+
+### 15.2 Claims confirmed (selection; re-check on each audit)
+
+- **Cookie `refresh_token`:** `Path=/api/v1/auth`, `HttpOnly`, `Secure` outside development, `SameSite=Strict`, `Max-Age` equal to the idle expiry (`auth/handler.go:97-107,435`). Idle TTL 30 days and absolute TTL 180 days (`config/config.go:115-116`); access token 15 min, in memory only (`config.go:114`).
+- **Session retention:** the purge runs at start and every 24 h (`retention/purger.go`, `cmd/api/main.go:213`) and deletes on `family_expires_at < now OR revoked_at < now-30d` (`refreshtoken/gorm_repo.go:86-94`). Logout revokes the whole family. Accepted tolerance: the daily job can delete up to one day after the stated limit.
+- **Reset token:** valid 1 hour (`cmd/api/main.go:104`), SHA-256 hashed (`password_reset.go:202`), purged once used or one day after expiry (`passwordreset/gorm_repo.go:55-61`), so within two days.
+- **Rate limits:** login, register and SSO 10 per minute; refresh 60 per minute; forgot and reset 5 per 15 minutes per IP; delete 5 per 15 minutes per user (`cmd/api/ratelimits.go`).
+- **Password hashing:** bcrypt `DefaultCost` (`auth/service.go:19`); room passwords are bcrypt too (`room/handler.go:489`).
+- **Honor:** 0 to 100, half-life 90 days, "new player" below 5 matches (`user/honor.go:9-13,130`). Rooms gate on `min_honor` or `allow_new_players` (`room/handler.go:63-80`).
+- **Usernames:** SSO usernames are `player_` plus 6 characters from `[a-z0-9]` (`sso_handler.go:22-24`). The cooldown is 30 days and the first change is free (`user/validate.go:15`; `username_changed_at` left NULL). `[a-zA-Z0-9_]` only, so a username cannot look like an email.
+- **Delete account:** password, or the exact username for passwordless accounts. Refused while seated in a waiting or playing room. Revokes access tokens, closes the WebSocket, deletes the avatar and clears the cookie (`auth/account_delete_handler.go`). Covers every `users` column (`schema_coverage_test.go`). UI path **Settings → Danger zone → Delete account**, and the mk labels match `mk.json`.
+- **Coins:** starting balance 5000, a daily reward (1000 rising by 162 a day to 3100), room and Quick Play stakes (`wallet/service.go:6-9`). There is no payment code. Buy Me a Coffee is a plain outbound link (`supportLinks.ts:1`).
+- **Chat:** not persisted; rejection logs carry only the user id and a rune count (`chat/handler.go:79`, `whisper_handler.go:70`).
+- **Avatar:** re-encoded to WebP and served with `Cache-Control: public, max-age=86400` (`avatar/handler.go:48`); the replaced pair is deleted (`:142`).
+- **Browser storage:** exactly `beljot.lang`, `beljot.theme` (localStorage), and `beljot.theme.picked`, `beljot:preload-error-reload`, `beljot:version-reloaded-for`, `beljot:lobby-idx` (sessionStorage). There is no IndexedDB, no service worker and no `document.cookie`. The only third-party script is `accounts.google.com/gsi/client`.
+- **Visibility:** the public profile DTO has no email (`user/handler.go` `PublicProfileResponse`); `robots.txt` disallows `/players/`; every profile, match and leaderboard route sits behind the auth middleware.
+- **Third-party facts:** the Resend DPA (Plus Five Five, Inc.) includes the SCCs, and Resend is DPF-certified. The АЗЛП address, phone and email were checked against the agency's own publications.
+- **Owner-asserted, not verifiable from the repo (§9):** Contabo Germany; nightly backups kept 14 days; Docker and Traefik logs kept 14 days; Resend EU region; Cloudflare DPA and Bot Fight Mode (`__cf_bm`); the database not reachable from the internet; the Proton mailbox.
+
+### 15.3 en and mk parity and branding
+
+- **Structure:** the same 37 (privacy) and 17 (terms) headings, the same table rows and bullet counts.
+- **Exact matches:** every email, URL, storage key, in-app link and number is identical in both languages. The only difference is "14-ти кат", the АЗЛП floor number.
+- **Script:** mk is all Cyrillic except names, keys, URLs and the standard abbreviations (GDPR, IP, JSON, HTTPS, EXIF/GPS, DPO).
+- **Branding:** "Beljot.online" is used for the service, "Belot" and „бељот“ for the game.
+- **Optional terminology note:** the terminology memory prefers „партија“ for a match in mk prose, but the mk texts use „меч“, as the UI does. Left as is because it is the owner's call.
+
+### 15.4 New findings (code side; the texts already describe current behaviour)
+
+**G-35 RECOMMENDATION: the reset token lands in the proxy log.** Art. 5(1)(c), Art. 32.
+- The reset link carries the token in the query (`password_reset.go:111`), and Traefik logs the full URI.
+- The reset page's same-origin API calls also send the full URL as `Referer`, because of `strict-origin-when-cross-origin` (`client/nginx.conf`).
+- The token is single-use and valid for 1 hour, and only the owner reads the log, so the risk is low. The policy now discloses it.
+- Fix: put the token in the URL fragment (`/reset-password#token=…`) and read it from `location.hash`. A fragment never reaches a server.
+
+**G-36 RECOMMENDATION: the rate limiter forgets IP addresses lazily.**
+- `Limiter.sweep` runs only inside `Take` (`ratelimit/limiter.go:31-61`). An address on a rarely used endpoint (reset) stays in memory until the next request to that endpoint, or until a restart.
+- Fix: a ticker that calls `sweep` every window.
+- The policy wording ("stops counting after at most 15 minutes") is accurate either way.
+
+**G-37 RECOMMENDATION: suspension is a contractual right with no code behind it.**
+- Terms 9.3 and 10.2 reserve "restrict, suspend or close". The code has no ban or suspension flag.
+- Closing works through `erase_user.sql`, and renaming through SQL.
+- Acceptable at launch, since it is a reservation of rights and not a description of a feature. Add `users.suspended_until`, checked at login, refresh and WebSocket connect, when it is first needed.
+
+**G-38 WARNING (owner, deploy): the legal files must be mounted in production.**
+- `client/public/legal/` is excluded from git (`.gitignore:67`) and from the image (`client/.dockerignore`: `public/legal`). The CI checkout never contains it.
+- Production must mount the four files read-only at `/usr/share/nginx/html/legal/` in the client service, readable by the unprivileged nginx user. Without them, `/privacy` and `/terms` show the "temporarily unavailable" state, and G-02 is not closed.
+- Recording the mount in the deployment notes is advised.
+- Optional: add `text/markdown` to `gzip_types`.
+
+**G-32 residual:** avatars uploaded before `690eb454` is deployed keep `max-age=31536000, immutable`. "Copies in caches may persist for a short time" holds for them only if the Cloudflare edge cache is purged on erasure. The runbook covers this manually; the Edge TTL 1-day cache rule from §14.2 would make it automatic.
+
+**Runbook nits (`DATA_REQUESTS.md`):**
+- §2 still says the edge cache can last "up to a year"; that is now true only for older avatars.
+- The reply template signs off as "Beljot"; use "Beljot.online".
+
+### 15.5 Reachability, new tabs and git exclusion
+
+- **Public routes:** `/privacy` and `/terms` sit under `PublicContentLayout`, outside `ProtectedRoute` (`App.tsx:90-94`), and render for logged-out and logged-in visitors.
+- **New tabs:** every entry link opens in a new tab with `rel="noopener noreferrer"`:
+  - the landing footer (`LandingFooter.tsx:19-20,32-33`)
+  - the register checkbox and the Google notice (`RegisterPage.tsx:239,249,297,307`)
+  - the login Google notice (`LoginPage.tsx:206-218`)
+  - Settings → Privacy (`PrivacySection.tsx:46-56`)
+- **Links inside the documents:** external links open in a new tab, `mailto:` links are left alone, and in-app links go through the router (`LegalMarkdown.tsx:14-33`).
+- **Missing file:** a 404, an HTML response or an HTML body is rejected (`shared/api/legal.ts`), and the page shows the unavailable alert with the contact email (`LegalPage.tsx` `LegalDocumentUnavailable`). Tested (`PrivacyPage.test.tsx:140`); the legal, settings and landing tests pass (66 of 66).
+- **nginx `/legal/`:** `.md` is served as `text/markdown; charset=utf-8` with `try_files $uri =404`, so it never falls back to the SPA. `Cache-Control: no-cache` comes from the `map`, and the server-level security headers are inherited because the location has no `add_header` of its own.
+- **Git and image exclusion:** `git check-ignore` matches `client/public/legal/privacy.en.md` (`.gitignore:67`), `git ls-files client/public/legal` is empty, and `client/.dockerignore` lists `public/legal`. The deploy workflow builds from a fresh checkout (`deploy.yml:104`), so the files cannot reach the GHCR image.

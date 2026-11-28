@@ -1,6 +1,6 @@
 # Data requests and breach runbook
 
-How Beljot handles GDPR requests from players (access, export, erasure) and what to do after a personal-data breach. It complements `GDPR_COMPLIANCE_AUDIT.md` (§7 erasure procedure).
+How Beljot.online handles GDPR requests from players (access, export, erasure) and what to do after a personal-data breach. It complements `GDPR_COMPLIANCE_AUDIT.md` (§7 erasure procedure).
 
 ## 1. How players ask
 
@@ -13,7 +13,7 @@ How Beljot handles GDPR requests from players (access, export, erasure) and what
 
 `DELETE /api/v1/users/:id` runs the §7 anonymisation in one transaction, then deletes the avatar from S3, clears the refresh cookie, closes the player's WebSocket and rejects their remaining access token. Nothing else is needed from the admin, except:
 
-- **Cloudflare cache:** the avatar may still be served from the edge for up to a year. The server logs `account erased` with `userID` and `avatarPrefix`; when the prefix is not empty, purge its two URLs (step 3 in §3). If the same request logged `avatar: best-effort delete failed`, delete the two objects from S3 by hand too.
+- **Cloudflare cache:** avatars uploaded since 28 Nov 2026 drop out of the edge cache within a day; older uploads carry a 1-year cache header and may still be served from the edge until purged. The server logs `account erased` with `userID` and `avatarPrefix`; when the prefix is not empty, purge its two URLs (step 3 in §3). If the same request logged `avatar: best-effort delete failed`, delete the two objects from S3 by hand too.
 
 ## 3. Admin erasure (emailed request)
 
@@ -40,12 +40,12 @@ Use this when the player cannot use the Settings button. `server/scripts/erase_u
 
    > Hello,
    >
-   > Your Beljot account has been deleted on <date>. We removed your email, username, password, linked Google sign-in, profile picture, friends, season standings and settings. Results of matches you played stay in the other players' history, but without your name or any link to you.
+   > Your Beljot.online account has been deleted on <date>. We removed your email, username, password, linked Google sign-in, profile picture, friends, season standings and settings. Results of matches you played stay in the other players' history, but without your name or any link to you.
    >
    > Server logs and backups that may still contain your data are deleted automatically within 14 days.
    >
    > Regards,
-   > Beljot
+   > Beljot.online
 
 ## 4. Export (access and portability)
 
@@ -55,7 +55,7 @@ Use this when the player cannot use the Settings button. `server/scripts/erase_u
 psql "$BELJOT_DB_URL" -X -q -v uid=<id> -f server/scripts/export_user.sql > beljot-export-<id>.json
 ```
 
-Send the file to the account's email address, then delete your local copy. Reply text: "Attached is all personal data Beljot holds about your account, as JSON. Server logs (kept 14 days) are not included."
+Send the file to the account's email address, then delete your local copy. Reply text: "Attached is all personal data Beljot.online holds about your account, as JSON. Server logs (kept 14 days) are not included."
 
 ## 5. Retention that runs by itself
 
