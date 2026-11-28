@@ -44,8 +44,8 @@ const (
 
 	keyPrefix = "avatars/"
 
-	contentTypeWebP       = "image/webp"
-	cacheControlImmutable = "public, max-age=31536000, immutable"
+	contentTypeWebP    = "image/webp"
+	cacheControlAvatar = "public, max-age=86400"
 )
 
 // UploadResponse is the body of a successful PUT: the two derived public URLs
@@ -275,10 +275,20 @@ func (h *Handler) render(ctx context.Context, src *Source) (large, small []byte,
 
 // putPair writes the 256 then the 128 derivative under prefix.
 func (h *Handler) putPair(ctx context.Context, prefix string, large, small []byte) error {
-	if err := h.store.Put(ctx, user.AvatarObjectKey(prefix, user.AvatarSizeLarge), contentTypeWebP, cacheControlImmutable, large); err != nil {
+	if err := h.store.Put(ctx, user.AvatarObjectKey(prefix, user.AvatarSizeLarge), contentTypeWebP, cacheControlAvatar, large); err != nil {
 		return err
 	}
-	return h.store.Put(ctx, user.AvatarObjectKey(prefix, user.AvatarSizeSmall), contentTypeWebP, cacheControlImmutable, small)
+	return h.store.Put(ctx, user.AvatarObjectKey(prefix, user.AvatarSizeSmall), contentTypeWebP, cacheControlAvatar, small)
+}
+
+// DeleteStored removes the pair under prefix for a caller outside this package, such as account erasure.
+// Without object storage configured it only logs the orphaned prefix.
+func (h *Handler) DeleteStored(ctx context.Context, userID uint, prefix, reason string) {
+	if h.store == nil {
+		slog.Warn("avatar: storage not configured, objects left in place", "userID", userID, "prefix", prefix, "reason", reason)
+		return
+	}
+	h.deletePair(ctx, userID, prefix, reason)
 }
 
 // deletePair removes both derivatives under prefix, best-effort: a failure is

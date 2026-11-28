@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/emilijan/beljot/server/internal/apperr"
@@ -765,6 +766,47 @@ func TestLogin_NonExistentEmail(t *testing.T) {
 	var errResp map[string]map[string]string
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
 	assert.Equal(t, "INVALID_CREDENTIALS", errResp["error"]["code"])
+}
+
+type recordedCompare struct{ hash, password string }
+
+func recordPasswordChecks(h *AuthHandler) *[]recordedCompare {
+	var calls []recordedCompare
+	h.checkPassword = func(hash, password string) error {
+		calls = append(calls, recordedCompare{hash, password})
+		return CheckPassword(hash, password)
+	}
+	return &calls
+}
+
+func TestLogin_UnknownEmailStillRunsBcryptCompare(t *testing.T) {
+	h, e := setupHandler()
+	calls := recordPasswordChecks(h)
+
+	rec := doLogin(e, `{"email":"noone@example.com","password":"password123"}`)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.Len(t, *calls, 1, "an unknown email costs one bcrypt compare, like a known one")
+	assert.Equal(t, dummyPasswordHash, (*calls)[0].hash)
+	assert.Equal(t, "password123", (*calls)[0].password)
+}
+
+func TestLogin_PasswordlessAccountStillRunsBcryptCompare(t *testing.T) {
+	h, e := setupHandler()
+	require.NoError(t, h.userRepo.Create(&user.User{Email: "sso@example.com", Username: "ssoonly"}))
+	calls := recordPasswordChecks(h)
+
+	rec := doLogin(e, `{"email":"sso@example.com","password":"password123"}`)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.Len(t, *calls, 1)
+	assert.Equal(t, dummyPasswordHash, (*calls)[0].hash)
+}
+
+func TestDummyPasswordHash_MatchesRealHashCost(t *testing.T) {
+	cost, err := bcrypt.Cost([]byte(dummyPasswordHash))
+	require.NoError(t, err)
+	assert.Equal(t, bcrypt.DefaultCost, cost)
 }
 
 func TestLogin_NormalizesEmail(t *testing.T) {

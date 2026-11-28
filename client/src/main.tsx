@@ -1,4 +1,5 @@
 import "@/shared/i18n/i18n";
+import "@/fonts.css";
 import "@/index.css";
 
 import { StrictMode } from "react";

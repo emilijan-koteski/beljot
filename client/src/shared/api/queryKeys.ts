@@ -1,3 +1,5 @@
+import type { LegalDocument, LegalDocumentLanguage } from "@/shared/api/legal";
+
 export const queryKeys = {
   rooms: {
     all: ["rooms"] as const,
@@ -35,6 +37,10 @@ export const queryKeys = {
     list: () => ["friends", "list"] as const,
     requests: () => ["friends", "requests"] as const,
     status: (id: number) => ["friends", "status", id] as const,
+  },
+  legal: {
+    document: (doc: LegalDocument, lang: LegalDocumentLanguage) =>
+      ["legal", "document", doc, lang] as const,
   },
   lobby: {
     stats: ["lobby", "stats"] as const,

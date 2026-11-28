@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { PasswordToggle } from "@/shared/components/PasswordToggle";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -15,13 +15,25 @@ interface FieldErrors {
   confirm?: string;
 }
 
+/** Reads the reset token from the URL fragment, falling back to the legacy ?token= query. */
+function readResetToken(hash: string, search: URLSearchParams): string {
+  return new URLSearchParams(hash.replace(/^#/, "")).get("token") ?? search.get("token") ?? "";
+}
+
 export function ResetPasswordPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const resetMutation = useResetPasswordMutation();
 
-  const token = searchParams.get("token") ?? "";
+  const [token] = useState(() => readResetToken(location.hash, searchParams));
+
+  useEffect(() => {
+    if (location.hash !== "" || searchParams.has("token")) {
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.hash, location.pathname, navigate, searchParams]);
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -64,6 +76,8 @@ export function ResetPasswordPage() {
           setErrors({ password: t("auth.resetPassword.errors.passwordTooShort") });
         } else if (err.code === "PASSWORD_TOO_LONG") {
           setErrors({ password: t("auth.resetPassword.errors.passwordTooLong") });
+        } else if (isRateLimited(err)) {
+          toast.error(t("common.tooManyAttempts"));
         } else {
           toast.error(t("auth.resetPassword.errors.resetFailed"));
         }

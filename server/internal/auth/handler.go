@@ -62,6 +62,9 @@ type AuthHandler struct {
 	accessTTL    time.Duration
 	idleTTL      time.Duration
 	absoluteTTL  time.Duration
+
+	usernameSuffix func() string
+	checkPassword  func(hash, password string) error
 }
 
 func NewAuthHandler(
@@ -85,6 +88,9 @@ func NewAuthHandler(
 		accessTTL:    accessTTL,
 		idleTTL:      idleTTL,
 		absoluteTTL:  absoluteTTL,
+
+		usernameSuffix: randomUsernameSuffix,
+		checkPassword:  CheckPassword,
 	}
 }
 
@@ -101,12 +107,17 @@ func (h *AuthHandler) setRefreshCookie(c echo.Context, token string, maxAge int)
 }
 
 func (h *AuthHandler) clearRefreshCookie(c echo.Context) {
+	clearRefreshCookie(c, h.env)
+}
+
+// clearRefreshCookie expires the httpOnly refresh cookie with the same attributes that set it.
+func clearRefreshCookie(c echo.Context, env string) {
 	c.SetCookie(&http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/api/v1/auth",
 		HttpOnly: true,
-		Secure:   h.env != "development",
+		Secure:   env != "development",
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
@@ -282,11 +293,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("finding user: %w", err)
 	}
-	if u == nil {
+	if u == nil || u.PasswordHash == "" {
+		_ = h.checkPassword(dummyPasswordHash, req.Password)
 		return apperr.ErrInvalidCredentials
 	}
 
-	if err := CheckPassword(u.PasswordHash, req.Password); err != nil {
+	if err := h.checkPassword(u.PasswordHash, req.Password); err != nil {
 		return apperr.ErrInvalidCredentials
 	}
 

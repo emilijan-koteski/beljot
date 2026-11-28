@@ -148,10 +148,10 @@ Currently, the Browse Rooms view shows `RoomCard` components with only summary i
 ├─────────────────────────────────────────────────┤
 │  Team A             Team B                       │  ← expanded detail (new)
 │  ┌────────┐        ┌────────┐                    │
-│  │ Kiro   │        │ Empty  │                    │
+│  │ Ana    │        │ Empty  │                    │
 │  └────────┘        └────────┘                    │
 │  ┌────────┐        ┌────────┐                    │
-│  │ Empty  │        │ Irena  │                    │
+│  │ Empty  │        │ Marko  │                    │
 │  └────────┘        └────────┘                    │
 │                                         [Join]   │
 └─────────────────────────────────────────────────┘

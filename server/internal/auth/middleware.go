@@ -12,6 +12,12 @@ import (
 )
 
 func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
+	return AuthMiddlewareWithRevocations(jwtSecret, nil)
+}
+
+// AuthMiddlewareWithRevocations is AuthMiddleware that also rejects tokens of users in revoked,
+// so an erased account's still-valid access token stops working at once.
+func AuthMiddlewareWithRevocations(jwtSecret string, revoked *RevokedUsers) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			authHeader := c.Request().Header.Get("Authorization")
@@ -40,6 +46,9 @@ func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 
 			userID, err := strconv.ParseUint(claims.Subject, 10, 64)
 			if err != nil {
+				return apperr.ErrUnauthorized
+			}
+			if revoked.IsRevoked(uint(userID)) {
 				return apperr.ErrUnauthorized
 			}
 

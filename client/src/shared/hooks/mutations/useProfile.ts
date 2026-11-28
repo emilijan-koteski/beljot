@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProfileResponse, UpdateUsernameRequest } from "@/shared/api/profile";
 import { removeAvatar, updateUsername, uploadAvatar } from "@/shared/api/profile";
 import { queryKeys } from "@/shared/api/queryKeys";
+import { deleteAccount, type DeleteAccountRequest } from "@/shared/api/users";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 /** Rename the user, patching both the profile cache and the auth store so the page and the TopBar update without a refetch. */
@@ -66,6 +67,18 @@ export function useRemoveAvatarMutation(userId: number) {
     mutationFn: () => removeAvatar(userId),
     onSuccess: () => {
       adoptAvatar(queryClient, userId, null, null);
+    },
+  });
+}
+
+/** Erase the signed-in account, then end the session locally; the server has already cleared the refresh cookie. */
+export function useDeleteAccountMutation(userId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: DeleteAccountRequest) => deleteAccount(userId, req),
+    onSuccess: () => {
+      useAuthStore.getState().endSession();
+      queryClient.clear();
     },
   });
 }

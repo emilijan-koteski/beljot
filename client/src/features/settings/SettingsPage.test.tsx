@@ -113,6 +113,7 @@ describe("SettingsPage", () => {
       "settings-game",
       "profile-audio",
       "profile-invites",
+      "settings-danger",
     ]) {
       expect(screen.getByTestId(id), id).toBeInTheDocument();
     }
@@ -186,7 +187,7 @@ describe("SettingsPage", () => {
     renderPage();
 
     const nav = screen.getByTestId("settings-nav");
-    expect(within(nav).getAllByRole("button")).toHaveLength(6);
+    expect(within(nav).getAllByRole("button")).toHaveLength(7);
     await user.click(screen.getByTestId("settings-nav-sound"));
 
     expect(screen.getByTestId("settings-nav-sound")).toHaveAttribute("aria-current", "true");

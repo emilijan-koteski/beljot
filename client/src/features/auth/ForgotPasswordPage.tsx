@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { AltLink, AuthCard, Field } from "@/features/auth/components/AuthCard";
+import { isRateLimited } from "@/shared/api/axiosClient";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { useForgotPasswordMutation } from "@/shared/hooks/mutations/useAuth";
@@ -36,8 +37,12 @@ export function ForgotPasswordPage() {
     try {
       await forgotMutation.mutateAsync({ email });
       setSubmitted(true);
-    } catch {
-      toast.error(t("auth.forgotPassword.errors.requestFailed"));
+    } catch (err) {
+      toast.error(
+        isRateLimited(err)
+          ? t("common.tooManyAttempts")
+          : t("auth.forgotPassword.errors.requestFailed"),
+      );
     }
   }
 

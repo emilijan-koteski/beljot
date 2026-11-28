@@ -252,7 +252,7 @@ func TestUpload_StoresTwoImmutableWebPsAndReturnsBothURLs(t *testing.T) {
 		obj, ok := hs.store.objects[key]
 		require.True(t, ok, key)
 		assert.Equal(t, "image/webp", obj.contentType)
-		assert.Equal(t, "public, max-age=31536000, immutable", obj.cacheControl)
+		assert.Equal(t, "public, max-age=86400", obj.cacheControl)
 		decodeSquareWebP(t, obj.body, size)
 	}
 	assert.Empty(t, hs.store.deletes, "nothing to replace")

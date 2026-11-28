@@ -81,7 +81,7 @@ const rooms = [
   room(6, "Kafanska", { playerCount: 2, isPrivate: false, minHonor: 0, players: [seat(6, 0, 26, "dragan"), seat(6, 2, 27, "sneza")] }),
   room(4, "Turnir", { status: "in_progress", playerCount: 4, players: [seat(4, 0, 28, "boban"), seat(4, 1, 29, "lile"), seat(4, 2, 30, "kire"), seat(4, 3, 31, "goce")] }),
 ];
-const friends = ["Natalija", "Cece", "stef", "DiC"].map((n, i) => ({ id: i + 7, username: n, avatarUrl: null, online: i < 2 }));
+const friends = ["Natalija", "Cece", "stef", "Dimceto"].map((n, i) => ({ id: i + 7, username: n, avatarUrl: null, online: i < 2 }));
 
 const card = (id) => ({ rank: id[0], suit: id[1] });
 const player = (s, userId, username, level, hand, handCount) => ({

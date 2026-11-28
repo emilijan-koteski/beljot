@@ -572,3 +572,23 @@ func TestRouter_SystemPrefix(t *testing.T) {
 		t.Fatal("timed out waiting for system handler")
 	}
 }
+
+func TestHub_DisconnectUser(t *testing.T) {
+	server, hub := setupTestServer(t)
+
+	conn := dialWS(t, server)
+	defer func() { _ = conn.CloseNow() }()
+	sendAuthMessage(t, conn, generateTestToken(t, 700))
+	readMessage(t, conn)
+	require.Eventually(t, func() bool { return hub.IsConnected(700) }, time.Second, 10*time.Millisecond)
+
+	hub.DisconnectUser(700)
+	hub.DisconnectUser(701)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _, err := conn.Read(ctx)
+	require.Error(t, err)
+	assert.Equal(t, websocket.StatusPolicyViolation, websocket.CloseStatus(err))
+	require.Eventually(t, func() bool { return !hub.IsConnected(700) }, time.Second, 10*time.Millisecond)
+}

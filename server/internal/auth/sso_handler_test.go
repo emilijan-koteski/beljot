@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -164,13 +165,14 @@ func TestSSOLogin_RegistersNewUser(t *testing.T) {
 
 	data := decodeAuthData(t, rec)
 	assert.Equal(t, "new@example.com", data.Email)
-	assert.Equal(t, "NewPlayer", data.Username)
+	assert.Regexp(t, generatedUsernamePattern, data.Username)
 	assert.NotEmpty(t, data.Token)
 	assert.True(t, hasRefreshCookie(rec), "SSO registration must open a refresh session")
 
 	require.Len(t, ur.users, 1)
 	u := ur.users[0]
 	assert.Equal(t, "", u.PasswordHash)
+	assert.Nil(t, u.UsernameChangedAt, "the first rename of a generated username stays free")
 	assert.Equal(t, 5000, u.WalletBalance)
 	assert.Equal(t, 0, u.LoginStreakDays)
 	assert.Equal(t, "en", u.LanguagePreference)
@@ -520,89 +522,60 @@ func TestCheckPassword_EmptyHashFails(t *testing.T) {
 	assert.Error(t, CheckPassword("", ""))
 }
 
-func TestSSOLogin_UsernameGeneration(t *testing.T) {
+var generatedUsernamePattern = regexp.MustCompile(`^player_[a-z0-9]{6}$`)
+
+func TestSSOLogin_UsernameIsNeutral(t *testing.T) {
 	tests := []struct {
 		name        string
 		displayName string
 		email       string
-		existing    []string
-		want        string
 	}{
-		{
-			name:        "display name sanitized to username alphabet",
-			displayName: "Ана Мария-Смит",
-			email:       "ana@example.com",
-			want:        "ana",
-		},
-		{
-			name:        "latin display name keeps letters and digits",
-			displayName: "John Smith 3rd!",
-			email:       "john@example.com",
-			want:        "JohnSmith3rd",
-		},
-		{
-			name:        "email local-part used when display name empty",
-			displayName: "",
-			email:       "local.part+tag@example.com",
-			want:        "localparttag",
-		},
-		{
-			name:        "player fallback when nothing sanitizes",
-			displayName: "!!",
-			email:       "--@example.com",
-			want:        "player",
-		},
-		{
-			name:        "long display name clamped to 20",
-			displayName: "AVeryLongDisplayNameIndeedYes",
-			email:       "long@example.com",
-			want:        "AVeryLongDisplayName",
-		},
-		{
-			name:        "collision gets numeric suffix",
-			displayName: "Popular Name",
-			email:       "popular@example.com",
-			existing:    []string{"PopularName"},
-			want:        "PopularName1",
-		},
-		{
-			name:        "second collision increments the suffix",
-			displayName: "Popular Name",
-			email:       "popular@example.com",
-			existing:    []string{"PopularName", "PopularName1"},
-			want:        "PopularName2",
-		},
-		{
-			name:        "suffix stays within the 20-char clamp",
-			displayName: "ExactlyTwentyCharsAB",
-			email:       "clamp@example.com",
-			existing:    []string{"ExactlyTwentyCharsAB"},
-			want:        "ExactlyTwentyCharsA1",
-		},
+		{name: "latin display name", displayName: "John Smith", email: "john.smith@example.com"},
+		{name: "cyrillic display name", displayName: "Ана Мария", email: "ana@example.com"},
+		{name: "no display name", displayName: "", email: "local.part@example.com"},
 	}
-
-	for i, tc := range tests {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			e, ur, _, fp := setupSSOHandler()
-			for j, taken := range tc.existing {
-				require.NoError(t, ur.Create(&user.User{
-					Email:    "taken" + uniqSuffix(i, j) + "@example.com",
-					Username: taken,
-				}))
-			}
+			e, _, _, fp := setupSSOHandler()
 			fp.add("cred-1", verifiedIdentity("sub-1", tc.email, tc.displayName))
 
 			rec := doSSOLogin(e, "fakeprov", `{"credential":"cred-1"}`)
 			require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
-			data := decodeAuthData(t, rec)
-			assert.Equal(t, tc.want, data.Username)
+			username := decodeAuthData(t, rec).Username
+			assert.Regexp(t, generatedUsernamePattern, username)
+			_, err := user.ValidateUsername(username)
+			require.NoError(t, err)
+			lower := strings.ToLower(username)
+			assert.NotContains(t, lower, "john")
+			assert.NotContains(t, lower, "smith")
+			assert.NotContains(t, lower, "local")
 		})
 	}
 }
 
-// uniqSuffix builds a unique email fragment for pre-seeded users in the
-// username-generation table test.
-func uniqSuffix(i, j int) string {
-	const digits = "0123456789"
-	return string(digits[i%10]) + string(digits[j%10])
+func TestSSOLogin_GeneratedUsernameRetriesOnCollision(t *testing.T) {
+	ur := newMockUserRepo()
+	fp := newFakeProvider()
+	h := NewAuthHandler(ur, newMockRefreshRepo(), newMockIdentityRepo(), identity.Registry{fp.Name(): fp}, "test-jwt-secret", "development", testAccessTTL, testIdleTTL, testAbsoluteTTL)
+	suffixes := []string{"aaaaaa", "aaaaaa", "bbbbbb"}
+	h.usernameSuffix = func() string {
+		next := suffixes[0]
+		suffixes = suffixes[1:]
+		return next
+	}
+	require.NoError(t, ur.Create(&user.User{Email: "first@example.com", Username: "player_aaaaaa"}))
+	e := echo.New()
+	e.HTTPErrorHandler = testErrorHandler
+	e.POST("/api/v1/auth/sso/:provider", h.SSOLogin)
+	fp.add("cred-1", verifiedIdentity("sub-1", "new@example.com", "New Player"))
+
+	rec := doSSOLogin(e, "fakeprov", `{"credential":"cred-1"}`)
+	require.Equal(t, http.StatusCreated, rec.Code, "body: %s", rec.Body.String())
+	assert.Equal(t, "player_bbbbbb", decodeAuthData(t, rec).Username)
+}
+
+func TestRandomUsernameSuffix_UsesTheUsernameAlphabet(t *testing.T) {
+	for range 50 {
+		assert.Regexp(t, `^[a-z0-9]{6}$`, randomUsernameSuffix())
+	}
 }

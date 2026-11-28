@@ -1,4 +1,12 @@
-import { Gamepad2, KeyRound, LogOut, ShieldCheck, UserRound, Volume2 } from "lucide-react";
+import {
+  Gamepad2,
+  KeyRound,
+  LogOut,
+  ShieldCheck,
+  TriangleAlert,
+  UserRound,
+  Volume2,
+} from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -10,6 +18,7 @@ import { cn } from "@/shared/lib/utils";
 import { useAuthStore } from "@/shared/stores/authStore";
 
 import { AccountSection } from "./components/AccountSection";
+import { DeleteAccountSection } from "./components/DeleteAccountSection";
 import { GameSection } from "./components/GameSection";
 import { PrivacySection } from "./components/PrivacySection";
 import type { SettingsSectionId } from "./components/SettingsGroup";
@@ -22,6 +31,7 @@ const SECTIONS: Array<{ id: SettingsSectionId; icon: ReactNode }> = [
   { id: "game", icon: <Gamepad2 /> },
   { id: "sound", icon: <Volume2 /> },
   { id: "privacy", icon: <ShieldCheck /> },
+  { id: "danger", icon: <TriangleAlert /> },
 ];
 
 /** Follows which settings group sits at the top of the window, so the desktop section list can mark it. */
@@ -46,7 +56,7 @@ function useActiveSection(enabled: boolean) {
 }
 
 /**
- * Account settings at /settings: account, sign-in, game, sound and privacy, then Log out.
+ * Account settings at /settings: account, sign-in, game, sound and privacy, then Log out and account deletion.
  * One column on a phone, two on a tablet, and a sticky section list beside the groups on a desktop.
  */
 export function SettingsPage() {
@@ -135,6 +145,7 @@ export function SettingsPage() {
             <GameSection wide />
             <SoundSection />
             <PrivacySection />
+            <DeleteAccountSection />
           </div>
         </div>
       </PageShell>
@@ -151,6 +162,7 @@ export function SettingsPage() {
             <SignInSection />
             <PrivacySection />
             {logoutButton}
+            <DeleteAccountSection />
           </div>
           <div className="flex flex-col gap-5">
             <GameSection />
@@ -170,6 +182,7 @@ export function SettingsPage() {
       <SoundSection />
       <PrivacySection />
       {logoutButton}
+      <DeleteAccountSection />
     </PageShell>
   );
 }

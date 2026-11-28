@@ -185,6 +185,24 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("form-error")).toHaveTextContent("Invalid email or password");
   });
 
+  it("shows the too-many-attempts message when login is rate limited", async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValueOnce(
+      new FetchError(429, "TOO_MANY_ATTEMPTS", "too many attempts, try again later"),
+    );
+
+    renderLoginPage();
+
+    await user.type(screen.getByTestId("email-input"), "test@example.com");
+    await user.type(screen.getByTestId("password-input"), "password123");
+    await user.click(screen.getByTestId("submit-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("form-error")).toHaveTextContent("Too many attempts");
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it("shows toast for non-401 errors", async () => {
     const user = userEvent.setup();
     mockLogin.mockRejectedValueOnce(new FetchError(500, "INTERNAL_ERROR", "Something went wrong"));
@@ -493,6 +511,10 @@ describe("LoginPage", () => {
       expect(screen.getByTestId("sso-consent-note")).toBeInTheDocument();
       expect(screen.getByTestId("sso-terms-link")).toHaveAttribute("href", "/terms");
       expect(screen.getByTestId("sso-privacy-link")).toHaveAttribute("href", "/privacy");
+      for (const id of ["sso-terms-link", "sso-privacy-link"]) {
+        expect(screen.getByTestId(id)).toHaveAttribute("target", "_blank");
+        expect(screen.getByTestId(id)).toHaveAttribute("rel", "noopener noreferrer");
+      }
     });
 
     it("ignores a second GIS callback while the first sign-in is pending", async () => {

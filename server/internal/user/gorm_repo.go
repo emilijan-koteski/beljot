@@ -38,9 +38,10 @@ func (r *GormUserRepository) Create(user *User) error {
 	return nil
 }
 
-// Delete soft-deletes the user, which frees their email and username under the partial unique indexes.
+// Delete hard-deletes a user nothing references yet, such as the SSO sign-up rollback.
+// It never leaves a soft-deleted row behind that still holds the email.
 func (r *GormUserRepository) Delete(id uint) error {
-	result := r.db.Delete(&User{}, id)
+	result := r.db.Unscoped().Delete(&User{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

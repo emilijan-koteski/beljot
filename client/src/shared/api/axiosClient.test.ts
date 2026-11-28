@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/shared/stores/authStore";
 
-import { axiosClient, axiosPublic, FetchError, refreshAccessToken } from "./axiosClient";
+import {
+  axiosClient,
+  axiosPublic,
+  FetchError,
+  isRateLimited,
+  refreshAccessToken,
+} from "./axiosClient";
 
 describe("axiosClient request deadline", () => {
   it.each([
@@ -99,5 +105,65 @@ describe("refreshAccessToken re-hydrates the avatar", () => {
 
     expect(useAuthStore.getState().user).not.toBeNull();
     expect(useAuthStore.getState().user?.avatarUrl).toBeNull();
+  });
+});
+
+describe("rate-limited responses never end the session", () => {
+  const rejected = () => {
+    const handler = axiosClient.interceptors.response as unknown as {
+      handlers: { rejected: (e: unknown) => Promise<unknown> }[];
+    };
+    return handler.handlers[0]!.rejected;
+  };
+
+  const axiosErrorWithStatus = (status: number, body: unknown) =>
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      isAxiosError: true,
+      config: { headers: {} },
+      response: { status, data: body, statusText: "" },
+    });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useAuthStore.setState({ token: null, user: null, isLoading: false });
+  });
+
+  it("surfaces a 429 as TOO_MANY_ATTEMPTS without refreshing", async () => {
+    const post = vi.spyOn(axiosPublic, "post");
+    const error = axiosErrorWithStatus(429, {
+      error: { code: "TOO_MANY_ATTEMPTS", message: "too many attempts, try again later" },
+    });
+
+    await expect(rejected()(error)).rejects.toMatchObject({
+      status: 429,
+      code: "TOO_MANY_ATTEMPTS",
+    });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("keeps the user signed in when the refresh after a 401 is rate limited", async () => {
+    useAuthStore.setState({ token: "stale", isLoading: false });
+    const logout = vi.fn();
+    useAuthStore.setState({ logout });
+    vi.spyOn(axiosPublic, "post").mockRejectedValue(axiosErrorWithStatus(429, {}));
+
+    await expect(rejected()(axiosErrorWithStatus(401, {}))).rejects.toMatchObject({
+      status: 429,
+      code: "TOO_MANY_ATTEMPTS",
+    });
+    expect(logout).not.toHaveBeenCalled();
+  });
+});
+
+describe("isRateLimited", () => {
+  it("recognises a 429 FetchError and a raw 429 axios error only", () => {
+    expect(isRateLimited(new FetchError(429, "TOO_MANY_ATTEMPTS", "x"))).toBe(true);
+    expect(isRateLimited(new FetchError(401, "UNAUTHORIZED", "x"))).toBe(false);
+    expect(
+      isRateLimited(
+        Object.assign(new Error("x"), { isAxiosError: true, response: { status: 429 } }),
+      ),
+    ).toBe(true);
+    expect(isRateLimited(new Error("x"))).toBe(false);
   });
 });

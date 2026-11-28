@@ -105,6 +105,18 @@ describe("LandingPage", () => {
     expect(within(footer).getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
   });
 
+  it("opens the footer's legal links in a new tab and keeps Rules in the same tab", () => {
+    renderAt("/");
+
+    const footer = screen.getByRole("contentinfo");
+    for (const name of ["Privacy", "Terms"]) {
+      const link = within(footer).getByRole("link", { name });
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+    expect(within(footer).getByRole("link", { name: "Rules" })).not.toHaveAttribute("target");
+  });
+
   it("links the footer to the social profiles in a new tab", () => {
     renderAt("/");
 

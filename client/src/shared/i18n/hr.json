@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "close": "Zatvori",
     "showPassword": "Prikaži lozinku",
     "hidePassword": "Sakrij lozinku",
@@ -10,7 +10,8 @@
       "backToLobby": "Natrag u lobi"
     },
     "done": "Gotovo",
-    "cancel": "Odustani"
+    "cancel": "Odustani",
+    "tooManyAttempts": "Previše pokušaja. Pokušaj ponovno za nekoliko minuta."
   },
   "team": {
     "us": "Mi",
@@ -23,7 +24,7 @@
     "leaderboard": "Ljestvica",
     "profile": "Profil",
     "rules": "Pravila",
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "logout": "Odjavi se",
     "signedInAs": "Prijavljen kao",
     "menu": "Izbornik",
@@ -628,17 +629,19 @@
     "reinviteSent": "Poziv je poslan igraču {{username}}."
   },
   "legal": {
-    "wipBadge": "U izradi",
-    "back": "Natrag",
+    "eyebrow": "Pravne informacije",
+    "languageNote": "Ovaj je dokument dostupan na engleskom i makedonskom jeziku.",
+    "switchLabel": "Jezik dokumenta",
+    "loading": "Učitavanje dokumenta…",
+    "unavailable": {
+      "title": "Dokument trenutačno nije dostupan.",
+      "contact": "Pokušaj ponovno kasnije ili nam piši na"
+    },
     "terms": {
-      "title": "Uvjeti korištenja",
-      "wipNotice": "Ovo je aplikacija u izradi koja se koristi samo za testiranje.",
-      "comingSoon": "Puni Uvjeti korištenja se pripremaju i bit će objavljeni ovdje uskoro."
+      "title": "Uvjeti korištenja"
     },
     "privacy": {
-      "title": "Pravila privatnosti",
-      "wipNotice": "Ovo je aplikacija u izradi koja se koristi samo za testiranje.",
-      "comingSoon": "Puna Pravila privatnosti se pripremaju i bit će objavljena ovdje uskoro."
+      "title": "Pravila privatnosti"
     }
   },
   "lobby": {
@@ -1160,7 +1163,7 @@
         "loginFailed": "Prijava nije uspjela. Pokušaj ponovno."
       },
       "eyebrow": "Dobrodošao natrag",
-      "altPrompt": "Nov si na Beljotu?",
+      "altPrompt": "Nov si na Beljot.online?",
       "altCta": "Stvori račun",
       "forgotLink": "Zaboravljena?"
     },
@@ -1175,9 +1178,9 @@
       "submitButton": "Stvori račun",
       "submitting": "Stvaranje…",
       "consent": {
-        "prefix": "Prihvaćam ",
+        "prefix": "Imam najmanje 16 godina, prihvaćam ",
         "termsLink": "Uvjete korištenja",
-        "and": " i ",
+        "and": " i pročitao/la sam ",
         "privacyLink": "Pravila privatnosti",
         "suffix": "."
       },
@@ -1193,7 +1196,7 @@
         "passwordRequired": "Lozinka je obavezna",
         "passwordTooShort": "Lozinka mora imati najmanje 8 znakova",
         "passwordTooLong": "Lozinka može imati najviše 72 znaka",
-        "consentRequired": "Moraš prihvatiti Uvjete korištenja i Pravila privatnosti",
+        "consentRequired": "Potvrdi da imaš najmanje 16 godina, da prihvaćaš Uvjete korištenja i da si pročitao/la Pravila privatnosti",
         "registrationFailed": "Stvaranje računa nije uspjelo. Pokušaj ponovno."
       },
       "eyebrow": "Privuci stolac",
@@ -1203,9 +1206,9 @@
     "sso": {
       "divider": "ili",
       "consent": {
-        "prefix": "Nastavkom s Google računom prihvaćaš ",
+        "prefix": "Nastavkom s Google računom potvrđuješ da imaš najmanje 16 godina, da prihvaćaš ",
         "termsLink": "Uvjete korištenja",
-        "and": " i ",
+        "and": " i da si pročitao/la ",
         "privacyLink": "Pravila privatnosti",
         "suffix": "."
       },
@@ -1534,7 +1537,8 @@
       "signIn": "Prijava",
       "game": "Igra",
       "sound": "Zvuk",
-      "privacy": "Privatnost"
+      "privacy": "Privatnost",
+      "danger": "Opasna zona"
     },
     "password": {
       "label": "Lozinka",
@@ -1549,6 +1553,37 @@
     "theme": {
       "label": "Mjedena tema",
       "hint": "Tamna čoha i mjed na svim stranicama izvan meča."
+    },
+    "deleteAccount": {
+      "label": "Brisanje računa",
+      "hint": "Trajno obriši račun i osobne podatke.",
+      "open": "Obriši račun",
+      "deletedToast": "Račun je obrisan.",
+      "dialog": {
+        "title": "Obrisati račun?",
+        "description": "Tvoj račun i osobni podaci bit će obrisani.",
+        "lostTitle": "Što se briše",
+        "lost": {
+          "account": "Račun, e-pošta i načini prijave",
+          "profile": "Profil: korisničko ime, razina, novčići i čast",
+          "friends": "Prijatelji i zahtjevi za prijateljstvo",
+          "seasons": "Plasmani u sezonama",
+          "avatar": "Profilna slika"
+        },
+        "kept": "Rezultati mečeva ostaju ostalim igračima, bez tvog imena.",
+        "permanent": "Ovo je trajno i ne može se poništiti.",
+        "passwordLabel": "Upiši lozinku za potvrdu",
+        "usernameLabel": "Upiši korisničko ime „{{username}}“ za potvrdu",
+        "confirm": "Obriši zauvijek",
+        "submitting": "Brišem…",
+        "cancel": "Odustani"
+      },
+      "errors": {
+        "inRoom": "Najprije izađi iz sobe ili meča, pa pokušaj ponovno.",
+        "wrongPassword": "Lozinka nije točna.",
+        "wrongUsername": "To nije tvoje korisničko ime.",
+        "failed": "Račun nije obrisan. Pokušaj ponovno."
+      }
     }
   },
   "meta": {

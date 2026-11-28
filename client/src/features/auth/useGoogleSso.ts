@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { reconcileLanguagePreference } from "@/features/auth/reconcileLanguage";
-import { FetchError } from "@/shared/api/axiosClient";
+import { FetchError, isRateLimited } from "@/shared/api/axiosClient";
 import { useSSOLinkMutation, useSSOLoginMutation } from "@/shared/hooks/mutations/useAuth";
 import { decodeCredentialEmail } from "@/shared/lib/googleIdentity";
 import { reconcileThemePreference } from "@/shared/lib/themePreference";
@@ -60,7 +60,9 @@ export function useGoogleSso(): UseGoogleSsoResult {
         toast.error(t("auth.sso.errors.emailUnverified"));
         return;
       }
-      toast.error(t("auth.sso.errors.ssoFailed"));
+      toast.error(
+        isRateLimited(err) ? t("common.tooManyAttempts") : t("auth.sso.errors.ssoFailed"),
+      );
     } finally {
       inFlightRef.current = false;
     }
@@ -84,6 +86,10 @@ export function useGoogleSso(): UseGoogleSsoResult {
     } catch (err) {
       if (err instanceof FetchError && err.code === "INVALID_CREDENTIALS") {
         setLinkErrorKey("auth.sso.linkDialog.errors.wrongPassword");
+        return;
+      }
+      if (isRateLimited(err)) {
+        setLinkErrorKey("common.tooManyAttempts");
         return;
       }
       setLinkCredential(null);

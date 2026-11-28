@@ -27,25 +27,25 @@ describe("i18n", () => {
   });
 
   it("returns English translation by default", () => {
-    expect(i18n.t("common.appName")).toBe("Beljot");
+    expect(i18n.t("common.appName")).toBe("Beljot.online");
   });
 
   it("returns Serbian when language is sr", async () => {
     await i18n.changeLanguage("sr");
-    expect(i18n.t("common.appName")).toBe("Beljot");
+    expect(i18n.t("common.appName")).toBe("Beljot.online");
     expect(i18n.t("nav.play")).toBe("Igraj");
     expect(i18n.t("chat.title")).toBe("Lobi chat");
   });
 
   it("returns Macedonian when language is mk", async () => {
     await i18n.changeLanguage("mk");
-    expect(i18n.t("common.appName")).toBe("Beljot");
+    expect(i18n.t("common.appName")).toBe("Beljot.online");
     expect(i18n.t("nav.play")).toBe("Играј");
   });
 
   it("returns Croatian when language is hr", async () => {
     await i18n.changeLanguage("hr");
-    expect(i18n.t("common.appName")).toBe("Beljot");
+    expect(i18n.t("common.appName")).toBe("Beljot.online");
     expect(i18n.t("nav.play")).toBe("Igraj");
     expect(i18n.t("chat.title")).toBe("Chat lobija");
   });

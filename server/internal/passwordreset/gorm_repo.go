@@ -51,3 +51,12 @@ func (r *GormRepository) MarkUsed(id uint) (bool, error) {
 func (r *GormRepository) DeleteByUserID(userID uint) error {
 	return r.db.Where("user_id = ?", userID).Delete(&PasswordResetToken{}).Error
 }
+
+const ExpiredRetention = 24 * time.Hour
+
+// PurgeStale deletes used reset tokens and unused ones that expired over ExpiredRetention ago.
+func (r *GormRepository) PurgeStale(now time.Time) (int64, error) {
+	res := r.db.Where("used_at IS NOT NULL OR expires_at < ?", now.Add(-ExpiredRetention)).
+		Delete(&PasswordResetToken{})
+	return res.RowsAffected, res.Error
+}

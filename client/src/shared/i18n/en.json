@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "close": "Close",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
@@ -10,7 +10,8 @@
       "backToLobby": "Back to lobby"
     },
     "done": "Done",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "tooManyAttempts": "Too many attempts. Try again in a few minutes."
   },
   "team": {
     "us": "Us",
@@ -23,7 +24,7 @@
     "leaderboard": "Leaderboard",
     "profile": "Profile",
     "rules": "Rules",
-    "appName": "Beljot",
+    "appName": "Beljot.online",
     "logout": "Log out",
     "signedInAs": "Signed in as",
     "menu": "Menu",
@@ -628,17 +629,19 @@
     "reinviteSent": "Invite sent to {{username}}."
   },
   "legal": {
-    "wipBadge": "Work in progress",
-    "back": "Back",
+    "eyebrow": "Legal",
+    "languageNote": "This document is available in English and Macedonian.",
+    "switchLabel": "Document language",
+    "loading": "Loading document…",
+    "unavailable": {
+      "title": "This document is temporarily unavailable.",
+      "contact": "Try again later, or email us at"
+    },
     "terms": {
-      "title": "Terms of Service",
-      "wipNotice": "This is a work-in-progress application used for testing purposes only.",
-      "comingSoon": "The full Terms of Service are being drafted and will be published here soon."
+      "title": "Terms of Service"
     },
     "privacy": {
-      "title": "Privacy Policy",
-      "wipNotice": "This is a work-in-progress application used for testing purposes only.",
-      "comingSoon": "The full Privacy Policy is being drafted and will be published here soon."
+      "title": "Privacy Policy"
     }
   },
   "lobby": {
@@ -1160,7 +1163,7 @@
         "loginFailed": "Couldn't log in. Try again."
       },
       "eyebrow": "Welcome back",
-      "altPrompt": "New to Beljot?",
+      "altPrompt": "New to Beljot.online?",
       "altCta": "Create an account",
       "forgotLink": "Forgot?"
     },
@@ -1175,9 +1178,9 @@
       "submitButton": "Create account",
       "submitting": "Creating…",
       "consent": {
-        "prefix": "I agree to the ",
+        "prefix": "I am 16 or older, I agree to the ",
         "termsLink": "Terms of Service",
-        "and": " and ",
+        "and": " and I have read the ",
         "privacyLink": "Privacy Policy",
         "suffix": "."
       },
@@ -1193,7 +1196,7 @@
         "passwordRequired": "Password is required",
         "passwordTooShort": "Password must be at least 8 characters",
         "passwordTooLong": "Password must be at most 72 characters",
-        "consentRequired": "You must accept the Terms of Service and Privacy Policy",
+        "consentRequired": "Confirm you are 16 or older, accept the Terms of Service and have read the Privacy Policy",
         "registrationFailed": "Couldn't create your account. Try again."
       },
       "eyebrow": "Pull up a chair",
@@ -1203,9 +1206,9 @@
     "sso": {
       "divider": "or",
       "consent": {
-        "prefix": "By continuing with Google, you agree to the ",
+        "prefix": "By continuing with Google, you confirm you are 16 or older, agree to the ",
         "termsLink": "Terms of Service",
-        "and": " and ",
+        "and": " and have read the ",
         "privacyLink": "Privacy Policy",
         "suffix": "."
       },
@@ -1285,9 +1288,9 @@
       "eyebrow": "2 v 2 · Free",
       "title": "Deal me",
       "titleAccent": "in.",
-      "subtitle": "Beljot for four, in your browser. Play with friends, strangers or bots.",
+      "subtitle": "Belot for four, in your browser. Play with friends, strangers or bots.",
       "cta": "Create free account",
-      "tableAlt": "A Beljot match in play",
+      "tableAlt": "A Belot match in play",
       "phoneAlt": "The same table on a phone, Croatian deck"
     },
     "facts": {
@@ -1534,7 +1537,8 @@
       "signIn": "Sign-in",
       "game": "Game",
       "sound": "Sound",
-      "privacy": "Privacy"
+      "privacy": "Privacy",
+      "danger": "Danger zone"
     },
     "password": {
       "label": "Password",
@@ -1549,6 +1553,37 @@
     "theme": {
       "label": "Brass mode",
       "hint": "Dark felt and brass on every page outside a match."
+    },
+    "deleteAccount": {
+      "label": "Delete account",
+      "hint": "Permanently erase your account and personal data.",
+      "open": "Delete account",
+      "deletedToast": "Your account has been deleted.",
+      "dialog": {
+        "title": "Delete your account?",
+        "description": "Your account and personal data will be erased.",
+        "lostTitle": "What gets deleted",
+        "lost": {
+          "account": "Your account, email and sign-in methods",
+          "profile": "Your profile: username, level, coins and honor",
+          "friends": "Your friends and friend requests",
+          "seasons": "Your season standings",
+          "avatar": "Your profile picture"
+        },
+        "kept": "Match results stay for the other players, without your name.",
+        "permanent": "This is permanent and cannot be undone.",
+        "passwordLabel": "Enter your password to confirm",
+        "usernameLabel": "Type your username \"{{username}}\" to confirm",
+        "confirm": "Delete forever",
+        "submitting": "Deleting…",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "inRoom": "Leave your room or match first, then try again.",
+        "wrongPassword": "That password is not correct.",
+        "wrongUsername": "That is not your username.",
+        "failed": "The account could not be deleted. Try again."
+      }
     }
   },
   "meta": {

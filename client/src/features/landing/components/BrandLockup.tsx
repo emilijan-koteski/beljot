@@ -23,7 +23,7 @@ export function BrandLockup({
   return (
     <Link
       to={to}
-      aria-label="Beljot"
+      aria-label="Beljot.online"
       className={cn(
         "flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:ring-ring/70 focus-visible:outline-none focus-visible:ring-3",
         className,
@@ -37,7 +37,7 @@ export function BrandLockup({
         style={{ width: size, height: size }}
       />
       <span className="text-ink inline-flex">
-        <span className="sr-only">Beljot{showSuffix ? ".online" : ""}</span>
+        <span className="sr-only">Beljot.online</span>
         <BrandWordmark
           height={Math.round(wordmarkSize * WORDMARK_PER_FONT_SIZE)}
           suffix={showSuffix}

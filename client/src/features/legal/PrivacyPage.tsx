@@ -1,36 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
 
-import { usePageMeta } from "@/shared/hooks/usePageMeta";
+import { LegalPage } from "@/features/legal/LegalPage";
 
+/** The Privacy Policy, in Macedonian for mk readers and in English for everyone else. */
 export function PrivacyPage() {
   const { t } = useTranslation();
-  usePageMeta(t("legal.privacy.title"));
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-150 rounded-xl bg-surface p-8">
-        <h1 className="mb-3 text-2xl font-bold text-ink tracking-tight" data-testid="privacy-title">
-          {t("legal.privacy.title")}
-        </h1>
-        <p className="mb-2 text-sm uppercase text-accent" data-testid="privacy-wip-badge">
-          {t("legal.wipBadge")}
-        </p>
-        <p className="mb-3 text-ink-dim" data-testid="privacy-wip-notice">
-          {t("legal.privacy.wipNotice")}
-        </p>
-        <p className="mb-6 text-ink-dim">{t("legal.privacy.comingSoon")}</p>
-
-        <div className="flex justify-end">
-          <Link
-            to="/"
-            className="text-sm text-accent underline-offset-2 hover:underline"
-            data-testid="privacy-back-link"
-          >
-            {t("legal.back")}
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  return <LegalPage title={t("legal.privacy.title")} doc="privacy" testIdPrefix="privacy" />;
 }

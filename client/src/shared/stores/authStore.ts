@@ -15,6 +15,7 @@ interface AuthState {
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
+  endSession: () => void;
 }
 
 /**
@@ -42,6 +43,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (get().token) {
       logoutApi();
     }
+    get().endSession();
+  },
+  endSession: () => {
     clearSessionStores();
     set({ token: null, user: null, isLoading: false });
   },

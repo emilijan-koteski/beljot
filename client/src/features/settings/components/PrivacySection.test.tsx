@@ -1,7 +1,8 @@
 import "@/shared/i18n/i18n";
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetInvitePreferenceRequestSequence } from "@/shared/lib/invitePreference";
@@ -19,6 +20,14 @@ vi.mock("@/shared/api/auth", () => ({
   logout: vi.fn(),
 }));
 
+function renderSection() {
+  return render(
+    <MemoryRouter>
+      <PrivacySection />
+    </MemoryRouter>,
+  );
+}
+
 describe("PrivacySection", () => {
   beforeEach(() => {
     mockUpdatePreferences.mockReset();
@@ -33,7 +42,7 @@ describe("PrivacySection", () => {
 
   it("shows the switch in the stored state, labelled by its row", () => {
     useAuthStore.setState({ user: makeUser({ id: 7, allowNonFriendInvites: false }) });
-    render(<PrivacySection />);
+    renderSection();
 
     expect(screen.getByTestId("profile-invites")).toHaveTextContent("Privacy");
     const toggle = screen.getByRole("switch", { name: "Invites from non-friends" });
@@ -45,7 +54,7 @@ describe("PrivacySection", () => {
     useAuthStore.setState({
       user: { ...makeUser({ id: 7 }), allowNonFriendInvites: undefined as never },
     });
-    render(<PrivacySection />);
+    renderSection();
 
     expect(screen.getByTestId("profile-allow-non-friend-invites")).toHaveAttribute(
       "aria-checked",
@@ -55,7 +64,7 @@ describe("PrivacySection", () => {
 
   it("turns the switch off optimistically and PATCHes only its own field", async () => {
     const user = userEvent.setup();
-    render(<PrivacySection />);
+    renderSection();
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
 
@@ -70,7 +79,7 @@ describe("PrivacySection", () => {
 
   it("toggles from its row label too", async () => {
     const user = userEvent.setup();
-    render(<PrivacySection />);
+    renderSection();
 
     await user.click(screen.getByText("Invites from non-friends"));
 
@@ -80,7 +89,7 @@ describe("PrivacySection", () => {
   it("reverts the switch when the PATCH fails", async () => {
     const user = userEvent.setup();
     mockUpdatePreferences.mockRejectedValueOnce(new Error("offline"));
-    render(<PrivacySection />);
+    renderSection();
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
 
@@ -102,7 +111,7 @@ describe("PrivacySection", () => {
           rejectFirst = reject;
         }),
     );
-    render(<PrivacySection />);
+    renderSection();
 
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
     await user.click(screen.getByTestId("profile-allow-non-friend-invites"));
@@ -122,7 +131,7 @@ describe("PrivacySection", () => {
           rejectFirst = reject;
         }),
     );
-    render(<PrivacySection />);
+    renderSection();
     const toggle = screen.getByTestId("profile-allow-non-friend-invites");
 
     await user.click(toggle);
@@ -134,5 +143,30 @@ describe("PrivacySection", () => {
 
     expect(useAuthStore.getState().user?.allowNonFriendInvites).toBe(false);
     expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("links to the Privacy Policy and the Terms of Service", () => {
+    renderSection();
+
+    const links = screen.getByTestId("settings-legal-links");
+    expect(within(links).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+    expect(within(links).getByRole("link", { name: "Terms of Service" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+  });
+
+  it("opens the legal pages in a new tab", () => {
+    renderSection();
+
+    const links = within(screen.getByTestId("settings-legal-links")).getAllByRole("link");
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
   });
 });

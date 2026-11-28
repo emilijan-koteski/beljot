@@ -38,6 +38,7 @@ var (
 	ErrUsernameTooLong      = NewAppError("USERNAME_TOO_LONG", "username must be at most 20 characters", http.StatusBadRequest)
 	ErrUsernameInvalidChars = NewAppError("USERNAME_INVALID_CHARS", "username can only contain letters, numbers, and underscores", http.StatusBadRequest)
 	ErrInvalidResetToken    = NewAppError("INVALID_RESET_TOKEN", "reset link is invalid or has expired", http.StatusBadRequest)
+	ErrTooManyAttempts      = NewAppError("TOO_MANY_ATTEMPTS", "too many attempts, try again later", http.StatusTooManyRequests)
 
 	ErrSSOInvalidCredential = NewAppError("SSO_INVALID_CREDENTIAL", "sign-in credential is invalid or expired", http.StatusUnauthorized)
 	ErrSSOLinkRequired      = NewAppError("SSO_LINK_REQUIRED", "an account with this email already exists — confirm its password to link", http.StatusConflict)
@@ -53,6 +54,9 @@ var (
 	ErrInvalidTheme          = NewAppError("INVALID_THEME", "theme must be one of: parchment, brass", http.StatusBadRequest)
 	ErrUsernameUnchanged     = NewAppError("USERNAME_UNCHANGED", "new username is the same as the current one", http.StatusBadRequest)
 	ErrUsernameChangeTooSoon = NewAppError("USERNAME_CHANGE_TOO_SOON", "username was changed too recently", http.StatusTooManyRequests)
+
+	ErrAccountDeleteConfirmation = NewAppError("ACCOUNT_DELETE_CONFIRMATION_MISMATCH", "the password or username does not match this account", http.StatusBadRequest)
+	ErrAccountDeleteInRoom       = NewAppError("ACCOUNT_DELETE_IN_ROOM", "leave your room or match before deleting your account", http.StatusConflict)
 
 	ErrAvatarMissing            = NewAppError("AVATAR_MISSING", "the request has no avatar file", http.StatusBadRequest)
 	ErrAvatarTooSmall           = NewAppError("AVATAR_TOO_SMALL", "the image must be at least 128 pixels on its shorter side", http.StatusBadRequest)
