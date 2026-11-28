@@ -280,7 +280,7 @@ Implement it as a version-controlled script (`server/scripts/erase_user.sql` or 
 2. Is the old Contabo VPS decommissioned, with its snapshot and `/var/backups/beljot` deleted? Are any local production dumps still kept?
 3. Nightly backup job: storage path, retention, encryption, off-site copy? Is Garage backed up?
 4. SMTP: consumer @gmail.com or Google Workspace? Which From address? Is the Sent folder kept?
-5. Is `ytbk awjy liwm pyzm` (`server/internal/config/config_test.go:18`) now, or was it ever, a real App password?
+5. Is the App-password-shaped test string (`server/internal/config/config_test.go:18`) now, or was it ever, a real App password?
 6. Cloudflare: which plan? Are Web Analytics/RUM, Bot Fight Mode or Logpush on? Is `storage.monexa.world` proxied?
 7. Docker log rotation in `/etc/docker/daemon.json`? Traefik access log in Dokploy? Is Dozzle behind authentication?
 8. Proton plan for the contact address: personal or business?
@@ -339,7 +339,7 @@ Severity is after verification. Source IDs from the scanner reports are in brack
 ### WARNING
 
 **G-04 A Gmail App password-shaped string in a public repo.** Art. 32. [I-10, X-11]
-- Evidence: `server/internal/config/config_test.go:18`: `"ytbk awjy liwm pyzm"`, added in `b82c9f6f`. The GitHub repo is PUBLIC.
+- Evidence: `server/internal/config/config_test.go:18`: an App-password-shaped string, added in `b82c9f6f`. The GitHub repo is PUBLIC.
 - Fix: if it is or was real, **revoke it in the Google account now**; removing it from the code does not remove it from history. Replace the fixture with an obviously fake value.
 - **Closed 2026-11-27: FALSE POSITIVE.** The owner confirmed it is not a real password. Optional: swap it for an obviously fake value such as `abcd efgh ijkl mnop` so future secret scans don't flag it again.
 
@@ -474,7 +474,7 @@ Every owner question is answered. These are the closures in order. "Policy" mean
 |---|---|
 | Set up Resend for `beljot.online` (EU region): add its DNS records in Cloudflare, set `BELJOT_SMTP_HOST=smtp.resend.com`, `PORT=587`, `USERNAME=resend`, `PASSWORD=<API key>` and the From address in Dokploy, then test a password reset. Afterwards revoke the Gmail App password and delete the reset emails from Sent. | G-08 |
 
-### PR 1: client privacy (`fix/client-privacy`): DONE 2026-11-28 (`1c0d43ad`)
+### PR 1: client privacy (`fix/client-privacy`): DONE 2026-11-28 (`b97ecd62`)
 
 | Change | Closes |
 |---|---|
@@ -503,7 +503,22 @@ Implemented:
 | Daily purge of old refresh and reset tokens | G-14 |
 | Google sign-up gets a generated username (e.g. `player_4821`) instead of the real name; the first rename stays free | G-11 |
 
-### PR 3: logging and hardening (`fix/logging-hardening`)
+### PR 3: logging and hardening: DONE 2026-11-28 (`b5f76483`)
+
+Also found and fixed:
+- go-mail error text echoed the recipient address; it is now masked in `mailer/smtp.go`.
+- The whisper lookup error logged the target username.
+
+Limits:
+
+| Endpoints | Limit |
+|---|---|
+| login, register, SSO | 10 per minute per IP |
+| forgot-password, reset-password | 5 per 15 minutes |
+| refresh | 60 per minute |
+| delete account | 5 per 15 minutes per user |
+
+The IP comes from the Cloudflare-aware extractor; the owner confirmed that Traefik forwards the real client IP.
 
 | Change | Closes |
 |---|---|
@@ -513,7 +528,12 @@ Implemented:
 | Rate limit on the auth endpoints | G-20 |
 | Dummy bcrypt compare for unknown emails | G-24 |
 
-### PR 4: repo hygiene (`chore/remove-real-player-data`)
+### PR 4: repo hygiene: DONE 2026-11-28
+
+- Real usernames and their ranking history in `_bmad-output` were replaced with placeholders: 6 files, including a mockup and a translation note.
+- The fixture is now `abcd efgh ijkl mnop`.
+- Test fixtures that use the bare name `kiro` with example.com emails carry no real data and are left as is.
+- `docs/brand/source/landing.mjs` names real players for the landing screenshots with made-up stats; the owner decides (G-05).
 
 | Change | Closes |
 |---|---|
