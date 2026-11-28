@@ -15,7 +15,7 @@ func TestStripWhitespace(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"gmail app password with spaces", "ytbk awjy liwm pyzm", "ytbkawjyliwmpyzm"},
+		{"app password with spaces", "abcd efgh ijkl mnop", "abcdefghijklmnop"},
 		{"already clean", "abcd1234", "abcd1234"},
 		{"tabs and newlines", "ab\tcd\nef ", "abcdef"},
 		{"empty", "", ""},

@@ -76,7 +76,7 @@ Hand reference: H = hearts (led, non-trump), D = diamonds (trump). Trick sequenc
 
 **Acceptance Criteria:**
 
-- Given the scenario in the attached image (kiro holds `[8H, AH, KC, AC]`, trick is `[(prev, KH)]`, trump is diamonds), when computing legal cards for kiro, then only `AH` is returned (server and client agree).
+- Given the scenario in the attached image (player A holds `[8H, AH, KC, AC]`, trick is `[(prev, KH)]`, trump is diamonds), when computing legal cards for player A, then only `AH` is returned (server and client agree).
 - Given a player holds `[7H, 8H]` and the trick is `[(prev, KH)]` with trump diamonds, when computing legal cards, then both `7H` and `8H` are legal (rule 2 — no higher led-suit available).
 - Given the same trump-led over-trump scenarios that pass today, when running the existing test suite, then all current trump tests continue to pass without modification.
 - Given the server rejects an illegal card play via `handlePlayCard`, when a client attempts to play `8H` in the matrix's first scenario, then the server returns the existing illegal-play error and the card is not played.

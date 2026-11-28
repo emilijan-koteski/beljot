@@ -31,7 +31,7 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/spec-13-4-compet
 
 | Scenario | Input / State | Expected |
 |---|---|---|
-| Regular | kiro's Q3 matches (dump of 2026-09-26) | row sp 534, silver, division 3, as the approved replay |
+| Regular | one player's Q3 matches (dump of 2026-09-26) | row sp 534, silver, division 3, as the approved replay |
 | Pre-tracking player | only played before 2026-08-27, no Q3 row | row created with the replay's result |
 | Old write before recalc | an old-formula award lands between migrate and start | overwritten by the replay |
 | Abandoner | a Q3 abandonment | −120 applied in order; `games_completed` excludes it |
@@ -93,4 +93,4 @@ Pass 1 (2026-09-26): blind-hunter (B), edge-case-hunter (E), verification-gap (V
 | E2 | More than 65535 bind parameters | false | Q3 has ~900 matches and 25 players | reject |
 | E4 | `completed_at` vs the finalizer's stamp at a quarter boundary | false | Live SP began 2026-08-27, so no Q2/Q3 boundary match was ever awarded | reject |
 | E5 | One user id in two seats | false | Unreachable: a user holds one seat | reject |
-- **Production-copy rehearsal (orchestrator, 2026-09-26).** `beljot_q3_recalc` (copy of the 2026-09-26 dump) migrated 26 → 29; the real api binary started against it with the job pending: `season recalculation: done`, 25 players rewritten, 909 loaded / 908 scored / 1 placeholder skipped, logged before `starting server`. All 25 Q3 rows equal the approved replay table on SP, tier and division (e.g. kiro 30841 grandmaster → 534 silver 3; emilijan 13433 master → 407 silver 2; Cece 8634 diamond → 686 gold 2); the 9 pre-tracking players got rows; the job is stamped done. A second start skipped the job and left every row unchanged.
+- **Production-copy rehearsal (orchestrator, 2026-09-26).** `beljot_q3_recalc` (copy of the 2026-09-26 dump) migrated 26 → 29; the real api binary started against it with the job pending: `season recalculation: done`, 25 players rewritten, 909 loaded / 908 scored / 1 placeholder skipped, logged before `starting server`. All 25 Q3 rows equal the approved replay table on SP, tier and division (e.g. player A grandmaster → silver 3; player B master → silver 2; player C diamond → gold 2); the 9 pre-tracking players got rows; the job is stamped done. A second start skipped the job and left every row unchanged.

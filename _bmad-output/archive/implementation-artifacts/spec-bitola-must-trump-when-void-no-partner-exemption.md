@@ -79,7 +79,7 @@ Hand reference: H = hearts (trump in scenarios 1 + 3, also a trump suit in scena
 
 **Acceptance Criteria:**
 
-- Given the img_two scenario (kiro is seat 0, void in clubs, hand contains `[9H, TH, 8D, TD, JD, QD, AD]`, trick = `[9C, QH, 7C]` from opponents and partner, trump = hearts), when computing legal cards for seat 0, then the result is `[9H, TH]` (server and client agree). The diamonds and lower hearts are excluded.
+- Given the img_two scenario (player A is seat 0, void in clubs, hand contains `[9H, TH, 8D, TD, JD, QD, AD]`, trick = `[9C, QH, 7C]` from opponents and partner, trump = hearts), when computing legal cards for seat 0, then the result is `[9H, TH]` (server and client agree). The diamonds and lower hearts are excluded.
 - Given the img_three scenario (emilijan is void in clubs, hand `[8S, JD, KD]`, trump = spades, trick = `[9C, TC, AC]` with partner winning), when computing legal cards, then the result is `[8S]` only.
 - Given the img_four scenario (void in led non-trump, no trump on table yet, multiple trumps in hand), when computing legal cards, then the result is exactly the set of trumps in hand.
 - Given the regression scenario where the player has led-suit cards, when computing legal cards, then the existing led-suit overplay rule is preserved (the prior spec's behavior).
